@@ -98,7 +98,8 @@ Supabase projesi: `updated-panel` (organizasyon: Updated, bölge: Frankfurt).
 | `week_notes` | Kullanılmıyor (gün notuna geçildi), kaldırılabilir |
 
 Sunucu işleri:
-- `notify-email` (Edge Function): yeni bildirimleri e-posta olarak gönderir. Şu an gönderen Enes'in Gmail'i (uygulama şifresi Supabase Secrets'ta).
+- `notify-email` (Edge Function): yeni bildirimleri e-posta olarak gönderir, e-postadaki link Stüdyo'yu gösterir. Gönderen adres (`MAIL_FROM`) ve şifre (`GMAIL_APP_PASSWORD`) Supabase Secrets'ta; şu an Enes'in Gmail'i.
+- Giriş ayarları: Site URL Stüdyo'nun adresi; izinli yönlendirmeler Stüdyo ve eski ekip paneli.
 - Zamanlanmış: pazartesi 09:00 müsaitlik hatırlatması, her gün 09:05 yaklaşan etkinlik bildirimi.
 
 Yeni modüller tablolarını bu modele ekler; aynı kişi bilgisi için ikinci bir tablo açılmaz, `profiles` kullanılır.
@@ -173,4 +174,5 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** iPhone uygulaması Apple hesabı kararına kadar ertelendi; kod tarafında iPhone'a hazır kurulacak.
 - **12 Ekim 2026:** İç araçlar WordPress sitesinin içine gömülmeyecek; alt adres kullanılacak.
 - **12 Ekim 2026:** Kod `updated-studio/studio` deposunda (GitHub organizasyonu). Depo şimdilik açık; yayın GitHub Pages, otomatik (`.github/workflows/yayin.yml`).
+- **12 Ekim 2026:** Kayıt onayı / şifre sıfırlama bağlantıları ve e-posta linkleri Stüdyo'ya yönlendirildi; e-posta fonksiyonu depodaki sürüme güncellendi.
 - **12 Ekim 2026:** Ekip ve Takvim modülleri Stüdyo'ya taşındı. Ortak canlı veri `src/shared/veri.tsx`; yeni sürüm uyarısı `src/shared/SurumUyarisi.tsx`.
