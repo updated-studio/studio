@@ -1,0 +1,101 @@
+-- Haber Masası başlangıç verisi: eski "Updated Triyaj" tablosundaki kaynaklar ve Türkiye pazarı markaları.
+insert into public.tr_sources (category, name, url, active) values
+  ('Telefon ve Mobil', 'GSMArena', 'https://www.gsmarena.com/rss-news-reviews.php3', true),
+  ('Telefon ve Mobil', '9to5Google', 'https://9to5google.com/feed/', true),
+  ('Telefon ve Mobil', 'SamMobile', 'https://www.sammobile.com/feed/', true),
+  ('Telefon ve Mobil', 'Android Authority', 'https://www.androidauthority.com/feed/', true),
+  ('Telefon ve Mobil', 'Android Central', 'https://www.androidcentral.com/feed', true),
+  ('Telefon ve Mobil', 'Android Police', 'https://www.androidpolice.com/feed/', true),
+  ('Telefon ve Mobil', 'XDA', 'https://www.xda-developers.com/feed/', true),
+  ('Apple', '9to5Mac', 'https://9to5mac.com/feed/', true),
+  ('Apple', 'MacRumors', 'https://feeds.macrumors.com/MacRumors-All', true),
+  ('Genel Teknoloji', 'The Verge', 'https://www.theverge.com/rss/index.xml', true),
+  ('Genel Teknoloji', 'TechCrunch', 'https://techcrunch.com/feed/', true),
+  ('Genel Teknoloji', 'Engadget', 'https://www.engadget.com/rss.xml', true),
+  ('Genel Teknoloji', 'Ars Technica', 'https://feeds.arstechnica.com/arstechnica/index', true),
+  ('Genel Teknoloji', 'TechRadar', 'https://www.techradar.com/feeds/articletype/news', true),
+  ('Genel Teknoloji', 'The Next Web', 'https://thenextweb.com/feed', true),
+  ('Genel Teknoloji', 'Techmeme', 'https://www.techmeme.com/feed.xml', true),
+  ('Genel Teknoloji', 'WIRED', 'https://www.wired.com/feed/rss', true),
+  ('Genel Teknoloji', 'CNET News', 'https://www.cnet.com/rss/news/', true),
+  ('Genel Teknoloji', 'Gizmodo', 'https://gizmodo.com/feed', true),
+  ('Genel Teknoloji', 'Mashable', 'https://mashable.com/feeds/rss/all', true),
+  ('Genel Teknoloji', 'GeekWire', 'https://www.geekwire.com/feed/', true),
+  ('Genel Teknoloji', 'The Information', 'https://www.theinformation.com/feed', true),
+  ('Genel Teknoloji', 'Slashdot', 'http://rss.slashdot.org/Slashdot/slashdotMain', true),
+  ('Donanım', 'Tom''s Hardware', 'https://www.tomshardware.com/feeds/all', true),
+  ('Donanım', 'Notebookcheck', 'https://www.notebookcheck.net/RSS-Feed-Notebook-Reviews.8156.0.html', true),
+  ('Donanım', 'WCCFtech', 'https://wccftech.com/feed/', true),
+  ('Kamera ve Video', 'DPReview', 'https://www.dpreview.com/feeds/news.xml', true),
+  ('Kamera ve Video', 'Sony Alpha Rumors', 'https://www.sonyalpharumors.com/feed/', true),
+  ('Kamera ve Video', 'CineD', 'https://www.cined.com/feed/', true),
+  ('Kamera ve Video', 'PetaPixel', 'https://petapixel.com/feed/', true),
+  ('Kamera ve Video', 'Canon Rumors', 'https://www.canonrumors.com/feed/', true),
+  ('Kamera ve Video', 'Nikon Rumors', 'https://nikonrumors.com/feed/', true),
+  ('Kamera ve Video', 'Fstoppers', 'https://fstoppers.com/rss.xml', true),
+  ('Kamera ve Video', 'Photography Life', 'https://photographylife.com/feed', true),
+  ('Kamera ve Video', 'DIY Photography', 'https://www.diyphotography.net/feed/', true),
+  ('Kamera ve Video', 'Digital Photography School', 'https://digital-photography-school.com/feed/', true),
+  ('Kamera ve Video', '500px', 'https://iso.500px.com/feed/', true),
+  ('Kamera ve Video', 'Newsshooter', 'https://www.newsshooter.com/feed/', true),
+  ('Drone', 'DroneDJ', 'https://dronedj.com/feed/', true),
+  ('Elektrikli Araç', 'Electrek', 'https://electrek.co/feed/', true),
+  ('Oyun ve Eğlence', 'GamesRadar', 'https://www.gamesradar.com/rss/', true),
+  ('LEGO ve Oyuncak', 'Brick Fanatics', 'https://www.brickfanatics.com/feed/', true),
+  ('Yapay Zeka', 'MIT Technology Review', 'https://www.technologyreview.com/feed/', true),
+  ('Yapay Zeka', 'Futurism', 'https://futurism.com/feed', true),
+  ('Ev ve Tüketici Elektroniği', 'Stuff', 'https://www.stuff.tv/feed', true),
+  ('Ev ve Tüketici Elektroniği', 'Wirecutter', 'https://www.nytimes.com/wirecutter/rss/', true),
+  ('Ev ve Tüketici Elektroniği', 'Tom''s Guide', 'https://www.tomsguide.com/feeds/all', true),
+  ('Ev ve Tüketici Elektroniği', 'SlashGear', 'https://www.slashgear.com/feed/', true),
+  ('Ev ve Tüketici Elektroniği', 'Ubergizmo', 'https://www.ubergizmo.com/feed/', true),
+  ('Ev ve Tüketici Elektroniği', 'Ars Technica Gear', 'https://feeds.arstechnica.com/arstechnica/gadgets', true),
+  ('Ev ve Tüketici Elektroniği', 'Product Hunt', 'https://www.producthunt.com/feed', true),
+  ('Sektör ve Güvenlik', 'The Register', 'https://www.theregister.com/headlines.atom', true),
+  ('Sektör ve Güvenlik', 'The Hacker News', 'https://feeds.feedburner.com/TheHackersNews', true)
+on conflict (url) do nothing;
+
+insert into public.tr_brands (name, grp, note) values
+  ('Apple', 'Öncelikli', 'Enes'),
+  ('Samsung', 'Öncelikli', 'Enes'),
+  ('Xiaomi', 'Öncelikli', 'Editör isteği'),
+  ('Dyson', 'Öncelikli', 'Enes'),
+  ('Oppo', 'Normal', 'Enes'),
+  ('Pixel', 'Hariç', 'Enes'),
+  ('Huawei', 'Öncelikli', 'Editör isteği'),
+  ('Honor', 'Öncelikli', 'Editör isteği'),
+  ('Realme', 'Normal', 'Öneri, onayla'),
+  ('Lenovo', 'Normal', 'Öneri, onayla'),
+  ('Asus', 'Normal', 'Öneri, onayla'),
+  ('Sony', 'Öncelikli', 'Editör isteği'),
+  ('Microsoft', 'Öncelikli', 'Editör isteği'),
+  ('Nvidia', 'Normal', 'Öneri, onayla'),
+  ('AMD', 'Normal', 'Öneri, onayla'),
+  ('Intel', 'Normal', 'Öneri, onayla'),
+  ('OpenAI', 'Normal', 'Öneri, onayla'),
+  ('DJI', 'Öncelikli', 'Editör isteği'),
+  ('Insta360', 'Öncelikli', 'Editör isteği'),
+  ('Meta', 'Öncelikli', 'Editör isteği'),
+  ('Google', 'Öncelikli', 'Editör isteği'),
+  ('Gemini', 'Öncelikli', 'Editör isteği')
+on conflict (name) do nothing;
+
+insert into public.tr_press (brand, url, note)
+select * from (values
+  ('Apple', 'https://www.apple.com/newsroom/', 'Basın görselleri sayfadan indirilebilir'),
+  ('Samsung', 'https://news.samsung.com/global/', 'Resmi newsroom'),
+  ('Microsoft', 'https://news.microsoft.com/', 'Resmi newsroom'),
+  ('Meta', 'https://about.fb.com/news/', 'Resmi newsroom'),
+  ('NVIDIA', 'https://nvidianews.nvidia.com/', 'Resmi newsroom'),
+  ('Intel', 'https://newsroom.intel.com/', 'Resmi newsroom'),
+  ('OpenAI', 'https://openai.com/news/', 'Resmi haber sayfası'),
+  ('Anthropic', 'https://www.anthropic.com/news', 'Resmi haber sayfası'),
+  ('Google', 'https://blog.google/press/', 'Resmi basın sayfası'),
+  ('Insta360', 'https://www.insta360.com/press', 'Press Hub')
+) v(brand, url, note)
+where not exists (select 1 from public.tr_press);
+
+-- Editör ilgi alanı (eski tablodaki Editörler sekmesinden)
+update public.profiles set interests = 'kamera, gimbal, ışık, drone, video ekipmanı' where name = 'Enes' and interests = '';
+
+select (select count(*) from public.tr_sources) as kaynak, (select count(*) from public.tr_brands) as marka, (select count(*) from public.tr_press) as basin;
