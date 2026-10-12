@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { Ikon } from "../../shared/Ikon";
@@ -9,7 +10,9 @@ import { adOf, IsKarti } from "./ortak";
 type Alt = "havuz" | "talep" | "atanan" | "biten";
 const ALTLAR: [Alt, string][] = [["havuz", "Bekleyen"], ["talep", "Taleplerim"], ["atanan", "Atananlar"], ["biten", "Biten"]];
 
-export default function Isler({ duzenle }: { duzenle: (id: number) => void }) {
+export default function Isler() {
+  const git = useNavigate();
+  const duzenle = (id: number) => git("/yonetim?is=" + id);
   const { veri, yenile } = useVeri();
   const { profile } = useAuth();
   const toast = useToast();

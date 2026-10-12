@@ -1,22 +1,20 @@
-import { useState } from "react";
-import { useAuth } from "../../shared/auth";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useVeri } from "../../shared/veri";
 import EkipmanSayfa from "./EkipmanSayfa";
 import Hafta from "./Hafta";
 import Isler from "./Isler";
 import Uyeler from "./Uyeler";
-import Yonetim from "./Yonetim";
 
-type Bolum = "hafta" | "isler" | "ekipman" | "uyeler" | "yonetim";
+type Bolum = "hafta" | "isler" | "ekipman" | "uyeler";
+const BOLUMLER: [Bolum, string][] = [["hafta", "Bu Hafta"], ["isler", "İşler"], ["ekipman", "Ekipman"], ["uyeler", "Ekip"]];
 
 export default function Ekip() {
-  const { profile } = useAuth();
   const { yukleniyor, hata } = useVeri();
-  const [bolum, setBolum] = useState<Bolum>("hafta");
-  const [duzenlenen, setDuzenlenen] = useState<number | null>(null);
-
-  const bolumler: [Bolum, string][] = [["hafta", "Bu Hafta"], ["isler", "İşler"], ["ekipman", "Ekipman"], ["uyeler", "Ekip"]];
-  if (profile!.is_admin) bolumler.push(["yonetim", "Yönetim"]);
+  const [sp, setSp] = useSearchParams();
+  const ilk = sp.get("b") as Bolum | null;
+  const [bolum, setBolum] = useState<Bolum>(ilk && BOLUMLER.some(([k]) => k === ilk) ? ilk : "hafta");
+  useEffect(() => { if (ilk) setSp({}, { replace: true }); }, [ilk, setSp]);
 
   if (yukleniyor) return <div className="muted">Yükleniyor…</div>;
   if (hata) return <div className="empty">Veri yüklenemedi: {hata}</div>;
@@ -24,13 +22,12 @@ export default function Ekip() {
   return (
     <>
       <div className="segment" role="group">
-        {bolumler.map(([k, l]) => <button key={k} aria-pressed={bolum === k} onClick={() => { setBolum(k); if (k !== "yonetim") setDuzenlenen(null); }}>{l}</button>)}
+        {BOLUMLER.map(([k, l]) => <button key={k} aria-pressed={bolum === k} onClick={() => setBolum(k)}>{l}</button>)}
       </div>
       {bolum === "hafta" && <Hafta />}
-      {bolum === "isler" && <Isler duzenle={(id) => { setDuzenlenen(id); setBolum("yonetim"); }} />}
+      {bolum === "isler" && <Isler />}
       {bolum === "ekipman" && <EkipmanSayfa />}
       {bolum === "uyeler" && <Uyeler />}
-      {bolum === "yonetim" && <Yonetim duzenlenen={duzenlenen} bitti={(isler) => { setDuzenlenen(null); if (isler) setBolum("isler"); }} />}
     </>
   );
 }

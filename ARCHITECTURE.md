@@ -88,7 +88,8 @@ Supabase projesi: `updated-panel` (organizasyon: Updated, bölge: Frankfurt).
 | Tablo | İçerik |
 |---|---|
 | `invites` | Davet listesi. Sadece buradaki e-postalar üye olabilir |
-| `profiles` | Üyeler: ad, rol, çalıştığı yer, yönetici mi, e-posta bildirimi açık mı |
+| `profiles` | Üyeler: ad, rol, çalıştığı yer, yönetici mi, e-posta bildirimi açık mı, profil fotoğrafı (`avatar_url`) |
+| Depolama `avatars` | Profil fotoğrafları, `<kişi id>/…webp`; herkes okur, kişi sadece kendi klasörüne yazar. Tarayıcıda 512 px WebP'ye küçültülür |
 | `availability` | Kişi + gün: boş/dolu, saat, konum, gün notu |
 | `jobs` | İşler: marka, kategori, tür, başlık, son gün, ambargo, durum, üstlenen, devir teklifi |
 | `job_requests` | "Ben alırım" talepleri |
@@ -100,7 +101,7 @@ Supabase projesi: `updated-panel` (organizasyon: Updated, bölge: Frankfurt).
 Sunucu işleri:
 - `notify-email` (Edge Function): yeni bildirimleri e-posta olarak gönderir, e-postadaki link Stüdyo'yu gösterir. Gönderen adres (`MAIL_FROM`) ve şifre (`GMAIL_APP_PASSWORD`) Supabase Secrets'ta; şu an Enes'in Gmail'i.
 - Giriş ayarları: Site URL Stüdyo'nun adresi; izinli yönlendirmeler Stüdyo ve eski ekip paneli.
-- Zamanlanmış: pazartesi 09:00 müsaitlik hatırlatması, her gün 09:05 yaklaşan etkinlik bildirimi.
+- Zamanlanmış: pazar 19:00 gelecek hafta müsaitlik hatırlatması, her gün 09:05 yaklaşan etkinlik bildirimi.
 
 Yeni modüller tablolarını bu modele ekler; aynı kişi bilgisi için ikinci bir tablo açılmaz, `profiles` kullanılır.
 
@@ -163,7 +164,6 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 ### İstek listesi (taşımalar bittikten sonra)
 
 - Triyaj: eski haberlerin otomatik silinmesi (süre ayarlanabilir: birkaç gün / bir hafta). İstek: Enes, 12 Ekim.
-- Müsaitlik hatırlatması: "gelecek hafta" görünümü eklendiği için pazar akşamı gelecek haftayı hatırlatmaya çevrilebilir.
 
 ## 11. Açık kararlar
 
@@ -182,3 +182,5 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** Ana menü telefonda altta, geniş ekranda solda; ekran içi bölümler segmentli seçici. Bu Hafta ekranına "Gelecek hafta" eklendi.
 - **12 Ekim 2026:** Kayıt onayı / şifre sıfırlama bağlantıları ve e-posta linkleri Stüdyo'ya yönlendirildi; e-posta fonksiyonu depodaki sürüme güncellendi.
 - **12 Ekim 2026:** Ekip ve Takvim modülleri Stüdyo'ya taşındı. Ortak canlı veri `src/shared/veri.tsx`; yeni sürüm uyarısı `src/shared/SurumUyarisi.tsx`.
+- **12 Ekim 2026:** Ana menü macOS tarzı yüzen **dock** oldu (telefon ve masaüstünde altta, ortada). Hesapla ilgili sayfalar sağ üstteki **profil menüsünde**: Profilim (fotoğraf yükleme), Yönetim (sadece yönetici), Çıkış. Modül nerede görünür `src/modules/index.ts`'te `yer: "dock" | "profil"` ile belirlenir. Kişi görseli her yerde `src/shared/Avatar.tsx`. Ekip listesinde 8 kişiyi geçince arama çıkar (50+ kişiye hazırlık).
+- **12 Ekim 2026:** Müsaitlik hatırlatması pazartesi 09:00 yerine **pazar 19:00**, gelecek hafta için (migration 0004).

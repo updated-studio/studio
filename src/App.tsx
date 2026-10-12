@@ -1,7 +1,7 @@
 import { HashRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthGate, useAuth } from "./shared/auth";
 import { Ikon } from "./shared/Ikon";
-import { sb } from "./shared/supabase";
+import ProfilMenu from "./shared/ProfilMenu";
 import { MODULLER } from "./modules";
 import Bildirimler from "./shared/Bildirimler";
 import SurumUyarisi from "./shared/SurumUyarisi";
@@ -11,26 +11,27 @@ import { VeriProvider } from "./shared/veri";
 function Kabuk() {
   const { profile } = useAuth();
   const gorunen = MODULLER.filter((m) => !m.sadeceYonetici || profile?.is_admin);
+  const dock = gorunen.filter((m) => (m.yer ?? "dock") === "dock");
+  const profilde = gorunen.filter((m) => m.yer === "profil");
   return (
     <div className="wrap">
       <header className="row" style={{ gap: 12 }}>
         <div className="brand" style={{ marginRight: "auto" }}><b>UP</b>DATED<span>Stüdyo</span></div>
-        <span className="muted">{profile?.name}</span>
         <Bildirimler />
-        <button className="btn ghost sm" onClick={() => sb.auth.signOut()}><Ikon ad="cikis" />Çıkış</button>
+        <ProfilMenu moduller={profilde} />
       </header>
       <SurumUyarisi />
-      <nav className="altmenu" aria-label="Ana menü">
-        {gorunen.map((m) => (
-          <NavLink key={m.id} to={"/" + m.id}>
-            <Ikon ad={m.ikon} />{m.ad}
+      <nav className="dock" aria-label="Ana menü">
+        {dock.map((m) => (
+          <NavLink key={m.id} to={"/" + m.id} title={m.ad} style={{ "--k": `var(--${m.renk ?? "blue"})` } as React.CSSProperties}>
+            <span className="kare"><Ikon ad={m.ikon} /></span><span className="ad">{m.ad}</span>
           </NavLink>
         ))}
       </nav>
       <main style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Routes>
           {gorunen.map((m) => <Route key={m.id} path={"/" + m.id} element={<m.bilesen />} />)}
-          <Route path="*" element={<Navigate to={"/" + gorunen[0].id} replace />} />
+          <Route path="*" element={<Navigate to={"/" + dock[0].id} replace />} />
         </Routes>
       </main>
     </div>

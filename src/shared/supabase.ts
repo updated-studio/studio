@@ -14,4 +14,5 @@ export type Profile = {
   org: string;
   is_admin: boolean;
   notify_email: boolean;
+  avatar_url: string | null;
 };

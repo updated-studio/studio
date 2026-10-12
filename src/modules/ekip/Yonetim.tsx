@@ -1,4 +1,5 @@
 import { type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
 import { Ikon } from "../../shared/Ikon";
 import { sb } from "../../shared/supabase";
@@ -9,7 +10,17 @@ import { adOf, bosGunler, KATEGORILER, TURLER } from "./ortak";
 
 type Sonuc = PromiseLike<{ error: { message: string } | null }>;
 
-export default function Yonetim({ duzenlenen, bitti }: { duzenlenen: number | null; bitti: (isler?: boolean) => void }) {
+// Profil menüsünden açılan sayfa. İşler'deki "Düzenle" buraya #/yonetim?is=<id> ile gelir.
+export default function YonetimSayfa() {
+  const { yukleniyor, hata } = useVeri();
+  const [sp] = useSearchParams();
+  const git = useNavigate();
+  if (yukleniyor) return <div className="muted">Yükleniyor…</div>;
+  if (hata) return <div className="empty">Veri yüklenemedi: {hata}</div>;
+  return <Yonetim duzenlenen={Number(sp.get("is")) || null} bitti={(isler) => git(isler ? "/ekip?b=isler" : "/yonetim")} />;
+}
+
+function Yonetim({ duzenlenen, bitti }: { duzenlenen: number | null; bitti: (isler?: boolean) => void }) {
   const { veri, yenile } = useVeri();
   const { profile } = useAuth();
   const toast = useToast();
@@ -150,7 +161,7 @@ export default function Yonetim({ duzenlenen, bitti }: { duzenlenen: number | nu
 
       <h3>Hatırlatma</h3>
       <div className="panel"><div className="row">
-        <div style={{ flex: "1 1 180px" }}>Bu hafta müsaitliğini işaretlemeyenlere bildirim gönder. (Her pazartesi 09:00'da kendiliğinden de gider.)</div>
+        <div style={{ flex: "1 1 180px" }}>Bu hafta müsaitliğini işaretlemeyenlere bildirim gönder. (Her pazar 19:00'da gelecek hafta için kendiliğinden de gider.)</div>
         <button className="btn ghost" onClick={hatirlat}><Ikon ad="zil" />Şimdi gönder</button>
       </div></div>
     </>
