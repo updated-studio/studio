@@ -16,6 +16,9 @@ async function kucult(dosya: File): Promise<Blob> {
   return new Promise((ok, red) => c.toBlob((x) => (x ? ok(x) : red(new Error("Görsel işlenemedi"))), "image/webp", 0.85));
 }
 
+// Hazır seçenekler; bunların dışında istediği emojiyi kutuya yazabilir (Mac: Ctrl+Cmd+Boşluk).
+const EMOJILER = ["📸", "🎬", "🎥", "🎧", "💻", "📱", "⌚", "🕹️", "🚁", "✂️", "🎨", "✍️", "📰", "🤖", "⚡", "🔥", "🚀", "☕", "🌴", "🤒", "🎓", "🪖", "😎", "🙂"];
+
 export default function Profil() {
   const { profile, reloadProfile } = useAuth();
   const { yenile } = useVeri();
@@ -56,6 +59,12 @@ export default function Profil() {
     await eskileriSil(); toast("Fotoğraf kaldırıldı."); await reloadProfile(); yenile();
   }
 
+  async function emojiKaydet(emoji: string | null) {
+    const r = await sb.from("profiles").update({ emoji }).eq("id", ben.id);
+    if (r.error) return toast(hataMetni(r.error));
+    await reloadProfile(); yenile();
+  }
+
   async function kaydet(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -85,6 +94,18 @@ export default function Profil() {
             <input ref={dosyaGir} type="file" accept="image/*" hidden onChange={fotoSec} />
           </div>
         </div>
+      </div>
+      <div className="panel">
+        <div className="row"><h3 style={{ margin: 0, marginRight: "auto" }}>Emoji</h3>
+          {ben.emoji && <button className="btn ghost sm" onClick={() => emojiKaydet(null)}>Kaldır</button>}</div>
+        <div className="muted">Fotoğrafının köşesinde görünür. Durumunu da anlatabilir: 🌴 izinde, 🪖 askerde…</div>
+        <div className="emojiler" role="group" aria-label="Emoji seç">
+          {EMOJILER.map((em) => <button key={em} aria-pressed={ben.emoji === em} onClick={() => emojiKaydet(ben.emoji === em ? null : em)}>{em}</button>)}
+        </div>
+        <form className="row" onSubmit={(e) => { e.preventDefault(); const v = String(new FormData(e.currentTarget).get("em")).trim(); if (v) emojiKaydet(v); }}>
+          <input name="em" type="text" maxLength={16} placeholder="Başka bir emoji yaz…" aria-label="Kendi emojin" style={{ flex: "1 1 160px", width: "auto" }} />
+          <button className="btn ghost sm">Kullan</button>
+        </form>
       </div>
       <div className="panel">
         <form className="grid" onSubmit={kaydet} key={ben.id + ben.name}>

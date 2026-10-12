@@ -15,4 +15,5 @@ export type Profile = {
   is_admin: boolean;
   notify_email: boolean;
   avatar_url: string | null;
+  emoji: string | null;
 };

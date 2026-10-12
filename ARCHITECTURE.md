@@ -88,7 +88,7 @@ Supabase projesi: `updated-panel` (organizasyon: Updated, bölge: Frankfurt).
 | Tablo | İçerik |
 |---|---|
 | `invites` | Davet listesi. Sadece buradaki e-postalar üye olabilir |
-| `profiles` | Üyeler: ad, rol, çalıştığı yer, yönetici mi, e-posta bildirimi açık mı, profil fotoğrafı (`avatar_url`) |
+| `profiles` | Üyeler: ad, rol, çalıştığı yer, yönetici mi, e-posta bildirimi açık mı, profil fotoğrafı (`avatar_url`), emoji rozeti (`emoji`, metin) |
 | Depolama `avatars` | Profil fotoğrafları, `<kişi id>/…webp`; herkes okur, kişi sadece kendi klasörüne yazar. Tarayıcıda 512 px WebP'ye küçültülür |
 | `availability` | Kişi + gün: boş/dolu, saat, konum, gün notu |
 | `jobs` | İşler: marka, kategori, tür, başlık, son gün, ambargo, durum, üstlenen, devir teklifi |
@@ -184,3 +184,4 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** Ekip ve Takvim modülleri Stüdyo'ya taşındı. Ortak canlı veri `src/shared/veri.tsx`; yeni sürüm uyarısı `src/shared/SurumUyarisi.tsx`.
 - **12 Ekim 2026:** Ana menü macOS tarzı yüzen **dock** oldu (telefon ve masaüstünde altta, ortada). Hesapla ilgili sayfalar sağ üstteki **profil menüsünde**: Profilim (fotoğraf yükleme), Yönetim (sadece yönetici), Çıkış. Modül nerede görünür `src/modules/index.ts`'te `yer: "dock" | "profil"` ile belirlenir. Kişi görseli her yerde `src/shared/Avatar.tsx`. Ekip listesinde 8 kişiyi geçince arama çıkar (50+ kişiye hazırlık).
 - **12 Ekim 2026:** Müsaitlik hatırlatması pazartesi 09:00 yerine **pazar 19:00**, gelecek hafta için (migration 0004).
+- **12 Ekim 2026:** Dock'ta modül adları simgenin altında sürekli görünür (ekip alışana kadar; gerekmezse kaldırılır). Profil fotoğrafına emoji rozeti eklendi: emoji metin olarak saklanır, her cihaz kendi emoji setiyle çizer (Apple cihazlarda Apple emojileri). Apple'ın emoji görselleri telif nedeniyle sunucudan dağıtılmaz (migration 0005).
