@@ -93,3 +93,6 @@ body { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
 .emojiler button { font-size: 22px; line-height: 1; padding: 7px 0; border-radius: 10px; border: 1px solid transparent; background: var(--sunk);
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
 .emojiler button[aria-pressed=true] { border-color: var(--blue); background: var(--blue-soft); }
+
+/* Stüdyo içinde çerçeveyle açılan araçlar (ör. post aracı) */
+.arac-cerceve { width: 100%; height: calc(100dvh - 190px); min-height: 520px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); display: block; }

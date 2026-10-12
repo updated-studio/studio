@@ -75,7 +75,7 @@ Kaçınılmaz dış servisler: telefon bildirimleri Apple ve Google sunucuların
 |---|---|---|---|
 | Ekip | Stüdyo modülü (`src/modules/ekip`). Eski tek dosyalık panel (eneshsahin.github.io/updated-panel/ekip) geçiş bitene kadar açık | Stüdyo modülü | Taşındı (12 Ekim), denemede |
 | Takvim | Stüdyo modülü (`src/modules/takvim`) | + kişisel takvime abonelik | Taşındı (12 Ekim); abonelik yapılacak |
-| İçerik (post aracı) | Tek HTML dosyası (eneshsahin/updated-panel), girişsiz | Stüdyo modülü, ortak giriş, kayıtlı taslaklar, story boyutu | Taşınacak |
+| İçerik (post aracı) | Stüdyo modülü (`src/modules/icerik`); araç `public/araclar/post/` içinde olduğu gibi çerçeveyle açılıyor. Eski adres de açık | Kayıtlı düzenler bulutta (ekip ortak), story boyutu, otomasyondan gelen postlar | 1. aşama taşındı (12 Ekim) |
 | Post otomasyonu | GitHub Actions + Telegram + Gemini (eneshsahin/updated-post-otomasyonu) | Supabase zamanlanmış işleri | Taşınacak |
 | Triyaj | Google Apps Script + Sheets + Gemini | Supabase | Taşınacak (5 Kasım öncesi şartlı) |
 | Marka Kiti | Stüdyo modülü (`src/modules/marka-kiti`): renkler, yazı tipleri | + logolar | Başlandı |
@@ -186,3 +186,4 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** Müsaitlik hatırlatması pazartesi 09:00 yerine **pazar 19:00**, gelecek hafta için (migration 0004).
 - **12 Ekim 2026:** Dock'ta modül adları simgenin altında sürekli görünür (ekip alışana kadar; gerekmezse kaldırılır). Profil fotoğrafına emoji rozeti eklendi: emoji metin olarak saklanır, her cihaz kendi emoji setiyle çizer (Apple cihazlarda Apple emojileri). Apple'ın emoji görselleri telif nedeniyle sunucudan dağıtılmaz (migration 0005).
 - **12 Ekim 2026:** Profil fotoğrafı yüklenmemişse Gravatar'daki fotoğraf (WordPress'in kullandığı servis, e-postanın SHA-256 özetiyle) gösterilir; o da yoksa baş harf. Emoji kutusu sadece tek emoji kabul eder; hazır liste hayvan emojileri.
+- **12 Ekim 2026:** Post aracı yeniden yazılmadan Stüdyo'ya alındı (aşamalı taşıma): mevcut tek dosya `public/araclar/post/index.html`, İçerik modülü onu çerçeveyle (iframe) açar; Stüdyo içinde açılınca kendi başlığını gizler. Gerekçe: 29 şablon çalışıyor, baştan yazmak haftalar sürer. Sonraki adımlar araç içinde parça parça: kayıtların buluta taşınması, story boyutu.
