@@ -153,8 +153,10 @@ async function topla(sb: ReturnType<typeof createClient>) {
   if (kural.length) await sb.from("tr_items").upsert(kural, { onConflict: "link", ignoreDuplicates: true });
 
   // 2) Yapay zekâ
-  const islenecek = aiye.slice(0, AI_SINIR);
-  let aiSayi = 0, hata = "";
+  // Anahtar yoksa ya da yapay zekâ yanıt vermezse haberler yazılmaz; bir sonraki çalıştırmada yeniden denenir.
+  const anahtarVar = !!Deno.env.get("GEMINI_API_KEY");
+  const islenecek = anahtarVar ? aiye.slice(0, AI_SINIR) : [];
+  let aiSayi = 0, hata = anahtarVar ? "" : "GEMINI_API_KEY tanımlı değil; haberler yapay zekâ olmadan havuza alınmıyor.";
   if (islenecek.length) {
     const [markalar, editorler, geri, adaylar] = await Promise.all([
       sb.from("tr_brands").select("name,grp"),
@@ -187,7 +189,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
       const ekKaynak: { id: number; name: string; link: string }[] = [];
       p.forEach((h, i) => {
         const s = sonuc.find((x) => Number(x.i) === i);
-        if (!s) { satirlar.push(satir(h, { status: "belirsiz", reason: hata ? "Yapay zekâ yanıt vermedi" : "", model: "yok" })); return; }
+        if (!s) return; // yanıt yoksa bu haber sonraki çalıştırmada yeniden denenir
         const ayni = s.ayni === null || s.ayni === undefined || s.ayni === "" ? null : Number(s.ayni);
         if (ayni && adayListe.some((a) => a.id === ayni)) {
           ekKaynak.push({ id: ayni, name: h.source.name, link: h.link });
