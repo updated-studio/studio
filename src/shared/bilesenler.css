@@ -46,3 +46,22 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .zil em { position: absolute; top: -6px; right: -6px; background: var(--orange); color: var(--on-accent); font: 500 11px var(--mono); border-radius: 99px; padding: 1px 6px; font-style: normal; }
 .bildirimler { position: absolute; right: 0; top: 48px; width: min(340px, calc(100vw - 32px)); z-index: 5; box-shadow: 0 12px 30px rgb(0 0 0 / .18); max-height: 70vh; overflow: auto; }
 .surum { background: var(--blue-soft); color: var(--blue); border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 13px; }
+
+/* Segmentli seçici: bir ekran içindeki bölümler arasında geçiş */
+.segment { display: inline-flex; background: var(--sunk); border-radius: 12px; padding: 4px; gap: 4px; overflow-x: auto; max-width: 100%; align-self: flex-start; }
+.segment button { border: 0; background: transparent; border-radius: 9px; padding: 7px 14px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.segment button[aria-pressed=true] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+
+/* Ana menü: telefonda altta, geniş ekranda solda */
+.altmenu { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; display: flex; gap: 4px; justify-content: space-around;
+  background: var(--surface); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); }
+.altmenu a { flex: 1 1 0; max-width: 120px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 500;
+  color: var(--muted); text-decoration: none; padding: 7px 4px; border-radius: 14px; }
+.altmenu a svg.i { width: 22px; height: 22px; }
+.altmenu a.active { color: var(--blue); background: var(--blue-soft); }
+body { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 900px) {
+  .altmenu { top: 0; right: auto; width: 92px; flex-direction: column; justify-content: flex-start; padding: 84px 8px 16px; border-top: 0; border-right: 1px solid var(--line); }
+  .altmenu a { flex: 0 0 auto; max-width: none; padding: 10px 4px; }
+  body { padding-bottom: 0; padding-left: 92px; }
+}

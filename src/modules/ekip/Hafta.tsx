@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { Ikon } from "../../shared/Ikon";
 import { sb } from "../../shared/supabase";
-import { BUGUN, BU_HAFTA, GUN, iso, saatMetni, uzun } from "../../shared/tarih";
+import { BUGUN, GUN, ekle, iso, pazartesi, saatMetni, uzun } from "../../shared/tarih";
 import { hataMetni, useToast } from "../../shared/toast";
 import { useVeri, type Musaitlik } from "../../shared/veri";
 import { KONUMLAR } from "./ortak";
@@ -14,7 +14,10 @@ export default function Hafta() {
   const { profile } = useAuth();
   const toast = useToast();
   const uid = profile!.id;
+  const [kayma, setKayma] = useState(0); // 0: bu hafta, 1: gelecek hafta
+  const hafta = [0, 1, 2, 3, 4, 5, 6].map((i) => ekle(i + 7 * kayma, pazartesi()));
   const [sec, setSec] = useState(iso(BUGUN));
+  const haftaDegistir = (k: number) => { setKayma(k); setSec(k === 0 ? iso(BUGUN) : iso(ekle(7 * k, pazartesi()))); };
   const benim = veri.avail[uid] ?? {};
   const a = benim[sec];
 
@@ -41,10 +44,14 @@ export default function Hafta() {
 
   return (
     <>
-      <h2>Bu hafta ne zaman boşsun, {profile!.name}?</h2>
+      <div className="segment" role="group">
+        <button aria-pressed={kayma === 0} onClick={() => haftaDegistir(0)}>Bu hafta</button>
+        <button aria-pressed={kayma === 1} onClick={() => haftaDegistir(1)}>Gelecek hafta</button>
+      </div>
+      <h2>{kayma === 0 ? "Bu hafta" : "Gelecek hafta"} ne zaman boşsun, {profile!.name}?</h2>
       <div className="panel">
         <div className="hafta">
-          {BU_HAFTA.map((d, i) => {
+          {hafta.map((d, i) => {
             const k = iso(d), s = benim[k]?.s ?? "";
             return (
               <button key={k} className={["gun", s, k === sec ? "sec" : "", k === iso(BUGUN) ? "bugun" : ""].join(" ")} onClick={() => gunTikla(k)}>
@@ -81,15 +88,15 @@ export default function Hafta() {
           </label>
         </>}
       </div>
-      <h3>Ekibin haftası</h3>
+      <h3>Ekibin {kayma === 0 ? "bu haftası" : "gelecek haftası"}</h3>
       <div className="panel kaydir">
         <table>
-          <thead><tr><th>Ekip</th>{BU_HAFTA.map((d, i) => <th key={i}>{GUN[i]} {d.getDate()}</th>)}</tr></thead>
+          <thead><tr><th>Ekip</th>{hafta.map((d, i) => <th key={i}>{GUN[i]} {d.getDate()}</th>)}</tr></thead>
           <tbody>
             {veri.profiles.map((m) => (
               <tr key={m.id}>
                 <td><strong>{m.name}</strong></td>
-                {BU_HAFTA.map((d) => {
+                {hafta.map((d) => {
                   const x = veri.avail[m.id]?.[iso(d)];
                   return (
                     <td key={iso(d)}>

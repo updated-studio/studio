@@ -160,6 +160,11 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 **Sonra:** iPhone uygulaması, telefon bildirimi, Öneriler kuyruğu (haberden etkinlik), Kamera Simülatörü.
 
+### İstek listesi (taşımalar bittikten sonra)
+
+- Triyaj: eski haberlerin otomatik silinmesi (süre ayarlanabilir: birkaç gün / bir hafta). İstek: Enes, 12 Ekim.
+- Müsaitlik hatırlatması: "gelecek hafta" görünümü eklendiği için pazar akşamı gelecek haftayı hatırlatmaya çevrilebilir.
+
 ## 11. Açık kararlar
 
 1. **Depo gizliliği.** Depo şimdilik açık (GitHub Pages ücretsiz). Fatih onay verirse gizliye çevrilir; o durumda yayının GitHub'da kalması için GitHub Team (kişi başı aylık ücret) gerekir.
@@ -174,5 +179,6 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** iPhone uygulaması Apple hesabı kararına kadar ertelendi; kod tarafında iPhone'a hazır kurulacak.
 - **12 Ekim 2026:** İç araçlar WordPress sitesinin içine gömülmeyecek; alt adres kullanılacak.
 - **12 Ekim 2026:** Kod `updated-studio/studio` deposunda (GitHub organizasyonu). Depo şimdilik açık; yayın GitHub Pages, otomatik (`.github/workflows/yayin.yml`).
+- **12 Ekim 2026:** Ana menü telefonda altta, geniş ekranda solda; ekran içi bölümler segmentli seçici. Bu Hafta ekranına "Gelecek hafta" eklendi.
 - **12 Ekim 2026:** Kayıt onayı / şifre sıfırlama bağlantıları ve e-posta linkleri Stüdyo'ya yönlendirildi; e-posta fonksiyonu depodaki sürüme güncellendi.
 - **12 Ekim 2026:** Ekip ve Takvim modülleri Stüdyo'ya taşındı. Ortak canlı veri `src/shared/veri.tsx`; yeni sürüm uyarısı `src/shared/SurumUyarisi.tsx`.

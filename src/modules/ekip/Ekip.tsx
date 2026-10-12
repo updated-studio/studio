@@ -23,8 +23,8 @@ export default function Ekip() {
 
   return (
     <>
-      <div className="row">
-        {bolumler.map(([k, l]) => <button key={k} className="chip" aria-pressed={bolum === k} onClick={() => { setBolum(k); if (k !== "yonetim") setDuzenlenen(null); }}>{l}</button>)}
+      <div className="segment" role="group">
+        {bolumler.map(([k, l]) => <button key={k} aria-pressed={bolum === k} onClick={() => { setBolum(k); if (k !== "yonetim") setDuzenlenen(null); }}>{l}</button>)}
       </div>
       {bolum === "hafta" && <Hafta />}
       {bolum === "isler" && <Isler duzenle={(id) => { setDuzenlenen(id); setBolum("yonetim"); }} />}

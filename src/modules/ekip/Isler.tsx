@@ -92,7 +92,7 @@ export default function Isler({ duzenle }: { duzenle: (id: number) => void }) {
   return (
     <>
       <h2>İşler</h2>
-      <div className="row">{ALTLAR.map(([k, l]) => <button key={k} className="chip" aria-pressed={alt === k} onClick={() => setAlt(k)}>{l}</button>)}</div>
+      <div className="segment" role="group">{ALTLAR.map(([k, l]) => <button key={k} aria-pressed={alt === k} onClick={() => setAlt(k)}>{l}</button>)}</div>
       {liste.length ? <div className="cards">{kartlar}</div>
         : <div className="empty">{alt === "havuz" ? (yonetici ? "Bekleyen iş yok. Yönetim bölümünden ilk işi aç." : "Bekleyen iş yok.") : "Bu bölümde iş yok."}</div>}
     </>

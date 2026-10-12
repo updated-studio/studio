@@ -20,9 +20,9 @@ function Kabuk() {
         <button className="btn ghost sm" onClick={() => sb.auth.signOut()}><Ikon ad="cikis" />Çıkış</button>
       </header>
       <SurumUyarisi />
-      <nav className="row" style={{ gap: 6, flexWrap: "nowrap", overflowX: "auto" }}>
+      <nav className="altmenu" aria-label="Ana menü">
         {gorunen.map((m) => (
-          <NavLink key={m.id} to={"/" + m.id} className={({ isActive }) => "btn sm " + (isActive ? "" : "ghost")} style={{ whiteSpace: "nowrap" }}>
+          <NavLink key={m.id} to={"/" + m.id}>
             <Ikon ad={m.ikon} />{m.ad}
           </NavLink>
         ))}
