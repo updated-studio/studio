@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useAuth } from "../../shared/auth";
-import { Avatar } from "../../shared/Avatar";
+import { Avatar, tekEmojiMi } from "../../shared/Avatar";
 import { Ikon } from "../../shared/Ikon";
 import { sb } from "../../shared/supabase";
 import { hataMetni, useToast } from "../../shared/toast";
@@ -16,8 +16,8 @@ async function kucult(dosya: File): Promise<Blob> {
   return new Promise((ok, red) => c.toBlob((x) => (x ? ok(x) : red(new Error("Görsel işlenemedi"))), "image/webp", 0.85));
 }
 
-// Hazır seçenekler; bunların dışında istediği emojiyi kutuya yazabilir (Mac: Ctrl+Cmd+Boşluk).
-const EMOJILER = ["📸", "🎬", "🎥", "🎧", "💻", "📱", "⌚", "🕹️", "🚁", "✂️", "🎨", "✍️", "📰", "🤖", "⚡", "🔥", "🚀", "☕", "🌴", "🤒", "🎓", "🪖", "😎", "🙂"];
+// Hazır seçenekler (hayvanlar); dışında tek bir emoji yazılabilir, yazı kabul edilmez (Mac: Ctrl+Cmd+Boşluk).
+const EMOJILER = ["🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🐶", "🐱", "🐰", "🐹", "🦉", "🐧", "🦅", "🐢", "🐙", "🦈", "🐬", "🦄", "🐝", "🦋"];
 
 export default function Profil() {
   const { profile, reloadProfile } = useAuth();
@@ -91,6 +91,7 @@ export default function Profil() {
               </button>
               {ben.avatar_url && <button className="btn ghost sm" onClick={fotoKaldir}>Kaldır</button>}
             </div>
+            {!ben.avatar_url && <div className="muted" style={{ fontSize: 13 }}>Fotoğraf eklemezsen <a href="https://gravatar.com" target="_blank" rel="noreferrer">Gravatar</a>'daki fotoğrafın (WordPress'in kullandığı) görünür.</div>}
             <input ref={dosyaGir} type="file" accept="image/*" hidden onChange={fotoSec} />
           </div>
         </div>
@@ -98,12 +99,14 @@ export default function Profil() {
       <div className="panel">
         <div className="row"><h3 style={{ margin: 0, marginRight: "auto" }}>Emoji</h3>
           {ben.emoji && <button className="btn ghost sm" onClick={() => emojiKaydet(null)}>Kaldır</button>}</div>
-        <div className="muted">Fotoğrafının köşesinde görünür. Durumunu da anlatabilir: 🌴 izinde, 🪖 askerde…</div>
+        <div className="muted">Fotoğrafının köşesinde görünür. Listede yoksa kutuya tek bir emoji yazabilirsin.</div>
         <div className="emojiler" role="group" aria-label="Emoji seç">
           {EMOJILER.map((em) => <button key={em} aria-pressed={ben.emoji === em} onClick={() => emojiKaydet(ben.emoji === em ? null : em)}>{em}</button>)}
         </div>
-        <form className="row" onSubmit={(e) => { e.preventDefault(); const v = String(new FormData(e.currentTarget).get("em")).trim(); if (v) emojiKaydet(v); }}>
-          <input name="em" type="text" maxLength={16} placeholder="Başka bir emoji yaz…" aria-label="Kendi emojin" style={{ flex: "1 1 160px", width: "auto" }} />
+        <form className="row" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget, v = String(new FormData(f).get("em")).trim();
+          if (!tekEmojiMi(v)) return toast("Sadece tek bir emoji yazabilirsin.");
+          emojiKaydet(v); f.reset(); }}>
+          <input name="em" type="text" maxLength={16} placeholder="Başka bir emoji (Mac: Ctrl+Cmd+Boşluk)" inputMode="text" aria-label="Kendi emojin" style={{ flex: "1 1 160px", width: "auto" }} />
           <button className="btn ghost sm">Kullan</button>
         </form>
       </div>
