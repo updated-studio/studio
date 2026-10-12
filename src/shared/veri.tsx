@@ -7,7 +7,7 @@ export type Musaitlik = { s: "bos" | "dolu"; t: string; loc: string; n: string }
 export type Is = {
   id: number; brand: string; category: string; type: string; title: string;
   due: string; embargo: string | null; status: "havuz" | "atandi" | "bitti";
-  assignee: string | null; transfer_to: string | null; req: string[];
+  assignee: string | null; transfer_to: string | null; req: string[]; done_at?: string | null;
 };
 export type Ekipman = { id: number; name: string; category: string; status: "elimizde" | "yolda"; holder: string | null; day: string | null };
 export type Etkinlik = { id: number; title: string; brand: string; start_day: string; end_day: string | null; certainty: "kesin" | "tahmini"; note: string };
