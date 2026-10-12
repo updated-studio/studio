@@ -77,7 +77,7 @@ Kaçınılmaz dış servisler: telefon bildirimleri Apple ve Google sunucuların
 | Takvim | Stüdyo modülü (`src/modules/takvim`) | + kişisel takvime abonelik | Taşındı (12 Ekim); abonelik yapılacak |
 | İçerik (post aracı) | Stüdyo modülü (`src/modules/icerik`); araç `public/araclar/post/` içinde olduğu gibi çerçeveyle açılıyor. Eski adres de açık | Kayıtlı düzenler bulutta (ekip ortak), story boyutu, otomasyondan gelen postlar | 1. aşama taşındı (12 Ekim) |
 | Post otomasyonu | GitHub Actions + Telegram + Gemini (eneshsahin/updated-post-otomasyonu) | Supabase zamanlanmış işleri | Taşınacak |
-| Triyaj | Google Apps Script + Sheets + Gemini | Supabase | Taşınacak (5 Kasım öncesi şartlı) |
+| Haber Masası (Triyaj) | Stüdyo modülü (`src/modules/haber-masasi`) + `triyaj-topla`, `triyaj-taslak` işleri. Eski Google Sheets/Apps Script sistemi ("Updated Haber Masası") geçiş bitene kadar paralel çalışıyor | Eski sistem kapanır; WordPress'e taslak gönderme | Kuruldu (12 Ekim), denemede |
 | Marka Kiti | Stüdyo modülü (`src/modules/marka-kiti`): renkler, yazı tipleri | + logolar | Başlandı |
 | Kamera Simülatörü | Fikir | Stüdyo modülü | İleride |
 
@@ -97,10 +97,20 @@ Supabase projesi: `updated-panel` (organizasyon: Updated, bölge: Frankfurt).
 | `events` | Etkinlik ve lansmanlar: kesin/tahmini |
 | `notifications` | Kişiye özel bildirimler, e-posta gönderildi mi |
 | `week_notes` | Kullanılmıyor (gün notuna geçildi), kaldırılabilir |
+| `tr_sources` | Haber Masası RSS kaynakları ve sağlık durumu |
+| `tr_items` | Haberler: havuz (`aday`), belirsiz, elendi, alındı, pas, yayında; olay özeti, marka, tür, öncelik 1-5, önerilen editör, alan kişi, aktarım, çeviri, `touched` (ekip dokundu mu) |
+| `tr_votes` | Oy ve not (yapay zekâ son 30 notu istemde kullanır, böylece ekibin zevkini öğrenir) |
+| `tr_drafts` | Stüdyo içinde düzenlenen haber taslakları (SEO paketi dahil) |
+| `tr_chat` | Haber Masası sohbeti |
+| `tr_brands`, `tr_press`, `tr_settings` | Türkiye pazarı markaları (Öncelikli/Normal/Hariç), basın kiti, ayarlar (saklama günü, gürültü kelimeleri, modeller, son toplama özeti) |
 
 Sunucu işleri:
 - `notify-email` (Edge Function): yeni bildirimleri e-posta olarak gönderir, e-postadaki link Stüdyo'yu gösterir. Gönderen adres (`MAIL_FROM`) ve şifre (`GMAIL_APP_PASSWORD`) Supabase Secrets'ta; şu an Enes'in Gmail'i.
 - Giriş ayarları: Site URL Stüdyo'nun adresi; izinli yönlendirmeler Stüdyo ve eski ekip paneli.
+- `triyaj-topla` (Edge Function, 15 dakikada bir `tr_kick` ile): RSS'leri okur, gürültü kelimesini kuralla, gerisini Gemini ile eler/sınıflandırır, aynı olayı tek kartta toplar ("diğer kaynaklar"), kaynak sağlığını yazar. Gemini yoksa ya da yanıt vermezse haber yazılmaz, sonraki turda yeniden denenir. 5 dakikadan sık çalışmaz.
+- `triyaj-taslak` (Edge Function, ekip üyesi çağırır): haber sayfasını okur, çeviri ya da Updated yazım standardında taslak üretir. Aynı haberde iki iş aynı anda başlamaz (kilit).
+- Gemini anahtarı `GEMINI_API_KEY` Supabase Secrets'ta.
+- Saklama kuralı (`tr_cleanup`, her gece 03:30): havuz/belirsiz/elenen haberlerden kimsenin dokunmadığı (alınmamış, oylanmamış, pas geçilmemiş) ve N günden eski olanlar silinir (N = ayar, varsayılan 3). İşlem görenler kalır.
 - Zamanlanmış: pazar 19:00 gelecek hafta müsaitlik hatırlatması, her gün 09:05 yaklaşan etkinlik bildirimi.
 
 Yeni modüller tablolarını bu modele ekler; aynı kişi bilgisi için ikinci bir tablo açılmaz, `profiles` kullanılır.
@@ -163,7 +173,10 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 ### İstek listesi (taşımalar bittikten sonra)
 
-- Triyaj: eski haberlerin otomatik silinmesi (süre ayarlanabilir: birkaç gün / bir hafta). İstek: Enes, 12 Ekim.
+- Haber Masası: taslağı WordPress'e tek tuşla taslak olarak gönderme; Unsplash/basın kiti görsel önerisi.
+- Haber Masası geçiş günü: eski tablodaki işlem görmüş haberler (alındı/yayında/pas, ~100 kayıt) içe aktarılır, sonra eski sistem kapanır ve tablodaki anahtarlar silinir.
+- İçerik: format sistemi (Post 4:5 / Story 9:16 / Reels kapağı 9:16, ızgara 3:4); şablonlar oran ve güvenli alanla tanımlanır, format değişince sadece çerçeve değişir. Story'de kaydırmalı şablon yok.
+- Video aracı (dar kapsam, askerlik sonrası): Reels kapağı için kare seçme, marka giriş/çıkışı, altyazı gömme, güvenli alan kılavuzu. Tam kurgu programı yapılmaz.
 
 ## 11. Açık kararlar
 
@@ -187,3 +200,5 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** Dock'ta modül adları simgenin altında sürekli görünür (ekip alışana kadar; gerekmezse kaldırılır). Profil fotoğrafına emoji rozeti eklendi: emoji metin olarak saklanır, her cihaz kendi emoji setiyle çizer (Apple cihazlarda Apple emojileri). Apple'ın emoji görselleri telif nedeniyle sunucudan dağıtılmaz (migration 0005).
 - **12 Ekim 2026:** Profil fotoğrafı yüklenmemişse Gravatar'daki fotoğraf (WordPress'in kullandığı servis, e-postanın SHA-256 özetiyle) gösterilir; o da yoksa baş harf. Emoji kutusu sadece tek emoji kabul eder; hazır liste hayvan emojileri.
 - **12 Ekim 2026:** Post aracı yeniden yazılmadan Stüdyo'ya alındı (aşamalı taşıma): mevcut tek dosya `public/araclar/post/index.html`, İçerik modülü onu çerçeveyle (iframe) açar; Stüdyo içinde açılınca kendi başlığını gizler. Gerekçe: 29 şablon çalışıyor, baştan yazmak haftalar sürer. Sonraki adımlar araç içinde parça parça: kayıtların buluta taşınması, story boyutu.
+- **12 Ekim 2026:** Triyaj, "Haber Masası" adıyla Stüdyo modülü olarak yeniden kuruldu (tam kapsam, sohbet dahil). Toplama Supabase Edge Function + pg_cron ile; taslaklar Google Docs yerine Stüdyo'da. Editör girişi ayrı şifre yerine Stüdyo hesabı. Eski sistem yenisi denenene kadar paralel çalışır (kural 9). Saklama: sadece dokunulmamış havuz haberleri 3 günde silinir.
+- **12 Ekim 2026:** Sıralama kararı (Enes): Haber Masası → kayıtların buluta taşınması → takvim aboneliği → İçerik format sistemi → (sonra) video aracı → en son Android uygulaması.
