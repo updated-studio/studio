@@ -1,10 +1,12 @@
 // Yeni bildirimleri e-posta olarak gönderir. Tetikleyici: notifications tablosuna ekleme (0003).
-// Gizli bilgi: GMAIL_APP_PASSWORD (Supabase > Edge Functions > Secrets). Koda yazılmaz.
+// Gizli bilgi: GMAIL_APP_PASSWORD ve MAIL_FROM (Supabase > Edge Functions > Secrets). Koda yazılmaz.
+// Not: Supabase'de şu an çalışan sürümde gönderen adres koda gömülü; bir sonraki yayında bu sürüme geçilecek.
 // Not: Supabase panelinde "Verify JWT" kapalı; fonksiyon girdi almaz, sadece bekleyen bildirimleri işler.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.14";
 
-const FROM = "eneshsahinn@gmail.com"; // kurumsal adres gelince değişecek
+// Gönderen adres Supabase Secrets'taki MAIL_FROM'dan okunur (depo açık olduğu için kodda yazılmaz).
+const FROM = Deno.env.get("MAIL_FROM") ?? "";
 const PANEL = "https://eneshsahin.github.io/updated-panel/ekip/";
 
 function serviceKey(): string {
