@@ -1,0 +1,48 @@
+/* Modüllerin ortak kullandığı parçalar: çip, rozet, kart, tablo, hafta şeridi. Renkler index.css değişkenlerinden. */
+.chip { background: var(--sunk); border: 1px solid transparent; border-radius: 99px; padding: 6px 12px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.chip[aria-pressed=true] { background: var(--blue); color: var(--on-accent); }
+.pill { border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; display: inline-flex; gap: 5px; align-items: center; }
+.pill.wait { background: var(--orange-soft); color: var(--orange); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.off { background: var(--busy-soft); color: var(--busy); }
+.pill.blue { background: var(--blue-soft); color: var(--blue); }
+.pill.purple { background: var(--purple-soft); color: var(--purple); }
+.btn.ok { background: var(--ok); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.kart { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.kart .ust { display: flex; gap: 10px; align-items: center; }
+.kart .baslik { font-weight: 500; overflow-wrap: anywhere; }
+.kart .alt { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: auto; }
+.kart select { width: auto; }
+.bname { font-family: var(--display); font-weight: 800; font-size: 16px; line-height: 1.1; }
+.caticon { width: 38px; height: 38px; border-radius: 10px; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; flex: none; }
+.avatar { width: 40px; height: 40px; border-radius: 12px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-family: var(--display); font-weight: 800; flex: none; }
+.due { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); }
+.due.soon { color: var(--orange); }
+.liste { display: flex; flex-direction: column; }
+.satir { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.satir:last-child { border-bottom: 0; }
+.satir .ana { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+form.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; }
+.kaydir { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; }
+th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); font-size: 13px; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.cell { display: inline-block; min-width: 44px; border-radius: 7px; padding: 3px 6px; font-size: 11px; font-weight: 600; }
+.cell.bos { background: var(--ok-soft); color: var(--ok); }
+.cell.dolu { background: var(--busy-soft); color: var(--busy); }
+.cell.none { color: var(--line); }
+.hafta { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.gun { background: var(--sunk); border: 2px solid transparent; border-radius: 12px; padding: 10px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.gun small { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.gun strong { font-family: var(--display); font-size: 20px; }
+.gun i { font-style: normal; font-size: 10px; font-weight: 600; }
+.gun.bos { background: var(--ok-soft); } .gun.bos i { color: var(--ok); }
+.gun.dolu { background: var(--busy-soft); } .gun.dolu i { color: var(--busy); }
+.gun.sec { border-color: var(--blue); } .gun.bugun strong { color: var(--blue); }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 13px; z-index: 9; max-width: calc(100vw - 32px); }
+.zil { position: relative; }
+.zil em { position: absolute; top: -6px; right: -6px; background: var(--orange); color: var(--on-accent); font: 500 11px var(--mono); border-radius: 99px; padding: 1px 6px; font-style: normal; }
+.bildirimler { position: absolute; right: 0; top: 48px; width: min(340px, calc(100vw - 32px)); z-index: 5; box-shadow: 0 12px 30px rgb(0 0 0 / .18); max-height: 70vh; overflow: auto; }
+.surum { background: var(--blue-soft); color: var(--blue); border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 13px; }

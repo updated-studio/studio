@@ -3,6 +3,10 @@ import { AuthGate, useAuth } from "./shared/auth";
 import { Ikon } from "./shared/Ikon";
 import { sb } from "./shared/supabase";
 import { MODULLER } from "./modules";
+import Bildirimler from "./shared/Bildirimler";
+import SurumUyarisi from "./shared/SurumUyarisi";
+import { ToastProvider } from "./shared/toast";
+import { VeriProvider } from "./shared/veri";
 
 function Kabuk() {
   const { profile } = useAuth();
@@ -12,8 +16,10 @@ function Kabuk() {
       <header className="row" style={{ gap: 12 }}>
         <div className="brand" style={{ marginRight: "auto" }}><b>UP</b>DATED<span>Stüdyo</span></div>
         <span className="muted">{profile?.name}</span>
+        <Bildirimler />
         <button className="btn ghost sm" onClick={() => sb.auth.signOut()}><Ikon ad="cikis" />Çıkış</button>
       </header>
+      <SurumUyarisi />
       <nav className="row" style={{ gap: 6, flexWrap: "nowrap", overflowX: "auto" }}>
         {gorunen.map((m) => (
           <NavLink key={m.id} to={"/" + m.id} className={({ isActive }) => "btn sm " + (isActive ? "" : "ghost")} style={{ whiteSpace: "nowrap" }}>
@@ -33,10 +39,14 @@ function Kabuk() {
 
 export default function App() {
   return (
-    <AuthGate>
-      <HashRouter>
-        <Kabuk />
-      </HashRouter>
-    </AuthGate>
+    <ToastProvider>
+      <AuthGate>
+        <VeriProvider>
+          <HashRouter>
+            <Kabuk />
+          </HashRouter>
+        </VeriProvider>
+      </AuthGate>
+    </ToastProvider>
   );
 }

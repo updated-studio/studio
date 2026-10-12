@@ -12,6 +12,14 @@ const P: Record<string, string> = {
   triyaj: "M4 5h16M7 12h10M10 19h4",
   check: "M5 12l5 5 9-10",
   plus: "M12 5v14M5 12h14",
+  lens: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 16a4 4 0 100-8 4 4 0 000 8z",
+  telefon: "M7 3h10v18H7zM11 18h2",
+  bilgisayar: "M4 5h16v11H4zM2 20h20",
+  drone: "M4 6h5M15 6h5M6.5 6v3l3.5 2h4l3.5-2V6M10 13v4h4v-4",
+  kurgu: "M4 4h16v16H4zM8 4v16M16 4v16M4 9h4M4 15h4M16 9h4M16 15h4",
+  pin: "M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11zM12 12a2 2 0 100-4 2 2 0 000 4z",
+  saat: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
+  sil: "M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13",
   cikis: "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10",
 };
 

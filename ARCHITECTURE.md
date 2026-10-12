@@ -2,7 +2,7 @@
 
 > **Bu doküman sistemin temelidir.** Updated üzerinde çalışan herkes (insan veya yapay zekâ), hangi sohbette veya oturumda olursa olsun, işe başlamadan önce bunu okur. Bir karar değişirse önce bu doküman güncellenir, sonra kod.
 
-- Sürüm: 1 (12 Ekim 2026)
+- Sürüm: 2 (12 Ekim 2026)
 - Hazırlayan: Enes + Claude
 - Onay: Enes ✔, Fatih (bekliyor)
 - Asıl kopya: kod deposundaki `ARCHITECTURE.md`. Claude projesindeki kopya onun aynasıdır; ikisi aynı anda güncellenir.
@@ -65,7 +65,7 @@ UPDATED STÜDYO (tek depo)
 | Mobil paketleme | Capacitor | Aynı koddan Android ve iPhone uygulaması üretir. Açık kaynak kütüphanedir, araya bir şirket veya sunucu girmez |
 | Bilgisayar | Kurulabilir web uygulaması (PWA) | Ek iş gerektirmez. Gerekirse ileride aynı koddan Tauri ile kurulum dosyası |
 | Yayın | GitHub Actions | Kod depoya gelince web sürümü ve Android dosyası kendiliğinden üretilir |
-| Barındırma | **Karar bekliyor** (bkz. Açık kararlar) | |
+| Barındırma | GitHub Pages (`updated-studio.github.io/studio`), otomatik yayın | Depo şimdilik açık; gizli olursa GitHub Team gerekir |
 
 Kaçınılmaz dış servisler: telefon bildirimleri Apple ve Google sunucularından geçer; iPhone dağıtımı Apple'a bağlıdır. Bunların dışında sistem hiçbir şirketin kapalı aracına bağlı değildir.
 
@@ -73,12 +73,12 @@ Kaçınılmaz dış servisler: telefon bildirimleri Apple ve Google sunucuların
 
 | Modül | Bugün nerede | Hedef | Durum |
 |---|---|---|---|
-| Ekip | Tek HTML dosyası, Supabase'e bağlı (eneshsahin.github.io/updated-panel/ekip) | Stüdyo modülü | Çalışıyor, taşınacak |
-| Takvim | Ekip panelinin içinde | Ayrı modül + takvim aboneliği | Çalışıyor, genişletilecek |
+| Ekip | Stüdyo modülü (`src/modules/ekip`). Eski tek dosyalık panel (eneshsahin.github.io/updated-panel/ekip) geçiş bitene kadar açık | Stüdyo modülü | Taşındı (12 Ekim), denemede |
+| Takvim | Stüdyo modülü (`src/modules/takvim`) | + kişisel takvime abonelik | Taşındı (12 Ekim); abonelik yapılacak |
 | İçerik (post aracı) | Tek HTML dosyası (eneshsahin/updated-panel), girişsiz | Stüdyo modülü, ortak giriş, kayıtlı taslaklar, story boyutu | Taşınacak |
 | Post otomasyonu | GitHub Actions + Telegram + Gemini (eneshsahin/updated-post-otomasyonu) | Supabase zamanlanmış işleri | Taşınacak |
 | Triyaj | Google Apps Script + Sheets + Gemini | Supabase | Taşınacak (5 Kasım öncesi şartlı) |
-| Marka Kiti | Dosyalar dağınık | Stüdyo modülü | Yapılacak |
+| Marka Kiti | Stüdyo modülü (`src/modules/marka-kiti`): renkler, yazı tipleri | + logolar | Başlandı |
 | Kamera Simülatörü | Fikir | Stüdyo modülü | İleride |
 
 ## 6. Veri modeli (mevcut)
@@ -108,6 +108,7 @@ Yeni modüller tablolarını bu modele ekler; aynı kişi bilgisi için ikinci b
 ```
 updated-studio/
 ├─ ARCHITECTURE.md        ← bu doküman
+├─ CLAUDE.md              ← her oturumda otomatik okunur, buraya yönlendirir
 ├─ src/
 │  ├─ shared/             ← giriş, veritabanı bağlantısı, tasarım, bildirim
 │  └─ modules/
@@ -160,7 +161,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 ## 11. Açık kararlar
 
-1. **Barındırma.** Depo gizli (private) olacaksa GitHub Pages ücretli plana geçmeyi gerektirir. Öneri: Cloudflare Pages (ücretsiz, gizli depoyla çalışır, alan adı bağlanır).
+1. **Depo gizliliği.** Depo şimdilik açık (GitHub Pages ücretsiz). Fatih onay verirse gizliye çevrilir; o durumda yayının GitHub'da kalması için GitHub Team (kişi başı aylık ücret) gerekir.
 2. **Apple geliştirici hesabı:** alınacak mı, kimin adına? (Fatih ile görüşülecek)
 3. **Alt adres:** `panel.updated.com.tr` (Natro erişimi gerekiyor)
 
@@ -171,3 +172,5 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** Tüm araçlar tek sistemde (Updated Stüdyo) toplanacak. Teknoloji: TypeScript + React + Vite + Supabase + Capacitor.
 - **12 Ekim 2026:** iPhone uygulaması Apple hesabı kararına kadar ertelendi; kod tarafında iPhone'a hazır kurulacak.
 - **12 Ekim 2026:** İç araçlar WordPress sitesinin içine gömülmeyecek; alt adres kullanılacak.
+- **12 Ekim 2026:** Kod `updated-studio/studio` deposunda (GitHub organizasyonu). Depo şimdilik açık; yayın GitHub Pages, otomatik (`.github/workflows/yayin.yml`).
+- **12 Ekim 2026:** Ekip ve Takvim modülleri Stüdyo'ya taşındı. Ortak canlı veri `src/shared/veri.tsx`; yeni sürüm uyarısı `src/shared/SurumUyarisi.tsx`.
