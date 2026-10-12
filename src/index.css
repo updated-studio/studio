@@ -2,7 +2,7 @@
 :root {
   --bg: #F3F6FC; --surface: #FFFFFF; --sunk: #E9EEF8; --ink: #0E1A33; --muted: #57657F; --line: #D9E0EE;
   --blue: #2563EB; --blue-soft: #DCE7FF; --orange: #E85A0C; --orange-soft: #FFE6D6;
-  --ok: #12804A; --ok-soft: #D6F3E3; --purple: #7C3AED; --purple-soft: #EDE4FF;
+  --ok: #12804A; --ok-soft: #D6F3E3; --rose: #E11D48; --rose-soft: #FFE4E9; --purple: #7C3AED; --purple-soft: #EDE4FF;
   --busy: #7C879B; --busy-soft: #E4E8F0; --on-accent: #FFFFFF; --err: #C62828;
   --brand-blue: #2563EB; --brand-orange: #FF6B1A;
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
@@ -13,7 +13,7 @@
   :root {
     --bg: #1B1D21; --surface: #26292F; --sunk: #31353C; --ink: #F1F3F6; --muted: #A8AFBA; --line: #3B4049;
     --blue: #6A98F8; --blue-soft: #1B2C55; --orange: #FF8A47; --orange-soft: #44240F;
-    --ok: #3DD68C; --ok-soft: #113524; --purple: #B794F6; --purple-soft: #3A2A5C;
+    --ok: #3DD68C; --ok-soft: #113524; --rose: #FB7185; --rose-soft: #4A1724; --purple: #B794F6; --purple-soft: #3A2A5C;
     --busy: #9AA1AD; --busy-soft: #353941; --on-accent: #14161A; --err: #FF8A80;
     color-scheme: dark;
   }

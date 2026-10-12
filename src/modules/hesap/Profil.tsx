@@ -70,7 +70,7 @@ export default function Profil() {
     const f = new FormData(e.currentTarget);
     const r = await sb.from("profiles").update({
       name: String(f.get("ad")).trim(), role: String(f.get("rol")).trim(),
-      org: String(f.get("yer")).trim(), notify_email: f.get("eposta") === "1",
+      org: String(f.get("yer")).trim(), interests: String(f.get("ilgi")).trim(), notify_email: f.get("eposta") === "1",
     }).eq("id", ben.id);
     if (r.error) return toast(hataMetni(r.error));
     toast("Kaydedildi."); reloadProfile(); yenile();
@@ -115,6 +115,7 @@ export default function Profil() {
           <label htmlFor="p-ad">Ad<input id="p-ad" name="ad" type="text" required maxLength={40} defaultValue={ben.name} /></label>
           <label htmlFor="p-rol">Rol<input id="p-rol" name="rol" type="text" maxLength={40} placeholder="Editör, lens uzmanı…" defaultValue={ben.role} /></label>
           <label htmlFor="p-yer">Çalıştığın yer<input id="p-yer" name="yer" type="text" maxLength={40} placeholder="GZT, Sigma…" defaultValue={ben.org} /></label>
+          <label htmlFor="p-ilgi">İlgi alanları (Haber Masası sana uygun haberleri önerir)<input id="p-ilgi" name="ilgi" type="text" maxLength={200} placeholder="kamera, drone, yapay zekâ…" defaultValue={ben.interests ?? ""} /></label>
           <label htmlFor="p-eposta">E-posta bildirimi
             <select id="p-eposta" name="eposta" defaultValue={ben.notify_email ? "1" : ""}><option value="1">Açık</option><option value="">Kapalı</option></select>
           </label>

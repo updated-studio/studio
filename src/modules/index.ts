@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import Ekip from "./ekip/Ekip";
+import HaberMasasi from "./haber-masasi/HaberMasasi";
 import Icerik from "./icerik/Icerik";
 import YonetimSayfa from "./ekip/Yonetim";
 import Profil from "./hesap/Profil";
@@ -20,6 +21,7 @@ export type Modul = {
 
 export const MODULLER: Modul[] = [
   { id: "ekip", ad: "Ekip", ikon: "ekip", bilesen: Ekip, renk: "blue" },
+  { id: "haber-masasi", ad: "Haber Masası", ikon: "triyaj", bilesen: HaberMasasi, renk: "rose" },
   { id: "icerik", ad: "İçerik", ikon: "icerik", bilesen: Icerik, renk: "ok" },
   { id: "takvim", ad: "Takvim", ikon: "takvim", bilesen: Takvim, renk: "orange" },
   { id: "marka-kiti", ad: "Marka Kiti", ikon: "marka", bilesen: MarkaKiti, renk: "purple" },

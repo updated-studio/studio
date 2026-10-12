@@ -23,7 +23,7 @@
 .satir { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .satir:last-child { border-bottom: 0; }
 .satir .ana { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
-form.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; }
+form.grid, div.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; }
 .kaydir { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; min-width: 520px; }
 th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); font-size: 13px; }
@@ -96,3 +96,23 @@ body { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
 
 /* Stüdyo içinde çerçeveyle açılan araçlar (ör. post aracı) */
 .arac-cerceve { width: 100%; height: calc(100dvh - 190px); min-height: 520px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); display: block; }
+.pill.rose { background: var(--rose-soft); color: var(--rose); }
+
+/* Haber Masası */
+.kart.haber .baslik { font-weight: 600; font-size: 15px; }
+.kart.haber .orj { overflow-wrap: anywhere; text-decoration: none; }
+.kart.haber .orj:hover { text-decoration: underline; }
+.filtre { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.filtre input[type=search] { flex: 1 1 200px; width: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.oybtn { min-width: 34px; }
+.oybtn[aria-pressed=true] { background: var(--blue-soft); color: var(--blue); border-color: transparent; }
+textarea.alan { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: inherit; color: inherit; resize: vertical; }
+.onizleme { line-height: 1.6; overflow-wrap: anywhere; }
+.onizleme h2 { font-size: 18px; margin: 14px 0 6px; }
+.onizleme p { margin: 0 0 10px; }
+.sohbet { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow: auto; }
+.sohbet .msj { display: flex; gap: 8px; align-items: flex-start; }
+.sohbet .msj .govde { background: var(--sunk); border-radius: 12px; padding: 8px 12px; max-width: 80%; overflow-wrap: anywhere; white-space: pre-wrap; }
+.sohbet .msj.ben { flex-direction: row-reverse; }
+.sohbet .msj.ben .govde { background: var(--blue-soft); }
+.tablo-kutu { overflow-x: auto; }

@@ -16,4 +16,5 @@ export type Profile = {
   notify_email: boolean;
   avatar_url: string | null;
   emoji: string | null;
+  interests: string;
 };
