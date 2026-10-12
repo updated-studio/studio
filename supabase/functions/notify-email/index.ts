@@ -1,13 +1,12 @@
 // Yeni bildirimleri e-posta olarak gönderir. Tetikleyici: notifications tablosuna ekleme (0003).
 // Gizli bilgi: GMAIL_APP_PASSWORD ve MAIL_FROM (Supabase > Edge Functions > Secrets). Koda yazılmaz.
-// Not: Supabase'de şu an çalışan sürümde gönderen adres koda gömülü; bir sonraki yayında bu sürüme geçilecek.
 // Not: Supabase panelinde "Verify JWT" kapalı; fonksiyon girdi almaz, sadece bekleyen bildirimleri işler.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.14";
 
 // Gönderen adres Supabase Secrets'taki MAIL_FROM'dan okunur (depo açık olduğu için kodda yazılmaz).
 const FROM = Deno.env.get("MAIL_FROM") ?? "";
-const PANEL = "https://eneshsahin.github.io/updated-panel/ekip/";
+const PANEL = "https://updated-studio.github.io/studio/";
 
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -18,7 +17,7 @@ function serviceKey(): string {
 
 Deno.serve(async () => {
   const pass = Deno.env.get("GMAIL_APP_PASSWORD");
-  if (!pass) return new Response("GMAIL_APP_PASSWORD yok", { status: 500 });
+  if (!pass || !FROM) return new Response("GMAIL_APP_PASSWORD veya MAIL_FROM yok", { status: 500 });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
 
   const { data: rows, error } = await sb.from("notifications")
@@ -46,7 +45,7 @@ Deno.serve(async () => {
     const mine = fresh.filter((r) => r.user_id === p.id);
     const subject = mine.length === 1 ? mine[0].body.slice(0, 90) : mine.length + " yeni bildirim";
     const text = "Merhaba " + p.name + ",\n\n" + mine.map((r) => "- " + r.body).join("\n") +
-      "\n\nPanel: " + PANEL + "\n\nBu e-postalari panelde Ekip > Profilim bolumunden kapatabilirsin.";
+      "\n\nPanel: " + PANEL + "\n\nBu e-postalari Studyo'da Ekip > Profilim bolumunden kapatabilirsin.";
     try {
       await tx.sendMail({ from: '"Updated Ekip Paneli" <' + FROM + ">", to: p.email, subject: "Updated: " + subject, text });
       sent++;
