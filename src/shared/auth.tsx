@@ -98,14 +98,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    let yedek = 0;
     const { data: sub } = sb.auth.onAuthStateChange((ev, s) => {
+      clearTimeout(yedek);
       if (ev === "PASSWORD_RECOVERY") setRecovering(true);
       if (ev === "USER_UPDATED") setRecovering(false);
       if (ev === "TOKEN_REFRESHED") return;
       setSession(s);
       setTimeout(async () => { await loadProfile(s); setReady(true); }, 0);
     });
-    return () => sub.subscription.unsubscribe();
+    // Güvenlik ağı: oturum olayı gecikirse (arka plandaki sekme, token yenileme) 6 sn sonra oturumu kendimiz okuruz.
+    yedek = window.setTimeout(async () => {
+      const { data } = await sb.auth.getSession();
+      setSession(data.session); await loadProfile(data.session); setReady(true);
+    }, 6000);
+    return () => { clearTimeout(yedek); sub.subscription.unsubscribe(); };
   }, []);
 
   if (!ready) return <div className="muted" style={{ textAlign: "center", marginTop: "20vh" }}>Yükleniyor…</div>;
