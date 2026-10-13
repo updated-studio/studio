@@ -33,6 +33,24 @@ function metinCikar(html: string): string {
   return satirlar.join("\n\n").slice(0, 16000);
 }
 
+// Sırayla dener: doğrudan sayfa → okuma servisi (r.jina.ai, sayfayı tarayıcı gibi açar) → diğer kaynaklar.
+async function haberMetni(linkler: string[]): Promise<string> {
+  const zamanli = async (url: string, h: Record<string, string>) => {
+    const c = new AbortController(); const t = setTimeout(() => c.abort(), 20000);
+    try { const r = await fetch(url, { headers: h, signal: c.signal }); return r.ok ? await r.text() : ""; }
+    catch { return ""; } finally { clearTimeout(t); }
+  };
+  for (const link of linkler.slice(0, 4)) {
+    const html = await zamanli(link, { "User-Agent": UA, Accept: "text/html" });
+    const dogrudan = html ? metinCikar(html) : "";
+    if (dogrudan.length >= 600) return dogrudan;
+    const okunan = (await zamanli("https://r.jina.ai/" + link, { Accept: "text/plain" })).slice(0, 16000);
+    if (okunan.length >= 600) return okunan;
+    if (dogrudan.length >= 300) return dogrudan;
+  }
+  return "";
+}
+
 async function gemini(model: string, istem: string, json: boolean): Promise<string> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY yok (Supabase Secrets)");
@@ -84,10 +102,8 @@ async function isle(sb: ReturnType<typeof createClient>, itemId: number, tur: "c
   try {
     const ayar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
     const model = String(ayar.model_taslak ?? "gemini-3.6-flash");
-    const r = await fetch(it.link, { headers: { "User-Agent": UA, Accept: "text/html" } });
-    if (!r.ok) throw new Error(`Kaynak sayfa açılmadı (HTTP ${r.status}). Site botları engelliyor olabilir.`);
-    const metin = metinCikar(await r.text());
-    if (metin.length < 300) throw new Error("Kaynak sayfadan haber metni okunamadı.");
+    const metin = await haberMetni([it.link, ...(it.other_sources ?? []).map((o: { link: string }) => o.link)]);
+    if (metin.length < 300) throw new Error("Haber metni hiçbir kaynaktan okunamadı (siteler otomatik okumayı engelliyor olabilir).");
 
     if (tur === "ceviri") {
       const ceviri = (await gemini(model, CEVIRI(it.title, metin), false)).trim();
