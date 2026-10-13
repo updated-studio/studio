@@ -8,3 +8,4 @@
 6. Çalışan araç, yenisi tamamen çalışana kadar kapatılmaz (kural 9).
 7. Arayüz metinleri Türkçe; renk ve yazı tipi `src/index.css` değişkenlerinden.
 8. Kullanıcı (Enes) teknik değil: kendisinin yapması gereken adımlarda ilgili sayfayı açıp önüne koy, işi ona yükleme; yapılan işlemi azaltan her otomasyon tercih edilir.
+9. Ekip katkı puanı kuralları tek yerde: `src/modules/ekip/Katki.tsx` içindeki `PUAN_KURALLARI` (ekrandaki açıklama buradan üretilir). Puanlamayı etkileyen her değişiklikte bu liste, `PUAN_SURUMU` tarihi ve ARCHITECTURE.md karar günlüğü birlikte güncellenir.

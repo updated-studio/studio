@@ -116,3 +116,5 @@ textarea.alan { width: 100%; background: var(--surface); border: 1px solid var(-
 .sohbet .msj.ben { flex-direction: row-reverse; }
 .sohbet .msj.ben .govde { background: var(--blue-soft); }
 .tablo-kutu { overflow-x: auto; }
+details.puanbilgi summary { cursor: pointer; font-size: 13px; color: var(--blue); font-weight: 500; }
+details.puanbilgi[open] { display: flex; flex-direction: column; gap: 8px; }

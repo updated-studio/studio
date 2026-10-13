@@ -6,7 +6,18 @@ import { useVeri } from "../../shared/veri";
 // Ekip katkısı: kim ne yaptı. Teşvik için sıralama + kişi profili.
 // Puan yayına giden işi ödüllendirir; sadece "almak" az puan getirir (sayı şişirmeyi önlemek için).
 export type Donem = "hafta" | "ay" | "hepsi";
-export const PUAN = { yayin: 3, alinan: 1, taslak: 1, is: 3, oy: 0.2 };
+
+// PUANLAMA KURALLARI: tek kaynak burası. Ekrandaki "Puan nasıl hesaplanır?" açıklaması bu listeden üretilir.
+// Kural değişince: listeyi güncelle, PUAN_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz.
+export const PUAN_SURUMU = "13 Ekim 2026";
+export const PUAN_KURALLARI = [
+  { k: "yayin", etiket: "Yayına giden haber", puan: 3, neden: "Asıl hedef bu: Haber Masası'nda aldığın haber yayında olarak işaretlenince." },
+  { k: "is", etiket: "Biten ekip işi", puan: 3, neden: "Ekip > İşler'de sana atanan iş tamamlandı olarak işaretlenince." },
+  { k: "alinan", etiket: "Alınan haber", puan: 1, neden: "Havuzdan haber aldığında. Az puan: almak tek başına iş değil." },
+  { k: "taslak", etiket: "Taslak", puan: 1, neden: "Haber Masası'nda taslak hazırladığında." },
+  { k: "oy", etiket: "Oy", puan: 0.2, neden: "Havuzdaki haberlere ▲▼ verdiğinde; yapay zekânın öğrenmesine katkı." },
+] as const;
+export const PUAN = Object.fromEntries(PUAN_KURALLARI.map((r) => [r.k, r.puan])) as Record<(typeof PUAN_KURALLARI)[number]["k"], number>;
 
 type Ham = {
   haber: { taken_by: string | null; status: string; taken_at: string | null; updated_at: string; event: string; title: string; link: string }[];
@@ -82,7 +93,7 @@ export function Siralama({ ac }: { ac: (id: string) => void }) {
           </tbody>
         </table>
       </div>
-      <div className="muted">Puan: yayına giden haber {PUAN.yayin}, biten ekip işi {PUAN.is}, alınan haber ve taslak {PUAN.alinan}, oy {PUAN.oy}.</div>
+      <PuanBilgisi />
     </div>
   );
 }
@@ -124,5 +135,23 @@ export function KisiProfil({ p, kapat }: { p: Profile; kapat: () => void }) {
         </div>
       </>}
     </>
+  );
+}
+
+/** Puanlama açıklaması: PUAN_KURALLARI'ndan üretilir, kural değişince kendiliğinden güncellenir. */
+export function PuanBilgisi() {
+  return (
+    <details className="puanbilgi">
+      <summary>Puan nasıl hesaplanır?</summary>
+      <div className="liste">
+        {PUAN_KURALLARI.map((r) => (
+          <div key={r.k} className="satir">
+            <div className="ana"><b>{r.etiket}</b><div className="muted">{r.neden}</div></div>
+            <span className="pill blue mono">+{String(r.puan).replace(".", ",")}</span>
+          </div>
+        ))}
+      </div>
+      <div className="muted">Dönem: "Bu hafta" pazartesiden, "Bu ay" ayın 1'inden başlar. Eşit puanda yayına giden haberi fazla olan öne geçer. Kurallar son güncelleme: {PUAN_SURUMU}.</div>
+    </details>
   );
 }
