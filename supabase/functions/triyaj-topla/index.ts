@@ -99,11 +99,13 @@ function jsonOku(ham: string): unknown {
 // Yoğunlukta ya da kota dolunca (429/500/503) sıradaki yedek modele, Gemini tamamen tıkanırsa ücretsiz yedek servise (Groq) geçer.
 let YEDEK_MODEL = "llama-3.3-70b-versatile"; // tr_settings.model_yedek ile değiştirilebilir
 async function gemini(model: string, kullanici: string, sistem = SISTEM): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
-  let son: unknown;
-  for (const m of [model, "gemini-3.5-flash", "gemini-3.6-flash"].filter((x, i, a) => a.indexOf(x) === i)) {
+  let son: unknown = GEMINI_TIKALI;
+  // Bu çalıştırmada Gemini kotası dolduysa her partide yeniden denenmez (zaman sınırı için), doğrudan yedeğe geçilir
+  if (!GEMINI_TIKALI) for (const m of [model, "gemini-3.5-flash", "gemini-3.6-flash"].filter((x, i, a) => a.indexOf(x) === i)) {
     try { return await geminiTek(m, kullanici, sistem); }
     catch (e) { son = e; if (!/ (429|500|503):/.test(String(e))) throw e; }
   }
+  if (son && / 429:/.test(String(son))) GEMINI_TIKALI = String(son);
   if (Deno.env.get("GROQ_API_KEY")) {
     try { return await groq(kullanici, sistem); }
     catch (e) { throw new Error(String(son) + " | Yedek (Groq) da olmadı: " + String((e as Error).message ?? e).slice(0, 200)); }
@@ -126,6 +128,7 @@ async function groq(kullanici: string, sistem: string): Promise<Record<string, a
   return veri;
 }
 let YEDEK_KULLANILDI = false;
+let GEMINI_TIKALI = "";
 
 async function geminiTek(model: string, kullanici: string, sistem: string): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const key = Deno.env.get("GEMINI_API_KEY");
@@ -152,8 +155,8 @@ async function geminiTek(model: string, kullanici: string, sistem: string): Prom
       continue;
     }
     son = r.status + ": " + govde.slice(0, 200);
-    if (![429, 500, 503].includes(r.status)) break;
-    await new Promise((x) => setTimeout(x, 5000));
+    if (r.status === 429 || ![500, 503].includes(r.status) || deneme >= 1) break; // kota dolu: bekleme, hemen sonraki modele geç
+    await new Promise((x) => setTimeout(x, 3000));
   }
   throw new Error("Gemini yanıt vermedi. " + son);
 }
@@ -182,6 +185,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const model = String(ayarlar.model_eleme ?? "gemini-3.5-flash-lite");
   if (ayarlar.model_yedek) YEDEK_MODEL = String(ayarlar.model_yedek);
   YEDEK_KULLANILDI = false;
+  GEMINI_TIKALI = "";
 
   const [{ data: kaynaklar }, { data: markalar }] = await Promise.all([
     sb.from("tr_sources").select("id,name,url").eq("active", true).order("id"),
