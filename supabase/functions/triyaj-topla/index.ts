@@ -181,7 +181,10 @@ async function topla(sb: ReturnType<typeof createClient>) {
       let sonuc: Record<string, unknown>[] = [];
       try {
         const j = await gemini(model, istemYaz(p, baglam));
-        sonuc = Array.isArray(j) ? j as Record<string, unknown>[] : [];
+        // Model bazen diziyi bir nesnenin içine sarar ({"haberler":[...]}); ikisini de kabul et.
+        const dizi = Array.isArray(j) ? j : Object.values((j ?? {}) as Record<string, unknown>).find(Array.isArray) ?? [];
+        sonuc = (dizi as Record<string, unknown>[]).map((x, k) => ({ ...x, i: x.i ?? k }));
+        if (!sonuc.length) hata = "Yapay zekâ boş yanıt verdi";
       } catch (e) {
         hata = String(e).slice(0, 300);
       }
