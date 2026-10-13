@@ -66,7 +66,8 @@ async function gemini(model: string, istem: string): Promise<unknown> {
   if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
   const j = await r.json();
   const metin = j?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
-  return JSON.parse(metin);
+  // Modelin metin içine koyduğu kontrol karakterleri JSON'u bozar; boşluğa çevir.
+  try { return JSON.parse(metin); } catch { return JSON.parse(metin.replace(/[\u0000-\u001F]+/g, " ")); }
 }
 
 function istemYaz(haberler: Ham[], baglam: { markalar: string; editorler: string; geriBildirim: string; adaylar: string }): string {
