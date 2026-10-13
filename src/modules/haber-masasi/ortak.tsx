@@ -65,8 +65,9 @@ export function OncelikBilgisi() {
 }
 
 /** Eski panelin filtreleri: öncelik çipleri + marka / kategori / kaynak seçimi */
-export function useFiltre(liste: Haber[], degerle: (h: Haber) => Degerlendirme) {
-  const [oncelik, setOncelik] = useState("hepsi");
+// "onemli" = Beklet dışındakiler (Hemen yaz + Yazılabilir); havuzun varsayılan görünümü (Enes: ~20 haberlik liste)
+export function useFiltre(liste: Haber[], degerle: (h: Haber) => Degerlendirme, varsayilan: "hepsi" | "onemli" = "hepsi") {
+  const [oncelik, setOncelik] = useState<string>(varsayilan);
   const [marka, setMarka] = useState("hepsi");
   const [konu, setKonu] = useState("hepsi");
   const [kaynak, setKaynak] = useState("hepsi");
@@ -75,7 +76,8 @@ export function useFiltre(liste: Haber[], degerle: (h: Haber) => Degerlendirme) 
     liste.forEach((h) => { const k = f(h).trim(); if (k) o.set(k, (o.get(k) ?? 0) + 1); });
     return [...o.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr")).map(([k]) => k);
   };
-  const sonuc = liste.filter((h) => (oncelik === "hepsi" || degerle(h).seviye.ad === oncelik)
+  const enAlt = SEVIYELER[SEVIYELER.length - 1].ad;
+  const sonuc = liste.filter((h) => (oncelik === "hepsi" || (oncelik === "onemli" ? degerle(h).seviye.ad !== enAlt : degerle(h).seviye.ad === oncelik))
     && (marka === "hepsi" || h.brand.trim() === marka) && (konu === "hepsi" || h.topic.trim() === konu) && (kaynak === "hepsi" || h.source_name.trim() === kaynak));
   const sec = (ad: string, deger: string, set: (s: string) => void, f: (h: Haber) => string) => (
     <select value={deger} onChange={(e) => set(e.target.value)} style={{ width: "auto" }} aria-label={ad}>
@@ -86,8 +88,10 @@ export function useFiltre(liste: Haber[], degerle: (h: Haber) => Degerlendirme) 
   const ui = (
     <>
       <div className="filtre">
-        {["hepsi", ...SEVIYELER.map((s) => s.ad)].map((o) => (
-          <button key={o} className="chip" aria-pressed={oncelik === o} onClick={() => setOncelik(o)}>{o === "hepsi" ? "Tüm öncelikler" : o}</button>
+        {[...(varsayilan === "onemli" ? ["onemli"] : []), "hepsi", ...SEVIYELER.map((s) => s.ad)].map((o) => (
+          <button key={o} className="chip" aria-pressed={oncelik === o} onClick={() => setOncelik(o)}>
+            {o === "onemli" ? `Önemliler (${liste.filter((h) => degerle(h).seviye.ad !== enAlt).length})` : o === "hepsi" ? `Tümü (${liste.length})` : o}
+          </button>
         ))}
       </div>
       <div className="filtre">

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { sb } from "../../shared/supabase";
 
 // Haber Masası'nın kendi canlı verisi. Sadece bu modül açıkken yüklenir.
-export type Durum = "aday" | "belirsiz" | "elendi" | "alindi" | "pas" | "yayinda";
+export type Durum = "aday" | "belirsiz" | "elendi" | "alindi" | "pas" | "yayinda" | "rehber";
 export type Haber = {
   id: number; created_at: string; published_at: string | null; source_name: string; link: string; title: string;
   event: string; brand: string; product: string; kind: string; topic: string; priority: number; news_type: string; ai_note: string; model: string;
@@ -45,7 +45,7 @@ export function MasaProvider({ children }: { children: ReactNode }) {
   const yenile = useCallback(async () => {
     const q = await Promise.all([
       // Havuz, belirsiz ve elenenlerin tamamı (saklama kuralı zaten 3 günde temizliyor) + son 30 günün alınan/pas/yayında haberleri
-      sb.from("tr_items").select("*").in("status", ["aday", "belirsiz", "elendi"]).order("published_at", { ascending: false }).limit(2000),
+      sb.from("tr_items").select("*").in("status", ["aday", "belirsiz", "elendi", "rehber"]).order("published_at", { ascending: false }).limit(2000),
       sb.from("tr_items").select("*").in("status", ["alindi", "pas", "yayinda"]).gte("updated_at", OTUZ_GUN()).order("updated_at", { ascending: false }).limit(1000),
       sb.from("tr_votes").select("id,item_id,user_id,value,note,created_at,brand,topic,event,link"),
       sb.from("tr_drafts").select("*").order("updated_at", { ascending: false }).limit(300),

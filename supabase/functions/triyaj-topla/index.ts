@@ -32,6 +32,9 @@ Alanlar:
 Sadece şu biçimde geçerli JSON döndür, başka hiçbir şey yazma:
 {"haberler":[{"id":1,"marka":"","urun":"","tur":"","tip":"","konu":"","turkiye":"","asil_kaynak":"","olay":"","neden":""}]}`;
 
+const AYNI_SISTEM = `Sen bir haber masası asistanısın. Sana "mevcut kartlar" ve "yeni haberler" listesi verilecek. Her yeni haber için, AYNI OLAYI (aynı ürün, aynı duyuru, aynı sızıntı, aynı gelişme) anlatan bir mevcut kart varsa onun id'sini ver; yoksa null ver. Sadece aynı markadan ya da benzer konudan olması yetmez; olay birebir aynı olmalı. Emin değilsen null ver.
+Sadece şu biçimde geçerli JSON döndür: {"eslesme":[{"yeni":0,"mevcut":123}]}`;
+
 type Kaynak = { id: number; name: string; url: string };
 type Ham = { source: Kaynak; title: string; link: string; date: Date | null; ozet: string };
 type Etiket = { id: number; marka?: string; urun?: string; tur?: string; tip?: string; konu?: string; turkiye?: string; asil_kaynak?: string; olay?: string; neden?: string };
@@ -93,7 +96,7 @@ function jsonOku(ham: string): unknown {
 }
 
 // Eski tr_gemini_: 3 deneme, ilk sıcaklık 0; 429/500/503'te 5 sn bekleyip tekrar
-async function gemini(model: string, kullanici: string): Promise<{ haberler?: Etiket[] }> {
+async function gemini(model: string, kullanici: string, sistem = SISTEM): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY yok");
   let son = "";
@@ -102,7 +105,7 @@ async function gemini(model: string, kullanici: string): Promise<{ haberler?: Et
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SISTEM }] },
+        systemInstruction: { parts: [{ text: sistem }] },
         contents: [{ role: "user", parts: [{ text: kullanici }] }],
         generationConfig: { temperature: deneme ? 0.3 : 0, responseMimeType: "application/json", maxOutputTokens: 16000 },
       }),
@@ -111,7 +114,7 @@ async function gemini(model: string, kullanici: string): Promise<{ haberler?: Et
     if (r.ok) {
       const j = JSON.parse(govde);
       const metin = (j?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
-      const veri = jsonOku(metin) as { haberler?: Etiket[] } | null;
+      const veri = jsonOku(metin) as Record<string, any> | null; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (veri) return veri;
       son = "geçersiz JSON döndü";
       await new Promise((x) => setTimeout(x, 2000));
@@ -223,7 +226,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
       const liste = p.map((h, i) => `${ilk + i + 1}. [${h.source.name}] ${h.title}\n Özet: ${h.ozet}`).join("\n\n");
       try {
         const v = await gemini(model, liste);
-        (v.haberler ?? []).forEach((e) => etiketler.set(Number(e.id), e));
+        ((v.haberler ?? []) as Etiket[]).forEach((e) => etiketler.set(Number(e.id), e));
         p.forEach((_, i) => islenen.add(ilk + i + 1));
       } catch (e) { hata = String((e as Error).message ?? e).slice(0, 300); }
     }));
@@ -233,6 +236,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const MODEL = model + " · Stüdyo";
   const elenen: Record<string, unknown>[] = [...onElenen];
   const belirsiz: Record<string, unknown>[] = [];
+  const rehber: Record<string, unknown>[] = [];
   const kalan: { h: Ham; e: Etiket }[] = [];
   adaylar.forEach((h, i) => {
     const id = i + 1;
@@ -245,7 +249,8 @@ async function topla(sb: ReturnType<typeof createClient>) {
     const kayit = pazar.find((p) => p.grup !== "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
     const grup = haric ? "Hariç" : kayit ? kayit.grup : "Listede yok";
     if (haric) { elenen.push(satir(h, { ...ortak, reason: "Hariç listesinde: " + haric.orj })); return; }
-    if (["kampanya", "rehber"].includes(String(e.tur))) { elenen.push(satir(h, { ...ortak, reason: "Tür: " + TUR[String(e.tur)] })); return; }
+    if (e.tur === "rehber") { rehber.push(satir(h, { ...ortak, status: "rehber", event: String(e.neden ?? "").slice(0, 400) })); return; } // Enes: rehber/liste içerik elenmez, "Rehber fikirleri"ne düşer
+    if (e.tur === "kampanya") { elenen.push(satir(h, { ...ortak, reason: "Tür: " + TUR[String(e.tur)] })); return; }
     if (e.turkiye === "belirsiz") { belirsiz.push(satir(h, { ...ortak, status: "belirsiz", reason: String(e.neden ?? "").slice(0, 300), event: String(e.neden ?? "").slice(0, 400), turkey: "belirsiz" })); return; }
     if (e.turkiye === "yok" && grup !== "Öncelikli") { elenen.push(satir(h, { ...ortak, reason: "Türkiye ile ilgisi yok: " + String(e.neden ?? "") })); return; }
     kalan.push({ h, e });
@@ -265,6 +270,25 @@ async function topla(sb: ReturnType<typeof createClient>) {
       .neq("status", "elendi").gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString());
     (data ?? []).forEach((r: { id: number; event_key: string; other_sources: { name: string; link: string }[]; source_name: string }) => { if (!mevcut.has(r.event_key)) mevcut.set(r.event_key, r); });
   }
+  // Olay kimliği tutmayanlar için: yapay zekâ yeni haberi son 48 saatteki kartlarla karşılaştırır (aynı olay farklı turda gelmesin)
+  const eslesmeyen = [...olaylar.entries()].filter(([a]) => !mevcut.has(a));
+  if (eslesmeyen.length && !hata) {
+    try {
+      const { data: son } = await sb.from("tr_items").select("id,brand,event,title,other_sources,source_name,event_key")
+        .in("status", ["aday", "alindi", "yayinda", "pas", "belirsiz"]).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
+        .order("created_at", { ascending: false }).limit(250);
+      const liste = (son ?? []) as { id: number; brand: string; event: string; title: string; other_sources: { name: string; link: string }[]; source_name: string; event_key: string }[];
+      if (liste.length) {
+        const istem = `MEVCUT KARTLAR (id | marka | olay):\n${liste.map((x) => `${x.id} | ${x.brand} | ${x.event || x.title}`).join("\n")}\n\nYENİ HABERLER (n | marka | olay | başlık):\n${eslesmeyen.map(([, g], n) => `${n} | ${g[0].e.marka ?? ""} | ${g[0].e.neden ?? ""} | ${g[0].h.title}`).join("\n")}`;
+        const v = await gemini(model, istem, AYNI_SISTEM);
+        for (const e of (v.eslesme ?? []) as { yeni: number; mevcut: number | null }[]) {
+          const kart = liste.find((x) => x.id === Number(e.mevcut));
+          const grup = eslesmeyen[Number(e.yeni)];
+          if (kart && grup) mevcut.set(grup[0], kart);
+        }
+      }
+    } catch (e) { console.error("eşleştirme hatası", e); }
+  }
   const yeniAday: Record<string, unknown>[] = [];
   const goruldu: string[] = [];
   for (const [anahtar, g] of olaylar) {
@@ -272,7 +296,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
     const eski = mevcut.get(anahtar);
     if (eski) {
       const ek = g.map((x) => ({ name: x.h.source.name, link: x.h.link })).filter((x) => !eski.other_sources.some((o) => o.link === x.link));
-      if (ek.length) await sb.from("tr_items").update({ other_sources: [...eski.other_sources, ...ek] }).eq("id", eski.id);
+      if (ek.length) { eski.other_sources = [...eski.other_sources, ...ek]; await sb.from("tr_items").update({ other_sources: eski.other_sources }).eq("id", eski.id); }
       goruldu.push(...g.map((x) => x.h.link));
       continue;
     }
@@ -292,13 +316,13 @@ async function topla(sb: ReturnType<typeof createClient>) {
   }
 
   try {
-    await yaz([...yeniAday, ...elenen, ...belirsiz]);
+    await yaz([...yeniAday, ...elenen, ...belirsiz, ...rehber]);
     if (goruldu.length) await sb.from("tr_seen").upsert(goruldu.map((link) => ({ link })), { onConflict: "link", ignoreDuplicates: true });
   } catch (e) { hata = String((e as Error).message ?? e).slice(0, 300); }
 
   const ozet = {
     kaynak: kaynaklar?.length ?? 0, okunan: tumLinkler.length, yeni: gorulen.size, kural: onElenen.length, sirada,
-    yapayZeka: islenen.size, aday: yeniAday.length, elenen: elenen.length, belirsiz: belirsiz.length,
+    yapayZeka: islenen.size, aday: yeniAday.length, elenen: elenen.length, belirsiz: belirsiz.length, rehber: rehber.length,
     bekleyen: sirada + adaylar.length - islenen.size, hata, sure: Date.now() - bas,
   };
   await sb.from("tr_settings").upsert({ key: "son_toplama", value: { ...ozet, durum: "bitti", zaman: new Date().toISOString() } });
@@ -306,12 +330,51 @@ async function topla(sb: ReturnType<typeof createClient>) {
   return ozet;
 }
 
+// Tek seferlik / yönetici: havuzdaki (son 48 saat, kimsenin dokunmadığı) aynı olaya ait kartları birleştirir.
+async function birlestir(sb: ReturnType<typeof createClient>, model: string) {
+  const { data } = await sb.from("tr_items").select("id,brand,event,title,link,source_name,other_sources,touched,published_at")
+    .eq("status", "aday").gte("created_at", new Date(Date.now() - 72 * 3600_000).toISOString()).order("published_at").limit(600);
+  const liste = (data ?? []) as { id: number; brand: string; event: string; title: string; link: string; source_name: string; other_sources: { name: string; link: string }[]; touched: boolean }[];
+  const markalar = new Map<string, typeof liste>();
+  liste.forEach((x) => { const m = (x.brand || "—").toLowerCase(); markalar.set(m, [...(markalar.get(m) ?? []), x]); });
+  let birlesen = 0;
+  for (const grup of markalar.values()) {
+    if (grup.length < 2) continue;
+    const v = await gemini(model, grup.map((x) => `${x.id} | ${x.event || x.title}`).join("\n"), GRUP_SISTEM);
+    for (const kume of (v.gruplar ?? []) as number[][]) {
+      const kartlar = kume.map((id) => grup.find((x) => x.id === Number(id))).filter(Boolean) as typeof liste;
+      if (kartlar.length < 2) continue;
+      const tutulan = kartlar.find((x) => x.touched) ?? kartlar[0];
+      const digerleri = kartlar.filter((x) => x !== tutulan && !x.touched);
+      if (!digerleri.length) continue;
+      const ek = digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources]);
+      const tum = [...tutulan.other_sources];
+      ek.forEach((o) => { if (o.link !== tutulan.link && !tum.some((t) => t.link === o.link)) tum.push(o); });
+      await sb.from("tr_items").update({ other_sources: tum }).eq("id", tutulan.id);
+      await sb.from("tr_seen").upsert(digerleri.map((x) => ({ link: x.link })), { onConflict: "link", ignoreDuplicates: true });
+      await sb.from("tr_items").delete().in("id", digerleri.map((x) => x.id)).eq("touched", false);
+      birlesen += digerleri.length;
+    }
+  }
+  return { kart: liste.length, birlesen };
+}
+
+const GRUP_SISTEM = `Sana aynı markaya ait numaralı haber kartları verilecek (id | olay). AYNI OLAYI anlatan kartları gruplandır (aynı ürün duyurusu, aynı sızıntı, aynı gelişme). Sadece birebir aynı olaylar bir gruba girer; emin değilsen gruplama. Tek kartlık grupları yazma.
+Sadece şu biçimde geçerli JSON döndür: {"gruplar":[[12,15],[20,31,33]]}`;
+
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
   const govde = await req.json().catch(() => ({}));
+  if (govde?.birlestir) {
+    const { data: u } = await sb.auth.getUser((req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, ""));
+    const { data: p } = u?.user ? await sb.from("profiles").select("is_admin").eq("id", u.user.id).maybeSingle() : { data: null };
+    if (!p?.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
+    const ay = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
+    return Response.json(await birlestir(sb, String(ay.model_eleme ?? "gemini-3.5-flash-lite")), { headers: CORS });
+  }
   const { data } = await sb.from("tr_settings").select("value").eq("key", "son_toplama").maybeSingle();
   const son = data?.value?.zaman ? Date.parse(data.value.zaman) : 0;
   if (Date.now() - son < 5 * 60_000 && !govde?.zorla) return Response.json({ atlandi: "Son 5 dakikada çalıştı" }, { headers: CORS });

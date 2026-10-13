@@ -18,7 +18,7 @@ export function elKat(n: string) {
 }
 
 // Havuz (eski "Yeni"), Pas, Belirsiz ve Elenenler aynı listeyi farklı eylemlerle kullanır.
-export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" | "belirsiz" | "elendi"> }) {
+export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" | "belirsiz" | "elendi" | "rehber"> }) {
   const { v } = useMasa();
   const { profile } = useAuth();
   const toast = useToast();
@@ -40,7 +40,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
     if (durum === "aday") return sirala(secili, v.oylar, v.haberler);
     return { liste: [...secili].sort((a, b) => Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at)), d: undefined };
   }, [v.haberler, v.oylar, durum, ara]);
-  const filtre = useFiltre(sirali, (h) => d?.get(h.id) ?? degerle(h));
+  const filtre = useFiltre(sirali, (h) => d?.get(h.id) ?? degerle(h), durum === "aday" ? "onemli" : "hepsi");
 
   let liste = durum === "elendi" ? sirali : filtre.sonuc;
   // "Bana göre": önerilen editörü ben olanlar üstte; ortak sıra değişmez, sadece benim görünümüm
@@ -97,6 +97,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
       {durum === "aday" && <OncelikBilgisi />}
       {durum === "aday" && gorunum === "bana" && !ilgiVar && <div className="msg err">"Bana göre" için Profilim'de ilgi alanlarını yaz (ör. sony, kamera, playstation).</div>}
       <div className="muted">{liste.length} haber</div>
+      {durum === "rehber" && <div className="muted">Yabancı kaynakların rehber ve liste içerikleri ("en iyi 10 kulaklık", "nasıl yapılır"). Kendi rehberimizi yazmak için fikir; puanlanmaz.</div>}
       {!liste.length && <div className="empty">{durum === "aday" ? "Havuz boş. Yeni haberler 15 dakikada bir gelir." : "Burada haber yok."}</div>}
       <div className="cards">
         {liste.slice(0, kac).map((h) => {
@@ -117,6 +118,10 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
                 <button className="btn sm" onClick={() => durumYap(h, "aday", {}, "Havuza alındı.")}>Havuza al</button>
                 <button className="btn ghost sm" onClick={() => al(h)}>Al</button>
                 <button className="btn ghost sm" onClick={() => durumYap(h, "elendi", { reason: "Ekip eledi" })}>Ele</button>
+              </>}
+              {durum === "rehber" && <>
+                <button className="btn sm" onClick={() => al(h)}>Ben yazarım</button>
+                <button className="btn ghost sm" onClick={() => durumYap(h, "elendi", { reason: "Ekip eledi (rehber)" })}>İlgilenmiyoruz</button>
               </>}
               {durum === "elendi" && <>
                 <a className="btn ghost sm" href={h.link} target="_blank" rel="noreferrer">Habere bak ↗</a>

@@ -11,7 +11,7 @@ import Taslaklar from "./Taslaklar";
 import { MasaProvider, useMasa, type Etkinlik } from "./veri";
 
 // Haber Masası (eski adıyla Triyaj): kaynaklardan gelen haberler, ekip iş akışı, taslaklar.
-type Bolum = "havuz" | "benim" | "pas" | "taslak" | "belirsiz" | "elenen" | "sohbet" | "kaynak" | "ayar";
+type Bolum = "havuz" | "benim" | "pas" | "taslak" | "rehber" | "belirsiz" | "elenen" | "sohbet" | "kaynak" | "ayar";
 
 const TUR: Record<string, string> = { "aldı": "haberi aldı", "yayında": "haberi yayına aldı", "pas": "haberi pas geçti", "bıraktı": "haberi bıraktı", "geri aldı": "haberi pastan geri aldı" };
 const metin = (r: Etkinlik) => (r.kind === "aktar" ? <><b>{r.actor_name}</b> → <b>{r.target_name}</b> haberi aktardı</> : <><b>{r.actor_name}</b> {TUR[r.kind] ?? r.kind}</>);
@@ -46,7 +46,7 @@ function Masa() {
   const sorunlu = profile!.is_admin ? sorunluKaynaklar(v.kaynaklar).length : 0;
   const bolumler: [Bolum, string][] = [
     ["havuz", `Yeni ${say("aday")}`], ["benim", `Benim aldıklarım ${benim.length}${yeniAktarim ? " •" : ""}`], ["pas", `Pas ${say("pas")}`],
-    ["taslak", "Taslaklar"], ["belirsiz", `Belirsiz ${say("belirsiz")}`], ["elenen", `Elenenler ${say("elendi")}`], ["sohbet", "Sohbet"],
+    ["taslak", "Taslaklar"], ["rehber", `Rehber fikirleri ${say("rehber")}`], ["belirsiz", `Belirsiz ${say("belirsiz")}`], ["elenen", `Elenenler ${say("elendi")}`], ["sohbet", "Sohbet"],
     ["kaynak", `Kaynaklar${sorunlu ? " ⚠ " + sorunlu : ""}`],
   ];
   if (profile!.is_admin) bolumler.push(["ayar", "Ayarlar"]);
@@ -83,6 +83,7 @@ function Masa() {
       {bolum === "benim" && <Benim taslakAc={(id) => { setTaslak(id); setBolum("taslak"); }} />}
       {bolum === "pas" && <Havuz durum="pas" />}
       {bolum === "taslak" && <Taslaklar acik={taslak} setAcik={setTaslak} />}
+      {bolum === "rehber" && <Havuz durum="rehber" />}
       {bolum === "belirsiz" && <Havuz durum="belirsiz" />}
       {bolum === "elenen" && <Havuz durum="elendi" />}
       {bolum === "sohbet" && <Sohbet />}
