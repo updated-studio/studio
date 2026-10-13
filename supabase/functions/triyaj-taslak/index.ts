@@ -51,7 +51,21 @@ async function haberMetni(linkler: string[]): Promise<string> {
   return "";
 }
 
+// Yoğunluk (429/503) hatasında bekleyip yeniden dener; olmazsa yedek modelle dener.
 async function gemini(model: string, istem: string, json: boolean): Promise<string> {
+  const modeller = [model, "gemini-3.5-flash"].filter((m, k, a) => a.indexOf(m) === k);
+  let son: unknown;
+  for (const m of modeller) {
+    for (const bekle of [0, 3000, 8000]) {
+      if (bekle) await new Promise((r) => setTimeout(r, bekle));
+      try { return await geminiTek(m, istem, json); }
+      catch (e) { son = e; if (!/ (429|500|503)/.test(String(e))) throw e; }
+    }
+  }
+  throw son;
+}
+
+async function geminiTek(model: string, istem: string, json: boolean): Promise<string> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY yok (Supabase Secrets)");
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {

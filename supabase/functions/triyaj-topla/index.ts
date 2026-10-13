@@ -55,7 +55,21 @@ async function getir(url: string, ms = 12000): Promise<Response> {
   finally { clearTimeout(t); }
 }
 
+// Yoğunluk (429/503) hatasında bekleyip yeniden dener; olmazsa yedek modelle dener.
 async function gemini(model: string, istem: string): Promise<unknown> {
+  const modeller = [model, "gemini-3.5-flash"].filter((m, k, a) => a.indexOf(m) === k);
+  let son: unknown;
+  for (const m of modeller) {
+    for (const bekle of [0, 3000, 8000]) {
+      if (bekle) await new Promise((r) => setTimeout(r, bekle));
+      try { return await geminiTek(m, istem); }
+      catch (e) { son = e; if (!/ (429|500|503)/.test(String(e))) throw e; }
+    }
+  }
+  throw son;
+}
+
+async function geminiTek(model: string, istem: string): Promise<unknown> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY yok");
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
