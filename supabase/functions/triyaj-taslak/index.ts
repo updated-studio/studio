@@ -53,7 +53,7 @@ async function haberMetni(linkler: string[]): Promise<string> {
 
 // Yoğunluk (429/503) hatasında bekleyip yeniden dener; olmazsa yedek modelle dener.
 async function gemini(model: string, istem: string, json: boolean): Promise<string> {
-  const modeller = [model, "gemini-3.5-flash"].filter((m, k, a) => a.indexOf(m) === k);
+  const modeller = [model, "gemini-3.5-flash", "gemini-3.5-flash-lite"].filter((m, k, a) => a.indexOf(m) === k);
   let son: unknown;
   for (const m of modeller) {
     for (const bekle of [0, 3000, 8000]) {
