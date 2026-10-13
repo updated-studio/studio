@@ -24,7 +24,7 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
   const ekip = v.haberler.filter((h) => h.status === "alindi");
   const yayinda = v.haberler.filter((h) => h.status === "yayinda");
   const ham = (kim === "ben" ? benim : kim === "ekip" ? ekip : yayinda)
-    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
+    .sort((a, b) => Date.parse(b.taken_at ?? b.published_at ?? b.created_at) - Date.parse(a.taken_at ?? a.published_at ?? a.created_at));
   const filtre = useFiltre(ham, degerle);
 
   const guncelle = (h: Haber, ek: Partial<Haber>, mesaj?: string) => iyimser(
