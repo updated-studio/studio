@@ -5,7 +5,7 @@ import { sb } from "../../shared/supabase";
 export type Durum = "aday" | "belirsiz" | "elendi" | "alindi" | "pas" | "yayinda";
 export type Haber = {
   id: number; created_at: string; published_at: string | null; source_name: string; link: string; title: string;
-  event: string; brand: string; product: string; kind: string; topic: string; priority: number; ai_note: string; model: string;
+  event: string; brand: string; product: string; kind: string; topic: string; priority: number; news_type: string; ai_note: string; model: string;
   status: Durum; reason: string; wrong_by: string | null; other_sources: { name: string; link: string }[];
   suggested_editor: string | null; taken_by: string | null; taken_at: string | null; transfer_from: string | null;
   transfer_seen: boolean; last_dropped_by: string | null; translation: string; work_state: "" | "ceviri" | "taslak" | "hata";

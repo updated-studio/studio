@@ -9,3 +9,4 @@
 7. Arayüz metinleri Türkçe; renk ve yazı tipi `src/index.css` değişkenlerinden.
 8. Kullanıcı (Enes) teknik değil: kendisinin yapması gereken adımlarda ilgili sayfayı açıp önüne koy, işi ona yükleme; yapılan işlemi azaltan her otomasyon tercih edilir.
 9. Ekip katkı puanı kuralları tek yerde: `src/modules/ekip/Katki.tsx` içindeki `PUAN_KURALLARI` (ekrandaki açıklama buradan üretilir). Puanlamayı etkileyen her değişiklikte bu liste, `PUAN_SURUMU` tarihi ve ARCHITECTURE.md karar günlüğü birlikte güncellenir.
+10. Haber Masası öncelik kuralları tek yerde: `src/modules/haber-masasi/oncelik.ts` (haber türü puanları, ek puanlar, seviyeler, oy etkisi, çeşitlilik). Ekrandaki "Öncelik nasıl hesaplanır?" açıklaması ve kart gerekçeleri buradan üretilir. Değişiklikte bu dosya, `ONCELIK_SURUMU` ve ARCHITECTURE.md karar günlüğü birlikte güncellenir. Yapay zekânın haber türü listesi (`triyaj-topla` istemi) `HABER_TURLERI` ile aynı tutulur.

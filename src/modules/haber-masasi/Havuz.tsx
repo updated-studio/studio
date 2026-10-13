@@ -2,11 +2,12 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
-import { HaberKart } from "./ortak";
+import { HaberKart, OncelikBilgisi, useHaric } from "./ortak";
+import { sirala, SEVIYELER } from "./oncelik";
 import { useIyimser, useMasa, type Durum, type Haber } from "./veri";
 
 // Havuz, Belirsiz ve Elenenler aynı listeyi farklı eylemlerle kullanır.
-export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "belirsiz" | "elendi"> }) {
+export default function Havuz({ durum: ilkDurum }: { durum: Extract<Durum, "aday" | "belirsiz" | "elendi"> }) {
   const { v } = useMasa();
   const { profile } = useAuth();
   const toast = useToast();
@@ -14,20 +15,31 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "belir
   const ben = profile!.id;
   const [ara, setAra] = useState("");
   const [konu, setKonu] = useState("");
-  const [enAz, setEnAz] = useState(durum === "aday" ? 0 : 0);
+  const [enAz, setEnAz] = useState(0);
+  const [gorunum, setGorunum] = useState<"herkes" | "bana">("herkes");
+  const [pasGoster, setPasGoster] = useState(false);
+  const durum: Durum = ilkDurum === "aday" && pasGoster ? "pas" : ilkDurum;
+  const haric = useHaric();
+  const ilgiler = (profile!.interests ?? "").toLocaleLowerCase("tr").split(/[,;]+/).map((x) => x.trim()).filter((x) => x.length > 1);
+  const banaUygun = (h: Haber) => ilgiler.length > 0 && ilgiler.some((i) => [h.brand, h.product, h.topic, h.event].join(" ").toLocaleLowerCase("tr").includes(i));
   const [notAcik, setNotAcik] = useState<number | null>(null);
   const [kac, setKac] = useState(60);
 
-  const liste = useMemo(() => {
+  const { liste, d } = useMemo(() => {
     const q = ara.trim().toLocaleLowerCase("tr");
-    return v.haberler.filter((h) => h.status === durum)
+    const secili = v.haberler.filter((h) => h.status === durum)
       .filter((h) => !konu || h.topic === konu)
-      .filter((h) => h.priority >= enAz)
-      .filter((h) => !q || [h.event, h.title, h.brand, h.product, h.source_name].join(" ").toLocaleLowerCase("tr").includes(q))
-      .sort((a, b) => durum === "aday"
-        ? b.priority - a.priority || Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at)
-        : Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at));
-  }, [v.haberler, durum, konu, enAz, ara]);
+      .filter((h) => !q || [h.event, h.title, h.brand, h.product, h.source_name].join(" ").toLocaleLowerCase("tr").includes(q));
+    if (durum !== "aday") {
+      const tarih = [...secili].sort((a, b) => Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at));
+      return { liste: tarih, d: undefined };
+    }
+    const r = sirala(secili, v.oylar, v.haberler, haric);
+    let l = r.liste.filter((h) => r.d.get(h.id)!.puan >= enAz);
+    // "Bana göre": ilgi alanıma uyanlar üstte; ortak sıra değişmez, sadece benim görünümüm
+    if (gorunum === "bana") l = [...l.filter(banaUygun), ...l.filter((h) => !banaUygun(h))];
+    return { liste: l, d: r.d };
+  }, [v.haberler, v.oylar, durum, konu, enAz, ara, gorunum, haric.size]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const konular = useMemo(() => {
     const say = new Map<string, number>();
@@ -86,11 +98,17 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "belir
     <>
       <div className="filtre">
         <input type="search" placeholder="Ara: marka, ürün, kaynak…" value={ara} onChange={(e) => setAra(e.target.value)} aria-label="Haberlerde ara" />
-        {durum === "aday" && (
-          <select value={enAz} onChange={(e) => setEnAz(Number(e.target.value))} style={{ width: "auto" }} aria-label="En az öncelik">
-            <option value={0}>Tüm öncelikler</option><option value={3}>P3 ve üstü</option><option value={4}>P4 ve üstü</option><option value={5}>Sadece P5</option>
+        {ilkDurum === "aday" && !pasGoster && <>
+          <div className="segment" role="group" aria-label="Görünüm">
+            <button aria-pressed={gorunum === "herkes"} onClick={() => setGorunum("herkes")}>Herkes için</button>
+            <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiler.length ? "İlgi alanlarına uyanlar üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
+          </div>
+          <select value={enAz} onChange={(e) => setEnAz(Number(e.target.value))} style={{ width: "auto" }} aria-label="Seviye">
+            <option value={0}>Tüm seviyeler</option>
+            {SEVIYELER.filter((x) => x.enAz > 0).map((x) => <option key={x.ad} value={x.enAz}>{x.ad} ve üstü</option>)}
           </select>
-        )}
+        </>}
+        {ilkDurum === "aday" && <button className="btn ghost sm" onClick={() => setPasGoster(!pasGoster)}>{pasGoster ? "← Havuza dön" : `Pas geçilenler (${v.haberler.filter((h) => h.status === "pas").length})`}</button>}
       </div>
       {konular.length > 1 && (
         <div className="filtre">
@@ -98,28 +116,31 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "belir
           {konular.map(([k, n]) => <button key={k} className="chip" aria-pressed={konu === k} onClick={() => setKonu(konu === k ? "" : k)}>{k} <span className="mono">{n}</span></button>)}
         </div>
       )}
+      {ilkDurum === "aday" && !pasGoster && <OncelikBilgisi />}
+      {gorunum === "bana" && !ilgiler.length && durum === "aday" && <div className="msg err">"Bana göre" için Profilim'de ilgi alanlarını yaz (ör. sony, kamera, playstation).</div>}
       <div className="muted">{liste.length} haber</div>
       {!liste.length && <div className="empty">{durum === "aday" ? "Havuz boş. Yeni haberler 15 dakikada bir gelir." : "Burada haber yok."}</div>}
       <div className="cards">
         {liste.slice(0, kac).map((h) => (
-          <HaberKart key={h.id} h={h} oylar={v.oylar}>
+          <HaberKart key={h.id} h={h} oylar={v.oylar} d={d?.get(h.id)}>
             {durum === "aday" && <>
               <button className="btn sm" onClick={() => al(h)}>Al</button>
               <button className="btn ghost sm" onClick={() => durumYap(h, "pas")}>Pas</button>
-              <button className="btn ghost sm oybtn" aria-pressed={benimOy(h.id) === 1} aria-label="İyi seçim" onClick={() => oyla(h, 1)}>▲</button>
-              <button className="btn ghost sm oybtn" aria-pressed={benimOy(h.id) === -1} aria-label="Kötü seçim" onClick={() => oyla(h, -1)}>▼</button>
+              <button className="btn ghost sm oybtn" aria-pressed={benimOy(h.id) === 1} title="Bu markada bu tür haberleri öne çıkarır. Tekrar basınca geri alınır." onClick={() => oyla(h, 1)}>Bunun gibi daha çok</button>
+              <button className="btn ghost sm oybtn" aria-pressed={benimOy(h.id) === -1} title="Bu markada bu tür haberleri geriye alır. Tekrar basınca geri alınır." onClick={() => oyla(h, -1)}>Bunun gibi daha az</button>
             </>}
             {durum === "belirsiz" && <>
               <button className="btn sm" onClick={() => durumYap(h, "aday")}>Havuza al</button>
               <button className="btn ghost sm" onClick={() => al(h)}>Al</button>
               <button className="btn ghost sm" onClick={() => durumYap(h, "elendi", { reason: "Ekip eledi" })}>Ele</button>
             </>}
+            {durum === "pas" && <button className="btn sm" onClick={() => durumYap(h, "aday")}>Havuza geri al</button>}
             {durum === "elendi" && (h.wrong_by
               ? <span className="muted">Yanlış elendi olarak işaretlendi</span>
               : <button className="btn ghost sm" onClick={() => yanlisElendi(h)}>Yanlış elendi</button>)}
             {notAcik === h.id && (
               <form className="row" style={{ width: "100%" }} onSubmit={(e) => { e.preventDefault(); notKaydet(h, String(new FormData(e.currentTarget).get("n"))); }}>
-                <input name="n" type="text" placeholder="Neden? (isteğe bağlı, yapay zekâ öğrenir)" autoFocus style={{ flex: "1 1 180px", width: "auto" }} />
+                <input name="n" type="text" placeholder="Neden? (isteğe bağlı) ör. kamera tescilleri önemli" autoFocus style={{ flex: "1 1 180px", width: "auto" }} />
                 <button className="btn ghost sm">Kaydet</button>
               </form>
             )}

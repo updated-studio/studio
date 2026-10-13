@@ -1,0 +1,114 @@
+// HABER MASASI ÖNCELİK KURALLARI: tek kaynak burası.
+// Ekrandaki "Öncelik nasıl hesaplanır?" açıklaması ve kartlardaki gerekçeler bu dosyadan üretilir.
+// Kural değişince: buradaki değerleri güncelle, ONCELIK_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz.
+import type { Haber, Oy } from "./veri";
+
+export const ONCELIK_SURUMU = "13 Ekim 2026";
+
+// 1) Haberin türü: markadan bağımsız temel değer. Yapay zekâ her haberi bu listeden birine koyar.
+export const HABER_TURLERI: { ad: string; puan: number; aciklama: string }[] = [
+  { ad: "Ürün duyurusu", puan: 40, aciklama: "Yeni ürün resmi olarak tanıtıldı." },
+  { ad: "Türkiye fiyatı", puan: 40, aciklama: "Türkiye fiyatı, satış tarihi ya da Türkiye'ye geliş." },
+  { ad: "Lansman tarihi", puan: 32, aciklama: "Etkinlik ya da lansman tarihi açıklandı." },
+  { ad: "Güçlü sızıntı", puan: 28, aciklama: "Güvenilir kaynaktan, ayrıntılı sızıntı." },
+  { ad: "Önemli güncelleme", puan: 24, aciklama: "Çok kullanıcıyı etkileyen yazılım/özellik güncellemesi." },
+  { ad: "Şirket ve sektör", puan: 20, aciklama: "Şirket kararı, satış, dava, sektör gelişmesi." },
+  { ad: "Söylenti", puan: 16, aciklama: "Zayıf ya da tek kaynaklı iddia." },
+  { ad: "İnceleme ve test", puan: 16, aciklama: "Başka yayının incelemesi ya da testi." },
+  { ad: "Küçük güncelleme", puan: 10, aciklama: "Az kişiyi ilgilendiren güncelleme." },
+  { ad: "Diğer", puan: 8, aciklama: "Yukarıdakilere uymayanlar." },
+];
+// Haber türü olmayan (eski) haberler için yapay zekânın "tür" alanından yaklaşık karşılık
+const ESKI_TUR: Record<string, string> = { Resmi: "Önemli güncelleme", Sızıntı: "Güçlü sızıntı", Söylenti: "Söylenti", İnceleme: "İnceleme ve test", Analiz: "Şirket ve sektör", Etkinlik: "Lansman tarihi", Fırsat: "Diğer" };
+
+// 2) Ek puanlar
+export const EK = {
+  kaynakBasina: 8, kaynakEnFazla: 24,          // aynı haberi yazan her ek kaynak
+  taze: [[3, 20], [12, 12], [24, 6]] as [number, number][], // [saatten yeni, puan]
+  yapayZeka: 4,                                 // yapay zekânın önem görüşü: (1-5 - 3) × 4 → -8 … +8
+  haricMarka: -20,                              // Türkiye'de satılmayan marka (Ayarlar > markalar > Hariç)
+};
+
+// 3) Seviyeler
+export const SEVIYELER = [
+  { ad: "Hemen yaz", enAz: 70, sinif: "rose" },
+  { ad: "Yazılabilir", enAz: 40, sinif: "blue" },
+  { ad: "Beklet", enAz: 0, sinif: "off" },
+] as const;
+
+// 4) Ekip oyu ("Bunun gibi daha çok / az"): sadece AYNI MARKANIN kendi haberleri arasında sırayı değiştirir.
+//    Markalar arası sıra oydan etkilenmez. Aynı marka + aynı türdeki her net oy: ±OY_ETKISI (en fazla ±OY_SINIRI).
+export const OY_ETKISI = 6;
+export const OY_SINIRI = 18;
+
+// 5) Çeşitlilik: havuzda aynı markadan art arda en fazla bu kadar haber gelir.
+export const ART_ARDA_EN_FAZLA = 2;
+
+export type Degerlendirme = { puan: number; seviye: (typeof SEVIYELER)[number]; tur: string; gerekce: string[] };
+
+export function haberTuru(h: Haber): string {
+  if (h.news_type && HABER_TURLERI.some((t) => t.ad === h.news_type)) return h.news_type;
+  return ESKI_TUR[h.kind] ?? "Diğer";
+}
+
+export function degerlendir(h: Haber, haricMarkalar: Set<string>): Degerlendirme {
+  const tur = haberTuru(h);
+  const temel = HABER_TURLERI.find((t) => t.ad === tur)!.puan;
+  const gerekce: string[] = [tur];
+  let puan = temel;
+  const kaynak = new Set(h.other_sources.map((o) => o.name).filter((n) => n !== h.source_name)).size;
+  if (kaynak) { puan += Math.min(EK.kaynakEnFazla, kaynak * EK.kaynakBasina); gerekce.push(`${kaynak + 1} kaynak`); }
+  const saat = (Date.now() - Date.parse(h.published_at ?? h.created_at)) / 3_600_000;
+  const t = EK.taze.find(([s]) => saat < s);
+  if (t) { puan += t[1]; gerekce.push(saat < 1 ? "yeni" : `${Math.round(saat)} sa önce`); }
+  if (h.priority) {
+    const yz = (h.priority - 3) * EK.yapayZeka;
+    puan += yz;
+    if (h.priority >= 4) gerekce.push("yapay zekâ: önemli");
+  }
+  if (h.brand && haricMarkalar.has(h.brand.toLocaleLowerCase("tr"))) { puan += EK.haricMarka; gerekce.push("Türkiye'de satılmıyor"); }
+  puan = Math.max(0, Math.round(puan));
+  const seviye = SEVIYELER.find((s) => puan >= s.enAz)!;
+  return { puan, seviye, tur, gerekce };
+}
+
+/** Havuz sıralaması: tarafsız puan → marka içi oy düzeltmesi → art arda aynı marka sınırı. */
+export function sirala(haberler: Haber[], oylar: Oy[], tumHaberler: Haber[], haricMarkalar: Set<string>) {
+  const d = new Map(haberler.map((h) => [h.id, degerlendir(h, haricMarkalar)]));
+  const marka = (h: Haber) => (h.brand || "—").toLocaleLowerCase("tr");
+
+  // Marka + tür başına net ekip oyu (son 60 gün, tüm haberlerden)
+  const sinir = Date.now() - 60 * 86_400_000;
+  const turOf = new Map(tumHaberler.map((h) => [h.id, h]));
+  const net = new Map<string, number>();
+  for (const o of oylar) {
+    const h = turOf.get(o.item_id);
+    if (!h || Date.parse(h.created_at) < sinir) continue;
+    const k = marka(h) + "|" + haberTuru(h);
+    net.set(k, (net.get(k) ?? 0) + o.value);
+  }
+  const oyDuzeltme = (h: Haber) => Math.max(-OY_SINIRI, Math.min(OY_SINIRI, (net.get(marka(h) + "|" + haberTuru(h)) ?? 0) * OY_ETKISI));
+
+  // Marka içinde: markanın puan "yerleri" aynı kalır, oya göre hangi haberin hangi yere oturacağı değişir.
+  const gruplar = new Map<string, Haber[]>();
+  for (const h of haberler) gruplar.set(marka(h), [...(gruplar.get(marka(h)) ?? []), h]);
+  const sira = new Map<number, number>();
+  for (const liste of gruplar.values()) {
+    const yerler = liste.map((h) => d.get(h.id)!.puan).sort((a, b) => b - a);
+    const oyla = [...liste].sort((a, b) => (d.get(b.id)!.puan + oyDuzeltme(b)) - (d.get(a.id)!.puan + oyDuzeltme(a)));
+    oyla.forEach((h, i) => sira.set(h.id, yerler[i] + i * 1e-3 * -1));
+  }
+  const temel = [...haberler].sort((a, b) => sira.get(b.id)! - sira.get(a.id)!
+    || Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at));
+
+  // Çeşitlilik: aynı markadan art arda en fazla N
+  const sonuc: Haber[] = [];
+  const kalan = [...temel];
+  while (kalan.length) {
+    const son = sonuc.slice(-ART_ARDA_EN_FAZLA).map(marka);
+    const dolu = son.length === ART_ARDA_EN_FAZLA && son.every((m) => m === son[0]);
+    const i = dolu ? kalan.findIndex((h) => marka(h) !== son[0]) : 0;
+    sonuc.push(kalan.splice(i < 0 ? 0 : i, 1)[0]);
+  }
+  return { liste: sonuc, d, oyDuzeltme };
+}

@@ -96,6 +96,7 @@ KARAR:
 
 ÖNCELİK (1-5): 5 = büyük ürün duyurusu/lansman tarihi/Türkiye fiyatı gibi hemen yazılması gereken; 4 = güçlü sızıntı veya önemli güncelleme; 3 = yazılabilir; 2 = zayıf; 1 = neredeyse ilgisiz.
 TÜR: Resmi, Söylenti, Sızıntı, İnceleme, Analiz, Fırsat, Etkinlik.
+TİP (haber türü, yalnızca bu listeden biri): Ürün duyurusu, Türkiye fiyatı, Lansman tarihi, Güçlü sızıntı, Önemli güncelleme, Şirket ve sektör, Söylenti, İnceleme ve test, Küçük güncelleme, Diğer.
 OLAY: Haberi Türkçe tek cümleyle, kaynağa sadık anlat (uydurma yok, abartı yok).
 EDİTÖR: Aşağıdaki editörlerden ilgi alanı en uygun olanın adı; uygun yoksa boş.
 AYNI: Haber aşağıdaki "son adaylar" listesindekiyle aynı olaysa o satırın numarası, değilse null.
@@ -111,7 +112,7 @@ YENİ HABERLER:
 ${haberler.map((h, i) => `${i}. [${h.source.name}] ${h.title}${h.desc ? " — " + h.desc.slice(0, 220) : ""}`).join("\n")}
 
 Yalnızca şu biçimde JSON dizi döndür, her haber için bir öğe:
-[{"i":0,"karar":"aday","neden":"","olay":"","marka":"","urun":"","tur":"Resmi","konu":"telefon","oncelik":3,"editor":"","ayni":null}]`;
+[{"i":0,"karar":"aday","neden":"","olay":"","marka":"","urun":"","tur":"Resmi","tip":"Ürün duyurusu","konu":"telefon","oncelik":3,"editor":"","ayni":null}]`;
 }
 
 async function topla(sb: ReturnType<typeof createClient>) {
@@ -155,7 +156,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const satir = (h: Ham, ek: Record<string, unknown>) => ({
     link: h.link, title: h.title.slice(0, 500), source_id: h.source.id, source_name: h.source.name,
     published_at: h.date?.toISOString() ?? null,
-    status: "belirsiz", reason: "", model: "", event: "", brand: "", product: "", kind: "", topic: "", priority: 0, suggested_editor: null,
+    status: "belirsiz", reason: "", model: "", event: "", brand: "", product: "", kind: "", topic: "", news_type: "", priority: 0, suggested_editor: null,
     ...ek,
   });
 
@@ -224,7 +225,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
         satirlar.push(satir(h, {
           status: karar, reason: String(s.neden ?? "").slice(0, 300), model,
           event: String(s.olay ?? "").slice(0, 400), brand: String(s.marka ?? "").slice(0, 60), product: String(s.urun ?? "").slice(0, 80),
-          kind: String(s.tur ?? "").slice(0, 30), topic: String(s.konu ?? "").slice(0, 40),
+          kind: String(s.tur ?? "").slice(0, 30), topic: String(s.konu ?? "").slice(0, 40), news_type: String(s.tip ?? "").slice(0, 30),
           priority: Math.max(0, Math.min(5, Number(s.oncelik) || 0)),
           suggested_editor: edAd.get(String(s.editor ?? "").toLocaleLowerCase("tr")) ?? null,
         }));
