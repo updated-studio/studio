@@ -96,7 +96,7 @@ async function isle(sb: ReturnType<typeof createClient>, itemId: number, tur: "c
       const digerleri = (it.other_sources ?? []).map((o: { name: string; link: string }) => `${o.name}: ${o.link}`).join(", ");
       const ham = await gemini(model, TASLAK(it, metin, digerleri), true);
       // Önce olduğu gibi oku; model metne çıplak kontrol karakteri koyduysa onları boşluğa çevirip yeniden dene.
-      let t;
+      let t: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       try { t = JSON.parse(ham); } catch { t = JSON.parse(ham.replace(/[\u0000-\u001F]+/g, " ")); }
       await sb.from("tr_drafts").insert({
         item_id: itemId, author: kullanici, model,
