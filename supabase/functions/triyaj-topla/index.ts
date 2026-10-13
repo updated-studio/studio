@@ -1,5 +1,6 @@
 // Haber Masası: RSS kaynaklarını okur → gürültüyü kuralla eler → Gemini SADECE etiket çıkarır → editörlerin kuralları karar verir.
-// Eski "Updated Triyaj" (Apps Script, Triyaj.gs) mantığının birebir karşılığı. Öncelik puanı ekranda src/modules/haber-masasi/oncelik.ts ile hesaplanır.
+// Eski "Updated Triyaj" (Apps Script, Triyaj.gs) mantığının karşılığı; Enes'in isteğiyle ek olarak "tip" (haber türü) etiketi alınır.
+// Öncelik puanı ekranda src/modules/haber-masasi/oncelik.ts ile hesaplanır (markadan bağımsız, haber türüne göre).
 // Tetikleyici: pg_cron 15 dakikada bir (tr_kick) ve Stüdyo'daki "Şimdi topla" düğmesi.
 // Gizli bilgi: GEMINI_API_KEY (Supabase > Edge Functions > Secrets). Koda yazılmaz.
 // Not: "Verify JWT" kapalı; girdi almaz. 5 dakikada bir defadan sık çalışmaz.
@@ -21,6 +22,7 @@ Alanlar:
 - marka: haberin ana markası, yaygın yazımıyla (Apple, Samsung, Xiaomi, Google, OpenAI...). Yoksa "".
 - urun: söz konusu ürün veya hizmet (örn. "iPhone 18 Pro", "Pixel 11", "ChatGPT"). Yoksa "".
 - tur: "resmi" (şirketin resmi duyurusu veya lansmanı), "sizinti" (render, sertifika, benchmark, belge sızıntısı), "soylenti" (iddia, muhabir veya analist kulisi), "inceleme" (ürün incelemesi veya testi), "sektor" (şirket, dava, finans, düzenleme), "kampanya" (indirim, fırsat, satış), "rehber" (nasıl yapılır, liste yazısı), "diger".
+- tip: haberin türü, şu listeden tam olarak biri: Ürün duyurusu (yeni ürün resmi tanıtıldı), Türkiye fiyatı (Türkiye fiyatı, satış tarihi ya da Türkiye'ye geliş), Lansman tarihi (etkinlik ya da lansman tarihi açıklandı), Güçlü sızıntı (güvenilir kaynaktan ayrıntılı sızıntı), Önemli güncelleme (çok kullanıcıyı etkileyen yazılım/özellik güncellemesi), Şirket ve sektör (şirket kararı, satış, dava, sektör gelişmesi), Söylenti (zayıf ya da tek kaynaklı iddia), İnceleme ve test (başka yayının incelemesi ya da testi), Küçük güncelleme (az kişiyi ilgilendiren güncelleme), Diğer.
 - konu: şu listeden tam olarak biri: telefon, tablet, bilgisayar, bileşen, giyilebilir, ses, kamera, drone, video ekipmanı, ev aletleri, akıllı ev, oyun, yapay zeka, yazılım, otomobil, sektör, eğlence, diğer.
 - turkiye: "var" (ürün veya hizmet Türkiye'de satılıyor ya da kullanılıyor, veya haber küresel önemde), "yok" (sadece belirli bir ülkeye özel operatör, hizmet, fiyat, lansman ya da yasa; Türkiye'de olmayan ürün), "global" (Türkiye'de satılmıyor veya Türkiye'ye özel değil, ancak dünya genelinde ilgi çekebilecek yeni teknoloji, yeni ürün kategorisi veya büyük bir yenilik; böyle haberlerde "yok" yerine "global" ver), "belirsiz".
 - asil_kaynak: metinde geçen asıl kaynak (örn. "Mark Gurman / Bloomberg", "Digital Chat Station / Weibo", "Samsung resmi açıklama"). Metinde yoksa haberi yayınlayan site.
@@ -28,11 +30,11 @@ Alanlar:
 - neden: haberin ne hakkında olduğunu anlatan en fazla 15 kelimelik Türkçe cümle.
 
 Sadece şu biçimde geçerli JSON döndür, başka hiçbir şey yazma:
-{"haberler":[{"id":1,"marka":"","urun":"","tur":"","konu":"","turkiye":"","asil_kaynak":"","olay":"","neden":""}]}`;
+{"haberler":[{"id":1,"marka":"","urun":"","tur":"","tip":"","konu":"","turkiye":"","asil_kaynak":"","olay":"","neden":""}]}`;
 
 type Kaynak = { id: number; name: string; url: string };
 type Ham = { source: Kaynak; title: string; link: string; date: Date | null; ozet: string };
-type Etiket = { id: number; marka?: string; urun?: string; tur?: string; konu?: string; turkiye?: string; asil_kaynak?: string; olay?: string; neden?: string };
+type Etiket = { id: number; marka?: string; urun?: string; tur?: string; tip?: string; konu?: string; turkiye?: string; asil_kaynak?: string; olay?: string; neden?: string };
 
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -238,7 +240,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
     const e = etiketler.get(id);
     if (!e) { elenen.push(satir(h, { reason: "Model etiket vermedi", model: MODEL })); return; }
     const markaK = String(e.marka ?? "").toLowerCase(), urunK = String(e.urun ?? "").toLowerCase();
-    const ortak = { model: MODEL, brand: String(e.marka ?? "").slice(0, 60), product: String(e.urun ?? "").slice(0, 80), topic: String(e.konu ?? "").slice(0, 40), kind: TUR[String(e.tur)] ?? String(e.tur ?? "").slice(0, 30) };
+    const ortak = { model: MODEL, brand: String(e.marka ?? "").slice(0, 60), product: String(e.urun ?? "").slice(0, 80), topic: String(e.konu ?? "").slice(0, 40), kind: TUR[String(e.tur)] ?? String(e.tur ?? "").slice(0, 30), news_type: String(e.tip ?? "").slice(0, 30) };
     const haric = pazar.find((p) => p.grup === "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
     const kayit = pazar.find((p) => p.grup !== "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
     const grup = haric ? "Hariç" : kayit ? kayit.grup : "Listede yok";
@@ -281,6 +283,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
       event: String(ilk.e.neden || ilk.h.title).slice(0, 400),
       brand: String(ilk.e.marka ?? "").slice(0, 60), product: String(ilk.e.urun ?? "").slice(0, 80),
       kind: TUR[String(ilk.e.tur)] ?? String(ilk.e.tur ?? ""), topic: String(ilk.e.konu ?? "").slice(0, 40),
+      news_type: String(ilk.e.tip ?? "").slice(0, 30),
       turkey: String(ilk.e.turkiye ?? ""), origin: String(asil).slice(0, 120),
       event_key: anahtar.startsWith("tekil-") ? "" : anahtar.slice(0, 80),
       other_sources: g.slice(1).map((x) => ({ name: x.h.source.name, link: x.h.link })),

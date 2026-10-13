@@ -37,9 +37,9 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
     const q = ara.trim().toLocaleLowerCase("tr");
     const secili = v.haberler.filter((h) => h.status === durum)
       .filter((h) => !q || [h.event, h.title, h.brand, h.product, h.source_name].join(" ").toLocaleLowerCase("tr").includes(q));
-    if (durum === "aday") return sirala(secili, v.markalar, v.oylar);
+    if (durum === "aday") return sirala(secili, v.oylar, v.haberler);
     return { liste: [...secili].sort((a, b) => Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at)), d: undefined };
-  }, [v.haberler, v.markalar, v.oylar, durum, ara]);
+  }, [v.haberler, v.oylar, durum, ara]);
   const filtre = useFiltre(sirali, (h) => d?.get(h.id) ?? degerle(h));
 
   let liste = durum === "elendi" ? sirali : filtre.sonuc;

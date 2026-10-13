@@ -4,7 +4,7 @@ import { Avatar } from "../../shared/Avatar";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
-import { degerlendir, EK, GRUP_PUANI, KONU_ODAKLI, ONCELIK_SURUMU, OY_SINIRI, SEVIYELER, type Degerlendirme } from "./oncelik";
+import { ART_ARDA_EN_FAZLA, degerlendir, EK, HABER_TURLERI, ONCELIK_SURUMU, OY_ETKISI, OY_GUN, OY_SINIRI, SEVIYELER, type Degerlendirme } from "./oncelik";
 import { useMasa, type Haber } from "./veri";
 
 export const KONUMLAR_ETIKET: Record<string, string> = { aday: "Havuz", belirsiz: "Belirsiz", elendi: "Elendi", alindi: "Alındı", pas: "Pas", yayinda: "Yayında" };
@@ -27,8 +27,7 @@ export function useKisi() {
 
 /** Haberin öncelik değerlendirmesi (oncelik.ts) */
 export function useDegerlendir() {
-  const { v } = useMasa();
-  return (h: Haber) => degerlendir(h, v.markalar, v.oylar);
+  return (h: Haber) => degerlendir(h);
 }
 
 /** Önerilen editörler: ilgi alanı haberin konu/ürün/marka metninde geçenler (eski "Önerilen Editör") */
@@ -41,23 +40,23 @@ export function useOnerilen() {
 }
 
 export function Seviye({ d }: { d: Degerlendirme }) {
-  return <span className={"pill " + d.seviye.sinif} title={"Öncelik puanı " + d.puan}>{d.seviye.ad} ({d.puan})</span>;
+  return <span className={"pill " + d.seviye.sinif} title={"Öncelik puanı " + d.puan}>{d.seviye.ad}</span>;
 }
 
 /** "Öncelik nasıl hesaplanır?" — oncelik.ts'teki kurallardan üretilir, kural değişince kendiliğinden güncellenir. */
 export function OncelikBilgisi() {
-  const odak = Object.entries(KONU_ODAKLI).map(([m, k]) => `${m[0].toUpperCase() + m.slice(1)} sadece ${k.join(" ve ")} haberlerinde`).join("; ");
   return (
     <details className="puanbilgi">
       <summary>Öncelik nasıl hesaplanır?</summary>
+      <div className="muted">Puan markadan bağımsızdır: Apple ile PlayStation aynı türde haberde aynı yerden başlar. Öncelikli marka listesi puanı etkilemez, sadece elemede kullanılır.</div>
       <div className="liste">
-        <div className="satir"><div className="ana"><b>Marka grubu</b> (Ayarlar &gt; Türkiye pazarı markaları)<div className="muted">{Object.entries(GRUP_PUANI).map(([g, p]) => `${g} ${p}`).join(" · ")}. {odak} öncelikli sayılır, diğer konularda Normal.</div></div></div>
-        <div className="satir"><div className="ana"><b>Resmi, sızıntı ya da söylenti</b><div className="muted">+{EK.tur}</div></div></div>
-        <div className="satir"><div className="ana"><b>En az {EK.kaynakEnAz} farklı kaynak yazdıysa</b><div className="muted">+{EK.kaynak}</div></div></div>
-        <div className="satir"><div className="ana"><b>Kamera haberi</b><div className="muted">+{EK.kamera}, Sony kamera +{EK.sonyKamera}</div></div></div>
-        <div className="satir"><div className="ana"><b>Öncelikli marka ama Türkiye'de yok</b><div className="muted">Elenmez, -{EK.turkiyeYokCeza}</div></div></div>
-        <div className="satir"><div className="ana"><b>Editör oyu (▲ Önemli / ▼ Önemsiz)</b><div className="muted">Aynı markadaki (marka yoksa aynı konudaki) oyların toplamı, en fazla ±{OY_SINIRI}. Oydan sonra gelen haberlere uygulanır.</div></div></div>
-        <div className="satir"><div className="ana"><b>Seviye</b><div className="muted">{SEVIYELER.map((s) => (Number.isFinite(s.enAz) ? `${s.ad}: ${s.enAz}+` : `${s.ad}: altı`)).join(" · ")}</div></div></div>
+        <div className="satir"><div className="ana"><b>Haber türü</b> (temel puan)<div className="muted">{HABER_TURLERI.map((t) => `${t.ad} ${t.puan}`).join(" · ")}</div></div></div>
+        <div className="satir"><div className="ana"><b>Aynı haberi yazan her ek kaynak</b><div className="muted">+{EK.kaynakBasina}, en fazla +{EK.kaynakEnFazla}</div></div></div>
+        <div className="satir"><div className="ana"><b>Tazelik</b><div className="muted">{EK.taze.map(([s, p]) => `${s} saatten yeni +${p}`).join(" · ")}</div></div></div>
+        <div className="satir"><div className="ana"><b>Öncelikli marka olduğu için elenmeyen "Türkiye'de yok" haberi</b><div className="muted">{EK.turkiyeZayif}</div></div></div>
+        <div className="satir"><div className="ana"><b>Seviye</b><div className="muted">{SEVIYELER.map((s) => `${s.ad}: ${s.enAz}+`).join(" · ")}</div></div></div>
+        <div className="satir"><div className="ana"><b>"Bunun gibi daha çok / az"</b><div className="muted">Herkes kendi oyunu verir, not ekleyebilir. Oy sadece aynı markanın kendi haberleri arasında sırayı değiştirir (aynı tür için net oy başına ±{OY_ETKISI}, en fazla ±{OY_SINIRI}, son {OY_GUN} gün). Markayı diğer markaların önüne ya da arkasına atmaz. Al ve Pas puanı etkilemez.</div></div></div>
+        <div className="satir"><div className="ana"><b>Çeşitlilik</b><div className="muted">Havuzda aynı markadan art arda en fazla {ART_ARDA_EN_FAZLA} haber gelir.</div></div></div>
         <div className="satir"><div className="ana"><b>Toplama sırasında elenenler</b><div className="muted">Hariç marka · kampanya ve rehber yazıları · Türkiye'de yok (Öncelikli marka değilse) · gürültü kelimeleri. Türkiye bilgisi belirsiz olanlar Belirsiz'e düşer.</div></div></div>
       </div>
       <div className="muted">Kurallar son güncelleme: {ONCELIK_SURUMU}.</div>
@@ -142,46 +141,52 @@ export function useIs() {
   };
 }
 
-/** Editör oyu: haber başına tek oy, notlu (eski "▲ Önemli / ▼ Önemsiz") */
+/** Ekip oyu: herkes kendi oyunu verir, notlu ("Bunun gibi daha çok / az"). Tekrar basınca geri alınır. */
 export function OyAlani({ h }: { h: Haber }) {
   const { v, yenile } = useMasa();
   const { profile } = useAuth();
   const kisi = useKisi();
   const toast = useToast();
-  const [secim, setSecim] = useState<1 | -1 | 0>(0);
+  const ben = profile!.id;
+  const [notAcik, setNotAcik] = useState(false);
   const [not, setNot] = useState("");
-  const oy = v.oylar.find((o) => o.item_id === h.id || (!!o.link && o.link === h.link));
-  if (oy) {
-    const ben = oy.user_id === profile!.id;
-    return (
-      <span className={"pill " + (oy.value > 0 ? "ok" : "off")} title={oy.note}>
-        {oy.value > 0 ? "▲ Önemli" : "▼ Önemsiz"} · {kisi(oy.user_id)?.name ?? "?"}{oy.note ? " — " + oy.note : ""}
-        {ben && <button className="linkbtn" style={{ marginLeft: 6 }} onClick={async () => {
-          const r = await sb.from("tr_votes").delete().eq("id", oy.id);
-          if (r.error) toast(r.error.message); else { toast("Oy geri alındı."); yenile(); }
-        }}>geri al</button>}
-      </span>
-    );
+  const oylar = v.oylar.filter((o) => o.item_id === h.id);
+  const benim = oylar.find((o) => o.user_id === ben);
+  async function oyla(deger: 1 | -1) {
+    if (benim?.value === deger) {
+      const r = await sb.from("tr_votes").delete().eq("id", benim.id);
+      if (r.error) toast(r.error.message); else yenile();
+      return;
+    }
+    const r = benim
+      ? await sb.from("tr_votes").update({ value: deger }).eq("id", benim.id)
+      : await sb.from("tr_votes").insert({ item_id: h.id, user_id: ben, value: deger, note: "" });
+    if (r.error) return toast(r.error.message);
+    setNotAcik(true); yenile();
   }
-  async function ver() {
-    const r = await sb.from("tr_votes").insert({ item_id: h.id, user_id: profile!.id, value: secim, note: not.trim().slice(0, 300) });
-    setSecim(0); setNot("");
-    if (r.error) return toast(/duplicate|unique/i.test(r.error.message) ? "Bu habere başkası az önce oy verdi." : r.error.message);
-    toast(secim > 0 ? "Kaydedildi: bu tür haberler daha önemli sayılacak." : "Kaydedildi: bu tür haberler daha az önemli sayılacak.");
-    yenile();
+  async function notKaydet() {
+    setNotAcik(false);
+    if (!not.trim() || !benim) return;
+    const r = await sb.from("tr_votes").update({ note: not.trim().slice(0, 300) }).eq("id", benim.id);
+    setNot("");
+    if (r.error) toast(r.error.message); else { toast("Not kaydedildi."); yenile(); }
   }
-  if (secim) return (
-    <form className="row" style={{ width: "100%" }} onSubmit={(e) => { e.preventDefault(); ver(); }}>
-      <span className="muted">{secim > 0 ? "▲ Önemli" : "▼ Önemsiz"} olarak işaretlenecek.</span>
-      <input type="text" value={not} onChange={(e) => setNot(e.target.value)} maxLength={300} placeholder="İstersen kısa not (boş bırakabilirsin)" autoFocus style={{ flex: "1 1 180px", width: "auto" }} />
-      <button className="btn sm">Oy ver</button>
-      <button type="button" className="btn ghost sm" onClick={() => setSecim(0)}>Vazgeç</button>
-    </form>
-  );
   return (
     <>
-      <button className="btn ghost sm" title="Bu markadan/konudan haberler daha önemli sayılsın" onClick={() => setSecim(1)}>▲ Önemli</button>
-      <button className="btn ghost sm" title="Bu markadan/konudan haberler daha az önemli sayılsın" onClick={() => setSecim(-1)}>▼ Önemsiz</button>
+      {oylar.map((o) => (
+        <span key={o.id} className={"pill " + (o.value > 0 ? "ok" : "off")} title={o.note}>
+          {o.value > 0 ? "Daha çok" : "Daha az"} · {kisi(o.user_id)?.name ?? "?"}{o.note ? " — " + o.note : ""}
+        </span>
+      ))}
+      <button className="btn ghost sm" aria-pressed={benim?.value === 1} title="Bu markada bu tür haberleri öne çıkarır. Tekrar basınca geri alınır." onClick={() => oyla(1)}>Bunun gibi daha çok</button>
+      <button className="btn ghost sm" aria-pressed={benim?.value === -1} title="Bu markada bu tür haberleri geriye alır. Tekrar basınca geri alınır." onClick={() => oyla(-1)}>Bunun gibi daha az</button>
+      {notAcik && benim && (
+        <form className="row" style={{ width: "100%" }} onSubmit={(e) => { e.preventDefault(); notKaydet(); }}>
+          <input type="text" value={not} onChange={(e) => setNot(e.target.value)} maxLength={300} placeholder="Neden? (isteğe bağlı) ör. kamera tescilleri önemli" autoFocus style={{ flex: "1 1 180px", width: "auto" }} />
+          <button className="btn ghost sm">Kaydet</button>
+          <button type="button" className="btn ghost sm" onClick={() => setNotAcik(false)}>Geç</button>
+        </form>
+      )}
     </>
   );
 }

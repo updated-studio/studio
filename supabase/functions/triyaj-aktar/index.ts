@@ -84,7 +84,8 @@ Deno.serve(async (req) => {
   }
 
   if (tur === "belirsiz" || tur === "elenenler") {
-    const yeni = rows.filter((r) => r["Link"] && zaman(r["Tarih"]) && Date.parse(zaman(r["Tarih"])!) >= gunOnce(3)).map((r) => {
+    // Son 3 gün + (yaş fark etmeksizin) "yanlış elenmiş" işaretli olanlar (ekip geri bildirimi)
+    const yeni = rows.filter((r) => r["Link"] && zaman(r["Tarih"]) && (Date.parse(zaman(r["Tarih"])!) >= gunOnce(3) || (tur === "elenenler" && !!r["Yanlış mı?"]))).map((r) => {
       const t = zaman(r["Tarih"]);
       const yanlis = tur === "elenenler" && r["Yanlış mı?"] ? kim(String(r["Yanlış mı?"]).replace(/^Evet · /, "")) : null;
       return {
