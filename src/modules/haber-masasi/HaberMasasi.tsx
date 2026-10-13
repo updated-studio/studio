@@ -5,7 +5,7 @@ import Ayarlar from "./Ayarlar";
 import Benim from "./Benim";
 import Havuz from "./Havuz";
 import Kaynaklar, { sorunluKaynaklar } from "./Kaynaklar";
-import { tarihSaat } from "./ortak";
+import { tarihSaat, YapayZekaUyari } from "./ortak";
 import Sohbet from "./Sohbet";
 import Taslaklar from "./Taslaklar";
 import { MasaProvider, useMasa, type Etkinlik } from "./veri";
@@ -66,6 +66,7 @@ function Masa() {
         </div>
         <button className="btn ghost sm" onClick={() => setZilAcik(!zilAcik)} aria-label="Bildirim havuzu" style={okunmamis ? { color: "var(--orange)" } : undefined}>🔔{okunmamis ? " " + okunmamis : ""}</button>
       </div>
+      <YapayZekaUyari />
       {zilAcik && (
         <div className="panel">
           <div className="row"><b style={{ marginRight: "auto" }}>Bildirim havuzu</b>{okunmamis > 0 && <button className="btn ghost sm" onClick={okunduYap}>Hepsini okundu yap</button>}<button className="btn ghost sm" onClick={() => setZilAcik(false)}>Kapat</button></div>

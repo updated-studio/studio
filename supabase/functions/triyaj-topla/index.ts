@@ -96,15 +96,36 @@ function jsonOku(ham: string): unknown {
 }
 
 // Eski tr_gemini_: 3 deneme, ilk sıcaklık 0; 429/500/503'te 5 sn bekleyip tekrar
-// Yoğunlukta (429/500/503) sıradaki yedek modele geçer
+// Yoğunlukta ya da kota dolunca (429/500/503) sıradaki yedek modele, Gemini tamamen tıkanırsa ücretsiz yedek servise (Groq) geçer.
+let YEDEK_MODEL = "llama-3.3-70b-versatile"; // tr_settings.model_yedek ile değiştirilebilir
 async function gemini(model: string, kullanici: string, sistem = SISTEM): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
   let son: unknown;
   for (const m of [model, "gemini-3.5-flash", "gemini-3.6-flash"].filter((x, i, a) => a.indexOf(x) === i)) {
     try { return await geminiTek(m, kullanici, sistem); }
     catch (e) { son = e; if (!/ (429|500|503):/.test(String(e))) throw e; }
   }
+  if (Deno.env.get("GROQ_API_KEY")) {
+    try { return await groq(kullanici, sistem); }
+    catch (e) { throw new Error(String(son) + " | Yedek (Groq) da olmadı: " + String((e as Error).message ?? e).slice(0, 200)); }
+  }
   throw son;
 }
+
+// Groq: OpenAI uyumlu, ücretsiz katmanı olan yedek servis. Gizli bilgi: GROQ_API_KEY (Supabase Secrets).
+async function groq(kullanici: string, sistem: string): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + Deno.env.get("GROQ_API_KEY") },
+    body: JSON.stringify({ model: YEDEK_MODEL, temperature: 0, response_format: { type: "json_object" }, messages: [{ role: "system", content: sistem }, { role: "user", content: kullanici }] }),
+  });
+  const govde = await r.text();
+  if (!r.ok) throw new Error("Groq " + r.status + ": " + govde.slice(0, 200));
+  const veri = jsonOku(JSON.parse(govde)?.choices?.[0]?.message?.content ?? "") as Record<string, any> | null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (!veri) throw new Error("Groq geçersiz JSON döndü");
+  YEDEK_KULLANILDI = true;
+  return veri;
+}
+let YEDEK_KULLANILDI = false;
 
 async function geminiTek(model: string, kullanici: string, sistem: string): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const key = Deno.env.get("GEMINI_API_KEY");
@@ -142,6 +163,8 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const ayarlar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
   const gurultu: string[] = (ayarlar.gurultu_kelimeleri ?? []).map((s: string) => String(s).toLowerCase()).filter(Boolean);
   const model = String(ayarlar.model_eleme ?? "gemini-3.5-flash-lite");
+  if (ayarlar.model_yedek) YEDEK_MODEL = String(ayarlar.model_yedek);
+  YEDEK_KULLANILDI = false;
 
   const [{ data: kaynaklar }, { data: markalar }] = await Promise.all([
     sb.from("tr_sources").select("id,name,url").eq("active", true).order("id"),
@@ -254,7 +277,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
     const e = etiketler.get(id);
     if (!e) { elenen.push(satir(h, { reason: "Model etiket vermedi", model: MODEL })); return; }
     const markaK = String(e.marka ?? "").toLowerCase(), urunK = String(e.urun ?? "").toLowerCase();
-    const ortak = { model: MODEL, brand: String(e.marka ?? "").slice(0, 60), product: String(e.urun ?? "").slice(0, 80), topic: String(e.konu ?? "").slice(0, 40), kind: TUR[String(e.tur)] ?? String(e.tur ?? "").slice(0, 30), news_type: String(e.tip ?? "").slice(0, 30) };
+    const ortak = { model: MODEL, brand: String(e.marka ?? "").slice(0, 60), product: String(e.urun ?? "").slice(0, 80), topic: String(e.konu ?? "").slice(0, 40), kind: TUR[String(e.tur)] ?? String(e.tur ?? "").slice(0, 30), news_type: String(e.tip ?? "").slice(0, 30), event: String(e.neden ?? "").slice(0, 400) }; // Türkçe olay özeti elenen/rehber kartlarda da görünsün
     const haric = pazar.find((p) => p.grup === "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
     const kayit = pazar.find((p) => p.grup !== "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
     const grup = haric ? "Hariç" : kayit ? kayit.grup : "Listede yok";
@@ -333,7 +356,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const ozet = {
     kaynak: kaynaklar?.length ?? 0, okunan: tumLinkler.length, yeni: gorulen.size, kural: onElenen.length, sirada,
     yapayZeka: islenen.size, aday: yeniAday.length, elenen: elenen.length, belirsiz: belirsiz.length, rehber: rehber.length,
-    bekleyen: sirada + adaylar.length - islenen.size, hata, sure: Date.now() - bas,
+    bekleyen: sirada + adaylar.length - islenen.size, hata, yedek: YEDEK_KULLANILDI, sure: Date.now() - bas,
   };
   await sb.from("tr_settings").upsert({ key: "son_toplama", value: { ...ozet, durum: "bitti", zaman: new Date().toISOString() } });
   console.log(JSON.stringify(ozet));

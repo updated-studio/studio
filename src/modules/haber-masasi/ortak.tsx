@@ -277,3 +277,23 @@ export function SimdiTopla() {
     </>
   );
 }
+
+/** Son toplamada yapay zekâ sorunu olduysa ekibe görünür uyarı (kota doldu, servis yoğun vb.) */
+export function YapayZekaUyari() {
+  const { v } = useMasa();
+  const son = v.ayarlar.son_toplama as { zaman?: string; hata?: string; bekleyen?: number; yedek?: boolean } | undefined;
+  if (son?.yedek && !son.hata) return <div className="msg good" role="status">Gemini şu an kullanılamıyor; haberler yedek yapay zekâ servisiyle işleniyor.</div>;
+  if (!son?.hata) return null;
+  const h = son.hata;
+  const metin = /429|quota|kota/i.test(h)
+    ? "Yapay zekâ kotası doldu. Yeni haberler şu an işlenemiyor; kota yenilenince kendiliğinden devam eder."
+    : /503|high demand|UNAVAILABLE/i.test(h)
+    ? "Yapay zekâ servisi şu an yoğun. Yeni haberler bir sonraki toplamada yeniden denenecek."
+    : /GEMINI_API_KEY/.test(h) ? "Yapay zekâ anahtarı tanımlı değil; yeni haberler işlenemiyor."
+    : "Son toplamada bir sorun oldu: " + h.slice(0, 160);
+  return (
+    <div className="msg err" role="status">
+      ⚠ {metin}{son.bekleyen ? ` Sırada bekleyen: ${son.bekleyen} haber.` : ""}{son.zaman ? ` (son deneme ${zamanOnce(son.zaman)} önce)` : ""}
+    </div>
+  );
+}
