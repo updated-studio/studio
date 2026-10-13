@@ -136,9 +136,12 @@ async function topla(sb: ReturnType<typeof createClient>) {
   }
   const yeni = tekil.filter((h) => !gorulen.has(h.link)).sort((a, b) => (+(b.date ?? 0)) - (+(a.date ?? 0)));
 
+  // Toplu yazmada her satır aynı sütunları taşımalı; eksik sütun NULL gider ve tüm parti reddedilir.
   const satir = (h: Ham, ek: Record<string, unknown>) => ({
     link: h.link, title: h.title.slice(0, 500), source_id: h.source.id, source_name: h.source.name,
-    published_at: h.date?.toISOString() ?? null, ...ek,
+    published_at: h.date?.toISOString() ?? null,
+    status: "belirsiz", reason: "", model: "", event: "", brand: "", product: "", kind: "", topic: "", priority: 0, suggested_editor: null,
+    ...ek,
   });
 
   // 1) Kural: gürültü kelimeleri
@@ -150,7 +153,10 @@ async function topla(sb: ReturnType<typeof createClient>) {
     if (k) kural.push(satir(h, { status: "elendi", reason: "Gürültü kelimesi: " + k, model: "kural" }));
     else aiye.push(h);
   }
-  if (kural.length) await sb.from("tr_items").upsert(kural, { onConflict: "link", ignoreDuplicates: true });
+  if (kural.length) {
+    const { error } = await sb.from("tr_items").upsert(kural, { onConflict: "link", ignoreDuplicates: true });
+    if (error) console.error("kural yazma hatası", error.message);
+  }
 
   // 2) Yapay zekâ
   // Anahtar yoksa ya da yapay zekâ yanıt vermezse haberler yazılmaz; bir sonraki çalıştırmada yeniden denenir.
@@ -208,8 +214,10 @@ async function topla(sb: ReturnType<typeof createClient>) {
           suggested_editor: edAd.get(String(s.editor ?? "").toLocaleLowerCase("tr")) ?? null,
         }));
       });
-      aiSayi += satirlar.length;
-      if (satirlar.length) await sb.from("tr_items").upsert(satirlar, { onConflict: "link", ignoreDuplicates: true });
+      if (satirlar.length) {
+        const { error } = await sb.from("tr_items").upsert(satirlar, { onConflict: "link", ignoreDuplicates: true });
+        if (error) hata = "Yazma hatası: " + error.message; else aiSayi += satirlar.length;
+      }
       for (const e of ekKaynak) {
         const { data } = await sb.from("tr_items").select("other_sources").eq("id", e.id).single();
         const liste = (data?.other_sources ?? []) as { name: string; link: string }[];
