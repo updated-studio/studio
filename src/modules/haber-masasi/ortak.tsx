@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "../../shared/auth";
 import { Avatar } from "../../shared/Avatar";
 import { sb } from "../../shared/supabase";
@@ -221,7 +221,7 @@ export function HaberKart({ h, children, ust, d, oyGoster = true }: { h: Haber; 
         {h.status === "alindi" && aktaran && <span>· ↪ {aktaran.name} → {alan?.name ?? "?"}</span>}
       </div>
       {ust}
-      <div className="baslik">{h.event || h.title}</div>
+      <div className="baslik">{baslikTr(h)}</div>
       <div className="muted">{h.title}</div>
       <div className="row" style={{ gap: 10 }}>
         <a href={h.link} target="_blank" rel="noreferrer">{h.source_name || "Haber"} ↗</a>
@@ -297,3 +297,32 @@ export function YapayZekaUyari() {
     </div>
   );
 }
+
+// Türkçe özeti olmayan (yapay zekâdan geçmemiş) haberlerin başlığını ücretsiz Google Çeviri ile tarayıcıda çevirir.
+// Veritabanına yazmaz (yazarsa haber "dokunulmuş" sayılır ve saklama kuralıyla silinmez); her tarayıcı kendi önbelleğini tutar.
+const ceviriOnbellek = new Map<string, string>();
+try { Object.entries(JSON.parse(sessionStorage.getItem("baslik-ceviri") ?? "{}") as Record<string, string>).forEach(([k, v]) => ceviriOnbellek.set(k, v)); } catch { /* yok */ }
+export function useBaslikCeviri(haberler: Haber[]) {
+  const [, yenile] = useState(0);
+  const eksik = haberler.filter((h) => !h.event && h.title && !ceviriOnbellek.has(h.title)).slice(0, 50).map((h) => h.title);
+  const anahtar = eksik.join("|");
+  useEffect(() => {
+    if (!eksik.length) return;
+    let iptal = false;
+    (async () => {
+      for (let i = 0; i < eksik.length; i += 25) {
+        const parca = eksik.slice(i, i + 25);
+        try {
+          const r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=tr&dt=t&q=" + encodeURIComponent(parca.join("\n")));
+          const j = await r.json();
+          const satirlar = ((j?.[0] ?? []) as unknown[][]).map((x) => String(x?.[0] ?? "")).join("").split("\n");
+          parca.forEach((t, k) => ceviriOnbellek.set(t, (satirlar[k] ?? "").trim() || t));
+        } catch { parca.forEach((t) => ceviriOnbellek.set(t, t)); }
+      }
+      try { sessionStorage.setItem("baslik-ceviri", JSON.stringify(Object.fromEntries(ceviriOnbellek))); } catch { /* yok */ }
+      if (!iptal) yenile((n) => n + 1);
+    })();
+    return () => { iptal = true; };
+  }, [anahtar]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+export const baslikTr = (h: Haber) => h.event || ceviriOnbellek.get(h.title) || h.title;

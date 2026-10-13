@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
-import { HaberKart, OncelikBilgisi, SimdiTopla, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
+import { HaberKart, OncelikBilgisi, SimdiTopla, useBaslikCeviri, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
 import { sirala } from "./oncelik";
 import { useIyimser, useMasa, type Durum, type Haber } from "./veri";
 
@@ -48,6 +48,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
     const bana = (h: Haber) => onerilen(h).some((p) => p.id === ben);
     liste = [...liste.filter(bana), ...liste.filter((h) => !bana(h))];
   }
+  useBaslikCeviri(liste.slice(0, kac));
   const kats = new Map<string, number>();
   if (durum === "elendi") {
     sirali.forEach((h) => kats.set(elKat(h.reason), (kats.get(elKat(h.reason)) ?? 0) + 1));
