@@ -36,6 +36,8 @@ export function HaberKart({ h, oylar, children, ust }: { h: Haber; oylar: Oy[]; 
   const onerilen = kisi(h.suggested_editor);
   const alan = kisi(h.taken_by);
   const skor = oySkor(oylar, h.id);
+  // Aynı kaynağı iki kez ya da haberin kendi kaynağını "diğer" olarak gösterme
+  const digerleri = h.other_sources.filter((o, i, a) => o.name !== h.source_name && a.findIndex((x) => x.name === o.name) === i);
   return (
     <div className="kart haber">
       <div className="row" style={{ gap: 6 }}>
@@ -49,8 +51,8 @@ export function HaberKart({ h, oylar, children, ust }: { h: Haber; oylar: Oy[]; 
       {ust}
       <div className="baslik">{h.event || h.title}</div>
       <a className="muted orj" href={h.link} target="_blank" rel="noreferrer">{h.source_name}: {h.title}</a>
-      {h.other_sources.length > 0 && (
-        <div className="muted">Diğer kaynaklar: {h.other_sources.map((o, i) => <a key={i} href={o.link} target="_blank" rel="noreferrer">{o.name}</a>).reduce<ReactNode[]>((a, x, i) => (i ? [...a, ", ", x] : [x]), [])}</div>
+      {digerleri.length > 0 && (
+        <div className="muted">Diğer kaynaklar: {digerleri.map((o, i) => <a key={i} href={o.link} target="_blank" rel="noreferrer">{o.name}</a>).reduce<ReactNode[]>((a, x, i) => (i ? [...a, ", ", x] : [x]), [])}</div>
       )}
       {h.reason && h.status !== "aday" && <div className="muted">Neden: {h.reason}</div>}
       {(onerilen || alan) && (
