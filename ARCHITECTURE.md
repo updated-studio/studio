@@ -176,7 +176,6 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - Haber Masası: taslağı WordPress'e tek tuşla taslak olarak gönderme; Unsplash/basın kiti görsel önerisi.
 - Haber Masası geçiş günü: eski tablodaki işlem görmüş haberler (alındı/yayında/pas, ~100 kayıt) içe aktarılır, sonra eski sistem kapanır ve tablodaki anahtarlar silinir.
 - İçerik: format sistemi (Post 4:5 / Story 9:16 / Reels kapağı 9:16, ızgara 3:4); şablonlar oran ve güvenli alanla tanımlanır, format değişince sadece çerçeve değişir. Story'de kaydırmalı şablon yok.
-- Video aracı (dar kapsam, askerlik sonrası): Reels kapağı için kare seçme, marka giriş/çıkışı, altyazı gömme, güvenli alan kılavuzu. Tam kurgu programı yapılmaz.
 
 ## 11. Açık kararlar
 
@@ -205,3 +204,4 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **12 Ekim 2026:** Tek hesap: ekip paneli, post aracı ve Haber Masası artık aynı Stüdyo hesabını kullanır (Haber Masası'nın ayrı şifre listesi bırakıldı). Ekip > Ekip'te katkı sıralaması (bu hafta / bu ay / tümü) ve kişi profili eklendi. Puan yayına gideni ödüllendirir (yayında 3, biten ekip işi 3, alınan haber ve taslak 1, oy 0.2) ki sayı şişirme teşvik edilmesin (`src/modules/ekip/Katki.tsx`).
 - **13 Ekim 2026:** Puanlama kuralları sistemde görünür: Ekip > Ekip > "Puan nasıl hesaplanır?" açıklaması `PUAN_KURALLARI` listesinden üretilir; kural değişince ekran kendiliğinden güncellenir. Değişiklik yapan, `PUAN_SURUMU` tarihini ve bu günlüğü günceller (CLAUDE.md kural 9).
 - **13 Ekim 2026:** Haber Masası'na eski tablodan işlem görmüş 99 haber aktarıldı (38 alındı, 50 yayında, 11 pas; alan editörler eşleşti). Toplamadaki hata düzeltildi: toplu yazmada bazı satırların eksik sütunu tüm partiyi reddettiriyordu; artık her satır tam sütunla yazılıyor ve yazma hatası "son toplama" özetinde görünüyor.
+- **13 Ekim 2026:** Video aracı yapılmayacak (Enes: uzun iş, mantıklı değil). "Askerlik sonrası" listesi yok: listedeki her iş 5 Kasım'dan önce yapılacak. Sıradakiler: taslak/çeviri testi → öncelik sistemi (P1-5 yerine anlaşılır seviye + gerekçe) ve oy yerine eylemden öğrenme → arayüz tasarımı → takvim aboneliği + davet e-postası → post aracı kayıtları buluta → post otomasyonu taşıma → format sistemi → WordPress'e taslak gönderme → Natro alt adres + kurumsal e-posta → telefon bildirimi → Android → devir paketi.
