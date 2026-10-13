@@ -338,23 +338,27 @@ async function birlestir(sb: ReturnType<typeof createClient>, model: string) {
   const markalar = new Map<string, typeof liste>();
   liste.forEach((x) => { const m = (x.brand || "—").toLowerCase(); markalar.set(m, [...(markalar.get(m) ?? []), x]); });
   let birlesen = 0;
-  for (const grup of markalar.values()) {
-    if (grup.length < 2) continue;
-    const v = await gemini(model, grup.map((x) => `${x.id} | ${x.event || x.title}`).join("\n"), GRUP_SISTEM);
-    for (const kume of (v.gruplar ?? []) as number[][]) {
-      const kartlar = kume.map((id) => grup.find((x) => x.id === Number(id))).filter(Boolean) as typeof liste;
-      if (kartlar.length < 2) continue;
-      const tutulan = kartlar.find((x) => x.touched) ?? kartlar[0];
-      const digerleri = kartlar.filter((x) => x !== tutulan && !x.touched);
-      if (!digerleri.length) continue;
-      const ek = digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources]);
-      const tum = [...tutulan.other_sources];
-      ek.forEach((o) => { if (o.link !== tutulan.link && !tum.some((t) => t.link === o.link)) tum.push(o); });
-      await sb.from("tr_items").update({ other_sources: tum }).eq("id", tutulan.id);
-      await sb.from("tr_seen").upsert(digerleri.map((x) => ({ link: x.link })), { onConflict: "link", ignoreDuplicates: true });
-      await sb.from("tr_items").delete().in("id", digerleri.map((x) => x.id)).eq("touched", false);
-      birlesen += digerleri.length;
-    }
+  const gruplar = [...markalar.values()].filter((g) => g.length >= 2).map((g) => g.slice(0, 150));
+  // Markalar 6'şar paralel işlenir (zaman sınırına takılmamak için)
+  for (let i = 0; i < gruplar.length; i += 6) {
+    await Promise.all(gruplar.slice(i, i + 6).map(async (grup) => {
+      let v: Record<string, unknown> = {};
+      try { v = await gemini(model, grup.map((x) => `${x.id} | ${x.event || x.title}`).join("\n"), GRUP_SISTEM); } catch { return; }
+      for (const kume of (v.gruplar ?? []) as number[][]) {
+        const kartlar = kume.map((id) => grup.find((x) => x.id === Number(id))).filter(Boolean) as typeof liste;
+        if (kartlar.length < 2) continue;
+        const tutulan = kartlar.find((x) => x.touched) ?? kartlar[0];
+        const digerleri = kartlar.filter((x) => x !== tutulan && !x.touched);
+        if (!digerleri.length) continue;
+        const tum = [...tutulan.other_sources];
+        digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources])
+          .forEach((o) => { if (o.link !== tutulan.link && !tum.some((t) => t.link === o.link)) tum.push(o); });
+        await sb.from("tr_items").update({ other_sources: tum }).eq("id", tutulan.id);
+        await sb.from("tr_seen").upsert(digerleri.map((x) => ({ link: x.link })), { onConflict: "link", ignoreDuplicates: true });
+        await sb.from("tr_items").delete().in("id", digerleri.map((x) => x.id)).eq("touched", false);
+        birlesen += digerleri.length;
+      }
+    }));
   }
   return { kart: liste.length, birlesen };
 }
@@ -373,7 +377,12 @@ Deno.serve(async (req) => {
     const { data: p } = u?.user ? await sb.from("profiles").select("is_admin").eq("id", u.user.id).maybeSingle() : { data: null };
     if (!p?.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
     const ay = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
-    return Response.json(await birlestir(sb, String(ay.model_eleme ?? "gemini-3.5-flash-lite")), { headers: CORS });
+    // Arka planda çalışır; sonuç tr_settings.son_birlestirme'ye yazılır
+    // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+    EdgeRuntime.waitUntil(birlestir(sb, String(ay.model_eleme ?? "gemini-3.5-flash-lite"))
+      .then((r) => sb.from("tr_settings").upsert({ key: "son_birlestirme", value: { ...r, zaman: new Date().toISOString() } }))
+      .catch((e) => console.error("birleştirme hatası", e)));
+    return Response.json({ basladi: true }, { status: 202, headers: CORS });
   }
   const { data } = await sb.from("tr_settings").select("value").eq("key", "son_toplama").maybeSingle();
   const son = data?.value?.zaman ? Date.parse(data.value.zaman) : 0;
