@@ -2,150 +2,130 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
-import { HaberKart, OncelikBilgisi, useHaric } from "./ortak";
-import { sirala, SEVIYELER } from "./oncelik";
+import { HaberKart, OncelikBilgisi, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
+import { sirala } from "./oncelik";
 import { useIyimser, useMasa, type Durum, type Haber } from "./veri";
 
-// Havuz, Belirsiz ve Elenenler aynı listeyi farklı eylemlerle kullanır.
-export default function Havuz({ durum: ilkDurum }: { durum: Extract<Durum, "aday" | "belirsiz" | "elendi"> }) {
+// Eski "Elenenler" kategori çipleri (eleme nedeninden)
+export function elKat(n: string) {
+  n = (n || "").toLocaleLowerCase("tr");
+  if (/gürültü/.test(n)) return "Reklam / gürültü";
+  if (/türkiye/.test(n)) return "Türkiye ilgisi yok";
+  if (/hariç/.test(n)) return "Hariç markalar";
+  if (/limit/.test(n)) return "Aday limiti";
+  if (/^tür:/.test(n)) return "Rehber / kampanya";
+  return "Diğer";
+}
+
+// Havuz (eski "Yeni"), Pas, Belirsiz ve Elenenler aynı listeyi farklı eylemlerle kullanır.
+export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" | "belirsiz" | "elendi"> }) {
   const { v } = useMasa();
   const { profile } = useAuth();
   const toast = useToast();
   const iyimser = useIyimser();
+  const kisi = useKisi();
+  const is_ = useIs();
+  const onerilen = useOnerilen();
+  const degerle = useDegerlendir();
   const ben = profile!.id;
   const [ara, setAra] = useState("");
-  const [konu, setKonu] = useState("");
-  const [enAz, setEnAz] = useState(0);
   const [gorunum, setGorunum] = useState<"herkes" | "bana">("herkes");
-  const [pasGoster, setPasGoster] = useState(false);
-  const durum: Durum = ilkDurum === "aday" && pasGoster ? "pas" : ilkDurum;
-  const haric = useHaric();
-  const ilgiler = (profile!.interests ?? "").toLocaleLowerCase("tr").split(/[,;]+/).map((x) => x.trim()).filter((x) => x.length > 1);
-  const banaUygun = (h: Haber) => ilgiler.length > 0 && ilgiler.some((i) => [h.brand, h.product, h.topic, h.event].join(" ").toLocaleLowerCase("tr").includes(i));
-  const [notAcik, setNotAcik] = useState<number | null>(null);
+  const [elKategori, setElKategori] = useState("hepsi");
   const [kac, setKac] = useState(60);
 
-  const { liste, d } = useMemo(() => {
+  const { liste: sirali, d } = useMemo(() => {
     const q = ara.trim().toLocaleLowerCase("tr");
     const secili = v.haberler.filter((h) => h.status === durum)
-      .filter((h) => !konu || h.topic === konu)
       .filter((h) => !q || [h.event, h.title, h.brand, h.product, h.source_name].join(" ").toLocaleLowerCase("tr").includes(q));
-    if (durum !== "aday") {
-      const tarih = [...secili].sort((a, b) => Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at));
-      return { liste: tarih, d: undefined };
-    }
-    const r = sirala(secili, v.oylar, v.haberler, haric);
-    let l = r.liste.filter((h) => r.d.get(h.id)!.puan >= enAz);
-    // "Bana göre": ilgi alanıma uyanlar üstte; ortak sıra değişmez, sadece benim görünümüm
-    if (gorunum === "bana") l = [...l.filter(banaUygun), ...l.filter((h) => !banaUygun(h))];
-    return { liste: l, d: r.d };
-  }, [v.haberler, v.oylar, durum, konu, enAz, ara, gorunum, haric.size]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (durum === "aday") return sirala(secili, v.markalar, v.oylar);
+    return { liste: [...secili].sort((a, b) => Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at)), d: undefined };
+  }, [v.haberler, v.markalar, v.oylar, durum, ara]);
+  const filtre = useFiltre(sirali, (h) => d?.get(h.id) ?? degerle(h));
 
-  const konular = useMemo(() => {
-    const say = new Map<string, number>();
-    v.haberler.filter((h) => h.status === durum && h.topic).forEach((h) => say.set(h.topic, (say.get(h.topic) ?? 0) + 1));
-    return [...say.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
-  }, [v.haberler, durum]);
+  let liste = durum === "elendi" ? sirali : filtre.sonuc;
+  // "Bana göre": önerilen editörü ben olanlar üstte; ortak sıra değişmez, sadece benim görünümüm
+  if (durum === "aday" && gorunum === "bana") {
+    const bana = (h: Haber) => onerilen(h).some((p) => p.id === ben);
+    liste = [...liste.filter(bana), ...liste.filter((h) => !bana(h))];
+  }
+  const kats = new Map<string, number>();
+  if (durum === "elendi") {
+    sirali.forEach((h) => kats.set(elKat(h.reason), (kats.get(elKat(h.reason)) ?? 0) + 1));
+    if (elKategori !== "hepsi") liste = liste.filter((h) => elKat(h.reason) === elKategori);
+  }
 
-  const durumYap = (h: Haber, yeni: Durum, ek: Partial<Haber> = {}) => iyimser(
+  const durumYap = (h: Haber, yeni: Durum, ek: Partial<Haber> = {}, mesaj?: string) => iyimser(
     (x) => ({ ...x, haberler: x.haberler.map((y) => (y.id === h.id ? { ...y, status: yeni, touched: true, ...ek } : y)) }),
     () => sb.from("tr_items").update({ status: yeni, ...ek }).eq("id", h.id),
     toast,
-  );
+  ).then((ok) => { if (ok && mesaj) toast(mesaj); return ok; });
 
   async function al(h: Haber) {
     const ok = await iyimser(
-      (x) => ({ ...x, haberler: x.haberler.map((y) => (y.id === h.id ? { ...y, status: "alindi", taken_by: ben, touched: true } : y)) }),
+      (x) => ({ ...x, haberler: x.haberler.map((y) => (y.id === h.id ? { ...y, status: "alindi", taken_by: ben, touched: true, last_dropped_by: null } : y)) }),
       () => sb.rpc("tr_take", { p_item: h.id }),
       toast,
     );
-    if (ok) toast("Aldın. Benim aldıklarım bölümünde.");
-  }
-
-  async function oyla(h: Haber, deger: 1 | -1) {
-    const mevcut = v.oylar.find((o) => o.item_id === h.id && o.user_id === ben);
-    if (mevcut?.value === deger) {
-      await iyimser((x) => ({ ...x, oylar: x.oylar.filter((o) => !(o.item_id === h.id && o.user_id === ben)) }),
-        () => sb.from("tr_votes").delete().eq("item_id", h.id).eq("user_id", ben), toast);
-      return;
-    }
-    const ok = await iyimser(
-      (x) => ({ ...x, oylar: [...x.oylar.filter((o) => !(o.item_id === h.id && o.user_id === ben)), { item_id: h.id, user_id: ben, value: deger, note: mevcut?.note ?? "" }] }),
-      () => sb.from("tr_votes").upsert({ item_id: h.id, user_id: ben, value: deger, note: mevcut?.note ?? "" }),
-      toast,
-    );
-    if (ok) setNotAcik(h.id);
-  }
-
-  async function notKaydet(h: Haber, note: string) {
-    setNotAcik(null);
-    if (!note.trim()) return;
-    const r = await sb.from("tr_votes").update({ note: note.trim().slice(0, 300) }).eq("item_id", h.id).eq("user_id", ben);
-    if (r.error) toast(r.error.message); else toast("Not kaydedildi; yapay zekâ bundan sonra dikkate alır.");
+    if (ok) toast('Haber sende. "Benim aldıklarım" bölümünde.');
   }
 
   async function yanlisElendi(h: Haber) {
-    const ok = await durumYap(h, "aday", { wrong_by: ben, reason: "" });
-    if (ok) {
-      await sb.from("tr_votes").upsert({ item_id: h.id, user_id: ben, value: 1, note: "Yanlış elenmiş: " + (h.reason || "") });
-      toast("Havuza alındı. Yapay zekâ bu tür haberleri bundan sonra elememeye çalışır.");
-    }
+    const ok = await durumYap(h, "elendi", { wrong_by: ben });
+    if (ok) toast("Not alındı, kuralı buna göre düzelteceğiz.");
   }
 
-  const benimOy = (id: number) => v.oylar.find((o) => o.item_id === id && o.user_id === ben)?.value ?? 0;
-
+  const ilgiVar = !!(profile!.interests ?? "").trim();
   return (
     <>
       <div className="filtre">
         <input type="search" placeholder="Ara: marka, ürün, kaynak…" value={ara} onChange={(e) => setAra(e.target.value)} aria-label="Haberlerde ara" />
-        {ilkDurum === "aday" && !pasGoster && <>
+        {durum === "aday" && (
           <div className="segment" role="group" aria-label="Görünüm">
             <button aria-pressed={gorunum === "herkes"} onClick={() => setGorunum("herkes")}>Herkes için</button>
-            <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiler.length ? "İlgi alanlarına uyanlar üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
+            <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiVar ? "Sana önerilenler üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
           </div>
-          <select value={enAz} onChange={(e) => setEnAz(Number(e.target.value))} style={{ width: "auto" }} aria-label="Seviye">
-            <option value={0}>Tüm seviyeler</option>
-            {SEVIYELER.filter((x) => x.enAz > 0).map((x) => <option key={x.ad} value={x.enAz}>{x.ad} ve üstü</option>)}
-          </select>
-        </>}
-        {ilkDurum === "aday" && <button className="btn ghost sm" onClick={() => setPasGoster(!pasGoster)}>{pasGoster ? "← Havuza dön" : `Pas geçilenler (${v.haberler.filter((h) => h.status === "pas").length})`}</button>}
+        )}
       </div>
-      {konular.length > 1 && (
+      {durum !== "elendi" && filtre.ui}
+      {durum === "elendi" && (
         <div className="filtre">
-          <button className="chip" aria-pressed={!konu} onClick={() => setKonu("")}>Tümü</button>
-          {konular.map(([k, n]) => <button key={k} className="chip" aria-pressed={konu === k} onClick={() => setKonu(konu === k ? "" : k)}>{k} <span className="mono">{n}</span></button>)}
+          <button className="chip" aria-pressed={elKategori === "hepsi"} onClick={() => setElKategori("hepsi")}>Hepsi · {sirali.length}</button>
+          {[...kats.entries()].map(([k, n]) => <button key={k} className="chip" aria-pressed={elKategori === k} onClick={() => setElKategori(k)}>{k} · {n}</button>)}
         </div>
       )}
-      {ilkDurum === "aday" && !pasGoster && <OncelikBilgisi />}
-      {gorunum === "bana" && !ilgiler.length && durum === "aday" && <div className="msg err">"Bana göre" için Profilim'de ilgi alanlarını yaz (ör. sony, kamera, playstation).</div>}
+      {durum === "aday" && <OncelikBilgisi />}
+      {durum === "aday" && gorunum === "bana" && !ilgiVar && <div className="msg err">"Bana göre" için Profilim'de ilgi alanlarını yaz (ör. sony, kamera, playstation).</div>}
       <div className="muted">{liste.length} haber</div>
       {!liste.length && <div className="empty">{durum === "aday" ? "Havuz boş. Yeni haberler 15 dakikada bir gelir." : "Burada haber yok."}</div>}
       <div className="cards">
-        {liste.slice(0, kac).map((h) => (
-          <HaberKart key={h.id} h={h} oylar={v.oylar} d={d?.get(h.id)}>
-            {durum === "aday" && <>
-              <button className="btn sm" onClick={() => al(h)}>Al</button>
-              <button className="btn ghost sm" onClick={() => durumYap(h, "pas")}>Pas</button>
-              <button className="btn ghost sm oybtn" aria-pressed={benimOy(h.id) === 1} title="Bu markada bu tür haberleri öne çıkarır. Tekrar basınca geri alınır." onClick={() => oyla(h, 1)}>Bunun gibi daha çok</button>
-              <button className="btn ghost sm oybtn" aria-pressed={benimOy(h.id) === -1} title="Bu markada bu tür haberleri geriye alır. Tekrar basınca geri alınır." onClick={() => oyla(h, -1)}>Bunun gibi daha az</button>
-            </>}
-            {durum === "belirsiz" && <>
-              <button className="btn sm" onClick={() => durumYap(h, "aday")}>Havuza al</button>
-              <button className="btn ghost sm" onClick={() => al(h)}>Al</button>
-              <button className="btn ghost sm" onClick={() => durumYap(h, "elendi", { reason: "Ekip eledi" })}>Ele</button>
-            </>}
-            {durum === "pas" && <button className="btn sm" onClick={() => durumYap(h, "aday")}>Havuza geri al</button>}
-            {durum === "elendi" && (h.wrong_by
-              ? <span className="muted">Yanlış elendi olarak işaretlendi</span>
-              : <button className="btn ghost sm" onClick={() => yanlisElendi(h)}>Yanlış elendi</button>)}
-            {notAcik === h.id && (
-              <form className="row" style={{ width: "100%" }} onSubmit={(e) => { e.preventDefault(); notKaydet(h, String(new FormData(e.currentTarget).get("n"))); }}>
-                <input name="n" type="text" placeholder="Neden? (isteğe bağlı) ör. kamera tescilleri önemli" autoFocus style={{ flex: "1 1 180px", width: "auto" }} />
-                <button className="btn ghost sm">Kaydet</button>
-              </form>
-            )}
-          </HaberKart>
-        ))}
+        {liste.slice(0, kac).map((h) => {
+          const calisiyor = h.work_state === "taslak";
+          return (
+            <HaberKart key={h.id} h={h} d={d?.get(h.id)} oyGoster={durum === "aday" || durum === "pas"}
+              ust={calisiyor ? <div className="msg good">Taslak yazılıyor…</div> : h.work_state === "hata" ? <div className="msg err">Olmadı: {h.work_error}</div> : undefined}>
+              {durum === "aday" && <>
+                <button className="btn sm" onClick={() => al(h)}>Ben alıyorum</button>
+                <button className="btn ghost sm" onClick={() => durumYap(h, "pas", {}, "Pas geçildi.")}>Pas</button>
+                <button className="btn ghost sm" disabled={calisiyor} onClick={() => is_(h, "taslak")}>{calisiyor ? "Taslak yazılıyor…" : "Taslak hazırla"}</button>
+              </>}
+              {durum === "pas" && <>
+                <span className="muted">Pas · {kisi(h.updated_by)?.name ?? ""}</span>
+                <button className="btn sm" onClick={() => durumYap(h, "aday", {}, "Haber tekrar havuzda.")}>Geri al</button>
+              </>}
+              {durum === "belirsiz" && <>
+                <button className="btn sm" onClick={() => durumYap(h, "aday", {}, "Havuza alındı.")}>Havuza al</button>
+                <button className="btn ghost sm" onClick={() => al(h)}>Al</button>
+                <button className="btn ghost sm" onClick={() => durumYap(h, "elendi", { reason: "Ekip eledi" })}>Ele</button>
+              </>}
+              {durum === "elendi" && <>
+                <a className="btn ghost sm" href={h.link} target="_blank" rel="noreferrer">Habere bak ↗</a>
+                {h.wrong_by
+                  ? <span className="muted">Yanlış elenmiş · {kisi(h.wrong_by)?.name ?? ""}</span>
+                  : <button className="btn ghost sm" onClick={() => yanlisElendi(h)}>Yanlış elenmiş</button>}
+              </>}
+            </HaberKart>
+          );
+        })}
       </div>
       {liste.length > kac && <button className="btn ghost" onClick={() => setKac(kac + 60)}>Daha fazla göster ({liste.length - kac})</button>}
     </>
