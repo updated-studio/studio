@@ -96,7 +96,17 @@ function jsonOku(ham: string): unknown {
 }
 
 // Eski tr_gemini_: 3 deneme, ilk sıcaklık 0; 429/500/503'te 5 sn bekleyip tekrar
+// Yoğunlukta (429/500/503) sıradaki yedek modele geçer
 async function gemini(model: string, kullanici: string, sistem = SISTEM): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  let son: unknown;
+  for (const m of [model, "gemini-3.5-flash", "gemini-3.6-flash"].filter((x, i, a) => a.indexOf(x) === i)) {
+    try { return await geminiTek(m, kullanici, sistem); }
+    catch (e) { son = e; if (!/ (429|500|503):/.test(String(e))) throw e; }
+  }
+  throw son;
+}
+
+async function geminiTek(model: string, kullanici: string, sistem: string): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY yok");
   let son = "";
