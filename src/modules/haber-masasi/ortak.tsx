@@ -55,7 +55,7 @@ export function OncelikBilgisi() {
         <div className="satir"><div className="ana"><b>Tazelik</b><div className="muted">{EK.taze.map(([s, p]) => `${s} saatten yeni +${p}`).join(" · ")}</div></div></div>
         <div className="satir"><div className="ana"><b>Öncelikli marka olduğu için elenmeyen "Türkiye'de yok" haberi</b><div className="muted">{EK.turkiyeZayif}</div></div></div>
         <div className="satir"><div className="ana"><b>Seviye</b><div className="muted">{SEVIYELER.map((s) => `${s.ad}: ${s.enAz}+`).join(" · ")}</div></div></div>
-        <div className="satir"><div className="ana"><b>"Bunun gibi daha çok / az"</b><div className="muted">Herkes kendi oyunu verir, not ekleyebilir. Oy sadece aynı markanın kendi haberleri arasında sırayı değiştirir (aynı tür için net oy başına ±{OY_ETKISI}, en fazla ±{OY_SINIRI}, son {OY_GUN} gün). Markayı diğer markaların önüne ya da arkasına atmaz. Al ve Pas puanı etkilemez.</div></div></div>
+        <div className="satir"><div className="ana"><b>👍 / 👎 (bunun gibi daha çok / az)</b><div className="muted">Herkes kendi oyunu verir, not ekleyebilir. Oy sadece aynı markanın kendi haberleri arasında sırayı değiştirir (aynı tür için net oy başına ±{OY_ETKISI}, en fazla ±{OY_SINIRI}, son {OY_GUN} gün). Markayı diğer markaların önüne ya da arkasına atmaz. Al ve Pas puanı etkilemez.</div></div></div>
         <div className="satir"><div className="ana"><b>Çeşitlilik</b><div className="muted">Havuzda aynı markadan art arda en fazla {ART_ARDA_EN_FAZLA} haber gelir.</div></div></div>
         <div className="satir"><div className="ana"><b>Toplama sırasında elenenler</b><div className="muted">Hariç marka · kampanya ve rehber yazıları · Türkiye'de yok (Öncelikli marka değilse) · gürültü kelimeleri. Türkiye bilgisi belirsiz olanlar Belirsiz'e düşer.</div></div></div>
       </div>
@@ -171,15 +171,14 @@ export function OyAlani({ h }: { h: Haber }) {
     setNot("");
     if (r.error) toast(r.error.message); else { toast("Not kaydedildi."); yenile(); }
   }
+  const arti = oylar.filter((o) => o.value > 0), eksi = oylar.filter((o) => o.value < 0);
+  const kimler = (l: typeof oylar) => l.map((o) => (kisi(o.user_id)?.name ?? "?") + (o.note ? ": " + o.note : "")).join("\n");
   return (
     <>
-      {oylar.map((o) => (
-        <span key={o.id} className={"pill " + (o.value > 0 ? "ok" : "off")} title={o.note}>
-          {o.value > 0 ? "Daha çok" : "Daha az"} · {kisi(o.user_id)?.name ?? "?"}{o.note ? " — " + o.note : ""}
-        </span>
-      ))}
-      <button className="btn ghost sm" aria-pressed={benim?.value === 1} title="Bu markada bu tür haberleri öne çıkarır. Tekrar basınca geri alınır." onClick={() => oyla(1)}>Bunun gibi daha çok</button>
-      <button className="btn ghost sm" aria-pressed={benim?.value === -1} title="Bu markada bu tür haberleri geriye alır. Tekrar basınca geri alınır." onClick={() => oyla(-1)}>Bunun gibi daha az</button>
+      <button className="btn ghost sm oybtn" aria-pressed={benim?.value === 1} aria-label="Bunun gibi daha çok"
+        title={"Bu markanın bu tür haberlerini öne al. Tekrar basınca geri alınır." + (arti.length ? "\n\n" + kimler(arti) : "")} onClick={() => oyla(1)}>👍{arti.length ? " " + arti.length : ""}</button>
+      <button className="btn ghost sm oybtn" aria-pressed={benim?.value === -1} aria-label="Bunun gibi daha az"
+        title={"Bu markanın bu tür haberlerini geriye al. Tekrar basınca geri alınır." + (eksi.length ? "\n\n" + kimler(eksi) : "")} onClick={() => oyla(-1)}>👎{eksi.length ? " " + eksi.length : ""}</button>
       {notAcik && benim && (
         <form className="row" style={{ width: "100%" }} onSubmit={(e) => { e.preventDefault(); notKaydet(); }}>
           <input type="text" value={not} onChange={(e) => setNot(e.target.value)} maxLength={300} placeholder="Neden? (isteğe bağlı) ör. kamera tescilleri önemli" autoFocus style={{ flex: "1 1 180px", width: "auto" }} />
@@ -237,5 +236,40 @@ export function HaberKart({ h, children, ust, d, oyGoster = true }: { h: Haber; 
       {h.last_action && <div className="muted" style={{ fontSize: 12 }}>{h.last_action}</div>}
       {!h.last_action && alan && <div className="row muted" style={{ gap: 6 }}><Avatar kisi={alan} boyut={20} /> {alan.name} aldı</div>}
     </div>
+  );
+}
+
+/** Haberleri şimdi topla: onay penceresiyle (sistem zaten 15 dakikada bir topluyor) */
+export function SimdiTopla() {
+  const { v } = useMasa();
+  const toast = useToast();
+  const [acik, setAcik] = useState(false);
+  const [calisiyor, setCalisiyor] = useState(false);
+  const son = v.ayarlar.son_toplama as { zaman?: string; durum?: string } | undefined;
+  async function topla() {
+    setAcik(false); setCalisiyor(true);
+    const { data, error } = await sb.functions.invoke("triyaj-topla", { body: { zorla: true } });
+    setCalisiyor(false);
+    if (error) return toast("Başlatılamadı: " + error.message);
+    toast(data?.atlandi ?? "Toplama başladı. Yeni haberler bir iki dakika içinde havuza düşer.");
+  }
+  return (
+    <>
+      <button className="btn ghost sm" disabled={calisiyor || son?.durum === "çalışıyor"} onClick={() => setAcik(true)}>
+        {calisiyor || son?.durum === "çalışıyor" ? "Haberler toplanıyor…" : "Haberleri şimdi topla"}
+      </button>
+      {acik && (
+        <div className="perde" onClick={(e) => { if (e.target === e.currentTarget) setAcik(false); }}>
+          <div className="pencere" role="dialog" aria-label="Haberleri şimdi topla">
+            <h3>Haberleri şimdi toplamak istediğine emin misin?</h3>
+            <p className="muted">Sistem haberleri zaten 15 dakikada bir kendiliğinden topluyor{son?.zaman ? `; son toplama ${zamanOnce(son.zaman)} önce yapıldı` : ""}. Şimdi toplamak sadece bir sonraki turu beklemek istemiyorsan gerekli. Her toplama yapay zekâ kullanır.</p>
+            <div className="row" style={{ justifyContent: "flex-end" }}>
+              <button className="btn ghost" onClick={() => setAcik(false)}>Vazgeç</button>
+              <button className="btn" onClick={topla}>Evet, şimdi topla</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

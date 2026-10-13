@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
-import { HaberKart, OncelikBilgisi, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
+import { HaberKart, OncelikBilgisi, SimdiTopla, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
 import { sirala } from "./oncelik";
 import { useIyimser, useMasa, type Durum, type Haber } from "./veri";
 
@@ -85,6 +85,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
             <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiVar ? "Sana önerilenler üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
           </div>
         )}
+        {durum === "aday" && <SimdiTopla />}
       </div>
       {durum !== "elendi" && filtre.ui}
       {durum === "elendi" && (

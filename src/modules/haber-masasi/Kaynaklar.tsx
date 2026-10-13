@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { hataMetni, useToast } from "../../shared/toast";
-import { zamanOnce } from "./ortak";
+import { SimdiTopla, zamanOnce } from "./ortak";
 import { useMasa, type Kaynak } from "./veri";
 
 const RENK: Record<string, string> = { "Çalışıyor": "ok", "Yavaş": "wait", "Ölü": "rose", "Boş": "wait", "Tarihsiz": "off" };
@@ -36,16 +36,7 @@ export default function Kaynaklar() {
   const { profile } = useAuth();
   const toast = useToast();
   const yonetici = profile!.is_admin;
-  const [calisiyor, setCalisiyor] = useState(false);
   const son = v.ayarlar.son_toplama as { zaman?: string; durum?: string; okunan?: number; yeni?: number; yapayZeka?: number; kural?: number; bekleyen?: number; hata?: string; aday?: number; elenen?: number; belirsiz?: number } | undefined;
-
-  async function topla() {
-    setCalisiyor(true);
-    const { data, error } = await sb.functions.invoke("triyaj-topla", { body: { zorla: true } });
-    setCalisiyor(false);
-    if (error) return toast("Başlatılamadı: " + error.message);
-    toast(data?.atlandi ?? "Toplama başladı. Yeni haberler bir iki dakika içinde havuza düşer.");
-  }
 
   async function ekle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -67,7 +58,7 @@ export default function Kaynaklar() {
             {son?.okunan !== undefined && <div className="muted">{son.okunan} haber okundu · {son.yeni} yeni · {son.yapayZeka} yapay zekâ etiketledi → {son.aday ?? 0} aday, {son.elenen ?? 0} elenen, {son.belirsiz ?? 0} belirsiz{son.bekleyen ? ` · ${son.bekleyen} sırada` : ""}</div>}
             {son?.hata && <div className="msg err">{son.hata}</div>}
           </div>
-          <button className="btn sm" onClick={topla} disabled={calisiyor}>Şimdi topla</button>
+          <SimdiTopla />
         </div>
         <div className="muted">Kendiliğinden 15 dakikada bir çalışır.</div>
       </div>
