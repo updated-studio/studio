@@ -49,7 +49,7 @@ export default function Sohbet() {
         <div ref={alt} />
       </div>
       <form className="row" onSubmit={gonder}>
-        <input type="text" value={metin} onChange={(e) => setMetin(e.target.value)} placeholder="Ekibe yaz…" maxLength={2000} style={{ flex: "1 1 200px", width: "auto" }} aria-label="Mesaj" />
+        <input type="text" value={metin} onChange={(e) => setMetin(e.target.value)} placeholder="Ekibe yaz…" maxLength={500} style={{ flex: "1 1 200px", width: "auto" }} aria-label="Mesaj" />
         <button className="btn" disabled={!metin.trim()}>Gönder</button>
       </form>
     </div>

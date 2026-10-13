@@ -29,6 +29,34 @@ export function mdHtml(md: string): string {
   return out.join("\n");
 }
 
+/** Eski taslak dokümanının "GÖRSEL" bölümü: öneri, alt text, basın kiti, stok önerileri, yapay zekâ istemi */
+function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
+  const g = t.image ?? {};
+  const stok = g.stok ?? [];
+  if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem) return null;
+  return (
+    <div className="panel">
+      <h3>Görsel</h3>
+      <ul>
+        <li>Öneri: {g.oneri || t.image_note}</li>
+        {g.alt_text && <li>Alt text: {g.alt_text}</li>}
+        {g.basin && <li><a href={g.basin.url} target="_blank" rel="noreferrer">{g.basin.kesin ? `Resmi basın sayfası (${marka}) ↗` : `Resmi basın görseli ara (${marka}) ↗`}</a>{!g.basin.kesin && <span className="muted"> (arama bağlantısı, resmi sayfayı kendin doğrula)</span>}</li>}
+        {(g.aramalar ?? []).length > 0 && !stok.length && <li>Stok fotoğraf aramaları: {g.aramalar!.join(" / ")} <span className="muted">({g.stok_anahtar ? "sonuç çıkmadı" : "stok fotoğraf anahtarı tanımlı değil"})</span></li>}
+      </ul>
+      {stok.length > 0 && <>
+        <div className="muted">Stok önerileri (aramalar: {(g.aramalar ?? []).join(" · ")}). Kullanırken kaynak göster.</div>
+        <div className="stok">
+          {stok.map((p) => <a key={p.url} href={p.url} target="_blank" rel="noreferrer"><img src={p.thumb} alt="" loading="lazy" />{p.kaynak} · {p.yazar}</a>)}
+        </div>
+      </>}
+      {g.ai_istem && <>
+        <div><b>Yapay zekâ görseli için istem (İngilizce):</b> {g.ai_istem}</div>
+        <div className="muted">Uyarı: Gerçek veya henüz çıkmamış bir ürünü yapay zekâyla birebir çizme; konsept/atmosfer görseli olarak kullan ve "yapay zekâ ile üretilmiştir" diye belirt.</div>
+      </>}
+    </div>
+  );
+}
+
 const DURUM: Record<Taslak["status"], string> = { taslak: "Taslak", hazir: "Yayına hazır", gonderildi: "Siteye gönderildi" };
 
 export default function Taslaklar({ acik, setAcik }: { acik: number | null; setAcik: (id: number | null) => void }) {
@@ -130,9 +158,14 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
         <label>Etiketler (virgülle)<input type="text" value={(d.seo.etiketler ?? []).join(", ")} onChange={(e) => seo("etiketler", e.target.value)} /></label>
       </div>
       <div className="panel">
-        <label>Kaynaklar<textarea className="alan" rows={2} value={d.sources} onChange={(e) => alan("sources", e.target.value)} /></label>
-        <label>Görsel önerisi<textarea className="alan" rows={2} value={d.image_note} onChange={(e) => alan("image_note", e.target.value)} /></label>
-        <label>Editöre not (yapay zekânın emin olmadıkları)<textarea className="alan" rows={3} value={d.editor_note} onChange={(e) => alan("editor_note", e.target.value)} /></label>
+        <label>Kaynaklar<textarea className="alan" rows={3} value={d.sources} onChange={(e) => alan("sources", e.target.value)} /></label>
+      </div>
+      <Gorsel t={t} marka={haber?.brand ?? ""} />
+      <div className="panel">
+        <h3>Editör için (yayına girmez)</h3>
+        {(t.questions ?? []).length > 0 && <><b>Senin katkın için sorular</b><div className="muted">Cevabını gövdede ilgili ara başlığın içine yerleştir.</div><ul>{t.questions.map((x, i) => <li key={i}>{x}</li>)}</ul></>}
+        {(t.checks ?? []).length > 0 && <><b>Yayından önce doğrula</b><ul>{t.checks.map((x, i) => <li key={i}>{x}</li>)}</ul></>}
+        <label>Notlar (yapay zekânın emin olmadıkları)<textarea className="alan" rows={3} value={d.editor_note} onChange={(e) => alan("editor_note", e.target.value)} /></label>
       </div>
       <div className="row">
         <span className="muted" style={{ marginRight: "auto" }}>Durum: {DURUM[d.status]}{t.model ? " · " + t.model : ""}</span>
