@@ -158,6 +158,23 @@ async function geminiTek(model: string, kullanici: string, sistem: string): Prom
   throw new Error("Gemini yanıt vermedi. " + son);
 }
 
+// Ücretsiz Google Çeviri (anahtarsız, resmi olmayan uç): yapay zekâya hiç gitmeyen (gürültüyle elenen) başlıkları Türkçeye çevirir.
+// Yapay zekâ kotası harcanmaz. Çalışmazsa başlık İngilizce kalır.
+async function cevir(basliklar: string[]): Promise<string[]> {
+  const out = [...basliklar].map(() => "");
+  for (let i = 0; i < basliklar.length; i += 25) {
+    const parca = basliklar.slice(i, i + 25);
+    try {
+      const r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=tr&dt=t&q=" + encodeURIComponent(parca.join("\n")));
+      if (!r.ok) continue;
+      const j = await r.json();
+      const satirlar = (j?.[0] ?? []).map((x: unknown[]) => String(x?.[0] ?? "")).join("").split("\n");
+      parca.forEach((_, k) => { out[i + k] = (satirlar[k] ?? "").trim(); });
+    } catch { /* İngilizce kalır */ }
+  }
+  return out;
+}
+
 async function topla(sb: ReturnType<typeof createClient>) {
   const bas = Date.now();
   const ayarlar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
@@ -348,6 +365,12 @@ async function topla(sb: ReturnType<typeof createClient>) {
     goruldu.push(...g.slice(1).map((x) => x.h.link));
   }
 
+  // Yapay zekâdan geçmeyen elenenlerin başlığı ücretsiz çeviriyle Türkçeleşir (elenenlere bakan ekip anlasın)
+  const cevrilecek = elenen.filter((x) => !x.event);
+  if (cevrilecek.length) {
+    const tr = await cevir(cevrilecek.map((x) => String(x.title)));
+    cevrilecek.forEach((x, k) => { if (tr[k]) x.event = tr[k].slice(0, 400); });
+  }
   try {
     await yaz([...yeniAday, ...elenen, ...belirsiz, ...rehber]);
     if (goruldu.length) await sb.from("tr_seen").upsert(goruldu.map((link) => ({ link })), { onConflict: "link", ignoreDuplicates: true });
@@ -406,6 +429,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
   const govde = await req.json().catch(() => ({}));
+  if (govde?.eskiCeviri) {
+    // Tek seferlik: Türkçe özeti olmayan elenen/rehber/belirsiz haberlerin başlığını ücretsiz çeviriyle doldurur (yapay zekâ kullanmaz)
+    const { data } = await sb.from("tr_items").select("id,title").in("status", ["elendi", "rehber", "belirsiz"]).eq("event", "").limit(400);
+    const l = (data ?? []) as { id: number; title: string }[];
+    const tr = await cevir(l.map((x) => x.title));
+    let n = 0;
+    for (let i = 0; i < l.length; i++) if (tr[i]) { await sb.from("tr_items").update({ event: tr[i].slice(0, 400) }).eq("id", l[i].id); n++; }
+    return Response.json({ bulunan: l.length, cevrilen: n }, { headers: CORS });
+  }
   if (govde?.birlestir) {
     const { data: u } = await sb.auth.getUser((req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, ""));
     const { data: p } = u?.user ? await sb.from("profiles").select("is_admin").eq("id", u.user.id).maybeSingle() : { data: null };

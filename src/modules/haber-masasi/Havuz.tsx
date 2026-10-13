@@ -125,6 +125,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
               </>}
               {durum === "elendi" && <>
                 <a className="btn ghost sm" href={h.link} target="_blank" rel="noreferrer">Habere bak ↗</a>
+                <button className="btn sm" onClick={() => durumYap(h, "aday", { wrong_by: h.wrong_by ?? ben }, "Havuza alındı.")}>Havuza al</button>
                 {h.wrong_by
                   ? <span className="muted">Yanlış elenmiş · {kisi(h.wrong_by)?.name ?? ""}</span>
                   : <button className="btn ghost sm" onClick={() => yanlisElendi(h)}>Yanlış elenmiş</button>}
