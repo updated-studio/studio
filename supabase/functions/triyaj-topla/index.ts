@@ -9,7 +9,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Eski TR_AYAR
 const SAAT = 24;          // bundan eski haberler alınmaz
 const KAYNAK_MAX = 10;    // bir çalıştırmada kaynak başına en fazla yeni haber (fazlası sonraki çalıştırmaya kalır)
-const MAX_HABER = 100;    // bir çalıştırmada yapay zekâya giden en fazla haber; fazlası "Toplu istek limiti" ile elenir
+const MAX_HABER = 100;    // bir çalıştırmada yapay zekâya giden en fazla haber; fazlası ELENMEZ, sıraya girer (Enes, 13 Ekim: hiçbir haber kaybolmasın)
 const PARTI = 50;         // tek istekte kaç haber
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 
@@ -201,7 +201,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   });
 
   adaylar.sort((a, b) => +(b.date ?? 0) - +(a.date ?? 0));
-  const fazla = adaylar.slice(MAX_HABER).map((h) => satir(h, { reason: `Toplu istek limiti (${MAX_HABER}) aşıldı`, model: "kural (yapay zeka öncesi)" }));
+  const sirada = adaylar.length - Math.min(adaylar.length, MAX_HABER); // yazılmaz; bir sonraki turda en yeniler önce işlenir
   adaylar = adaylar.slice(0, MAX_HABER);
 
   const yaz = async (satirlar: Record<string, unknown>[]) => {
@@ -231,7 +231,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
 
   // --- Kurallar (eski triyajIs_) ---
   const MODEL = model + " · Stüdyo";
-  const elenen: Record<string, unknown>[] = [...onElenen, ...fazla];
+  const elenen: Record<string, unknown>[] = [...onElenen];
   const belirsiz: Record<string, unknown>[] = [];
   const kalan: { h: Ham; e: Etiket }[] = [];
   adaylar.forEach((h, i) => {
@@ -297,9 +297,9 @@ async function topla(sb: ReturnType<typeof createClient>) {
   } catch (e) { hata = String((e as Error).message ?? e).slice(0, 300); }
 
   const ozet = {
-    kaynak: kaynaklar?.length ?? 0, okunan: tumLinkler.length, yeni: gorulen.size, kural: onElenen.length + fazla.length,
+    kaynak: kaynaklar?.length ?? 0, okunan: tumLinkler.length, yeni: gorulen.size, kural: onElenen.length, sirada,
     yapayZeka: islenen.size, aday: yeniAday.length, elenen: elenen.length, belirsiz: belirsiz.length,
-    bekleyen: adaylar.length - islenen.size, hata, sure: Date.now() - bas,
+    bekleyen: sirada + adaylar.length - islenen.size, hata, sure: Date.now() - bas,
   };
   await sb.from("tr_settings").upsert({ key: "son_toplama", value: { ...ozet, durum: "bitti", zaman: new Date().toISOString() } });
   console.log(JSON.stringify(ozet));
