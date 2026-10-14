@@ -33,14 +33,21 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
   const [gorunum, setGorunum] = useState<"herkes" | "bana">("herkes");
   const [elKategori, setElKategori] = useState("hepsi");
   const [kac, setKac] = useState(60);
+  // Ekip isteği: öncelik yerine zamana göre sıralama (haberin yayın saati ya da sisteme giriş saati, yeniden eskiye)
+  const [siralama, setSiralama] = useState<"oncelik" | "haber" | "derleme">(() => { try { return (localStorage.getItem("hm-siralama") as "oncelik") || "oncelik"; } catch { return "oncelik"; } });
+  const siralamaSec = (x: typeof siralama) => { setSiralama(x); try { localStorage.setItem("hm-siralama", x); } catch { /* yok */ } };
 
   const { liste: sirali, d } = useMemo(() => {
     const q = ara.trim().toLocaleLowerCase("tr");
     const secili = v.haberler.filter((h) => h.status === durum)
       .filter((h) => !q || [h.event, h.title, h.brand, h.product, h.source_name].join(" ").toLocaleLowerCase("tr").includes(q));
-    if (durum === "aday") return sirala(secili, v.oylar, v.haberler);
-    return { liste: [...secili].sort((a, b) => Date.parse(b.published_at ?? b.created_at) - Date.parse(a.published_at ?? a.created_at)), d: undefined };
-  }, [v.haberler, v.oylar, durum, ara]);
+    const zaman = (h: Haber) => Date.parse(siralama === "derleme" ? h.created_at : h.published_at ?? h.created_at);
+    if (durum === "aday") {
+      const r = sirala(secili, v.oylar, v.haberler);
+      return siralama === "oncelik" ? r : { liste: [...secili].sort((a, b) => zaman(b) - zaman(a)), d: r.d };
+    }
+    return { liste: [...secili].sort((a, b) => zaman(b) - zaman(a)), d: undefined };
+  }, [v.haberler, v.oylar, durum, ara, siralama]); // eslint-disable-line react-hooks/exhaustive-deps
   const filtre = useFiltre(sirali, (h) => d?.get(h.id) ?? degerle(h), durum === "aday" ? "onemli" : "hepsi");
 
   let liste = durum === "elendi" ? sirali : filtre.sonuc;
@@ -87,6 +94,11 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
             <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiVar ? "Sana önerilenler üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
           </div>
         )}
+        <select value={durum !== "aday" && siralama === "oncelik" ? "haber" : siralama} onChange={(e) => siralamaSec(e.target.value as typeof siralama)} style={{ width: "auto" }} aria-label="Sıralama">
+          {durum === "aday" && <option value="oncelik">Sıra: öncelik</option>}
+          <option value="haber">Sıra: haber saati (yeni → eski)</option>
+          <option value="derleme">Sıra: sisteme düşme saati (yeni → eski)</option>
+        </select>
         {durum === "aday" && <SimdiTopla />}
       </div>
       {durum !== "elendi" && filtre.ui}
