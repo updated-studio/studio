@@ -41,7 +41,11 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .gun.bos { background: var(--ok-soft); } .gun.bos i { color: var(--ok); }
 .gun.dolu { background: var(--busy-soft); } .gun.dolu i { color: var(--busy); }
 .gun.sec { border-color: var(--blue); } .gun.bugun strong { color: var(--blue); }
-.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 13px; z-index: 9; max-width: calc(100vw - 32px); }
+/* Bildirim (toast): ekranın üstünde, cam görünüm; tema renkleriyle uyumlu (beyaz kutu yok) */
+.toast { position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 60;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(24px) saturate(1.8); -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  color: var(--ink); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); box-shadow: inset 0 1px 0 rgb(255 255 255 / .08), 0 10px 30px rgb(0 0 0 / .25);
+  padding: 11px 18px; border-radius: 16px; font-size: 14px; font-weight: 500; max-width: calc(100vw - 32px); width: max-content; text-align: center; }
 .zil { position: relative; }
 .zil em { position: absolute; top: -6px; right: -6px; background: var(--orange); color: var(--on-accent); font: 500 11px var(--mono); border-radius: 99px; padding: 1px 6px; font-style: normal; }
 .bildirimler { position: absolute; right: 0; top: 48px; width: min(340px, calc(100vw - 32px)); z-index: 5; box-shadow: 0 12px 30px rgb(0 0 0 / .18); max-height: 70vh; overflow: auto; }
@@ -61,12 +65,18 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
   box-shadow: inset 0 1px 0 rgb(255 255 255 / .10), 0 12px 36px rgb(0 0 0 / .22); }
 .dock a { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; padding: 2px 4px 7px;
   color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 500; }
-.dock .kare { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; color: var(--k);
-  background: color-mix(in srgb, var(--k) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--k) 22%, transparent);
-  transition: transform .18s cubic-bezier(.3,.7,.4,1.4); transform-origin: bottom center; }
+/* Uygulama simgesi görünümü: modül renginde dolu kare, beyaz simge (iOS dock gibi) */
+.dock a { -webkit-tap-highlight-color: transparent; outline: none; }
+.dock .kare { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--k) 78%, #fff), var(--k) 55%, color-mix(in srgb, var(--k) 82%, #000));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .28), 0 2px 6px color-mix(in srgb, var(--k) 35%, transparent);
+  transition: transform .18s cubic-bezier(.3,.7,.4,1.4), filter .15s; transform-origin: bottom center; }
+.dock a:not(.active) .kare { filter: saturate(.85) brightness(.95); }
+.dock a:active .kare { transform: scale(.9); }
+.dock a:focus-visible .kare { outline: 2px solid var(--ink); outline-offset: 3px; }
 .dock .kare svg.i { width: 23px; height: 23px; }
 .dock a.active { color: var(--ink); }
-.dock a.active .kare { background: var(--k); color: var(--on-accent); border-color: transparent; }
+.dock a.active .kare { filter: none; }
 .dock a.active::after { content: ""; position: absolute; bottom: -1px; width: 4px; height: 4px; border-radius: 50%; background: var(--ink); }
 @media (hover: hover) {
   .dock a:hover .kare { transform: scale(1.28) translateY(-6px); }

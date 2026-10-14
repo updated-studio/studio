@@ -1,4 +1,5 @@
 /* Updated Stüdyo ortak tasarım. Modüller renk icat etmez, buradaki değişkenleri kullanır. */
+html { -webkit-tap-highlight-color: transparent; }
 :root {
   --bg: #F3F6FC; --surface: #FFFFFF; --sunk: #E9EEF8; --ink: #0E1A33; --muted: #57657F; --line: #D9E0EE;
   --blue: #2563EB; --blue-soft: #DCE7FF; --orange: #E85A0C; --orange-soft: #FFE6D6;
