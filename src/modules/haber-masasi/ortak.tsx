@@ -66,7 +66,7 @@ export function OncelikBilgisi() {
 }
 
 /** Eski panelin filtreleri: öncelik çipleri + marka / kategori / kaynak seçimi */
-// "onemli" = Beklet dışındakiler (Hemen yaz + Yazılabilir); havuzun varsayılan görünümü (Enes: ~20 haberlik liste)
+// "onemli" = Öncelik 3 dışındakiler (Öncelik 1 + 2); havuzun varsayılan görünümü (Enes: ~20 haberlik liste)
 export function useFiltre(liste: Haber[], degerle: (h: Haber) => Degerlendirme, varsayilan: "hepsi" | "onemli" = "hepsi") {
   const [oncelik, setOncelik] = useState<string>(varsayilan);
   const [marka, setMarka] = useState("hepsi");

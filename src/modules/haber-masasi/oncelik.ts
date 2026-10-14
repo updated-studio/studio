@@ -6,7 +6,7 @@
 // oy sadece aynı markanın aynı türdeki haberleri arasında sırayı değiştirir; Al/Pas öğrenmede kullanılmaz.
 import type { Haber, Oy } from "./veri";
 
-export const ONCELIK_SURUMU = "13 Ekim 2026";
+export const ONCELIK_SURUMU = "14 Ekim 2026";
 
 // 1) Haberin türü: markadan bağımsız temel değer. Yapay zekâ her haberi bu listeden birine koyar ("tip" etiketi).
 export const HABER_TURLERI: { ad: string; puan: number; aciklama: string }[] = [
@@ -33,9 +33,9 @@ export const EK = {
 
 // 3) Seviyeler
 export const SEVIYELER = [
-  { ad: "Hemen yaz", enAz: 70, sinif: "rose" },
-  { ad: "Yazılabilir", enAz: 40, sinif: "blue" },
-  { ad: "Beklet", enAz: 0, sinif: "off" },
+  { ad: "Öncelik 1", enAz: 70, sinif: "rose" },
+  { ad: "Öncelik 2", enAz: 40, sinif: "blue" },
+  { ad: "Öncelik 3", enAz: 0, sinif: "off" },
 ] as const;
 
 // 4) Ekip oyu ("Bunun gibi daha çok / az", herkes kendi oyunu verir, notlu): sadece AYNI MARKANIN kendi haberleri arasında sırayı değiştirir.
