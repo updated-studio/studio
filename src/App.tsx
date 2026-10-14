@@ -5,6 +5,7 @@ import ProfilMenu from "./shared/ProfilMenu";
 import { MODULLER } from "./modules";
 import Bildirimler from "./shared/Bildirimler";
 import SurumUyarisi from "./shared/SurumUyarisi";
+import AltyapiUyari from "./shared/altyapi";
 import { ToastProvider } from "./shared/toast";
 import { VeriProvider } from "./shared/veri";
 
@@ -21,6 +22,7 @@ function Kabuk() {
         <ProfilMenu moduller={profilde} />
       </header>
       <SurumUyarisi />
+      <AltyapiUyari />
       <nav className="dock" aria-label="Ana menü">
         {dock.map((m) => (
           <NavLink key={m.id} to={"/" + m.id} title={m.ad} style={{ "--k": `var(--${m.renk ?? "blue"})` } as React.CSSProperties}>

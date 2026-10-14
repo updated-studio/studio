@@ -4,6 +4,7 @@ import { Avatar } from "../../shared/Avatar";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
+import { hataKaynagi, useAltyapi } from "../../shared/altyapi";
 import { ART_ARDA_EN_FAZLA, degerlendir, EK, HABER_TURLERI, ONCELIK_SURUMU, OY_ETKISI, OY_GUN, OY_SINIRI, SEVIYELER, type Degerlendirme } from "./oncelik";
 import { useMasa, type Haber } from "./veri";
 
@@ -138,7 +139,8 @@ export function useIs() {
     if (error) {
       let m = error.message;
       try { const j = await (error as { context?: Response }).context?.json(); if (j?.hata) m = j.hata; } catch { /* yok */ }
-      toast("Başlatılamadı: " + m); return false;
+      const k = hataKaynagi(m, false);
+      toast(k.etiket === "Sistem" ? "Başlatılamadı: " + m : `Başlatılamadı (${k.etiket}): ${m}`); return false;
     }
     if (data?.basladi) toast(tur === "ceviri" ? "Çeviri hazırlanıyor (yaklaşık 20 sn)." : "Taslak yazılıyor (yaklaşık 30 sn). Hazır olunca haber sende, taslak Taslaklar'da.");
     return true;
@@ -339,12 +341,20 @@ export function useSaat(ms = 20_000) {
   const [, set] = useState(0);
   useEffect(() => { const t = window.setInterval(() => set((n) => n + 1), ms); return () => window.clearInterval(t); }, [ms]);
 }
-/** Taslak/çeviri durumu kutusu */
+/** Taslak/çeviri durumu kutusu. Hatada kaynağı yazar: Altyapı (Supabase) / Yapay zekâ / Kaynak site */
 export function IsDurumKutusu({ h, tekrar }: { h: Haber; tekrar: () => void }) {
+  const altyapi = useAltyapi();
   const d = isDurumu(h);
   const tur = h.work_state === "ceviri" ? "Çeviri" : "Taslak";
-  if (d === "calisiyor") return <div className="msg good">{tur} yazılıyor… ({zamanOnce(h.updated_at)} önce başladı, genelde 30-60 sn)</div>;
-  if (d === "takildi") return <div className="msg err row">{tur} {IS_ZAMAN_ASIMI_DK} dakikadır bitmedi, yarıda kalmış olabilir. <button className="linkbtn" onClick={tekrar}>Tekrar dene</button></div>;
-  if (d === "hata") return <div className="msg err row">Olmadı: {h.work_error} <button className="linkbtn" onClick={tekrar}>Tekrar dene</button></div>;
-  return null;
+  if (d === "calisiyor") return <div className="msg good">{tur} yazılıyor… (genelde 30-60 sn)</div>;
+  if (d !== "takildi" && d !== "hata") return null;
+  const k = hataKaynagi(d === "takildi" ? "takıldı" : h.work_error, altyapi.length > 0);
+  return (
+    <div className="msg err">
+      <span className="pill">{k.etiket}</span>{" "}
+      {d === "takildi" ? `${tur} ${IS_ZAMAN_ASIMI_DK} dakikadır bitmedi, yarıda kaldı.` : `Olmadı: ${h.work_error}`}
+      {k.aciklama && <> <span className="muted">{k.aciklama}</span></>}{" "}
+      <button className="linkbtn" onClick={tekrar}>Tekrar dene</button>
+    </div>
+  );
 }
