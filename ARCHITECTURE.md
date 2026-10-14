@@ -291,9 +291,9 @@ Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve 
 
 ### 13.9 Yapılacaklar (14 Ekim itibarıyla, sırayla)
 
-1. **Fatih'i sahip yapmak** (Enes, 14 Ekim'de başlıyor; Fatih'in Gmail adresi Enes'te, depo herkese açık olduğu için buraya yazılmaz):
+1. **Fatih'i sahip yapmak** (Enes 14 Ekim'de dört daveti de gönderdi; Fatih'in kabul etmesi ve Stüdyo'da hesap oluşturması bekleniyor; Fatih'in Gmail adresi Enes'te, depo herkese açık olduğu için buraya yazılmaz):
    a. GitHub `updated-studio` organizasyonuna Owner olarak davet.
-   b. Enes'in kişisel hesabındaki eski depolara (`eneshsahin/updated-panel`, `eneshsahin/updated-post-otomasyonu`) Collaborator; ileride organizasyona taşınır.
+   b. Enes'in kişisel hesabındaki eski depolara (`eneshsahin/updated-panel`, `eneshsahin/updated-post-otomasyonu`) Collaborator. **Şimdi organizasyona taşınmıyor:** `updated-panel` taşınırsa adresi `eneshsahin.github.io` → `updated-studio.github.io` olur ve eski post aracındaki tarayıcı kayıtları (adrese bağlı) kaybolur; GitHub eski adresi yönlendirmez. `updated-post-otomasyonu` zaten Supabase'e taşınacağı için çalışan otomasyonu taşıma riskine sokmaya değmez. İkisi de taşıma işleri bitince ya arşivlenir ya da organizasyona alınır.
    c. Supabase "Updated" organizasyonuna Owner olarak davet.
    d. Stüdyo: davet listesine e-posta → Fatih kayıt olur → Yönetim'de yönetici yapılır.
 2. Devir paketi: hesap listesi (hangi hesap kimin e-postasında, kurtarma), Google AI Studio (Gemini) ve Groq anahtarlarının sahibi, Natro erişimi.
