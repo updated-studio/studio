@@ -73,11 +73,11 @@ Kaçınılmaz dış servisler: telefon bildirimleri Apple ve Google sunucuların
 
 | Modül | Bugün nerede | Hedef | Durum |
 |---|---|---|---|
-| Ekip | Stüdyo modülü (`src/modules/ekip`). Eski tek dosyalık panel (eneshsahin.github.io/updated-panel/ekip) geçiş bitene kadar açık | Stüdyo modülü | Taşındı (12 Ekim), denemede |
+| Ekip | Stüdyo modülü (`src/modules/ekip`). Eski panel (eneshsahin.github.io/updated-panel/ekip) 14 Ekim'de kapatıldı, Stüdyo'ya yönlendiriyor | Stüdyo modülü | Taşındı |
 | Takvim | Stüdyo modülü (`src/modules/takvim`) | + kişisel takvime abonelik | Taşındı (12 Ekim); abonelik yapılacak |
-| İçerik (post aracı) | Stüdyo modülü (`src/modules/icerik`); araç `public/araclar/post/` içinde olduğu gibi çerçeveyle açılıyor. Eski adres de açık | Kayıtlı düzenler bulutta (ekip ortak), story boyutu, otomasyondan gelen postlar | 1. aşama taşındı (12 Ekim) |
+| İçerik (post aracı) | Stüdyo modülü (`src/modules/icerik`); araç `public/araclar/post/` içinde olduğu gibi çerçeveyle açılıyor. Eski adres (eneshsahin.github.io/updated-panel) **açık kalıyor**: kayıtlı düzenler o adreste tarayıcıda duruyor, buluta taşınmadan kapatılırsa kaybolur | Kayıtlı düzenler bulutta (ekip ortak), story boyutu, otomasyondan gelen postlar | 1. aşama taşındı (12 Ekim) |
 | Post otomasyonu | GitHub Actions + Telegram + Gemini (eneshsahin/updated-post-otomasyonu) | Supabase zamanlanmış işleri | Taşınacak |
-| Haber Masası (Triyaj) | Stüdyo modülü (`src/modules/haber-masasi`) + `triyaj-topla`, `triyaj-taslak` işleri. Eski Google Sheets/Apps Script sistemi ("Updated Haber Masası") geçiş bitene kadar paralel çalışıyor | Eski sistem kapanır; WordPress'e taslak gönderme | Kuruldu (12 Ekim), denemede |
+| Haber Masası (Triyaj) | Stüdyo modülü (`src/modules/haber-masasi`) + `triyaj-topla`, `triyaj-taslak` işleri. Eski Google Sheets/Apps Script sistemi 13 Ekim'de kapatıldı (tetikleyici silindi, tablo arşiv) | WordPress'e taslak gönderme | Çalışıyor |
 | Marka Kiti | Stüdyo modülü (`src/modules/marka-kiti`): renkler, yazı tipleri | + logolar | Başlandı |
 | Kamera Simülatörü | Fikir | Stüdyo modülü | İleride |
 
@@ -221,6 +221,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **14 Ekim 2026 (6):** Ana ekran ikonunun zemini #1B1D21 (manifest background_color ile aynı); Android 12+ açılışta ikonu bu renk üstünde gösterdiği için siyah kare/daire görünmez. Uygulamanın kendi açılış ekranı her temada #1B1D21 ve aynı boyutta logo: telefonun açılışıyla uygulamanınki arasında dikiş yok. Ana ekrandan açanlara bir kez "ikon yenilendi" uyarısı (`src/shared/IkonUyarisi.tsx`, ikon değişince IKON_SURUMU güncellenir).
 - **14 Ekim 2026 (7):** Mobilde üst bölümde UP işareti, geniş ekranda UPDATED yazısı. İkonlar UP işaretinden üretiliyor (ana ekran koyu zemin, sekme ikonu yuvarlak köşeli mavi). ARCHITECTURE.md'ye "İşletme el kitabı" (bölüm 13) eklendi: adresler, gizli bilgilerin yeri, fonksiyonlar, zamanlanmış görevler, arıza tablosu, yapılacaklar.
 
+- **14 Ekim 2026 (8):** Güncelleme notları: her yayından sonra kullanıcı görmediği notları "Neler değişti" penceresinde bölüm bölüm okur (`public/yenilikler.json`, `src/shared/Yenilikler.tsx`; CLAUDE.md kural 11). Eski ekip paneli kapatıldı (Stüdyo'ya yönlendirme). Eski post aracı adresi ve post otomasyonu açık kalıyor (kayıtlar ve otomasyon henüz taşınmadı, kural 9). Dokümana bölüm 17 (yapay zekâya verilen talimatların tam özeti) ve 18 (bu doküman ne için) eklendi.
 ## 13. İşletme el kitabı (her şey nerede, bir şey bozulursa)
 
 Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilginin kendisi burada yazmaz; sadece **nerede durduğu** yazar.
@@ -369,3 +370,57 @@ Aktarılanlar: alınan/yayında/pas haberler, oylar, bildirimler, "yanlış elen
 - **Açılış ekranı ve ikon.** Siyah kare istenmedi; telefonun kendi açılışı (Android 12+ ikonu dairede gösterir) ile uygulamanın açılışı aynı renk (#1B1D21) yapıldı ki geçiş görünmesin. Ana ekran ve sekme ikonu için UP işareti (küçük boyutta UPDATED yazısı okunmuyor). Sekme ikonu yuvarlak köşeli mavi (şeffaf siyah logo koyu temada kaybolur).
 - **Sohbet devri.** Fatih'in sohbet geçmişini okumasına gerek yok: GitHub + Supabase sahipliği ve bu doküman yeterli; yeni sohbet "önce ARCHITECTURE.md" ile başlar.
 - **Çalışma biçimi (Enes):** teknik değil; yapması gereken adımda sayfa açılıp önüne konur. Bir sorun/engel olunca hemen söylenir, sormadan karar değiştirilmez, kalıcı silme istemeden yapılmaz, şifre/anahtar asla Claude tarafından girilmez.
+
+## 17. Yapay zekâya ve sisteme verdiğimiz talimatlar (Haber Masası)
+
+Asıl metinler kodda durur; burada ne söylediğimizin tam özeti var. Değiştirirken CLAUDE.md kural 10'a uyulur.
+
+**1. Toplama ve ön eleme** (`triyaj-topla`, yapay zekâdan önce, ücretsiz)
+- Son 24 saatteki haberler; kaynak başına tur başına en fazla 10; daha önce görülen link tekrar alınmaz.
+- Gürültü kelimeleri (Ayarlar'dan düzenlenir): başlık + özette geçerse "Reklam / gürültü" diye elenir.
+- Turda en fazla 100 haber yapay zekâya gider, fazlası sıraya girer (en yeniler önce).
+
+**2. Etiketleme talimatı** (yapay zekâ puan vermez, karar vermez, sadece etiket çıkarır)
+- marka, ürün; tür: resmi / sızıntı / söylenti / inceleme / sektör / kampanya / rehber / diğer.
+- haber tipi (puanı bu belirler): Ürün duyurusu, Türkiye fiyatı, Lansman tarihi, Güçlü sızıntı, Önemli güncelleme, Şirket ve sektör, Söylenti, İnceleme ve test, Küçük güncelleme, Diğer.
+- konu: telefon, tablet, bilgisayar, bileşen, giyilebilir, ses, kamera, drone, video ekipmanı, ev aletleri, akıllı ev, oyun, yapay zeka, yazılım, otomobil, sektör, eğlence, diğer.
+- Türkiye: var (Türkiye'de satılıyor/kullanılıyor ya da küresel önemde) / yok (başka ülkeye özel) / global (Türkiye'de yok ama dünya çapında ilgi çekici yenilik) / belirsiz.
+- asıl kaynak (ör. "Mark Gurman / Bloomberg"), olay kimliği (aynı olaya aynı kimlik), en fazla 15 kelimelik Türkçe özet.
+- Sadece JSON döner; başka bir şey yazmaz.
+
+**3. Kurallar (kararı bunlar verir)**
+- Hariç marka listesinde → elenir. Tür kampanya → elenir. Tür rehber → "Rehber fikirleri".
+- Türkiye "yok" ve marka Öncelikli değil → elenir; Öncelikli ise kalır ama puanı −16.
+- Türkiye "belirsiz" → Belirsiz bölümü (ekip karar verir).
+- Kalanlar Havuz'a. Marka grupları (Öncelikli / normal / Hariç) Ayarlar'dan düzenlenir.
+
+**4. Aynı haber eşleştirme**
+- 48 saat içinde aynı olay kimliği → aynı kart.
+- Ayrıca yapay zekâya "bu yeni haber mevcut kartlardan biriyle birebir aynı olay mı?" sorulur: aynı marka ya da benzer konu yetmez, olay aynı olmalı, emin değilse "hayır".
+
+**5. Öncelik puanı** (`oncelik.ts`, yapay zekâ değil)
+- Haber tipine göre taban puan + her ek kaynak +8 (en fazla +24) + tazelik (3 saatten yeni +20, 12 saat +12, 24 saat +6) − Türkiye zayıf 16.
+- Öncelik 1 ≥ 70, Öncelik 2 ≥ 40, altı Öncelik 3. Kartta gerekçe yazar; "Öncelik nasıl hesaplanır?" ekranda.
+- Ekip oyu: her 👍/👎 aynı marka + tür haberlerine ±6 (en fazla ±18, son 60 gün). Aynı markadan art arda en fazla 2 haber.
+
+**6. Taslak talimatı** (`triyaj-taslak`)
+- Rol: Updated'ın haber editörü asistanı; İngilizce kaynaktan yayına hazırlanacak Türkçe taslak.
+- Çeviri yapma, kendi cümlelerinle sade haber Türkçesi; kaynak cümlesini kopyalama.
+- Ters piramit; 2-4 ara başlık; 250-450 kelime; kısa paragraflar.
+- Başlık merak uyandırsın ama her iddiası kaynakta olsun; abartı, "şok", soru tuzağı yok.
+- Doğrulanmamış bilgi "iddiaya göre / sızıntıya göre" diye işaretlenir. Fiyat kaynaktaki para biriminde, TL'ye çevrilmez.
+- **Kaynakta olmayan bilgi, rakam, tarih eklenmez**; emin olunmayan şey editör notuna yazılır.
+- Resmi değilse "Dikkat edilmesi gerekenler" bölümü.
+- Editöre 2-3 somut soru (Türkiye durumu, kendi deneyimi, sahada kullanım) ve yayından önce doğrulanacak iddialar listesi (hangi kaynakta geçtiğiyle).
+- Görsel: telif riski olmayan resmi görsel önerisi (basın sayfası; URL uydurma yasak), Türkçe alt metin, stok sitesi için 3 İngilizce arama (ürün/kategori, kullanım sahnesi, detay; marka adı yok), yapay zekâ görsel istemi (gerçek ürünü çizmeye çalışmadan).
+- SEO: odak kelime, başlık etiketi (≤60), slug, meta açıklama (≤155), kategori, 5-7 etiket.
+- Sona "[EDİTÖR YORUMU]" yeri eklenir. Kaynaklar listesi (ilk yazan + diğerleri + asıl kaynak). Tam metin alınamadıysa notla uyarır.
+- Yapay zekâya ayrıca söylenir: "özet ve tür etiketi otomatik, hatalı olabilir; resmi mi sızıntı mı, sadece kaynak metne bakarak kendin belirle."
+
+**7. Çeviri talimatı:** paragraf yapısını koruyarak eksiksiz, sadık çeviri; yorum, özet, ekleme yok.
+
+**8. Ekibin ayarlayabildikleri (Haber Masası → Ayarlar / Kaynaklar):** kaynak listesi (aç/kapat), marka grupları (Öncelikli / Hariç), gürültü kelimeleri, saklama süresi (varsayılan 3 gün), taslak modeli.
+
+## 18. Bu doküman ne için
+
+İlk kez bakan biri (Fatih, yeni bir ekip üyesi ya da yeni bir Claude sohbeti) sohbet geçmişine ihtiyaç duymadan sistemi anlayıp devralabilsin diye. Okuma sırası: 1-2 (amaç, kurallar) → 14 (nasıl çalışır) → 13 (her şey nerede, arıza tablosu) → 16 (neden böyle) → 12 (karar günlüğü, en yenisi altta). Her mimari karar önce buraya yazılır; Claude Project'teki `claude/ARCHITECTURE.md` kopyası aynı anda güncellenir.

@@ -1,0 +1,27 @@
+[
+  {
+    "id": "2026-10-14-a",
+    "tarih": "14 Ekim 2026",
+    "baslik": "Taslaklar artık takılmıyor, yeni sıralamalar ve yeni ikon",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "\"Taslak hazırla\" ve \"Tekrar dene\" düzeltildi. Taslak 2 dakikada bitmezse kart kilitli kalmaz; \"Tekrar dene\" kendiliğinden çıkar.",
+          "Hata olursa kartta nereden kaynaklandığı yazar: Altyapı (Supabase), Yapay zekâ (Gemini) ya da Kaynak site.",
+          "Yeni sıralamalar (listenin üstündeki seçim kutusu): haber saati, sisteme düşme saati, öncelik grubu içinde yeniden eskiye.",
+          "Seviyelerin adı değişti: Öncelik 1 / Öncelik 2 / Öncelik 3."
+        ]
+      },
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Supabase'te bir arıza olursa sayfanın üstünde \"Altyapı sorunu, bizden kaynaklı değil\" uyarısı çıkar. Düzelince kendiliğinden kaybolur.",
+          "Yeni logo: üstte UPDATED yazısı (telefonda UP işareti), yeni sekme ikonu ve ana ekran ikonu.",
+          "Açılış ekranı yenilendi: siyah kare yerine yumuşakça beliren logo.",
+          "Her güncellemeden sonra neyin değiştiği bu pencerede yazacak."
+        ]
+      }
+    ]
+  }
+]

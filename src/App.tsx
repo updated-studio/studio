@@ -7,6 +7,7 @@ import Bildirimler from "./shared/Bildirimler";
 import SurumUyarisi from "./shared/SurumUyarisi";
 import AltyapiUyari from "./shared/altyapi";
 import IkonUyarisi from "./shared/IkonUyarisi";
+import Yenilikler from "./shared/Yenilikler";
 import { ToastProvider } from "./shared/toast";
 import { VeriProvider } from "./shared/veri";
 
@@ -25,6 +26,7 @@ function Kabuk() {
       <SurumUyarisi />
       <AltyapiUyari />
       <IkonUyarisi />
+      <Yenilikler />
       <nav className="dock" aria-label="Ana menü">
         {dock.map((m) => (
           <NavLink key={m.id} to={"/" + m.id} title={m.ad} style={{ "--k": `var(--${m.renk ?? "blue"})` } as React.CSSProperties}>
