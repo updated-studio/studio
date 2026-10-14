@@ -219,7 +219,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **14 Ekim 2026 (4):** Üst bölümdeki "UPDATED" yazısı yerine logo (tema rengine uyar, `src/assets/logo.png` maske). Açılış ekranı: siyah kare ikon yerine tema arka planında arka plansız logo, yumuşak giriş/çıkış (`index.html` #acilis, `main.tsx`). Android açılışı için şeffaf ikon (`icon-seffaf-512.png`, purpose any); ana ekran ikonu siyah zeminli kaldı (maskable). Havuz sıralamasına "öncelik grubu, içinde yeni → eski" seçeneği eklendi.
 - **14 Ekim 2026 (5):** Uygulama ikonları tek kaynaktan üretilir: `python3 scripts/ikonlar.py [logo.png] [zemin]` → iPhone (180), Android maskable (192/512, logo daire kesimde kırpılmaz), şeffaf açılış ikonu, favicon (32), logo maskesi. Logo optik merkeze oturtulur. Yeni marka kiti gelince sadece kaynak logo değişir.
 - **14 Ekim 2026 (6):** Ana ekran ikonunun zemini #1B1D21 (manifest background_color ile aynı); Android 12+ açılışta ikonu bu renk üstünde gösterdiği için siyah kare/daire görünmez. Uygulamanın kendi açılış ekranı her temada #1B1D21 ve aynı boyutta logo: telefonun açılışıyla uygulamanınki arasında dikiş yok. Ana ekrandan açanlara bir kez "ikon yenilendi" uyarısı (`src/shared/IkonUyarisi.tsx`, ikon değişince IKON_SURUMU güncellenir).
-- **14 Ekim 2026 (7):** İkonlar UP işaretinden üretiliyor (ana ekran koyu zemin, sekme ikonu yuvarlak köşeli mavi). ARCHITECTURE.md'ye "İşletme el kitabı" (bölüm 13) eklendi: adresler, gizli bilgilerin yeri, fonksiyonlar, zamanlanmış görevler, arıza tablosu, yapılacaklar.
+- **14 Ekim 2026 (7):** Mobilde üst bölümde UP işareti, geniş ekranda UPDATED yazısı. İkonlar UP işaretinden üretiliyor (ana ekran koyu zemin, sekme ikonu yuvarlak köşeli mavi). ARCHITECTURE.md'ye "İşletme el kitabı" (bölüm 13) eklendi: adresler, gizli bilgilerin yeri, fonksiyonlar, zamanlanmış görevler, arıza tablosu, yapılacaklar.
 
 ## 13. İşletme el kitabı (her şey nerede, bir şey bozulursa)
 
@@ -303,3 +303,69 @@ Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve 
 ### 13.10 Marka ve ikonlar
 
 İkonlar tek komutla üretilir: `python3 scripts/ikonlar.py` (kaynak `assets/marka/up-isaret.png`). Ana ekran ikonu: koyu zemin (#1B1D21) üstünde beyaz UP; açılış ekranı aynı renk ve işaret (dikiş görünmesin). Sekme ikonu: yuvarlak köşeli marka mavisi (#2563FF) kare. Üst bölümde "UPDATED" yazısı (`src/assets/logo.png`). İkon değişince `src/shared/IkonUyarisi.tsx` içindeki tarih güncellenir (iPhone ikonu kendiliğinden yenilemez).
+
+## 14. Sistem nasıl çalışır (uçtan uca)
+
+**Katmanlar.** Ekip Stüdyo'yu tarayıcıdan ya da ana ekrana eklenmiş uygulama olarak açar. Sayfanın kendisi GitHub Pages'te duran hazır dosyalardır (sunucu yok). Giriş, veri ve canlı güncelleme Supabase'ten gelir: tarayıcı doğrudan veritabanıyla konuşur, kim neyi görebilir kuralları (RLS) veritabanının içindedir. Ağır ya da gizli anahtar gerektiren işler (yapay zekâ, e-posta, haber toplama) Supabase'teki sunucu fonksiyonlarında çalışır; anahtarlar sadece orada durur. Zamanlanmış görevler (pg_cron) veritabanının içinde çalışır ve fonksiyonları çağırır.
+
+**Değişiklik nasıl canlıya çıkar.** Ekran kodu: depoya gönderim → GitHub Actions derler → GitHub Pages yayınlar → açık sayfalarda "yeni sürüm hazır, yenile" uyarısı çıkar (`SurumUyarisi`). Sunucu fonksiyonu: Supabase panelinden "Deploy" (13.3). Veritabanı: yeni migration dosyası + SQL Editor (13.5).
+
+**Modüller ve ne işe yaradıkları.**
+- **Ekip:** kim ne zaman müsait, kimde hangi iş, devir notları, ekipman; katkı puanı (kurallar `src/modules/ekip/Katki.tsx` PUAN_KURALLARI).
+- **Haber Masası:** yabancı teknoloji haberlerini toplar, eler, önceliklendirir; editör haberi alır, Türkçe taslak hazırlatır, düzenler, yayınladım der (13.7).
+- **İçerik:** Instagram post/story/reels görseli hazırlama aracı.
+- **Takvim:** lansman ve etkinlikler, aylık görünüm.
+- **Marka Kiti:** logolar, renkler, yazı tipleri; ekip buradan indirir.
+- **Profilim / Yönetim:** kişisel ayarlar ve ilgi alanları ("Bana göre" görünümü buradan çalışır); yönetici için üye ve ayar ekranı.
+
+**Haber Masası'nda bir haberin yolculuğu.**
+1. Zamanlanmış görev 15 dk'da bir `triyaj-topla`yı çağırır. Fonksiyon kaynakların RSS'lerini okur (son 24 saat, kaynak başına 10), daha önce görülenleri atlar (`tr_seen`).
+2. Yeni haberler 50'lik partilerle Gemini'ye (en ucuz model) gider; yapay zekâ sadece etiket döndürür (marka, ürün, tür, haber tipi, konu, Türkiye durumu, asıl kaynak, olay kimliği, Türkçe özet). Uydurma yasağı istemde yazılıdır. Gemini kotası doluysa Groq'a geçer ve panelde uyarı çıkar.
+3. Kurallar karar verir: elenir / Belirsiz / Rehber fikirleri / Havuz. Elenen başlıklar tarayıcıda ücretsiz çeviriyle Türkçeleşir.
+4. Aynı olay (48 saat içinde aynı olay kimliği ya da yapay zekâ eşleştirmesi) tek karta birleşir; diğer siteler kartta bağlantı olur ve puanı artırır.
+5. Ekranda `oncelik.ts` puanlar ve sıralar; ekip 👍/👎 verir, "Ben alıyorum" der ya da pas geçer.
+6. "Taslak hazırla" → `triyaj-taslak` makaleyi (ve varsa ikinci kaynağı) çeker, Gemini'ye yazdırır, taslağı `tr_drafts`a koyar, haberi hazırlayan kişiye verir. İş sürerken nabız atar; 2 dk nabız gelmezse `triyaj-is-kurtar` hatayı yazar.
+7. Editör taslağı Taslaklar'da düzenler, "Yayına hazır" yapar, HTML'i kopyalayıp WordPress'e yapıştırır, kartta "Yayınladım" der. Her adım bildirim havuzuna (🔔) düşer.
+
+## 15. Eski sistemle farklar (Google E-Tablolar + Apps Script → Stüdyo)
+
+| Konu | Eski (Triyaj tablosu) | Yeni (Haber Masası) |
+|---|---|---|
+| Nerede | Google E-Tablolar + Apps Script, tek kişinin Google hesabı | Stüdyo içinde modül; ortak giriş, Supabase |
+| İş süresi sınırı | 6 dk | ~150 sn (bu yüzden süre bütçesi + nabız + kendiliğinden kurtarma) |
+| Öncelik | P1-P5 ve Sony kamera bonusu, Öncelikli marka listesi puan veriyordu | Öncelik 1/2/3; puan markadan bağımsız (haber türü + kaynak sayısı + tazelik); Öncelikli liste sadece elemede |
+| Oy | ▲▼, haber başına tek oy | Herkes kendi 👍/👎'su, notlu; sadece aynı marka içinde etkili |
+| Al / Pas | Sıralamayı etkiliyordu | Sinyal sayılmaz; pas geri alınabilir |
+| Tur sınırı | 100'ü aşan haber "Toplu istek limiti" ile eleniyordu | Fazlası sıraya girer, sonraki turda işlenir |
+| Aynı haber | Her kaynak ayrı satır | Tek kart, diğer kaynaklar bağlantı |
+| Rehber / listeler | Eleniyordu | Ayrı "Rehber fikirleri" bölümü |
+| Elenenler | İngilizce, geri alınamıyordu | Türkçe, "Havuza al" ile geri alınır |
+| Taslak | Google Docs dosyası | Uygulama içinde düzenleyici; eski Docs taslakları bağlantı olarak kaldı |
+| Yapay zekâ kotası | Dolunca durur, kimse bilmezdi | Groq yedeği + panelde uyarı |
+| Anlık toplama | Yok | "Haberleri şimdi topla" (onaylı) |
+| Arıza görünürlüğü | Yok | Altyapı uyarısı (Supabase durum sayfası) + kartta hata kaynağı |
+| Görünüm | Tablo | Kartlar, filtreler, "Bana göre", 4 sıralama, mobil |
+
+Aktarılanlar: alınan/yayında/pas haberler, oylar, bildirimler, "yanlış elenmiş" işaretleri tamamen; Yeni/Belirsiz/Elenen haberlerden son 3 gün. Eski tablo arşiv olarak duruyor, tetikleyicisi kapatıldı.
+
+## 16. Tartışmalar ve gerekçeler (neden böyle karar verdik)
+
+- **Tek depo, tek giriş, modüller.** Ayrı ayrı araçlar (triyaj tablosu, post aracı, takvim) her biri ayrı giriş ve ayrı bakım istiyordu; Enes askerdeyken bakacak kişi tek yere bakabilmeli.
+- **Supabase + GitHub Pages.** Ücretsiz, sunucu yönetimi yok, Fatih devralabilir. Bedeli: fonksiyon süre sınırı (150 sn) ve Supabase arızalarına bağımlılık (14 Ekim'de 16 saatlik fonksiyon arızası yaşandı; buna karşı süre bütçesi, nabız, kurtarma görevi ve altyapı uyarısı eklendi).
+- **Yapay zekâ karar vermez, etiket çıkarır.** Eleme kararı kurallarda: hangi haberin neden elendiği okunabilir ve kural değiştirmek kod satırı değiştirmek demek. Yapay zekâ "daha akıllı modele geçelim mi" sorusu konuşuldu: etiketlemede ucuz model yeterli, pahalı model kotayı hızla bitirir; taslakta daha güçlü model kullanılıyor.
+- **Öncelik markadan bağımsız.** Enes: büyük markalar her şeyi ezmesin, küçük ama önemli haber kaybolmasın. Oy sadece aynı markanın kendi haberleri arasında sırayı değiştirir; aynı markadan art arda en fazla 2 haber (çeşitlilik).
+- **Al/Pas sinyal değil.** Bir haberi almak "iyi haber" demek değil (müsait olan alır), pas "kötü" demek değil (başkası yazıyordur). Öğrenme için güvenilir değil.
+- **Oy düğmeleri.** "Bunun gibi daha çok / az" yazısı beğenilmedi; global örnekler (Netflix, YouTube) incelendi, sadece simge (👍/👎) + sayı seçildi; açıklama üzerine gelince.
+- **Seviye adları.** "Hemen yaz / Yazılabilir / Beklet" tutmadı; "Kaçırma / Değerlendir / Opsiyonel", "Sıcak / Ilık / Soğuk", "Manşet / Gündem / Kısa" seçenekleri konuşuldu; Enes "Öncelik 1/2/3"ü seçti (yanlış anlaşılmaz).
+- **100 sınırı.** Önce haberler eleniyordu; Enes "hepsini okusun ama limit aşmasın" dedi → fazlası sıraya girer, sonraki turlarda işlenir, okunan tekrar alınmaz.
+- **Rehber ayrı bölüm.** "En iyi 10 kulaklık" tarzı listeler Türkiye'de çok okunuyor (Enes); haber değil ama kendi rehberimiz için fikir → ayrı bölüm, puanlanmaz.
+- **Kopya kartlar tek kart.** "Hangisini istersin seç" yerine tek kart, diğer kaynaklar bağlantı; Enes beğendi.
+- **Çeviri tarayıcıda.** Kota tasarrufu için başlık çevirisi ücretsiz Google çeviri ucuna taşındı; sunucudan o uca erişilemediği için tarayıcıda yapılıyor ve tarayıcıda saklanıyor.
+- **Groq yedeği.** Ücretsiz; Gemini kotası dolunca etiketleme durmasın. Taslakta Gemini kalıyor (Türkçe yazımda daha iyi).
+- **Altyapı uyarısı.** Enes: "Supabase kaynaklıysa ekip bilsin, bana yazmasın." Durum sayfası canlı okunur; küçük/izlenen olaylar gürültü olmasın diye gösterilmez.
+- **Sistem Durumu sayfası.** Adı için "Sağlık", "Status", "Sistem Durumu" konuşuldu; tüm ekip görecek (sadece yöneticiler değil), geri bildirim verebilsinler. Yapılacaklarda.
+- **Alan adı.** Uzun vadede en sağlıklısı alt adres (`studio.updated.com.tr`, Natro'da CNAME); ana sitenin (WordPress) yanında ayrı durur, taşıma gerekmez.
+- **WordPress'e gönderim.** Taslak WordPress'e "taslak" olarak gider, yayına basma kararı editörde kalır; uygulama şifresini sahip oluşturur.
+- **Açılış ekranı ve ikon.** Siyah kare istenmedi; telefonun kendi açılışı (Android 12+ ikonu dairede gösterir) ile uygulamanın açılışı aynı renk (#1B1D21) yapıldı ki geçiş görünmesin. Ana ekran ve sekme ikonu için UP işareti (küçük boyutta UPDATED yazısı okunmuyor). Sekme ikonu yuvarlak köşeli mavi (şeffaf siyah logo koyu temada kaybolur).
+- **Sohbet devri.** Fatih'in sohbet geçmişini okumasına gerek yok: GitHub + Supabase sahipliği ve bu doküman yeterli; yeni sohbet "önce ARCHITECTURE.md" ile başlar.
+- **Çalışma biçimi (Enes):** teknik değil; yapması gereken adımda sayfa açılıp önüne konur. Bir sorun/engel olunca hemen söylenir, sormadan karar değiştirilmez, kalıcı silme istemeden yapılmaz, şifre/anahtar asla Claude tarafından girilmez.

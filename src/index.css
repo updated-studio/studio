@@ -32,6 +32,7 @@ svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-widt
 .brand { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -.02em; }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand .logo { display: block; width: 30px; height: 37px; background: var(--ink); -webkit-mask: url("./assets/logo.png") center / contain no-repeat; mask: url("./assets/logo.png") center / contain no-repeat; }
+@media (max-width: 560px) { .brand .logo { width: 24px; height: 32px; -webkit-mask-image: url("./assets/isaret.png"); mask-image: url("./assets/isaret.png"); } }
 .brand span:not(.logo) { color: var(--muted); font-weight: 600; font-size: 17px; }
 h2 { font-family: var(--display); font-size: 22px; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
 h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; font-weight: 600; }
