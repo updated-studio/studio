@@ -54,34 +54,49 @@ function jsonOku(ham: string): Record<string, any> | null { // eslint-disable-li
 }
 
 // Eski gemini_: modeller sırayla; geçersiz JSON'da aynı modeli 2 kez daha dener; 429/500/503'te sonraki modele geçer
-async function gemini(sistem: string, kullanici: string, modeller: string[]) {
+// Toplam süre bütçesi: sunucu ~150 sn'de işi öldürür, ondan önce bitirip hata yazmalıyız
+const BUTCE_MS = 115_000;
+
+async function gemini(sistem: string, kullanici: string, modeller: string[], bitis = Date.now() + BUTCE_MS) {
+  const kalan = () => bitis - Date.now();
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY yok (Supabase Secrets)");
   let son = "";
+  let dusunme = true; // "düşünme" kısık: yanıt çok daha hızlı gelir; model desteklemezse kapatılır
   for (const model of modeller) {
     for (let deneme = 0; deneme < 2; deneme++) {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: sistem }] },
-          contents: [{ role: "user", parts: [{ text: kullanici }] }],
-          generationConfig: { temperature: 0.4, responseMimeType: "application/json" },
-        }),
-      });
-      const govde = await r.text();
+      const sure = Math.min(50_000, kalan());
+      if (sure < 8_000) throw new Error("Zaman aşımı: yapay zekâ yavaş yanıt verdi. Tekrar dene. " + son);
+      const c = new AbortController(); const t = setTimeout(() => c.abort(), sure);
+      let r!: Response, govde = "";
+      try {
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST", signal: c.signal,
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: sistem }] },
+            contents: [{ role: "user", parts: [{ text: kullanici }] }],
+            generationConfig: { temperature: 0.4, responseMimeType: "application/json", ...(dusunme ? { thinkingConfig: { thinkingLevel: "low" } } : {}) },
+          }),
+        });
+        govde = await r.text();
+      } catch {
+        son = model + " → " + Math.round(sure / 1000) + " sn içinde yanıt vermedi";
+        break; // aynı modeli bekletmeden sonrakine geç
+      } finally { clearTimeout(t); }
       if (r.ok) {
         const j = JSON.parse(govde);
-        const metin = (j?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
+        const metin = (j?.candidates?.[0]?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
         const veri = jsonOku(metin);
         if (veri) return { veri, model };
         son = model + " → geçersiz JSON döndü";
         continue;
       }
+      if (r.status === 400 && dusunme && /thinking/i.test(govde)) { dusunme = false; deneme--; continue; }
       son = model + " → " + r.status + ": " + govde.slice(0, 200);
       break;
     }
-    if (!/geçersiz JSON|→ (429|500|503)/.test(son)) break;
+    if (!/geçersiz JSON|yanıt vermedi|→ (429|500|503)/.test(son)) break;
   }
   throw new Error("Yapay zeka yanıt vermedi. " + son);
 }
@@ -124,13 +139,17 @@ async function stok(q: string): Promise<Stok[]> {
 }
 
 async function isle(sb: ReturnType<typeof createClient>, itemId: number, tur: "ceviri" | "taslak", kullanici: string, ad: string) {
+  const bitis = Date.now() + BUTCE_MS;
+  // Nabız: iş sürdükçe updated_at tazelenir; 2 dk nabız gelmezse zamanlanmış görev işi "hata"ya çeker (0013)
+  const nabiz = () => sb.from("tr_items").update({ work_state: tur }).eq("id", itemId).eq("work_state", tur);
   const { data: it } = await sb.from("tr_items").select("*").eq("id", itemId).single();
   if (!it) return;
   try {
     if (tur === "ceviri") {
       const metin = await makaleCek(it.link, 10000);
       if (metin.length < 300) throw new Error("Kaynak sitenin metni otomatik alınamadı. Linke tıklayıp tarayıcının çeviri özelliğini kullan.");
-      const { veri } = await gemini(CEVIRI_SISTEM, metin, ["gemini-3.5-flash-lite", "gemini-3.5-flash"]);
+      await nabiz();
+      const { veri } = await gemini(CEVIRI_SISTEM, metin, ["gemini-3.5-flash-lite", "gemini-3.5-flash"], bitis);
       await sb.from("tr_items").update({ translation: String(veri.ceviri ?? "").slice(0, 45000), work_state: "", work_error: "" }).eq("id", itemId);
       return;
     }
@@ -147,7 +166,9 @@ Orijinal başlık: ${it.title}
 
 ${metinler.join("\n\n---\n\n")}`;
 
-    const { veri: t, model } = await gemini(TASLAK_SISTEM, istem, MODELLER);
+    await nabiz();
+    const { veri: t, model } = await gemini(TASLAK_SISTEM, istem, MODELLER, bitis);
+    await nabiz();
     const notlar: string[] = (t.editor_notlari ?? []).filter(Boolean).map(String);
     if (ana.length < 300) notlar.push("Kaynak sitenin tam metni otomatik alınamadı; taslak kısıtlı bilgiyle yazıldı. Kaynağı mutlaka oku.");
 
@@ -217,8 +238,8 @@ Deno.serve(async (req) => {
   }
 
   // Kilit: aynı haber için iş sürüyorsa ikinciyi başlatma
-  // 3 dakikadan eski iş yarıda kalmış sayılır, yeniden başlatılabilir
-  const eski = new Date(Date.now() - 3 * 60_000).toISOString();
+  // 2 dakikadır nabız gelmeyen iş yarıda kalmış sayılır, yeniden başlatılabilir
+  const eski = new Date(Date.now() - 2 * 60_000).toISOString();
   const { data: kilit } = await sb.from("tr_items").update({ work_state: tur, work_error: "", touched: true })
     .eq("id", item_id).or(`work_state.not.in.(ceviri,taslak),updated_at.lt.${eski}`).select("id");
   if (!kilit?.length) return Response.json({ hata: "Bu haber için zaten bir iş sürüyor" }, { status: 409, headers: CORS });
@@ -228,7 +249,7 @@ Deno.serve(async (req) => {
     await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi. Tekrar dene." })
       .eq("id", Number(item_id)).eq("work_state", tur);
     r();
-  }, 130_000));
+  }, 135_000));
   // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
   EdgeRuntime.waitUntil(Promise.race([isle(sb, Number(item_id), tur, u.user.id, p.name), sure]));
   return Response.json({ basladi: true }, { status: 202, headers: CORS });

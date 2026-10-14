@@ -328,7 +328,7 @@ export function useBaslikCeviri(haberler: Haber[]) {
 export const baslikTr = (h: Haber) => h.event || ceviriOnbellek.get(h.title) || h.title;
 
 /** Arka plan işinin durumu. 3 dakikadan uzun süren iş "takıldı" sayılır (sunucu işi yarıda kalmış olabilir), yeniden başlatılabilir. */
-export const IS_ZAMAN_ASIMI_DK = 3;
+export const IS_ZAMAN_ASIMI_DK = 2;
 export function isDurumu(h: Haber): "" | "calisiyor" | "takildi" | "hata" {
   if (h.work_state === "hata") return "hata";
   if (h.work_state !== "taslak" && h.work_state !== "ceviri") return "";
