@@ -76,7 +76,7 @@ Kaçınılmaz dış servisler: telefon bildirimleri Apple ve Google sunucuların
 | Ekip | Stüdyo modülü (`src/modules/ekip`). Eski panel (eneshsahin.github.io/updated-panel/ekip) 14 Ekim'de kapatıldı, Stüdyo'ya yönlendiriyor | Stüdyo modülü | Taşındı |
 | Takvim | Stüdyo modülü (`src/modules/takvim`) | + kişisel takvime abonelik | Taşındı (12 Ekim); abonelik yapılacak |
 | İçerik (post aracı) | Stüdyo modülü (`src/modules/icerik`); araç `public/araclar/post/` içinde olduğu gibi çerçeveyle açılıyor. Eski adres (eneshsahin.github.io/updated-panel) **açık kalıyor**: kayıtlı düzenler o adreste tarayıcıda duruyor, buluta taşınmadan kapatılırsa kaybolur | Kayıtlı düzenler bulutta (ekip ortak), story boyutu, otomasyondan gelen postlar | 1. aşama taşındı (12 Ekim) |
-| Post otomasyonu | GitHub Actions + Telegram + Gemini (eneshsahin/updated-post-otomasyonu) | Supabase zamanlanmış işleri | Taşınacak |
+| Post otomasyonu | GitHub Actions + Telegram + Gemini (eneshsahin/updated-post-otomasyonu), çalışıyor | Supabase zamanlanmış işleri; Telegram botu ekip grubunda | Taşınacak |
 | Haber Masası (Triyaj) | Stüdyo modülü (`src/modules/haber-masasi`) + `triyaj-topla`, `triyaj-taslak` işleri. Eski Google Sheets/Apps Script sistemi 13 Ekim'de kapatıldı (tetikleyici silindi, tablo arşiv) | WordPress'e taslak gönderme | Çalışıyor |
 | Marka Kiti | Stüdyo modülü (`src/modules/marka-kiti`): renkler, yazı tipleri | + logolar | Başlandı |
 | Kamera Simülatörü | Fikir | Stüdyo modülü | İleride |
@@ -222,6 +222,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **14 Ekim 2026 (7):** Mobilde üst bölümde UP işareti, geniş ekranda UPDATED yazısı. İkonlar UP işaretinden üretiliyor (ana ekran koyu zemin, sekme ikonu yuvarlak köşeli mavi). ARCHITECTURE.md'ye "İşletme el kitabı" (bölüm 13) eklendi: adresler, gizli bilgilerin yeri, fonksiyonlar, zamanlanmış görevler, arıza tablosu, yapılacaklar.
 
 - **14 Ekim 2026 (8):** Güncelleme notları: her yayından sonra kullanıcı görmediği notları "Neler değişti" penceresinde bölüm bölüm okur (`public/yenilikler.json`, `src/shared/Yenilikler.tsx`; CLAUDE.md kural 11). Eski ekip paneli kapatıldı (Stüdyo'ya yönlendirme). Eski post aracı adresi ve post otomasyonu açık kalıyor (kayıtlar ve otomasyon henüz taşınmadı, kural 9). Dokümana bölüm 17 (yapay zekâya verilen talimatların tam özeti) ve 18 (bu doküman ne için) eklendi.
+- **14 Ekim 2026 (9):** Fatih sahip yapılmaya başlandı (GitHub organizasyonu, eski depolar, Supabase, Stüdyo yöneticiliği). Yapılacaklara eklendi: post aracı kayıtlarının buluta taşınması (eski adres ancak sonra kapanır) ve post otomasyonunun Telegram botunun ekip grubuna alınması.
 ## 13. İşletme el kitabı (her şey nerede, bir şey bozulursa)
 
 Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilginin kendisi burada yazmaz; sadece **nerede durduğu** yazar.
@@ -290,16 +291,23 @@ Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve 
 
 ### 13.9 Yapılacaklar (14 Ekim itibarıyla, sırayla)
 
-1. Fatih'i GitHub ve Supabase'e sahip olarak eklemek; Stüdyo'da yönetici.
-2. Devir paketi: bu bölümün Fatih'e göre gözden geçirilmesi + hesap listesi (kimin e-postası, kurtarma).
-3. Alan adı: `studio.updated.com.tr` (Natro CNAME; sonra GitHub Pages özel alan adı, Supabase Auth izinli adresler, e-postalardaki panel adresi).
-4. Sistem Durumu sayfası (tüm ekip görür): yapay zekâ/kota, son toplama, kaynak sağlığı (Kaynaklar'dan taşınır), zamanlanmış görevler, anahtar var/yok.
-5. Kopya kart birleştirmesinin geçmiş haberler için tamamlanması (kaynak sınırına takıldı).
-6. WordPress'e taslak gönderme (WordPress "Application Password" sahip tarafından oluşturulur).
-7. Takvim aboneliği + davet e-postası; post aracı kayıtları buluta; post otomasyonu taşıma; format sistemi.
-8. Kurumsal e-posta, telefon bildirimi, Android uygulaması.
-9. Yeni kaynaklar: Asya sızıntı siteleri, resmi basın sayfaları, Türkiye kaynakları (araştırma notları: Webtekno, LOG, ShiftDelete ~50'şer haber incelendi).
-10. Fonksiyonların GitHub'dan otomatik yayını (13.3).
+1. **Fatih'i sahip yapmak** (Enes, 14 Ekim'de başlıyor; Fatih'in Gmail adresi Enes'te, depo herkese açık olduğu için buraya yazılmaz):
+   a. GitHub `updated-studio` organizasyonuna Owner olarak davet.
+   b. Enes'in kişisel hesabındaki eski depolara (`eneshsahin/updated-panel`, `eneshsahin/updated-post-otomasyonu`) Collaborator; ileride organizasyona taşınır.
+   c. Supabase "Updated" organizasyonuna Owner olarak davet.
+   d. Stüdyo: davet listesine e-posta → Fatih kayıt olur → Yönetim'de yönetici yapılır.
+2. Devir paketi: hesap listesi (hangi hesap kimin e-postasında, kurtarma), Google AI Studio (Gemini) ve Groq anahtarlarının sahibi, Natro erişimi.
+3. **Post aracı kayıtlarını buluta taşımak.** Bugün kayıtlı düzenler herkesin kendi tarayıcısında, eski adreste (eneshsahin.github.io/updated-panel) duruyor. Plan: Stüdyo'daki post aracına "eski kayıtlarımı aktar" adımı (eski adreste dışa aktar → Stüdyo'da içe al) ve kayıtların Supabase'te ekip ortak tutulması. Bu bitip ekip aktardıktan sonra eski post aracı adresi kapatılır (yönlendirme sayfası). O zamana kadar açık kalır (kural 9).
+4. **Post otomasyonunu taşımak** (`eneshsahin/updated-post-otomasyonu`: GitHub Actions + Telegram botu + Gemini) Supabase zamanlanmış işlerine. Telegram botu **ekip grubuna** eklenecek: otomasyonun bildirimleri ve onayları tek kişiye değil gruba gelsin (Enes, 14 Ekim). Taşıma bitene kadar eski otomasyon çalışmaya devam eder.
+5. Alan adı: `studio.updated.com.tr` (Natro CNAME; sonra GitHub Pages özel alan adı, Supabase Auth izinli adresler, e-postalardaki panel adresi).
+6. Sistem Durumu sayfası (tüm ekip görür): yapay zekâ/kota, son toplama, kaynak sağlığı (Kaynaklar'dan taşınır), zamanlanmış görevler, anahtar var/yok.
+7. Kopya kart birleştirmesinin geçmiş haberler için tamamlanması (kaynak sınırına takıldı).
+8. WordPress'e taslak gönderme (WordPress "Application Password" sahip tarafından oluşturulur).
+9. Takvim aboneliği + davet e-postası; format sistemi (Post 4:5 / Story 9:16 / Reels kapağı).
+10. Kurumsal e-posta, telefon bildirimi, Android uygulaması.
+11. Yeni kaynaklar: Asya sızıntı siteleri, resmi basın sayfaları, Türkiye kaynakları (Webtekno, LOG, ShiftDelete ~50'şer haber incelendi).
+12. Fonksiyonların GitHub'dan otomatik yayını (13.3).
+13. Yeni marka kiti gelince: `assets/marka/` güncellenir, `python3 scripts/ikonlar.py`, Marka Kiti modülüne logolar.
 
 ### 13.10 Marka ve ikonlar
 
