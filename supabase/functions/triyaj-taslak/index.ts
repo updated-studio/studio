@@ -33,7 +33,7 @@ function htmlMetin(html: string): string {
 // Eski makaleCek_ + okuma servisi yedeği (site doğrudan okumayı engellerse)
 async function makaleCek(url: string, sinir: number): Promise<string> {
   const zamanli = async (u: string, h: Record<string, string>) => {
-    const c = new AbortController(); const t = setTimeout(() => c.abort(), 20000);
+    const c = new AbortController(); const t = setTimeout(() => c.abort(), 15000);
     try { const r = await fetch(u, { headers: h, signal: c.signal, redirect: "follow" }); return r.ok ? await r.text() : ""; }
     catch { return ""; } finally { clearTimeout(t); }
   };
@@ -59,7 +59,7 @@ async function gemini(sistem: string, kullanici: string, modeller: string[]) {
   if (!key) throw new Error("GEMINI_API_KEY yok (Supabase Secrets)");
   let son = "";
   for (const model of modeller) {
-    for (let deneme = 0; deneme < 3; deneme++) {
+    for (let deneme = 0; deneme < 2; deneme++) {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -217,11 +217,19 @@ Deno.serve(async (req) => {
   }
 
   // Kilit: aynı haber için iş sürüyorsa ikinciyi başlatma
+  // 3 dakikadan eski iş yarıda kalmış sayılır, yeniden başlatılabilir
+  const eski = new Date(Date.now() - 3 * 60_000).toISOString();
   const { data: kilit } = await sb.from("tr_items").update({ work_state: tur, work_error: "", touched: true })
-    .eq("id", item_id).not("work_state", "in", "(ceviri,taslak)").select("id");
+    .eq("id", item_id).or(`work_state.not.in.(ceviri,taslak),updated_at.lt.${eski}`).select("id");
   if (!kilit?.length) return Response.json({ hata: "Bu haber için zaten bir iş sürüyor" }, { status: 409, headers: CORS });
 
+  // Sunucu süre sınırına (yaklaşık 150 sn) takılmadan önce işi kesip hatayı yaz; "yazılıyor"da asılı kalmasın
+  const sure = new Promise<void>((r) => setTimeout(async () => {
+    await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi. Tekrar dene." })
+      .eq("id", Number(item_id)).eq("work_state", tur);
+    r();
+  }, 130_000));
   // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
-  EdgeRuntime.waitUntil(isle(sb, Number(item_id), tur, u.user.id, p.name));
+  EdgeRuntime.waitUntil(Promise.race([isle(sb, Number(item_id), tur, u.user.id, p.name), sure]));
   return Response.json({ basladi: true }, { status: 202, headers: CORS });
 });

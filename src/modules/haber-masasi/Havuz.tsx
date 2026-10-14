@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
-import { HaberKart, OncelikBilgisi, SimdiTopla, useBaslikCeviri, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
+import { HaberKart, IsDurumKutusu, isDurumu, useSaat, OncelikBilgisi, SimdiTopla, useBaslikCeviri, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
 import { sirala } from "./oncelik";
 import { useIyimser, useMasa, type Durum, type Haber } from "./veri";
 
@@ -27,6 +27,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
   const is_ = useIs();
   const onerilen = useOnerilen();
   const degerle = useDegerlendir();
+  useSaat();
   const ben = profile!.id;
   const [ara, setAra] = useState("");
   const [gorunum, setGorunum] = useState<"herkes" | "bana">("herkes");
@@ -102,10 +103,10 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
       {!liste.length && <div className="empty">{durum === "aday" ? "Havuz boş. Yeni haberler 15 dakikada bir gelir." : "Burada haber yok."}</div>}
       <div className="cards">
         {liste.slice(0, kac).map((h) => {
-          const calisiyor = h.work_state === "taslak";
+          const calisiyor = isDurumu(h) === "calisiyor";
           return (
             <HaberKart key={h.id} h={h} d={d?.get(h.id)} oyGoster={durum === "aday" || durum === "pas"}
-              ust={calisiyor ? <div className="msg good">Taslak yazılıyor…</div> : h.work_state === "hata" ? <div className="msg err">Olmadı: {h.work_error}</div> : undefined}>
+              ust={<IsDurumKutusu h={h} tekrar={() => is_(h, "taslak")} />}>
               {durum === "aday" && <>
                 <button className="btn sm" onClick={() => al(h)}>Ben alıyorum</button>
                 <button className="btn ghost sm" onClick={() => durumYap(h, "pas", {}, "Pas geçildi.")}>Pas</button>

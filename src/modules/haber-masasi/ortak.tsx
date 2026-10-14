@@ -326,3 +326,25 @@ export function useBaslikCeviri(haberler: Haber[]) {
   }, [anahtar]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 export const baslikTr = (h: Haber) => h.event || ceviriOnbellek.get(h.title) || h.title;
+
+/** Arka plan işinin durumu. 3 dakikadan uzun süren iş "takıldı" sayılır (sunucu işi yarıda kalmış olabilir), yeniden başlatılabilir. */
+export const IS_ZAMAN_ASIMI_DK = 3;
+export function isDurumu(h: Haber): "" | "calisiyor" | "takildi" | "hata" {
+  if (h.work_state === "hata") return "hata";
+  if (h.work_state !== "taslak" && h.work_state !== "ceviri") return "";
+  return Date.now() - Date.parse(h.updated_at) > IS_ZAMAN_ASIMI_DK * 60_000 ? "takildi" : "calisiyor";
+}
+/** Ekranı her 20 sn'de yeniler (süre gösterimleri ve "takıldı" tespiti için) */
+export function useSaat(ms = 20_000) {
+  const [, set] = useState(0);
+  useEffect(() => { const t = window.setInterval(() => set((n) => n + 1), ms); return () => window.clearInterval(t); }, [ms]);
+}
+/** Taslak/çeviri durumu kutusu */
+export function IsDurumKutusu({ h, tekrar }: { h: Haber; tekrar: () => void }) {
+  const d = isDurumu(h);
+  const tur = h.work_state === "ceviri" ? "Çeviri" : "Taslak";
+  if (d === "calisiyor") return <div className="msg good">{tur} yazılıyor… ({zamanOnce(h.updated_at)} önce başladı, genelde 30-60 sn)</div>;
+  if (d === "takildi") return <div className="msg err row">{tur} {IS_ZAMAN_ASIMI_DK} dakikadır bitmedi, yarıda kalmış olabilir. <button className="linkbtn" onClick={tekrar}>Tekrar dene</button></div>;
+  if (d === "hata") return <div className="msg err row">Olmadı: {h.work_error} <button className="linkbtn" onClick={tekrar}>Tekrar dene</button></div>;
+  return null;
+}

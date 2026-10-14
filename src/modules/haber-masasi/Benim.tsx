@@ -4,7 +4,7 @@ import { Avatar } from "../../shared/Avatar";
 import { sb, type Profile } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
-import { HaberKart, useDegerlendir, useFiltre, useIs, useKisi, zamanOnce } from "./ortak";
+import { HaberKart, IsDurumKutusu, isDurumu, useDegerlendir, useFiltre, useIs, useKisi, useSaat, zamanOnce } from "./ortak";
 import { useIyimser, useMasa, type Haber } from "./veri";
 
 export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) {
@@ -17,6 +17,7 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
   const is_ = useIs();
   const degerle = useDegerlendir();
   const ben = profile!.id;
+  useSaat();
   const [aktarAcik, setAktarAcik] = useState<Haber | null>(null);
   const [kim, setKim] = useState<"ben" | "ekip" | "yayinda">("ben");
 
@@ -53,7 +54,7 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
         {filtre.sonuc.map((h) => {
           const taslaklar = v.taslaklar.filter((t) => t.item_id === h.id);
           const aktaran = kisi(h.transfer_from);
-          const calisiyor = h.work_state === "ceviri" || h.work_state === "taslak";
+          const calisiyor = isDurumu(h) === "calisiyor";
           const bende = h.status === "alindi" && h.taken_by === ben;
           return (
             <HaberKart key={h.id} h={h} ust={
@@ -64,8 +65,7 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
                     <button className="linkbtn" onClick={() => guncelle(h, { transfer_seen: true })}>Gördüm</button>
                   </div>
                 )}
-                {h.work_state === "taslak" && <div className="msg good">Taslak yazılıyor…</div>}
-                {h.work_state === "hata" && <div className="msg err">Olmadı: {h.work_error}</div>}
+                <IsDurumKutusu h={h} tekrar={() => is_(h, h.work_state === "ceviri" ? "ceviri" : "taslak")} />
               </>
             }>
               {bende && <>
@@ -80,7 +80,7 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
               </>}
               {h.draft_url && <a className="btn ghost sm" href={h.draft_url} target="_blank" rel="noreferrer">Taslağı aç (eski) ↗</a>}
               {taslaklar.map((t) => <button key={t.id} className="btn ghost sm" onClick={() => taslakAc(t.id)}>Taslağı aç · {zamanOnce(t.updated_at)}</button>)}
-              {bende && <button className="btn ghost sm" disabled={calisiyor} onClick={() => is_(h, "taslak")}>{h.work_state === "taslak" ? "Taslak yazılıyor…" : taslaklar.length || h.draft_url ? "Yeni taslak" : "Taslak hazırla"}</button>}
+              {bende && <button className="btn ghost sm" disabled={calisiyor} onClick={() => is_(h, "taslak")}>{calisiyor ? "Taslak yazılıyor…" : taslaklar.length || h.draft_url ? "Yeni taslak" : "Taslak hazırla"}</button>}
             </HaberKart>
           );
         })}
