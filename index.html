@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1B1D21" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Updated Stüdyo" />
-    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="./favicon.png" />
     <link rel="apple-touch-icon" href="./icon-180.png" />
     <link rel="manifest" href="./manifest.json" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" />
@@ -14,7 +14,7 @@
     <style>
       /* Açılış ekranı: telefonun kendi açılış ekranıyla aynı renk ve boyut (#1B1D21, ikon zemini de bu renk), dikiş görünmesin; uygulama yüklenince kaybolur (main.tsx) */
       #acilis { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: #1B1D21; transition: opacity .35s ease; }
-      #acilis i { width: 98px; height: 120px; background: #F1F3F6; -webkit-mask: url("./logo.png") center / contain no-repeat; mask: url("./logo.png") center / contain no-repeat; animation: acilis-gel .6s cubic-bezier(.2,.8,.2,1) both; }
+      #acilis i { width: 89px; height: 120px; background: #F1F3F6; -webkit-mask: url("./isaret.png") center / contain no-repeat; mask: url("./isaret.png") center / contain no-repeat; animation: acilis-gel .6s cubic-bezier(.2,.8,.2,1) both; }
       #acilis.git { opacity: 0; pointer-events: none; }
       @keyframes acilis-gel { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }
       @media (prefers-reduced-motion: reduce) { #acilis i { animation: none; } }

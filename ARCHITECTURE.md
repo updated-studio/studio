@@ -144,10 +144,12 @@ updated-studio/
 | Servis | Şu an kimde | Hedef |
 |---|---|---|
 | Supabase (organizasyon "Updated") | Enes | Fatih de sahip |
-| GitHub | Enes'in kişisel hesabı | "Updated" GitHub organizasyonu, Fatih sahip |
+| GitHub | `updated-studio` organizasyonu (ücretsiz plan), sahip Enes | Fatih de sahip (ücretsiz planda sınırsız sahip/üye) |
 | E-posta gönderimi | Enes'in Gmail'i | Kurumsal adres (updated.com.tr) |
 | Alan adı ve DNS (Natro) | Fatih | Fatih |
-| Triyaj (Google) | Enes'in Google hesabı | Supabase'e taşınınca kapanır |
+| Triyaj (Google) | Kapatıldı (13 Ekim): Haber Masası'na taşındı; eski tablo Enes'in Google hesabında arşiv | — |
+| Yapay zekâ anahtarları (Gemini, Groq) | Enes'in hesapları; anahtarlar Supabase Secrets'ta | Fatih'e devir paketinde |
+| Claude (Project "Updated") | Enes | Project paylaşımı Claude Team/Enterprise ister; Fatih kendi Claude'uyla depoyu okur |
 | Apple geliştirici hesabı | Yok | Fatih ile karar verilecek |
 
 ## 9. Maliyet
@@ -217,3 +219,87 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **14 Ekim 2026 (4):** Üst bölümdeki "UPDATED" yazısı yerine logo (tema rengine uyar, `src/assets/logo.png` maske). Açılış ekranı: siyah kare ikon yerine tema arka planında arka plansız logo, yumuşak giriş/çıkış (`index.html` #acilis, `main.tsx`). Android açılışı için şeffaf ikon (`icon-seffaf-512.png`, purpose any); ana ekran ikonu siyah zeminli kaldı (maskable). Havuz sıralamasına "öncelik grubu, içinde yeni → eski" seçeneği eklendi.
 - **14 Ekim 2026 (5):** Uygulama ikonları tek kaynaktan üretilir: `python3 scripts/ikonlar.py [logo.png] [zemin]` → iPhone (180), Android maskable (192/512, logo daire kesimde kırpılmaz), şeffaf açılış ikonu, favicon (32), logo maskesi. Logo optik merkeze oturtulur. Yeni marka kiti gelince sadece kaynak logo değişir.
 - **14 Ekim 2026 (6):** Ana ekran ikonunun zemini #1B1D21 (manifest background_color ile aynı); Android 12+ açılışta ikonu bu renk üstünde gösterdiği için siyah kare/daire görünmez. Uygulamanın kendi açılış ekranı her temada #1B1D21 ve aynı boyutta logo: telefonun açılışıyla uygulamanınki arasında dikiş yok. Ana ekrandan açanlara bir kez "ikon yenilendi" uyarısı (`src/shared/IkonUyarisi.tsx`, ikon değişince IKON_SURUMU güncellenir).
+- **14 Ekim 2026 (7):** İkonlar UP işaretinden üretiliyor (ana ekran koyu zemin, sekme ikonu yuvarlak köşeli mavi). ARCHITECTURE.md'ye "İşletme el kitabı" (bölüm 13) eklendi: adresler, gizli bilgilerin yeri, fonksiyonlar, zamanlanmış görevler, arıza tablosu, yapılacaklar.
+
+## 13. İşletme el kitabı (her şey nerede, bir şey bozulursa)
+
+Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilginin kendisi burada yazmaz; sadece **nerede durduğu** yazar.
+
+### 13.1 Adresler
+
+| Ne | Nerede |
+|---|---|
+| Stüdyo (canlı) | https://updated-studio.github.io/studio/ (hedef: `studio.updated.com.tr`, Natro'da CNAME → `updated-studio.github.io`) |
+| Kod | GitHub `updated-studio/studio`, `main` dalı. `main`'e her gönderim GitHub Actions ile 1-2 dk'da canlıya çıkar |
+| Veritabanı + sunucu | Supabase projesi `updated-panel` (kimlik `fulmooonidwrqyybbkvu`), organizasyon "Updated", ücretsiz plan |
+| Supabase durum sayfası | https://status.supabase.com (Stüdyo bunu okur, arıza varsa üstte uyarı çıkar) |
+| Marka dosyaları | `assets/marka/` (UP işareti şeffaf, mavi ve siyah kare, UPDATED yazısı) |
+
+### 13.2 Gizli bilgiler (sadece Supabase → Edge Functions → Secrets)
+
+`GEMINI_API_KEY` (Google AI Studio, ücretsiz kota), `GROQ_API_KEY` (Gemini kotası dolunca yedek, ücretsiz), `GMAIL_APP_PASSWORD` + `MAIL_FROM` (bildirim e-postaları, Enes'in Gmail'i), isteğe bağlı `UNSPLASH_ACCESS_KEY` / `PIXABAY_API_KEY` / `PEXELS_API_KEY` (taslakta stok görsel önerisi; şu an yok). Tarayıcıdaki "publishable" anahtar gizli değildir, kodda durur. Kural: şifre/anahtar asla koda ya da sohbete yazılmaz.
+
+### 13.3 Sunucu fonksiyonları (supabase/functions)
+
+| Fonksiyon | Ne yapar | Nasıl tetiklenir |
+|---|---|---|
+| `triyaj-topla` | Kaynaklardan haber toplar, yapay zekâyla etiketler, kurallarla eler, olayları gruplar | 15 dk'da bir zamanlanmış görev + "Haberleri şimdi topla" düğmesi |
+| `triyaj-taslak` | Seçilen habere Türkçe taslak ya da çeviri yazar | Karttaki "Taslak hazırla" / "Tekrar dene" |
+| `notify-email` | Bildirim e-postaları | Veritabanı tetikleyicileri |
+| `triyaj-aktar` | Eski tablodan tek seferlik aktarım (kullanıldı, artık çalışmaz) | — |
+
+**Yayınlama:** Supabase CLI kurulu değil. Fonksiyon kodu Supabase panelinde Edge Functions → fonksiyon → Code sekmesinde değiştirilip "Deploy updates" ile yayınlanır (Claude bunu kodu GitHub'daki son halinden alarak yapıyor). Uzun vadeli öneri: GitHub Actions + Supabase CLI ile otomatik yayın (bir `SUPABASE_ACCESS_TOKEN` gerekir, sahip oluşturur).
+**Not:** Supabase arka plan işini ~150 sn'de öldürür. Taslak işi 115 sn bütçeyle çalışır; aşarsa hata yazar.
+
+### 13.4 Zamanlanmış görevler (pg_cron)
+
+| Ad | Ne zaman | Ne yapar |
+|---|---|---|
+| `triyaj-topla` | 15 dk'da bir | Haber toplama fonksiyonunu çağırır |
+| `triyaj-is-kurtar` | Dakikada bir | 2 dk'dır nabızsız taslak/çeviri işini "hata"ya çeker (kilit açılır, kartta "Tekrar dene") |
+| `triyaj-temizlik` | Her gece 03:30 TR | Eski haberleri ve görülme kayıtlarını temizler |
+| `haftalik-hatirlatma` | Pazar 19:00 TR | Ekibe haftalık hatırlatma e-postası |
+| `etkinlik-hatirlatma` | Her gün 09:05 TR | Yaklaşan etkinlik hatırlatması |
+
+Liste SQL Editor'da: `select jobname, schedule from cron.job;`
+
+### 13.5 Veritabanı değişikliği
+
+Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0013_is_kurtarma.sql`.
+
+### 13.6 Bir şey bozulursa
+
+| Belirti | Önce buna bak | Çözüm |
+|---|---|---|
+| Üstte "Altyapı sorunu (Supabase)" uyarısı | status.supabase.com | Bizden değil; beklenir, düzelince kendiliğinden geçer |
+| Taslak "yazılıyor"da kalıyor | Karttaki kaynak etiketi (Altyapı / Yapay zekâ / Kaynak site) | 2 dk sonra kendiliğinden "Tekrar dene" çıkar. Sürekliyse: Supabase → triyaj-taslak → Logs |
+| Yeni haber gelmiyor | Haber Masası üstündeki yapay zekâ uyarısı; Kaynaklar sekmesi | Kota dolduysa ertesi gün düzelir (Groq yedeği devreye girer). Kaynak bozuksa Kaynaklar'da kapat |
+| "Yapay zekâ kotası doldu" | Google AI Studio kotası | Ertesi gün sıfırlanır; sürekliyse ücretli plan ya da toplama aralığını uzatmak |
+| Site açılmıyor | GitHub → Actions son çalışma | Kırmızıysa son değişiklik geri alınır (`git revert`) |
+| Giriş e-postası / bildirim gelmiyor | Supabase Secrets'ta `GMAIL_APP_PASSWORD` | Gmail uygulama şifresi yenilenir |
+| Supabase projesi "paused" | Supabase paneli | "Restore" (ücretsiz plan uzun kullanılmazsa duraklatır) |
+
+### 13.7 Haber Masası özeti
+
+Toplama (15 dk): son 24 saat, kaynak başına 10, tur başına en fazla 100 haber, fazlası sıraya girer. Yapay zekâ sadece etiket çıkarır, kararı kurallar verir (hariç marka, kampanya → elenir; rehber/liste → "Rehber fikirleri"; Türkiye'de yok ve Öncelikli değil → elenir; belirsiz → Belirsiz). Aynı olay tek kartta, diğer kaynaklar bağlantı. Elenen başlıklar Türkçe görünür, "Havuza al" ile geri alınır. Öncelik: Öncelik 1 (≥70) / 2 (≥40) / 3; puan haber türü + kaynak sayısı + tazelik; ekip oyu (👍/👎) sadece aynı marka içinde etkili; aynı markadan art arda en fazla 2. Sıralama: öncelik puanı / öncelik grubu içinde yeni→eski / haber saati / sisteme düşme saati. Taslak: Gemini (3.8 → 3.6 → 3.5 flash), iki kaynak, SEO, editöre sorular, doğrulama, görsel önerisi; hazırlayan haberi alır. "Yayına hazır" şu an sadece durum + HTML kopyala (WordPress'e gönderim yok). Kurallar: eleme `supabase/functions/triyaj-topla/index.ts`, puan `src/modules/haber-masasi/oncelik.ts`.
+
+### 13.8 Ekip geri bildirimleri (karşılananlar)
+
+Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve sisteme düşme saatine göre yeniden eskiye sıralama → eklendi. Öncelik grubu içinde zamana göre sıralama → eklendi. Kopya kartlar → tek kartta birleşiyor. Elenenler İngilizceydi → Türkçe. Bildirimler altta ve beyaz zeminliydi → üstte, cam görünüm. Mobil menü (dock) bozuktu → düzeltildi; dokununca mavi kare kalktı.
+
+### 13.9 Yapılacaklar (14 Ekim itibarıyla, sırayla)
+
+1. Fatih'i GitHub ve Supabase'e sahip olarak eklemek; Stüdyo'da yönetici.
+2. Devir paketi: bu bölümün Fatih'e göre gözden geçirilmesi + hesap listesi (kimin e-postası, kurtarma).
+3. Alan adı: `studio.updated.com.tr` (Natro CNAME; sonra GitHub Pages özel alan adı, Supabase Auth izinli adresler, e-postalardaki panel adresi).
+4. Sistem Durumu sayfası (tüm ekip görür): yapay zekâ/kota, son toplama, kaynak sağlığı (Kaynaklar'dan taşınır), zamanlanmış görevler, anahtar var/yok.
+5. Kopya kart birleştirmesinin geçmiş haberler için tamamlanması (kaynak sınırına takıldı).
+6. WordPress'e taslak gönderme (WordPress "Application Password" sahip tarafından oluşturulur).
+7. Takvim aboneliği + davet e-postası; post aracı kayıtları buluta; post otomasyonu taşıma; format sistemi.
+8. Kurumsal e-posta, telefon bildirimi, Android uygulaması.
+9. Yeni kaynaklar: Asya sızıntı siteleri, resmi basın sayfaları, Türkiye kaynakları (araştırma notları: Webtekno, LOG, ShiftDelete ~50'şer haber incelendi).
+10. Fonksiyonların GitHub'dan otomatik yayını (13.3).
+
+### 13.10 Marka ve ikonlar
+
+İkonlar tek komutla üretilir: `python3 scripts/ikonlar.py` (kaynak `assets/marka/up-isaret.png`). Ana ekran ikonu: koyu zemin (#1B1D21) üstünde beyaz UP; açılış ekranı aynı renk ve işaret (dikiş görünmesin). Sekme ikonu: yuvarlak köşeli marka mavisi (#2563FF) kare. Üst bölümde "UPDATED" yazısı (`src/assets/logo.png`). İkon değişince `src/shared/IkonUyarisi.tsx` içindeki tarih güncellenir (iPhone ikonu kendiliğinden yenilemez).
