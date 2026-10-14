@@ -3,7 +3,7 @@ import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { HaberKart, IsDurumKutusu, isDurumu, useSaat, OncelikBilgisi, SimdiTopla, useBaslikCeviri, useDegerlendir, useFiltre, useIs, useKisi, useOnerilen } from "./ortak";
-import { sirala } from "./oncelik";
+import { SEVIYELER, sirala } from "./oncelik";
 import { useIyimser, useMasa, type Durum, type Haber } from "./veri";
 
 // Eski "Elenenler" kategori çipleri (eleme nedeninden)
@@ -34,7 +34,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
   const [elKategori, setElKategori] = useState("hepsi");
   const [kac, setKac] = useState(60);
   // Ekip isteği: öncelik yerine zamana göre sıralama (haberin yayın saati ya da sisteme giriş saati, yeniden eskiye)
-  const [siralama, setSiralama] = useState<"oncelik" | "haber" | "derleme">(() => { try { return (localStorage.getItem("hm-siralama") as "oncelik") || "oncelik"; } catch { return "oncelik"; } });
+  const [siralama, setSiralama] = useState<"oncelik" | "oncelik-zaman" | "haber" | "derleme">(() => { try { return (localStorage.getItem("hm-siralama") as "oncelik") || "oncelik"; } catch { return "oncelik"; } });
   const siralamaSec = (x: typeof siralama) => { setSiralama(x); try { localStorage.setItem("hm-siralama", x); } catch { /* yok */ } };
 
   const { liste: sirali, d } = useMemo(() => {
@@ -44,7 +44,12 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
     const zaman = (h: Haber) => Date.parse(siralama === "derleme" ? h.created_at : h.published_at ?? h.created_at);
     if (durum === "aday") {
       const r = sirala(secili, v.oylar, v.haberler);
-      return siralama === "oncelik" ? r : { liste: [...secili].sort((a, b) => zaman(b) - zaman(a)), d: r.d };
+      if (siralama === "oncelik") return r;
+      // "Öncelik dahil zamana göre": önce Öncelik 1, sonra 2, sonra 3; her grubun içinde yeniden eskiye (haber saati)
+      const sev = (h: Haber) => { const x = r.d.get(h.id); return x ? SEVIYELER.indexOf(x.seviye) : 9; };
+      const z = (h: Haber) => Date.parse(h.published_at ?? h.created_at);
+      if (siralama === "oncelik-zaman") return { liste: [...secili].sort((a, b) => sev(a) - sev(b) || z(b) - z(a)), d: r.d };
+      return { liste: [...secili].sort((a, b) => zaman(b) - zaman(a)), d: r.d };
     }
     return { liste: [...secili].sort((a, b) => zaman(b) - zaman(a)), d: undefined };
   }, [v.haberler, v.oylar, durum, ara, siralama]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -94,8 +99,9 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
             <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiVar ? "Sana önerilenler üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
           </div>
         )}
-        <select value={durum !== "aday" && siralama === "oncelik" ? "haber" : siralama} onChange={(e) => siralamaSec(e.target.value as typeof siralama)} style={{ width: "auto" }} aria-label="Sıralama">
-          {durum === "aday" && <option value="oncelik">Sıra: öncelik</option>}
+        <select value={durum !== "aday" && siralama.startsWith("oncelik") ? "haber" : siralama} onChange={(e) => siralamaSec(e.target.value as typeof siralama)} style={{ width: "auto" }} aria-label="Sıralama">
+          {durum === "aday" && <option value="oncelik">Sıra: öncelik puanı</option>}
+          {durum === "aday" && <option value="oncelik-zaman">Sıra: öncelik grubu, içinde yeni → eski</option>}
           <option value="haber">Sıra: haber saati (yeni → eski)</option>
           <option value="derleme">Sıra: sisteme düşme saati (yeni → eski)</option>
         </select>

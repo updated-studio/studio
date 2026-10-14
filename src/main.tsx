@@ -9,3 +9,10 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </StrictMode>,
 );
+
+// Açılış ekranı (index.html) en az 0,6 sn görünsün, sonra yumuşakça kaybolsun
+const acilis = document.getElementById("acilis");
+if (acilis) {
+  const kalan = 650;
+  window.setTimeout(() => { acilis.classList.add("git"); window.setTimeout(() => acilis.remove(), 400); }, kalan);
+}

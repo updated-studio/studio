@@ -57,7 +57,7 @@ function AuthScreen({ initial }: { initial: Mode }) {
 
   return (
     <div className="wrap" style={{ maxWidth: 400, marginTop: "8vh" }}>
-      <div className="brand"><b>UP</b>DATED<span>Stüdyo</span></div>
+      <div className="brand"><span className="logo" role="img" aria-label="Updated" /><span>Stüdyo</span></div>
       <div className="panel">
         <h2>{LABELS[mode][0]}</h2>
         {msg && <div className={"msg " + (msg.good ? "good" : "err")}>{msg.t}</div>}

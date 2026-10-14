@@ -17,7 +17,7 @@ function Kabuk() {
   return (
     <div className="wrap">
       <header className="row" style={{ gap: 12 }}>
-        <div className="brand" style={{ marginRight: "auto" }}><b>UP</b>DATED<span>Stüdyo</span></div>
+        <div className="brand" style={{ marginRight: "auto" }}><span className="logo" role="img" aria-label="Updated" /><span>Stüdyo</span></div>
         <Bildirimler />
         <ProfilMenu moduller={profilde} />
       </header>
