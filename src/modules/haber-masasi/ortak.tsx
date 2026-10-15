@@ -5,7 +5,7 @@ import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
 import { hataKaynagi, useAltyapi } from "../../shared/altyapi";
-import { ART_ARDA_EN_FAZLA, degerlendir, EK, HABER_TURLERI, ONCELIK_SURUMU, OY_ETKISI, OY_GUN, OY_SINIRI, SEVIYELER, type Degerlendirme } from "./oncelik";
+import { ART_ARDA_EN_FAZLA, degerlendir, EK, ilgiEslesme, HABER_TURLERI, ONCELIK_SURUMU, OY_ETKISI, OY_GUN, OY_SINIRI, SEVIYELER, type Degerlendirme } from "./oncelik";
 import { useMasa, type Haber } from "./veri";
 
 export const KONUMLAR_ETIKET: Record<string, string> = { aday: "Havuz", belirsiz: "Belirsiz", elendi: "Elendi", alindi: "Alındı", pas: "Pas", yayinda: "Yayında" };
@@ -35,8 +35,7 @@ export function useDegerlendir() {
 export function useOnerilen() {
   const { veri } = useVeri();
   return (h: Haber) => {
-    const metin = `${h.topic} ${h.product} ${h.brand}`.toLowerCase();
-    return veri.profiles.filter((p) => (p.interests ?? "").split(/[,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean).some((x) => metin.includes(x)));
+    return veri.profiles.filter((p) => ilgiEslesme(h, p.interests) > 0);
   };
 }
 
@@ -214,6 +213,7 @@ export function HaberKart({ h, children, ust, d, oyGoster = true }: { h: Haber; 
         {h.brand && <span className="pill blue">{h.brand}</span>}
         {h.kind && <span className={"pill " + (h.kind === "Sızıntı" || h.kind === "Söylenti" ? "purple" : "off")}>{h.kind}</span>}
         {h.topic && <span className="muted">{h.topic}</span>}
+        {h.auto_draft_at && <span className="pill purple" title="En güçlü haberlerden; taslağı Stüdyo kendisi hazırladı">🤖 Otomatik taslak</span>}
         <span className="muted" style={{ marginLeft: "auto" }}>{zamanOnce(h.published_at || h.created_at)}</span>
       </div>
       <div className="row muted" style={{ gap: 6, fontSize: 12 }}>

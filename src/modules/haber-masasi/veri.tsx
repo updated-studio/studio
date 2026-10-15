@@ -11,6 +11,7 @@ export type Haber = {
   transfer_seen: boolean; last_dropped_by: string | null; translation: string; work_state: "" | "ceviri" | "taslak" | "hata";
   work_error: string; touched: boolean; updated_at: string; updated_by: string | null;
   origin: string; turkey: string; event_key: string; draft_url: string; transfer_note: string; last_action: string;
+  auto_draft_at: string | null; // otomatik taslak için seçildiği an
 };
 export type Oy = { id: number; item_id: number | null; user_id: string; value: number; note: string; created_at: string; brand: string; topic: string; event: string; link: string };
 export type Etkinlik = { id: number; created_at: string; kind: string; actor: string | null; target: string | null; actor_name: string; target_name: string; item_id: number | null; title: string; link: string; note: string; read_by: string[] };
@@ -22,6 +23,7 @@ export type Taslak = {
   questions: string[]; checks: string[]; notes: string[];
   image: { oneri?: string; alt_text?: string; aramalar?: string[]; ai_istem?: string; basin?: { url: string; kesin: boolean } | null; stok?: Stok[]; stok_anahtar?: boolean };
   created_at: string; updated_at: string;
+  auto: boolean; wp_post_id: number | null; wp_link: string; wp_error: string; wp_sent_at: string | null; wp_pending: boolean; // otomatik mi, WordPress karşılığı
 };
 export type Mesaj = { id: number; user_id: string; body: string; item_id: number | null; created_at: string };
 export type Kaynak = { id: number; category: string; name: string; url: string; active: boolean; last_check: string | null; item_count: number | null; last_item_at: string | null; status: string; error: string };

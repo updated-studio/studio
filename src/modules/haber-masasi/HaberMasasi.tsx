@@ -14,7 +14,7 @@ import { MasaProvider, useMasa, type Etkinlik } from "./veri";
 type Bolum = "havuz" | "benim" | "pas" | "taslak" | "rehber" | "belirsiz" | "elenen" | "sohbet" | "kaynak" | "ayar";
 
 const TUR: Record<string, string> = { "aldı": "haberi aldı", "yayında": "haberi yayına aldı", "pas": "haberi pas geçti", "bıraktı": "haberi bıraktı", "geri aldı": "haberi pastan geri aldı" };
-const metin = (r: Etkinlik) => (r.kind === "aktar" ? <><b>{r.actor_name}</b> → <b>{r.target_name}</b> haberi aktardı</> : <><b>{r.actor_name}</b> {TUR[r.kind] ?? r.kind}</>);
+const metin = (r: Etkinlik) => (r.kind === "oto" ? <><b>Stüdyo</b> otomatik taslak hazırladı{r.target_name ? <> → <b>{r.target_name}</b></> : " (sahipsiz)"}</> : r.kind === "aktar" ? <><b>{r.actor_name}</b> → <b>{r.target_name}</b> haberi aktardı</> : <><b>{r.actor_name}</b> {TUR[r.kind] ?? r.kind}</>);
 
 function Masa() {
   const { v, yukleniyor, hata, yenile } = useMasa();

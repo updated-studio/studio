@@ -5,29 +5,8 @@ import { useToast } from "../../shared/toast";
 import { useKisi, zamanOnce } from "./ortak";
 import { useMasa, type Taslak } from "./veri";
 
-const kacis = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const satirIci = (s: string) => kacis(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-/** Basit Markdown → HTML (ara başlık, paragraf, liste, kalın). WordPress'e yapıştırmak için de kullanılır. */
-export function mdHtml(md: string): string {
-  const out: string[] = [];
-  let liste: string[] = [];
-  const bitir = () => { if (liste.length) { out.push("<ul>" + liste.map((l) => `<li>${satirIci(l)}</li>`).join("") + "</ul>"); liste = []; } };
-  for (const blok of md.replace(/\r/g, "").split(/\n{2,}/)) {
-    for (const s of blok.split("\n")) {
-      const t = s.trim();
-      if (!t) continue;
-      if (/^[-*]\s+/.test(t)) { liste.push(t.replace(/^[-*]\s+/, "")); continue; }
-      bitir();
-      if (/^###\s+/.test(t)) out.push(`<h3>${satirIci(t.slice(4))}</h3>`);
-      else if (/^##\s+/.test(t)) out.push(`<h2>${satirIci(t.slice(3))}</h2>`);
-      else if (/^#\s+/.test(t)) out.push(`<h2>${satirIci(t.slice(2))}</h2>`);
-      else out.push(`<p>${satirIci(t)}</p>`);
-    }
-    bitir();
-  }
-  return out.join("\n");
-}
+// Markdown → HTML ortak dosyada: WordPress'e giden metin ile "HTML kopyala" aynı olsun.
+import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
 
 /** Eski taslak dokümanının "GÖRSEL" bölümü: öneri, alt text, basın kiti, stok önerileri, yapay zekâ istemi */
 function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
@@ -79,6 +58,8 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
         {liste.map((x) => (
           <button key={x.id} className="satir linkbtn" style={{ color: "inherit", width: "100%" }} onClick={() => setAcik(x.id)}>
             <div className="ana"><b>{x.title || "(başlıksız)"}</b><div className="muted">{kisi(x.author)?.name ?? "?"} · {zamanOnce(x.updated_at)} önce</div></div>
+            {x.auto && <span className="pill purple" title="Stüdyo kendisi hazırladı">🤖</span>}
+            {x.wp_error && <span className="pill rose" title={x.wp_error}>WordPress hatası</span>}
             <span className={"pill " + (x.status === "hazir" ? "ok" : x.status === "gonderildi" ? "blue" : "off")}>{DURUM[x.status]}</span>
           </button>
         ))}
@@ -108,11 +89,27 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
   }
 
   async function kopyala() {
-    const html = `<p><strong>${kacis(d.spot)}</strong></p>\n${mdHtml(d.body)}`;
+    const html = yaziHtml(d.spot, d.body);
     try {
       await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([d.spot + "\n\n" + d.body], { type: "text/plain" }) })]);
       toast("Kopyalandı. WordPress düzenleyicisine yapıştırabilirsin.");
     } catch { toast("Kopyalanamadı; tarayıcı izin vermedi."); }
+  }
+
+  // WordPress'e taslak olarak gönder (yayına basma kararı WordPress'te editörde). Kaydedilmemiş değişiklik varsa önce kaydedilir.
+  const [wpSuruyor, setWpSuruyor] = useState(false);
+  async function wordpressGonder(zorla = false) {
+    if (degisti) await kaydet();
+    setWpSuruyor(true);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { wp: true, draft_id: t.id, zorla } });
+    setWpSuruyor(false);
+    if (error) {
+      let m = error.message;
+      try { const j = await (error as { context?: Response }).context?.json(); if (j?.hata) m = j.hata; } catch { /* yok */ }
+      return toast(m);
+    }
+    setD({ ...d, status: "gonderildi" });
+    toast(`WordPress'e taslak olarak gitti${data?.kategori ? " (" + data.kategori + ")" : ""}. Yayına WordPress'te sen basarsın.`);
   }
 
   const [silOnay, setSilOnay] = useState(false);
@@ -133,6 +130,9 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
         <button className="btn sm" onClick={() => kaydet()} disabled={!degisti}>Kaydet</button>
       </div>
       {haber && <div className="muted">Haber: <a href={haber.link} target="_blank" rel="noreferrer">{haber.event || haber.title}</a></div>}
+      {t.auto && <div className="muted">🤖 Bu taslağı Stüdyo en güçlü haberlerden otomatik hazırladı{t.author ? " ve ilgi alanına göre sana verdi" : ""}. Yayından önce doğrulama listesine bak.</div>}
+      {t.wp_link && <div className="msg good">WordPress'te taslak olarak duruyor{t.wp_sent_at ? " (" + zamanOnce(t.wp_sent_at) + " önce gönderildi)" : ""}. <a href={t.wp_link} target="_blank" rel="noreferrer">WordPress'te aç ↗</a></div>}
+      {t.wp_error && <div className="msg err">{t.wp_error}{/düzenlenmiş/.test(t.wp_error) && <> <button className="linkbtn" onClick={() => wordpressGonder(true)}>Üzerine yaz</button></>}</div>}
       <div className="panel">
         <label>Başlık (H1)<input type="text" value={d.title} onChange={(e) => alan("title", e.target.value)} /></label>
         <label>Spot<textarea className="alan" rows={2} value={d.spot} onChange={(e) => alan("spot", e.target.value)} /></label>
@@ -143,7 +143,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
         {gorunum === "duzen"
           ? <textarea className="alan" rows={22} value={d.body} onChange={(e) => alan("body", e.target.value)} aria-label="Haber metni" />
           // Önizleme kendi ürettiğimiz kaçışlı HTML'dir.
-          : <div className="onizleme" dangerouslySetInnerHTML={{ __html: `<p><strong>${kacis(d.spot)}</strong></p>` + mdHtml(d.body) }} />}
+          : <div className="onizleme" dangerouslySetInnerHTML={{ __html: yaziHtml(d.spot, d.body) }} />}
         {d.body.includes("[EDİTÖR YORUMU") && <div className="msg err">Yayınlamadan önce "Editör yorumu" alanını doldur.</div>}
       </div>
       <div className="panel">
@@ -171,6 +171,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
         <span className="muted" style={{ marginRight: "auto" }}>Durum: {DURUM[d.status]}{t.model ? " · " + t.model : ""}</span>
         {d.status !== "hazir" && <button className="btn ok sm" onClick={() => kaydet("hazir")}>Yayına hazır</button>}
         {d.status === "hazir" && <button className="btn ghost sm" onClick={() => kaydet("taslak")}>Taslağa geri al</button>}
+        <button className="btn sm" onClick={() => wordpressGonder()} disabled={wpSuruyor}>{wpSuruyor ? "Gönderiliyor…" : t.wp_post_id ? "WordPress'i güncelle" : "WordPress'e gönder"}</button>
         <button className="btn ghost sm" onClick={sil}>{silOnay ? "Emin misin? Tekrar bas" : "Sil"}</button>
       </div>
     </>

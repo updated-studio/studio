@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-10-15-a",
+    "tarih": "15 Ekim 2026",
+    "baslik": "Otomatik taslak ve WordPress'e gönderim",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "En güçlü haberlerin (Öncelik 1) taslağını Stüdyo artık kendisi hazırlıyor. Günde en fazla 50; haber düştükten yarım saat sonra, diğer kaynaklar da gelsin diye.",
+          "Otomatik taslak, ilgi alanı habere en uygun editöre verilir; sana düşerse bildirim ve e-posta gelir. İlgi alanlarını Profilim'den güncel tut.",
+          "Taslaklar'da yeni düğme: \"WordPress'e gönder\". Taslak siteye taslak olarak gider, kategori ve etiketler otomatik seçilir. Yayına WordPress'te sen basarsın.",
+          "Otomatik hazırlanan haberlerde 🤖 işareti var. Yayından önce \"Yayından önce doğrula\" listesine mutlaka bak.",
+          "WordPress'te taslağı değiştirdiysen Stüdyo üzerine yazmaz; önce sorar."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-14-a",
     "tarih": "14 Ekim 2026",
     "baslik": "Taslaklar artık takılmıyor, yeni sıralamalar ve yeni ikon",
