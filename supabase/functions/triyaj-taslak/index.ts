@@ -10,7 +10,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { adaySec, ayniHaber, editorSec, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { wpAyar, wpDene, wpGonder, type Kategori } from "./wordpress.ts";
-import { adayListesi, commons, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
+import { adayListesi, commons, kuralSecim, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -178,8 +178,15 @@ async function gorselSec(it: { brand: string; product: string; title: string }, 
     const goruldu = new Set<string>();
     const adaylar = [...c1, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
     if (!adaylar.length) return { ...bos, neden: "Serbest lisanslı uygun fotoğraf bulunamadı." };
-    const { veri } = await gemini(SECIM_SISTEM, `Haber başlığı: ${baslik}\nÜrün: ${urun || "-"}\nOrijinal başlık: ${it.title}\n\nAdaylar:\n${adayListesi(adaylar)}`,
-      ["gemini-3.5-flash-lite", "gemini-3.5-flash"], Math.min(bitis - 30_000, Date.now() + 25_000));
+    let veri: Record<string, unknown>;
+    try {
+      // Küçük modelden başlar; kotası dolmuşsa taslağı yazan büyük modellere geçer
+      ({ veri } = await gemini(SECIM_SISTEM, `Haber başlığı: ${baslik}\nÜrün: ${urun || "-"}\nOrijinal başlık: ${it.title}\n\nAdaylar:\n${adayListesi(adaylar)}`,
+        ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 30_000, Date.now() + 25_000)));
+    } catch {
+      const k = kuralSecim(adaylar, urun);
+      return { secilen: k, adaylar: adaylar.slice(0, 8), neden: k ? "Yapay zekâ yanıt vermedi; ürün adıyla birebir eşleşen Commons fotoğrafı seçildi." : "Yapay zekâ yanıt vermedi ve ürün adıyla eşleşen fotoğraf yok; görsel eklenmedi." };
+    }
     const i = Number(veri.secim);
     const secilen = Number.isInteger(i) && i >= 0 && i < adaylar.length ? adaylar[i] : null;
     return { secilen, adaylar: adaylar.slice(0, 8), neden: String(veri.neden ?? "").slice(0, 200) || (secilen ? "" : "Uygun görsel yok.") };
