@@ -2,14 +2,16 @@
 // Kaynaklar, doğruluk sırasıyla:
 //   1) Wikimedia Commons: ürünün KENDİSİNİN gerçek fotoğrafı çoğu zaman burada (marka + ürün adıyla aranır).
 //      Sadece serbest lisanslar (CC0, kamu malı, CC BY, CC BY-SA); yazar ve lisans altyazıya yazılır.
-//   2) Pexels, 3) Pixabay: konuyu temsil eden gerçek fotoğraflar (anahtar varsa: PEXELS_API_KEY, PIXABAY_API_KEY).
+//   2) Openverse (anahtar gerekmez): Flickr vb. kaynaklardan serbest lisanslı (CC0, kamu malı, CC BY, CC BY-SA) gerçek fotoğraflar;
+//      önce ürün adıyla, sonra konu aramasıyla. Ticari kullanıma izin vermeyen (NC) ve değiştirilemez (ND) lisanslar alınmaz.
+//   3) Pexels, Pixabay: sadece anahtar tanımlıysa (PEXELS_API_KEY, PIXABAY_API_KEY); şu an yok.
 // Unsplash yüklenmez: API kuralları görselin kendi sunucularından gösterilmesini istiyor (sadece öneri olarak kalır).
 // Bu dosya Deno'ya özgü bir şey kullanmaz (ekran da tiplerini içe aktarıyor); anahtarlar çağırandan gelir.
 // Haber sitelerinin kendi görselleri (og:image) ALINMAZ: başka yayının telifli fotoğrafıdır.
 // Hangi adayın kullanılacağına yapay zekâ karar verir; uygun aday yoksa görsel eklenmez. Yayına basma kararı yine editörde.
 
 export type GorselAday = {
-  kaynak: "Wikimedia Commons" | "Pexels" | "Pixabay";
+  kaynak: "Wikimedia Commons" | "Openverse" | "Pexels" | "Pixabay";
   sayfa: string;      // görselin kendi sayfası (altyazıda bağlantı)
   buyuk: string;      // indirilecek dosya (en fazla ~1600 px)
   thumb: string;      // ekranda küçük önizleme
@@ -56,6 +58,23 @@ export async function commons(q: string, adet = 6): Promise<GorselAday[]> {
   return out;
 }
 
+/** Openverse: anahtarsız, serbest lisanslı, yatay ve büyük fotoğraflar */
+export async function openverse(q: string, adet = 5): Promise<GorselAday[]> {
+  if (!q.trim()) return [];
+  const j = await json("https://api.openverse.org/v1/images/?license=cc0,pdm,by,by-sa&category=photograph&aspect_ratio=wide&size=large&mature=false&page_size=12&q=" + encodeURIComponent(q));
+  const out: GorselAday[] = [];
+  for (const x of ((j?.results ?? []) as any[])) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!x.url || (x.width && x.width < 900) || (x.width && x.height && x.width < x.height)) continue;
+    const l = String(x.license ?? "").toLowerCase();
+    const lisans = l === "cc0" ? "CC0" : l === "pdm" ? "Kamu malı" : `CC ${l.toUpperCase()} ${x.license_version ?? ""}`.trim();
+    // Orijinal dosya indirilir (sıkıştırılmış kopya servisi çok yavaş); 8 MB'tan büyükse yükleme yapılmaz
+    out.push({ kaynak: "Openverse", sayfa: x.foreign_landing_url || x.url, buyuk: x.url, thumb: x.thumbnail || x.url, yazar: String(x.creator || "Bilinmiyor").slice(0, 80), lisans,
+      aciklama: [x.title, (x.tags ?? []).slice(0, 8).map((t: { name: string }) => t.name).join(", ")].filter(Boolean).join(" — ").slice(0, 220) || q, w: x.width ?? 0, h: x.height ?? 0 });
+    if (out.length >= adet) break;
+  }
+  return out;
+}
+
 /** Pexels + Pixabay: konuyu temsil eden gerçek fotoğraflar (yatay, illüstrasyon değil) */
 export async function stokFoto(q: string, adet: number, anahtar: { pexels?: string; pixabay?: string }): Promise<GorselAday[]> {
   const pk = anahtar.pexels, bk = anahtar.pixabay;
@@ -72,7 +91,7 @@ export async function stokFoto(q: string, adet: number, anahtar: { pexels?: stri
 /** WordPress altyazısı: yazar, kaynak ve lisans (CC lisanslarında zorunlu atıf) */
 export function altyazi(g: GorselAday): string {
   const k = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return `Fotoğraf: ${k(g.yazar)} / <a href="${k(g.sayfa)}" target="_blank" rel="noopener">${k(g.kaynak)}</a>${/^cc/i.test(g.lisans) ? ` (${k(g.lisans)})` : ""}`;
+  return `Fotoğraf: ${k(g.yazar)} / <a href="${k(g.sayfa)}" target="_blank" rel="noopener">${k(g.kaynak)}</a>${/^(cc|kamu)/i.test(g.lisans) ? ` (${k(g.lisans)})` : ""}`;
 }
 
 /** Yapay zekâya gösterilecek aday listesi */
@@ -96,5 +115,5 @@ const kelimeler = (s: string) => (s ?? "").toLowerCase().replace(/ı/g, "i").nor
 export function kuralSecim(adaylar: GorselAday[], urun: string): GorselAday | null {
   const aranan = kelimeler(urun);
   if (aranan.length < 2) return null;
-  return adaylar.find((a) => a.kaynak === "Wikimedia Commons" && aranan.every((w) => kelimeler(a.aciklama).includes(w))) ?? null;
+  return adaylar.find((a) => (a.kaynak === "Wikimedia Commons" || a.kaynak === "Openverse") && aranan.every((w) => kelimeler(a.aciklama).includes(w))) ?? null;
 }

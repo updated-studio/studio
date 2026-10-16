@@ -10,7 +10,8 @@
           "Otomatik taslak çalışıyor: en güçlü haberlerin taslağı kendiliğinden yazılıp WordPress'e taslak olarak gidiyor. Yayına basmak yine editörün işi.",
           "Taslaklara öne çıkan görsel otomatik ekleniyor: önce ürünün kendi fotoğrafı (Wikimedia Commons, serbest lisanslı), yoksa konuyu anlatan gerçek bir fotoğraf. Altyazıda fotoğrafçı ve lisans yazıyor; uygun değilse WordPress'te değiştir.",
           "Aynı haber farklı sitelerden ayrı kartlar olarak gelse de otomatik taslak bir kez yazılır.",
-          "Taslak ekranının Görsel bölümünde seçilen fotoğrafı ve neden seçildiğini görebilirsin."
+          "Taslak ekranının Görsel bölümünde seçilen fotoğrafı ve neden seçildiğini görebilirsin.",
+          "Görseller artık Openverse'ten de geliyor (serbest lisanslı gerçek fotoğraflar). Gemini'nin kotası dolarsa taslaklar yedek yapay zekâyla (Groq) yazılmaya devam ediyor."
         ]
       }
     ]
