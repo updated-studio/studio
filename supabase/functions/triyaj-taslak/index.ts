@@ -237,6 +237,12 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
   }
 }
 
+/** Yapay zekâ listeleri bazen nesne döndürür ({iddia, kaynak}); hepsi düz metne çevrilir */
+function metinListe(x: unknown): string[] {
+  const duz = (v: unknown): string => typeof v === "string" ? v : v && typeof v === "object" ? Object.values(v as Record<string, unknown>).map(duz).filter(Boolean).join(" — ") : String(v ?? "");
+  return (Array.isArray(x) ? x : x ? [x] : []).map(duz).map((s) => s.trim()).filter(Boolean);
+}
+
 async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici: string | null, ad: string, sec: IsSecenek = {}) {
   const bitis = Date.now() + BUTCE_MS;
   // Nabız: iş sürdükçe updated_at tazelenir; 2 dk nabız gelmezse zamanlanmış görev işi "hata"ya çeker (0013)
@@ -273,7 +279,7 @@ ${metinler.join("\n\n---\n\n")}`;
     await nabiz();
     const { veri: t, model } = await gemini(taslakSistem(uslup), istem, MODELLER, bitis);
     await nabiz();
-    const notlar: string[] = (t.editor_notlari ?? []).filter(Boolean).map(String);
+    const notlar: string[] = metinListe(t.editor_notlari);
     if (ana.length < 300) notlar.push("Kaynak sitenin tam metni otomatik alınamadı; taslak kısıtlı bilgiyle yazıldı. Kaynağı mutlaka oku.");
 
     // Gövde: ara başlıklar + "Dikkat edilmesi gerekenler" + editör yorumu yeri
@@ -283,7 +289,7 @@ ${metinler.join("\n\n---\n\n")}`;
       for (const p of b?.paragraflar ?? []) if (p) parcalar.push(String(p));
     }
     // "Dikkat edilmesi gerekenler" sitedeki yazılarda yok: editör notlarına gider, metne girmez
-    const dikkat = (t.dikkat_edilmesi_gerekenler ?? []).filter(Boolean).map(String);
+    const dikkat = metinListe(t.dikkat_edilmesi_gerekenler);
     if (dikkat.length) notlar.unshift(...dikkat.map((x: string) => "Dikkat: " + x));
     parcalar.push("**[EDİTÖR YORUMU: Buraya kendi değerlendirmeni ekle]**");
 
@@ -330,7 +336,7 @@ ${metinler.join("\n\n---\n\n")}`;
       title: baslik, spot, body: govdeMd,
       seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: t.etiketler ?? [] },
       sources: kaynaklar.join("\n"), image_note: String(g.oneri ?? ""), editor_note: notlar.join("\n"),
-      questions: (t.editor_sorulari ?? []).filter(Boolean), checks: (t.dogrulama ?? []).filter(Boolean), notes: notlar,
+      questions: metinListe(t.editor_sorulari), checks: metinListe(t.dogrulama), notes: notlar,
       image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: secilen.slice(0, 6), secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: oneCikan.neden, stok_anahtar: !!(Deno.env.get("UNSPLASH_ACCESS_KEY") || Deno.env.get("PIXABAY_API_KEY") || Deno.env.get("PEXELS_API_KEY")) },
     }).select("id").single();
 

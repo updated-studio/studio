@@ -8,6 +8,9 @@ import { useMasa, type Taslak } from "./veri";
 // Markdown → HTML ortak dosyada: WordPress'e giden metin ile "HTML kopyala" aynı olsun.
 import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
 
+/** Yapay zekâ bazen liste öğesini metin yerine nesne döndürür ({iddia, kaynak} gibi): ekran çökmesin diye metne çevrilir */
+const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof x === "object" ? Object.values(x as Record<string, unknown>).map((v) => metinYap(v)).filter(Boolean).join(" — ") : String(x ?? "");
+
 /** Eski taslak dokümanının "GÖRSEL" bölümü: öneri, alt text, basın kiti, stok önerileri, yapay zekâ istemi */
 function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   const g = t.image ?? {};
@@ -176,8 +179,8 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       <Gorsel t={t} marka={haber?.brand ?? ""} />
       <div className="panel">
         <h3>Editör için (yayına girmez)</h3>
-        {(t.questions ?? []).length > 0 && <><b>Senin katkın için sorular</b><div className="muted">Cevabını gövdede ilgili ara başlığın içine yerleştir.</div><ul>{t.questions.map((x, i) => <li key={i}>{x}</li>)}</ul></>}
-        {(t.checks ?? []).length > 0 && <><b>Yayından önce doğrula</b><ul>{t.checks.map((x, i) => <li key={i}>{x}</li>)}</ul></>}
+        {(t.questions ?? []).length > 0 && <><b>Senin katkın için sorular</b><div className="muted">Cevabını gövdede ilgili ara başlığın içine yerleştir.</div><ul>{t.questions.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
+        {(t.checks ?? []).length > 0 && <><b>Yayından önce doğrula</b><ul>{t.checks.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
         <label>Notlar (yapay zekânın emin olmadıkları)<textarea className="alan" rows={3} value={d.editor_note} onChange={(e) => alan("editor_note", e.target.value)} /></label>
       </div>
       <div className="row">
