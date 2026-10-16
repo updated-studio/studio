@@ -3,6 +3,7 @@
 // Kurallar (ARCHITECTURE.md, 15 Ekim 2026): yazı her zaman "draft" gider, yayına editör basar; kategori sadece sitede VAR OLANLARDAN seçilir;
 // etiket önce sitede aranır, yoksa açılır; editör notları/sorular/doğrulama listesi gitmez; WordPress'te editörün değiştirdiği taslağın üzerine yazılmaz.
 import { yaziHtml } from "./html.ts";
+import { altyazi, type GorselAday } from "./gorsel.ts";
 
 // deno-lint-ignore no-explicit-any
 type Sb = any;
@@ -119,6 +120,33 @@ export async function wpDene(sb: Sb) {
   return { ok: true, kullanici: v.name, roller: v.roles ?? [], kategori: kategoriler.length, site: a.url, uyari };
 }
 
+
+/** Seçilen görseli WordPress ortam kütüphanesine yükler (alt metin + yazar/lisans altyazısı). Hata olursa yazıyı engellemez. */
+async function gorselYukle(a: WpAyar, g: GorselAday, alt: string, ad: string): Promise<{ id?: number; hata?: string }> {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), 25_000);
+  try {
+    const r = await fetch(g.buyuk, { headers: { "User-Agent": "UpdatedStudyo/1.0 (https://www.updated.com.tr)" }, signal: c.signal });
+    if (!r.ok) return { hata: "Görsel indirilemedi (" + r.status + ")" };
+    const tur = (r.headers.get("content-type") ?? "image/jpeg").split(";")[0];
+    if (!/^image\/(jpeg|png|webp)$/.test(tur)) return { hata: "Görsel türü desteklenmiyor: " + tur };
+    const veri = new Uint8Array(await r.arrayBuffer());
+    if (veri.byteLength > 8_000_000) return { hata: "Görsel çok büyük" };
+    const uzanti = tur === "image/png" ? "png" : tur === "image/webp" ? "webp" : "jpg";
+    const dosya = (ad || "haber-gorseli").replace(/[^a-z0-9-]/gi, "-").slice(0, 60) + "." + uzanti;
+    const y = await fetch(a.url + "/wp-json/wp/v2/media", {
+      method: "POST", signal: c.signal,
+      headers: { Authorization: "Basic " + btoa(a.user + ":" + a.pass), "Content-Type": tur, "Content-Disposition": `attachment; filename="${dosya}"`, "User-Agent": "UpdatedStudyo/1.0" },
+      body: veri,
+    });
+    const m = await y.json().catch(() => null) as { id?: number } | null;
+    if (!y.ok || !m?.id) return { hata: hataMetni(y.status, JSON.stringify(m ?? {})) };
+    await wp(a, `/wp/v2/media/${m.id}`, { method: "POST", body: { alt_text: alt.slice(0, 200), caption: altyazi(g), title: alt.slice(0, 120) || dosya } });
+    return { id: m.id };
+  } catch (e) {
+    return { hata: "Görsel yüklenemedi: " + String((e as Error).message ?? e).slice(0, 120) };
+  } finally { clearTimeout(t); }
+}
+
 type Secenek = { zorla?: boolean; kategoriSec?: (baslik: string, oneri: string, liste: Kategori[]) => Promise<string> };
 
 /** Taslağı WordPress'e taslak olarak gönderir ya da daha önce gönderilmişse günceller. Sonucu tr_drafts'a yazar. */
@@ -164,8 +192,17 @@ export async function wpGonder(sb: Sb, taslakId: number, s: Secenek = {}): Promi
       yazar = await yazarBul(a, p?.email ?? "");
     }
 
+    // Öne çıkan görsel: seçildiyse ve daha önce yüklenmediyse ortam kütüphanesine yükle (bir kez)
+    const img = (t.image ?? {}) as { secilen?: GorselAday | null; wp_media_id?: number; alt_text?: string; yukleme_hata?: string };
+    let medya = img.wp_media_id;
+    if (!medya && img.secilen?.buyuk) {
+      const y = await gorselYukle(a, img.secilen, img.alt_text || t.title, seo.slug || "");
+      medya = y.id;
+      await sb.from("tr_drafts").update({ image: { ...img, wp_media_id: y.id ?? null, yukleme_hata: y.hata ?? "" } }).eq("id", taslakId);
+    }
+
     const yazi: Record<string, unknown> = {
-      status: "draft", title: t.title, content: yaziHtml(t.spot ?? "", t.body ?? ""), excerpt: seo.meta ?? "",
+      status: "draft", ...(medya ? { featured_media: medya } : {}), title: t.title, content: yaziHtml(t.spot ?? "", t.body ?? ""), excerpt: seo.meta ?? "",
       ...(seo.slug ? { slug: seo.slug } : {}), ...(kat ? { categories: [kat.id] } : {}), ...(etiketler.length ? { tags: etiketler } : {}),
       ...(yazar ? { author: yazar } : {}),
       // SEO eklentisi alanları: eklenti bunları REST'e açmışsa dolar, açmamışsa WordPress sessizce yok sayar.

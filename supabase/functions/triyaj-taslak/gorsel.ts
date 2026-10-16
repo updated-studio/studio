@@ -1,0 +1,90 @@
+// Taslağın öne çıkan görseli (ARCHITECTURE.md, 16 Ekim 2026): telifi açık, gerçek fotoğraflardan seçilir.
+// Kaynaklar, doğruluk sırasıyla:
+//   1) Wikimedia Commons: ürünün KENDİSİNİN gerçek fotoğrafı çoğu zaman burada (marka + ürün adıyla aranır).
+//      Sadece serbest lisanslar (CC0, kamu malı, CC BY, CC BY-SA); yazar ve lisans altyazıya yazılır.
+//   2) Pexels, 3) Pixabay: konuyu temsil eden gerçek fotoğraflar (anahtar varsa: PEXELS_API_KEY, PIXABAY_API_KEY).
+// Unsplash yüklenmez: API kuralları görselin kendi sunucularından gösterilmesini istiyor (sadece öneri olarak kalır).
+// Bu dosya Deno'ya özgü bir şey kullanmaz (ekran da tiplerini içe aktarıyor); anahtarlar çağırandan gelir.
+// Haber sitelerinin kendi görselleri (og:image) ALINMAZ: başka yayının telifli fotoğrafıdır.
+// Hangi adayın kullanılacağına yapay zekâ karar verir; uygun aday yoksa görsel eklenmez. Yayına basma kararı yine editörde.
+
+export type GorselAday = {
+  kaynak: "Wikimedia Commons" | "Pexels" | "Pixabay";
+  sayfa: string;      // görselin kendi sayfası (altyazıda bağlantı)
+  buyuk: string;      // indirilecek dosya (en fazla ~1600 px)
+  thumb: string;      // ekranda küçük önizleme
+  yazar: string;
+  lisans: string;     // ör. "CC BY-SA 4.0", "Pexels Lisansı"
+  aciklama: string;   // yapay zekânın seçerken okuyacağı metin
+  w: number; h: number;
+};
+
+const UA = "UpdatedStudyo/1.0 (https://www.updated.com.tr; haber gorseli secimi)";
+const duz = (s: string) => String(s ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+const SERBEST = /^(cc0|public domain|pd|cc[- ]by(-sa)?[- ]\d)/i;
+
+async function json(url: string, h: Record<string, string> = {}) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), 10_000);
+  try { const r = await fetch(url, { headers: { "User-Agent": UA, ...h }, signal: c.signal }); return r.ok ? await r.json() : null; }
+  catch { return null; } finally { clearTimeout(t); }
+}
+
+/** Wikimedia Commons: marka + ürün adıyla, sadece serbest lisanslı ve yeterince büyük fotoğraflar */
+export async function commons(q: string, adet = 6): Promise<GorselAday[]> {
+  if (!q.trim()) return [];
+  const u = "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=12"
+    + "&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=1600&iiextmetadatafilter=LicenseShortName|Artist|ImageDescription|ObjectName"
+    + "&gsrsearch=" + encodeURIComponent(q + " filetype:bitmap");
+  const j = await json(u);
+  const sayfalar = Object.values((j?.query?.pages ?? {}) as Record<string, { title: string; index?: number; imageinfo?: Record<string, any>[] }>) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  const out: GorselAday[] = [];
+  for (const p of sayfalar) {
+    const i = p.imageinfo?.[0];
+    if (!i || !/jpe?g|png|webp/i.test(i.mime ?? "") || (i.width ?? 0) < 900 || (i.width ?? 0) < (i.height ?? 0)) continue; // yatay, büyük, fotoğraf
+    const m = i.extmetadata ?? {};
+    const lisans = duz(m.LicenseShortName?.value ?? "");
+    if (!SERBEST.test(lisans)) continue;
+    out.push({
+      kaynak: "Wikimedia Commons", sayfa: i.descriptionurl, buyuk: i.thumburl ?? i.url, thumb: (i.thumburl ?? i.url).replace(/\/\d+px-/, "/400px-"),
+      yazar: duz(m.Artist?.value ?? "").slice(0, 80) || "Bilinmiyor", lisans,
+      aciklama: (duz(m.ObjectName?.value ?? "") + " — " + duz(m.ImageDescription?.value ?? "")).slice(0, 220) || p.title,
+      w: i.width, h: i.height,
+    });
+    if (out.length >= adet) break;
+  }
+  return out;
+}
+
+/** Pexels + Pixabay: konuyu temsil eden gerçek fotoğraflar (yatay, illüstrasyon değil) */
+export async function stokFoto(q: string, adet: number, anahtar: { pexels?: string; pixabay?: string }): Promise<GorselAday[]> {
+  const pk = anahtar.pexels, bk = anahtar.pixabay;
+  const [p, b] = await Promise.all([
+    pk ? json(`https://api.pexels.com/v1/search?per_page=${adet}&orientation=landscape&query=` + encodeURIComponent(q), { Authorization: pk }) : null,
+    bk ? json(`https://pixabay.com/api/?key=${encodeURIComponent(bk)}&per_page=${Math.max(3, adet)}&orientation=horizontal&image_type=photo&safesearch=true&q=` + encodeURIComponent(q)) : null,
+  ]);
+  const out: GorselAday[] = [];
+  for (const x of (p?.photos ?? []) as any[]) out.push({ kaynak: "Pexels", sayfa: x.url, buyuk: x.src.large2x ?? x.src.large, thumb: x.src.medium, yazar: x.photographer, lisans: "Pexels Lisansı", aciklama: x.alt || q, w: x.width, h: x.height }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (const x of ((b?.hits ?? []) as any[]).slice(0, adet)) out.push({ kaynak: "Pixabay", sayfa: x.pageURL, buyuk: x.largeImageURL, thumb: x.webformatURL, yazar: x.user, lisans: "Pixabay İçerik Lisansı", aciklama: (x.tags || q) as string, w: x.imageWidth, h: x.imageHeight }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  return out;
+}
+
+/** WordPress altyazısı: yazar, kaynak ve lisans (CC lisanslarında zorunlu atıf) */
+export function altyazi(g: GorselAday): string {
+  const k = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `Fotoğraf: ${k(g.yazar)} / <a href="${k(g.sayfa)}" target="_blank" rel="noopener">${k(g.kaynak)}</a>${/^cc/i.test(g.lisans) ? ` (${k(g.lisans)})` : ""}`;
+}
+
+/** Yapay zekâya gösterilecek aday listesi */
+export function adayListesi(adaylar: GorselAday[]): string {
+  return adaylar.map((a, i) => `${i}. [${a.kaynak}] ${a.aciklama} (${a.w}x${a.h})`).join("\n");
+}
+
+export const SECIM_SISTEM = `Bir Türkçe teknoloji haberine öne çıkan görsel seçiyorsun. Sana haber başlığı ve numaralı görsel adayları verilecek.
+KURALLAR:
+- Haberin konusu olan ürünü/şirketi/olayı en doğru gösteren GERÇEK fotoğrafı seç.
+- Ürünün kendisinin fotoğrafı (aynı model) varsa onu tercih et. Eski model ya da başka ürünse seçme.
+- Ürünün kendisi yoksa konuyu genel olarak temsil eden gerçekçi bir fotoğraf (ör. akıllı telefon haberine telefon fotoğrafı) seçilebilir.
+- Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.
+- Hiçbiri uygun değilse -1 döndür. Uydurma yapma.
+Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe"}`;

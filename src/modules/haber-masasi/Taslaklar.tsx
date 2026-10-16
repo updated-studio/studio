@@ -12,10 +12,23 @@ import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
 function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   const g = t.image ?? {};
   const stok = g.stok ?? [];
-  if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem) return null;
+  if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem && !g.secilen && !g.gorsel_neden) return null;
+  const sec = g.secilen;
   return (
     <div className="panel">
       <h3>Görsel</h3>
+      {sec ? (
+        <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
+          <a href={sec.sayfa} target="_blank" rel="noreferrer"><img src={sec.thumb} alt={g.alt_text ?? ""} style={{ width: 200, borderRadius: 8 }} /></a>
+          <div>
+            <b>Öne çıkan görsel (otomatik seçildi)</b>
+            <div className="muted">Fotoğraf: {sec.yazar} / {sec.kaynak} · {sec.lisans}</div>
+            {g.gorsel_neden && <div className="muted">Neden: {g.gorsel_neden}</div>}
+            <div className="muted">{g.wp_media_id ? "WordPress'e yüklendi; altyazıda kaynak ve lisans yazıyor. Değiştirmek istersen WordPress'te öne çıkan görseli değiştir." : "WordPress'e gönderilince öne çıkan görsel olarak eklenecek."}</div>
+            {g.yukleme_hata && <div className="msg err">{g.yukleme_hata}</div>}
+          </div>
+        </div>
+      ) : g.gorsel_neden ? <div className="muted">Öne çıkan görsel eklenmedi: {g.gorsel_neden}</div> : null}
       <ul>
         <li>Öneri: {g.oneri || t.image_note}</li>
         {g.alt_text && <li>Alt text: {g.alt_text}</li>}
