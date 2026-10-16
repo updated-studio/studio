@@ -213,7 +213,7 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     const { data: bk } = it.brand ? await sb.from("tr_press").select("url").ilike("brand", it.brand) : { data: [] };
     const linkler = [it.link, ...((it.other_sources ?? []).map((o) => o.link))].filter(Boolean);
     const [r1, c1, o1, o2, s1, s2] = await Promise.all([
-      resmiGorsel(linkler, it.brand, ((bk ?? []) as { url: string }[]).map((x) => x.url)),
+      resmiGorsel({ linkler, marka: it.brand, basin: ((bk ?? []) as { url: string }[]).map((x) => x.url), urun: it.product, baslik: it.title }),
       commons(urun), openverse(urun, 4), aramalar[0] ? openverse(aramalar[0], 3) : Promise.resolve([]),
       aramalar[0] ? stokFoto(aramalar[0], 3, anahtar) : Promise.resolve([]), aramalar[1] ? stokFoto(aramalar[1], 2, anahtar) : Promise.resolve([]),
     ]);
