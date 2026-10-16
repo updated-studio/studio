@@ -5,11 +5,12 @@
 //   - Zamanlanmış görev (10 dk'da bir, tr_oto_kick): {oto:true} en güçlü haberden birine otomatik taslak + WordPress'e taslak.
 // Gizli bilgi (Supabase Secrets): GEMINI_API_KEY; WordPress için WP_URL, WP_USER, WP_APP_PASSWORD;
 // isteğe bağlı stok fotoğraf anahtarları UNSPLASH_ACCESS_KEY, PIXABAY_API_KEY, PEXELS_API_KEY.
-// Dosyalar: puan.ts (öncelik puanı, ekranla ortak), secim.ts (otomatik taslak: haber ve editör seçimi), html.ts (Markdown → HTML, ekranla ortak), wordpress.ts (WordPress REST).
-// Panelden yayınlarken beş dosya birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
+// Dosyalar: puan.ts (öncelik puanı, ekranla ortak), secim.ts (otomatik taslak: haber ve editör seçimi), gorsel.ts (öne çıkan görsel), html.ts (Markdown → HTML, ekranla ortak), wordpress.ts (WordPress REST).
+// Panelden yayınlarken altı dosya birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { adaySec, editorSec, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
+import { adaySec, ayniHaber, editorSec, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { wpAyar, wpDene, wpGonder, type Kategori } from "./wordpress.ts";
+import { adayListesi, commons, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -166,6 +167,27 @@ const kategoriSec = async (baslik: string, oneri: string, liste: Kategori[]) => 
   return String(veri.kategori ?? "");
 };
 
+/** Öne çıkan görsel adayları toplanır, yapay zekâ en doğrusunu seçer. Süre azsa ya da hata olursa görselsiz devam edilir. */
+async function gorselSec(it: { brand: string; product: string; title: string }, baslik: string, aramalar: string[], bitis: number) {
+  const bos = { secilen: null as GorselAday | null, adaylar: [] as GorselAday[], neden: "" };
+  try {
+    if (bitis - Date.now() < 45_000) return { ...bos, neden: "Süre yetmedi, görsel seçilmedi." };
+    const urun = [it.brand, it.product].filter(Boolean).join(" ").trim();
+    const anahtar = { pexels: Deno.env.get("PEXELS_API_KEY"), pixabay: Deno.env.get("PIXABAY_API_KEY") };
+    const [c1, s1, s2] = await Promise.all([commons(urun), aramalar[0] ? stokFoto(aramalar[0], 3, anahtar) : Promise.resolve([]), aramalar[1] ? stokFoto(aramalar[1], 2, anahtar) : Promise.resolve([])]);
+    const goruldu = new Set<string>();
+    const adaylar = [...c1, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
+    if (!adaylar.length) return { ...bos, neden: "Serbest lisanslı uygun fotoğraf bulunamadı." };
+    const { veri } = await gemini(SECIM_SISTEM, `Haber başlığı: ${baslik}\nÜrün: ${urun || "-"}\nOrijinal başlık: ${it.title}\n\nAdaylar:\n${adayListesi(adaylar)}`,
+      ["gemini-3.5-flash-lite", "gemini-3.5-flash"], Math.min(bitis - 30_000, Date.now() + 25_000));
+    const i = Number(veri.secim);
+    const secilen = Number.isInteger(i) && i >= 0 && i < adaylar.length ? adaylar[i] : null;
+    return { secilen, adaylar: adaylar.slice(0, 8), neden: String(veri.neden ?? "").slice(0, 200) || (secilen ? "" : "Uygun görsel yok.") };
+  } catch (e) {
+    return { ...bos, neden: "Görsel seçilemedi: " + String((e as Error).message ?? e).slice(0, 120) };
+  }
+}
+
 async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici: string | null, ad: string, sec: IsSecenek = {}) {
   const bitis = Date.now() + BUTCE_MS;
   // Nabız: iş sürdükçe updated_at tazelenir; 2 dk nabız gelmezse zamanlanmış görev işi "hata"ya çeker (0013)
@@ -229,13 +251,17 @@ ${metinler.join("\n\n---\n\n")}`;
     const secilen: Stok[] = []; const goruldu = new Set<string>();
     for (let n = 0; n < 4; n++) for (const s of sonuc) { const p = s[n]; if (p && !goruldu.has(p.url)) { goruldu.add(p.url); secilen.push(p); } }
 
+    // Öne çıkan görsel (gorsel.ts): Commons'ta ürünün kendisi, yoksa Pexels/Pixabay; yapay zekâ en uygununu seçer ya da hiçbirini
+    const oneCikan = await gorselSec(it, String(t.baslik ?? it.title), aramalar, bitis);
+    await nabiz();
+
     const { data: yeni } = await sb.from("tr_drafts").insert({
       item_id: itemId, author: kullanici, model, auto: !!sec.oto,
       title: String(t.baslik ?? ""), spot: String(t.spot ?? ""), body: parcalar.join("\n\n"),
       seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: t.etiketler ?? [] },
       sources: kaynaklar.join("\n"), image_note: String(g.oneri ?? ""), editor_note: notlar.join("\n"),
       questions: (t.editor_sorulari ?? []).filter(Boolean), checks: (t.dogrulama ?? []).filter(Boolean), notes: notlar,
-      image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: secilen.slice(0, 6), stok_anahtar: !!(Deno.env.get("UNSPLASH_ACCESS_KEY") || Deno.env.get("PIXABAY_API_KEY") || Deno.env.get("PEXELS_API_KEY")) },
+      image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: secilen.slice(0, 6), secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: oneCikan.neden, stok_anahtar: !!(Deno.env.get("UNSPLASH_ACCESS_KEY") || Deno.env.get("PIXABAY_API_KEY") || Deno.env.get("PEXELS_API_KEY")) },
     }).select("id").single();
 
     const zaman = istanbulZaman();
@@ -260,22 +286,37 @@ ${metinler.join("\n\n---\n\n")}`;
       const ayar = await otoAyar(sb);
       if (yeni?.id && ayar.wordpress && wpAyar()) {
         if (ana.length < 300) await sb.from("tr_drafts").update({ wp_error: "Kaynağın tam metni alınamadığı için WordPress'e otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", yeni.id);
-        else if (bitis - Date.now() < 20_000) await sb.from("tr_drafts").update({ wp_pending: true }).eq("id", yeni.id); // süre yetmedi: sonraki turda gönderilir
+        else if (bitis - Date.now() < 40_000) await sb.from("tr_drafts").update({ wp_pending: true }).eq("id", yeni.id); // süre yetmedi: sonraki turda gönderilir
         else await wpGonder(sb, yeni.id, { kategoriSec });
       }
+      const { data: son } = await sb.from("tr_drafts").select("wp_post_id,wp_error,wp_pending,image").eq("id", yeni?.id ?? 0).maybeSingle();
+      const wpDurum = son?.wp_post_id ? "WordPress'e taslak olarak gitti" : son?.wp_pending ? "WordPress'e sonraki turda gidecek" : son?.wp_error ? "WordPress hatası: " + son.wp_error : "Sadece Stüdyo'da";
+      const gDurum = (son?.image as { wp_media_id?: number; secilen?: unknown } | null)?.wp_media_id ? "görsel eklendi" : (son?.image as { secilen?: unknown } | null)?.secilen ? "görsel seçildi" : "görselsiz";
+      await otoOzet(sb, { durum: `Taslak hazır · ${wpDurum} · ${gDurum}`, haber: baslik, editor: kullanici ? ad : "" });
     }
   } catch (e) {
     const mesaj = String((e as Error).message ?? e);
     // Otomatik taslakta kota/servis hatası haberin suçu değil: haberi serbest bırak, sonraki turda yeniden denensin
     if (sec.oto && /→ (429|500|503)/.test(mesaj)) {
       await sb.from("tr_items").update({ work_state: "", work_error: "", auto_draft_at: null }).eq("id", itemId);
+      // Kota dolduysa (429) bir saat beklenir; her 10 dakikada aynı haberi boşuna denemesin
+      const kota = /→ 429/.test(mesaj);
+      await otoOzet(sb, { durum: kota ? "Yapay zekâ kotası doldu; 1 saat sonra yeniden denenecek" : "Yapay zekâ geçici hata verdi; sonraki turda yeniden denenecek", haber: it.event || it.title, ...(kota ? { bekle: new Date(Date.now() + 60 * 60_000).toISOString() } : {}) });
       return;
     }
+    if (sec.oto) await otoOzet(sb, { durum: "Hata: " + mesaj.slice(0, 160), haber: it.event || it.title });
     await sb.from("tr_items").update({ work_state: "hata", work_error: mesaj.slice(0, 300) }).eq("id", itemId);
   }
 }
 
 // ---------- Otomatik taslak (ARCHITECTURE.md, 15 Ekim 2026) ----------
+/** Ayarlar ekranındaki "Son çalışma" satırı (tr_settings.oto_son); günün sayacı korunur */
+async function otoOzet(sb: Sb, o: Record<string, unknown>) {
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "oto_son").maybeSingle();
+  const eski = (data?.value ?? {}) as Record<string, unknown>;
+  await sb.from("tr_settings").upsert({ key: "oto_son", value: { zaman: eski.zaman ?? new Date().toISOString(), bugun: eski.bugun, ...o, bitti: new Date().toISOString() } });
+}
+
 async function otoAyar(sb: Sb): Promise<OtoAyar> {
   const { data } = await sb.from("tr_settings").select("value").eq("key", "oto_taslak").maybeSingle();
   return { ...OTO_VARSAYILAN, ...((data?.value ?? {}) as Partial<OtoAyar>) };
@@ -287,6 +328,7 @@ async function otoCalistir(sb: Sb) {
   const { data: son } = await sb.from("tr_settings").select("value").eq("key", "oto_son").maybeSingle();
   const onceki = (son?.value ?? {}) as Record<string, unknown>;
   if (onceki.zaman && Date.now() - Date.parse(String(onceki.zaman)) < 8 * 60_000) return { atlandi: "Son 8 dakikada çalıştı" };
+  if (onceki.bekle && Date.now() < Date.parse(String(onceki.bekle))) return { atlandi: "Yapay zekâ kotası için bekleniyor" };
   const ozet = (o: Record<string, unknown>) => sb.from("tr_settings").upsert({ key: "oto_son", value: { zaman: new Date().toISOString(), ...o } });
   await ozet({ durum: "çalışıyor" });
 
@@ -303,13 +345,22 @@ async function otoCalistir(sb: Sb) {
 
   // 3) Aday: havuzda, kimse almamış, daha önce otomatik denenmemiş, iş sürmüyor, son 24 saatte düşmüş
   const { data: havuz } = await sb.from("tr_items")
-    .select("id,brand,topic,product,news_type,kind,source_name,turkey,other_sources,published_at,created_at,title,event")
+    .select("id,brand,topic,product,news_type,kind,source_name,turkey,other_sources,published_at,created_at,title,event,event_key")
     .eq("status", "aday").is("taken_by", null).is("auto_draft_at", null).eq("work_state", "")
     .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString()).limit(1000);
   const liste = (havuz ?? []) as Aday[];
   if (!liste.length) { await ozet({ durum: "Uygun haber yok", bugun }); return { bos: true }; }
   const { data: taslakli } = await sb.from("tr_drafts").select("item_id").in("item_id", liste.map((h) => h.id));
-  const secim = adaySec(liste, new Set((taslakli ?? []).map((x: { item_id: number }) => x.item_id)), ayar);
+  // Aynı olay farklı kartlara bölünmüş olabilir: son 3 günde taslağı yazılmış ya da bir editörün aldığı haberlerle aynı olanlar atlanır
+  const ucGun = new Date(Date.now() - 72 * 3_600_000).toISOString();
+  const [{ data: sonTaslak }, { data: alinan }] = await Promise.all([
+    sb.from("tr_drafts").select("item_id").gte("created_at", ucGun).not("item_id", "is", null).limit(500),
+    sb.from("tr_items").select("id,brand,product,event_key").in("status", ["alindi", "yayinda"]).gte("updated_at", ucGun).limit(1000),
+  ]);
+  const taslakIdleri = ((sonTaslak ?? []) as { item_id: number }[]).map((x) => x.item_id);
+  const { data: taslakHaber } = taslakIdleri.length ? await sb.from("tr_items").select("id,brand,product,event_key").in("id", taslakIdleri) : { data: [] };
+  const yazilmis = [...((taslakHaber ?? []) as { brand: string; product: string; event_key: string }[]), ...((alinan ?? []) as { brand: string; product: string; event_key: string }[])];
+  const secim = adaySec(liste.filter((h) => !ayniHaber(h, yazilmis)), new Set((taslakli ?? []).map((x: { item_id: number }) => x.item_id)), ayar);
   if (!secim) { await ozet({ durum: `Eşiği (${ayar.esik}) geçen yeni haber yok`, bugun }); return { bos: true }; }
 
   // 4) Kilit (aynı haber iki kez seçilmesin; elle "Taslak hazırla" ile çakışmasın)

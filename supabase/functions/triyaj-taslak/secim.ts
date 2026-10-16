@@ -12,7 +12,7 @@ export const OTO_VARSAYILAN = {
 };
 export type OtoAyar = typeof OTO_VARSAYILAN;
 
-export type Aday = { id: number; brand: string; topic: string; product: string; news_type: string; kind: string; source_name: string; turkey: string; other_sources: { name: string; link: string }[]; published_at: string | null; created_at: string; title: string; event: string };
+export type Aday = { event_key?: string; id: number; brand: string; topic: string; product: string; news_type: string; kind: string; source_name: string; turkey: string; other_sources: { name: string; link: string }[]; published_at: string | null; created_at: string; title: string; event: string };
 export type Profil = { id: string; name: string; interests: string };
 
 /** Editör seçimi: ilgi alanı eşleşmesi en çok olan; eşitlikte bugün müsait olan, sonra elinde en az iş olan. Eşleşen yoksa null. */
@@ -36,3 +36,16 @@ export function adaySec(haberler: Aday[], taslakliIdler: Set<number>, ayar: OtoA
     .sort((a, b) => b.d.puan - a.d.puan || Date.parse(b.h.published_at ?? b.h.created_at) - Date.parse(a.h.published_at ?? a.h.created_at))[0] ?? null;
 }
 
+
+const anahtar = (s: string) => (s ?? "").toLocaleLowerCase("tr").replace(/[^a-z0-9ğüşıöç]+/g, "");
+
+/** Aynı olay mı? Aynı olay anahtarı, ya da aynı marka + aynı ürün (biri diğerini içeriyorsa). Ürün adı yoksa sadece olay anahtarına bakılır. */
+export function ayniHaber(h: { brand: string; product: string; event_key?: string }, oncekiler: { brand: string; product: string; event_key?: string }[]): boolean {
+  const m = anahtar(h.brand), u = anahtar(h.product);
+  return oncekiler.some((o) => {
+    if (h.event_key && o.event_key && h.event_key === o.event_key) return true;
+    if (!m || !u || u.length < 3 || anahtar(o.brand) !== m) return false;
+    const ou = anahtar(o.product);
+    return ou.length >= 3 && (ou === u || ou.includes(u) || u.includes(ou));
+  });
+}

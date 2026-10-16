@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { sb } from "../../shared/supabase";
+import type { GorselAday } from "../../../supabase/functions/triyaj-taslak/gorsel.ts";
 
 // Haber Masası'nın kendi canlı verisi. Sadece bu modül açıkken yüklenir.
 export type Durum = "aday" | "belirsiz" | "elendi" | "alindi" | "pas" | "yayinda" | "rehber";
@@ -21,7 +22,10 @@ export type Taslak = {
   seo: { focus?: string; title_tag?: string; slug?: string; meta?: string; kategori?: string; etiketler?: string[] };
   sources: string; image_note: string; editor_note: string; status: "taslak" | "hazir" | "gonderildi"; model: string;
   questions: string[]; checks: string[]; notes: string[];
-  image: { oneri?: string; alt_text?: string; aramalar?: string[]; ai_istem?: string; basin?: { url: string; kesin: boolean } | null; stok?: Stok[]; stok_anahtar?: boolean };
+  image: {
+    oneri?: string; alt_text?: string; aramalar?: string[]; ai_istem?: string; basin?: { url: string; kesin: boolean } | null; stok?: Stok[]; stok_anahtar?: boolean;
+    secilen?: GorselAday | null; gorsel_adaylar?: GorselAday[]; gorsel_neden?: string; wp_media_id?: number | null; yukleme_hata?: string; // öne çıkan görsel (gorsel.ts)
+  };
   created_at: string; updated_at: string;
   auto: boolean; wp_post_id: number | null; wp_link: string; wp_error: string; wp_sent_at: string | null; wp_pending: boolean; // otomatik mi, WordPress karşılığı
 };

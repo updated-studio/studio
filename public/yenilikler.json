@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-16-a",
+    "tarih": "16 Ekim 2026",
+    "baslik": "Otomatik taslak açıldı, taslaklara görsel geliyor",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Otomatik taslak çalışıyor: en güçlü haberlerin taslağı kendiliğinden yazılıp WordPress'e taslak olarak gidiyor. Yayına basmak yine editörün işi.",
+          "Taslaklara öne çıkan görsel otomatik ekleniyor: önce ürünün kendi fotoğrafı (Wikimedia Commons, serbest lisanslı), yoksa konuyu anlatan gerçek bir fotoğraf. Altyazıda fotoğrafçı ve lisans yazıyor; uygun değilse WordPress'te değiştir.",
+          "Aynı haber farklı sitelerden ayrı kartlar olarak gelse de otomatik taslak bir kez yazılır.",
+          "Taslak ekranının Görsel bölümünde seçilen fotoğrafı ve neden seçildiğini görebilirsin."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-15-a",
     "tarih": "15 Ekim 2026",
     "baslik": "Otomatik taslak ve WordPress'e gönderim",
