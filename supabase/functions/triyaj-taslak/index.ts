@@ -1,8 +1,15 @@
 // Haber Masası: seçilen haberin kaynağını okur; ham Türkçe çeviri ya da Updated standardında haber taslağı üretir.
 // Eski "Updated Triyaj" (Kod.gs: taslakHazirla_, ceviriGetir, gorselYaz_) mantığının karşılığı. Taslak Google Docs yerine Stüdyo'da (tr_drafts) durur.
-// Çağıran: Stüdyo (giriş yapmış ekip üyesi). Üyelik burada kontrol edilir.
-// Gizli bilgi (Supabase Secrets): GEMINI_API_KEY; isteğe bağlı stok fotoğraf anahtarları UNSPLASH_ACCESS_KEY, PIXABAY_API_KEY, PEXELS_API_KEY.
+// Çağıranlar:
+//   - Stüdyo (giriş yapmış ekip üyesi): {item_id, tur} taslak/çeviri; {wp:true, draft_id} WordPress'e gönder; {wp_dene:true} bağlantı denemesi (yönetici).
+//   - Zamanlanmış görev (10 dk'da bir, tr_oto_kick): {oto:true} en güçlü haberden birine otomatik taslak + WordPress'e taslak.
+// Gizli bilgi (Supabase Secrets): GEMINI_API_KEY; WordPress için WP_URL, WP_USER, WP_APP_PASSWORD;
+// isteğe bağlı stok fotoğraf anahtarları UNSPLASH_ACCESS_KEY, PIXABAY_API_KEY, PEXELS_API_KEY.
+// Dosyalar: puan.ts (öncelik puanı, ekranla ortak), secim.ts (otomatik taslak: haber ve editör seçimi), html.ts (Markdown → HTML, ekranla ortak), wordpress.ts (WordPress REST).
+// Panelden yayınlarken beş dosya birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { adaySec, editorSec, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
+import { wpAyar, wpDene, wpGonder, type Kategori } from "./wordpress.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -138,7 +145,28 @@ async function stok(q: string): Promise<Stok[]> {
   return out;
 }
 
-async function isle(sb: ReturnType<typeof createClient>, itemId: number, tur: "ceviri" | "taslak", kullanici: string, ad: string) {
+type Sb = ReturnType<typeof createClient>;
+type IsSecenek = { oto?: boolean };
+
+const istanbulGun = () => new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" }).slice(0, 10);
+const istanbulZaman = () => new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" }).slice(0, 16);
+
+/** Sitedeki kategoriler (WordPress'ten okunmuş ve saklanmış liste); yoksa boş. Yapay zekâ kategoriyi bu listeden seçer. */
+async function kayitliKategoriler(sb: Sb): Promise<Kategori[]> {
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "wp_kategoriler").maybeSingle();
+  return ((data?.value as { liste?: Kategori[] } | null)?.liste ?? []).filter((k) => k.slug !== "uncategorized");
+}
+
+/** Yapay zekânın önerdiği kategori sitede yoksa: listeden en uygununu ucuz modelle seçtir. */
+const kategoriSec = async (baslik: string, oneri: string, liste: Kategori[]) => {
+  const { veri } = await gemini(
+    'Bir Türkçe teknoloji haberi için verilen kategori listesinden en uygun TEK kategoriyi seç. Listede olmayan ad yazma. Sadece {"kategori":"listedeki ad aynen"} döndür.',
+    `Haber başlığı: ${baslik}\nÖnerilen: ${oneri}\nKategoriler: ${liste.map((k) => k.name).join(" | ")}`,
+    ["gemini-3.5-flash-lite", "gemini-3.5-flash"], Date.now() + 25_000);
+  return String(veri.kategori ?? "");
+};
+
+async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici: string | null, ad: string, sec: IsSecenek = {}) {
   const bitis = Date.now() + BUTCE_MS;
   // Nabız: iş sürdükçe updated_at tazelenir; 2 dk nabız gelmezse zamanlanmış görev işi "hata"ya çeker (0013)
   const nabiz = () => sb.from("tr_items").update({ work_state: tur }).eq("id", itemId).eq("work_state", tur);
@@ -159,11 +187,14 @@ async function isle(sb: ReturnType<typeof createClient>, itemId: number, tur: "c
     const [ana, ek] = await Promise.all([makaleCek(it.link, 12000), diger[0] ? makaleCek(diger[0].link, 6000) : Promise.resolve("")]);
     const metinler = [`KAYNAK 1 (${it.source_name}) ${it.link}\n` + (ana.length >= 300 ? ana : `(Tam metin alınamadı. Başlık: ${it.title})`)];
     if (ek.length >= 300) metinler.push(`KAYNAK 2 ${diger[0].link}\n` + ek);
+    // Kategori sitedeki listeden seçilsin (liste WordPress'ten okununca saklanır; yoksa serbest yazar)
+    const kategoriler = await kayitliKategoriler(sb);
+    const katSatiri = kategoriler.length ? `\nKATEGORİ: "kategori" alanına SADECE şu listeden birini aynen yaz: ${kategoriler.map((k) => k.name).join(" | ")}\n` : "";
     const istem = `UYARI: Aşağıdaki özet ve tür etiketi otomatik üretildi, hatalı olabilir. Haberin resmi mi, sızıntı mı, söylenti mi olduğunu ve ürünün piyasada olup olmadığını SADECE kaynak metne bakarak kendin belirle.
 Haber özeti (sistemden): ${it.event}
 Marka: ${it.brand} · Tür: ${it.kind} · Asıl kaynak: ${it.origin || it.source_name}
 Orijinal başlık: ${it.title}
-
+${katSatiri}
 ${metinler.join("\n\n---\n\n")}`;
 
     await nabiz();
@@ -198,35 +229,147 @@ ${metinler.join("\n\n---\n\n")}`;
     const secilen: Stok[] = []; const goruldu = new Set<string>();
     for (let n = 0; n < 4; n++) for (const s of sonuc) { const p = s[n]; if (p && !goruldu.has(p.url)) { goruldu.add(p.url); secilen.push(p); } }
 
-    await sb.from("tr_drafts").insert({
-      item_id: itemId, author: kullanici, model,
+    const { data: yeni } = await sb.from("tr_drafts").insert({
+      item_id: itemId, author: kullanici, model, auto: !!sec.oto,
       title: String(t.baslik ?? ""), spot: String(t.spot ?? ""), body: parcalar.join("\n\n"),
       seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: t.etiketler ?? [] },
       sources: kaynaklar.join("\n"), image_note: String(g.oneri ?? ""), editor_note: notlar.join("\n"),
       questions: (t.editor_sorulari ?? []).filter(Boolean), checks: (t.dogrulama ?? []).filter(Boolean), notes: notlar,
       image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: secilen.slice(0, 6), stok_anahtar: !!(Deno.env.get("UNSPLASH_ACCESS_KEY") || Deno.env.get("PIXABAY_API_KEY") || Deno.env.get("PEXELS_API_KEY")) },
-    });
+    }).select("id").single();
 
-    // Taslak hazırlayan haberi henüz kimse almadıysa otomatik alır (eski davranış)
-    const zaman = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" }).slice(0, 16);
-    const ek2: Record<string, unknown> = { work_state: "", work_error: "", last_action: `${zaman} · ${ad} · taslak` };
-    if (!it.taken_by || !["alindi", "yayinda"].includes(it.status)) Object.assign(ek2, { status: "alindi", taken_by: kullanici, taken_at: new Date().toISOString(), last_dropped_by: null });
+    const zaman = istanbulZaman();
+    const ek2: Record<string, unknown> = { work_state: "", work_error: "" };
+    if (sec.oto) {
+      // Otomatik taslak: ilgi alanı en uygun editöre atanır; eşleşen yoksa havuzda sahipsiz kalır
+      ek2.last_action = kullanici ? `${zaman} · Otomatik taslak → ${ad}` : `${zaman} · Otomatik taslak hazır (sahipsiz)`;
+      if (kullanici) Object.assign(ek2, { status: "alindi", taken_by: kullanici, taken_at: new Date().toISOString(), last_dropped_by: null });
+    } else {
+      // Taslak hazırlayan haberi henüz kimse almadıysa otomatik alır (eski davranış)
+      ek2.last_action = `${zaman} · ${ad} · taslak`;
+      if (!it.taken_by || !["alindi", "yayinda"].includes(it.status)) Object.assign(ek2, { status: "alindi", taken_by: kullanici, taken_at: new Date().toISOString(), last_dropped_by: null });
+    }
     await sb.from("tr_items").update(ek2).eq("id", itemId);
+
+    if (sec.oto) {
+      const baslik = String(t.baslik ?? "") || it.event || it.title;
+      await sb.from("tr_activity").insert({ kind: "oto", actor: null, actor_name: "Stüdyo", target: kullanici, target_name: kullanici ? ad : "", item_id: itemId, title: baslik, link: it.link, note: "" });
+      if (kullanici) await sb.from("notifications").insert({ user_id: kullanici, body: `Otomatik taslak sana atandı: ${baslik} (Haber Masası → Taslaklar)` });
+
+      // WordPress'e taslak: bağlantı kuruluysa, ayar açıksa ve kaynağın tam metni okunabildiyse
+      const ayar = await otoAyar(sb);
+      if (yeni?.id && ayar.wordpress && wpAyar()) {
+        if (ana.length < 300) await sb.from("tr_drafts").update({ wp_error: "Kaynağın tam metni alınamadığı için WordPress'e otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", yeni.id);
+        else if (bitis - Date.now() < 20_000) await sb.from("tr_drafts").update({ wp_pending: true }).eq("id", yeni.id); // süre yetmedi: sonraki turda gönderilir
+        else await wpGonder(sb, yeni.id, { kategoriSec });
+      }
+    }
   } catch (e) {
-    await sb.from("tr_items").update({ work_state: "hata", work_error: String((e as Error).message ?? e).slice(0, 300) }).eq("id", itemId);
+    const mesaj = String((e as Error).message ?? e);
+    // Otomatik taslakta kota/servis hatası haberin suçu değil: haberi serbest bırak, sonraki turda yeniden denensin
+    if (sec.oto && /→ (429|500|503)/.test(mesaj)) {
+      await sb.from("tr_items").update({ work_state: "", work_error: "", auto_draft_at: null }).eq("id", itemId);
+      return;
+    }
+    await sb.from("tr_items").update({ work_state: "hata", work_error: mesaj.slice(0, 300) }).eq("id", itemId);
   }
+}
+
+// ---------- Otomatik taslak (ARCHITECTURE.md, 15 Ekim 2026) ----------
+async function otoAyar(sb: Sb): Promise<OtoAyar> {
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "oto_taslak").maybeSingle();
+  return { ...OTO_VARSAYILAN, ...((data?.value ?? {}) as Partial<OtoAyar>) };
+}
+
+async function otoCalistir(sb: Sb) {
+  const ayar = await otoAyar(sb);
+  if (!ayar.acik) return { atlandi: "Otomatik taslak kapalı" };
+  const { data: son } = await sb.from("tr_settings").select("value").eq("key", "oto_son").maybeSingle();
+  const onceki = (son?.value ?? {}) as Record<string, unknown>;
+  if (onceki.zaman && Date.now() - Date.parse(String(onceki.zaman)) < 8 * 60_000) return { atlandi: "Son 8 dakikada çalıştı" };
+  const ozet = (o: Record<string, unknown>) => sb.from("tr_settings").upsert({ key: "oto_son", value: { zaman: new Date().toISOString(), ...o } });
+  await ozet({ durum: "çalışıyor" });
+
+  // 1) Önceki turda süre yetmediği için WordPress'e gidemeyen otomatik taslaklar
+  if (ayar.wordpress && wpAyar()) {
+    const { data: bekleyen } = await sb.from("tr_drafts").select("id").eq("wp_pending", true).is("wp_post_id", null).limit(3);
+    for (const b of bekleyen ?? []) { await sb.from("tr_drafts").update({ wp_pending: false }).eq("id", b.id); await wpGonder(sb, b.id, { kategoriSec }); }
+  }
+
+  // 2) Günlük sınır (İstanbul günü; Türkiye yıl boyu UTC+3)
+  const gunBasi = istanbulGun() + "T00:00:00+03:00";
+  const { count: bugun } = await sb.from("tr_drafts").select("id", { count: "exact", head: true }).eq("auto", true).gte("created_at", gunBasi);
+  if ((bugun ?? 0) >= ayar.gunluk) { await ozet({ durum: `Günlük sınır doldu (${bugun}/${ayar.gunluk})`, bugun }); return { atlandi: "Günlük sınır" }; }
+
+  // 3) Aday: havuzda, kimse almamış, daha önce otomatik denenmemiş, iş sürmüyor, son 24 saatte düşmüş
+  const { data: havuz } = await sb.from("tr_items")
+    .select("id,brand,topic,product,news_type,kind,source_name,turkey,other_sources,published_at,created_at,title,event")
+    .eq("status", "aday").is("taken_by", null).is("auto_draft_at", null).eq("work_state", "")
+    .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString()).limit(1000);
+  const liste = (havuz ?? []) as Aday[];
+  if (!liste.length) { await ozet({ durum: "Uygun haber yok", bugun }); return { bos: true }; }
+  const { data: taslakli } = await sb.from("tr_drafts").select("item_id").in("item_id", liste.map((h) => h.id));
+  const secim = adaySec(liste, new Set((taslakli ?? []).map((x: { item_id: number }) => x.item_id)), ayar);
+  if (!secim) { await ozet({ durum: `Eşiği (${ayar.esik}) geçen yeni haber yok`, bugun }); return { bos: true }; }
+
+  // 4) Kilit (aynı haber iki kez seçilmesin; elle "Taslak hazırla" ile çakışmasın)
+  const { data: kilit } = await sb.from("tr_items").update({ work_state: "taslak", work_error: "", touched: true, auto_draft_at: new Date().toISOString() })
+    .eq("id", secim.h.id).eq("work_state", "").is("taken_by", null).select("id");
+  if (!kilit?.length) return { atlandi: "Haber bu arada alındı" };
+
+  // 5) Editör: ilgi alanı → bugün müsait → elinde en az iş
+  const [{ data: prof }, { data: gun }, { data: isler }, { data: otolar }] = await Promise.all([
+    sb.from("profiles").select("id,name,interests"),
+    sb.from("availability").select("user_id,status").eq("day", istanbulGun()),
+    sb.from("tr_items").select("taken_by").eq("status", "alindi").gte("taken_at", new Date(Date.now() - 48 * 3_600_000).toISOString()),
+    sb.from("tr_drafts").select("author").eq("auto", true).gte("created_at", gunBasi),
+  ]);
+  const musait = new Map(((gun ?? []) as { user_id: string; status: string }[]).map((g) => [g.user_id, g.status]));
+  const yuk = new Map<string, number>();
+  for (const x of [...((isler ?? []) as { taken_by: string | null }[]).map((i) => i.taken_by), ...((otolar ?? []) as { author: string | null }[]).map((o) => o.author)]) if (x) yuk.set(x, (yuk.get(x) ?? 0) + 1);
+  const editor = editorSec(secim.h, (prof ?? []) as Profil[], musait, yuk);
+
+  await ozet({ durum: "Taslak yazılıyor", haber: secim.h.event || secim.h.title, puan: secim.d.puan, editor: editor?.name ?? "", bugun: (bugun ?? 0) + 1 });
+  const sure = new Promise<void>((r) => setTimeout(async () => {
+    await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi. Tekrar dene." })
+      .eq("id", secim.h.id).eq("work_state", "taslak");
+    r();
+  }, 135_000));
+  // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+  EdgeRuntime.waitUntil(Promise.race([isle(sb, secim.h.id, "taslak", editor?.id ?? null, editor?.name ?? "", { oto: true }), sure]));
+  return { basladi: secim.h.id, puan: secim.d.puan, editor: editor?.name ?? null };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  const auth = req.headers.get("Authorization") ?? "";
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
+  const govde = await req.json().catch(() => ({}));
+
+  // Zamanlanmış görev: kullanıcı girdisi almaz, seçimi kendisi yapar; sınırlar ayarlardan (sık çağrılsa da 8 dk'da bir çalışır)
+  if (govde?.oto) {
+    try { return Response.json(await otoCalistir(sb), { headers: CORS }); }
+    catch (e) { await sb.from("tr_settings").upsert({ key: "oto_son", value: { zaman: new Date().toISOString(), durum: "Hata: " + String((e as Error).message ?? e).slice(0, 200) } }); return Response.json({ hata: String(e) }, { status: 500, headers: CORS }); }
+  }
+
+  const auth = req.headers.get("Authorization") ?? "";
   const { data: u } = await sb.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
   if (!u?.user) return Response.json({ hata: "Giriş gerekli" }, { status: 401, headers: CORS });
-  const { data: p } = await sb.from("profiles").select("id,name").eq("id", u.user.id).maybeSingle();
+  const { data: p } = await sb.from("profiles").select("id,name,is_admin").eq("id", u.user.id).maybeSingle();
   if (!p) return Response.json({ hata: "Ekip üyesi değil" }, { status: 403, headers: CORS });
 
-  const { item_id, tur } = await req.json().catch(() => ({}));
+  // WordPress bağlantısını dene (yönetici)
+  if (govde?.wp_dene) {
+    if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
+    return Response.json(await wpDene(sb), { headers: CORS });
+  }
+  // Taslağı WordPress'e gönder (ekip üyesi)
+  if (govde?.wp) {
+    if (!govde.draft_id) return Response.json({ hata: "draft_id gerekli" }, { status: 400, headers: CORS });
+    const r = await wpGonder(sb, Number(govde.draft_id), { zorla: !!govde.zorla, kategoriSec });
+    return Response.json(r, { status: r.ok ? 200 : 422, headers: CORS });
+  }
+
+  const { item_id, tur } = govde ?? {};
   if (!item_id || !["ceviri", "taslak"].includes(tur)) return Response.json({ hata: "item_id ve tur (ceviri|taslak) gerekli" }, { status: 400, headers: CORS });
 
   if (tur === "taslak") {

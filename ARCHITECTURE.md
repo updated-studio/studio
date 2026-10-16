@@ -103,7 +103,7 @@ Supabase projesi: `updated-panel` (organizasyon: Updated, bölge: Frankfurt).
 | `tr_activity` | Bildirim havuzu: aldı / yayında / pas / bıraktı / aktar (notlu), kimin okuduğu |
 | `tr_seen` | Aynı olaya bağlanan haber bağlantıları (tekrar gelmesin; 7 günde silinir) |
 | `tr_votes` | Oy ve not (yapay zekâ son 30 notu istemde kullanır, böylece ekibin zevkini öğrenir) |
-| `tr_drafts` | Stüdyo içinde düzenlenen haber taslakları (SEO paketi dahil) |
+| `tr_drafts` | Stüdyo içinde düzenlenen haber taslakları (SEO paketi dahil); otomatik mi (`auto`), WordPress yazı numarası/bağlantısı/gönderim zamanı/hatası (`wp_*`) |
 | `tr_chat` | Haber Masası sohbeti |
 | `tr_brands`, `tr_press`, `tr_settings` | Türkiye pazarı markaları (Öncelikli/Normal/Hariç), basın kiti, ayarlar (saklama günü, gürültü kelimeleri, modeller, son toplama özeti) |
 
@@ -223,6 +223,8 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 - **14 Ekim 2026 (8):** Güncelleme notları: her yayından sonra kullanıcı görmediği notları "Neler değişti" penceresinde bölüm bölüm okur (`public/yenilikler.json`, `src/shared/Yenilikler.tsx`; CLAUDE.md kural 11). Eski ekip paneli kapatıldı (Stüdyo'ya yönlendirme). Eski post aracı adresi ve post otomasyonu açık kalıyor (kayıtlar ve otomasyon henüz taşınmadı, kural 9). Dokümana bölüm 17 (yapay zekâya verilen talimatların tam özeti) ve 18 (bu doküman ne için) eklendi.
 - **14 Ekim 2026 (9):** Fatih sahip yapılmaya başlandı (GitHub organizasyonu, eski depolar, Supabase, Stüdyo yöneticiliği). Yapılacaklara eklendi: post aracı kayıtlarının buluta taşınması (eski adres ancak sonra kapanır) ve post otomasyonunun Telegram botunun ekip grubuna alınması.
+- **15 Ekim 2026:** **Otomatik taslak + WordPress'e gönderim** (Fatih). En güçlü haberler (Öncelik 1, puanı en yüksekten başlayarak) için taslak düğmeye basılmadan hazırlanır ve WordPress'e **taslak** olarak gider; yayına basma kararı editörde kalır. Günde en fazla 50. Haber ilk düştükten 30 dk sonra seçilir (diğer kaynaklar aynı karta birleşsin, puan otursun); söylentiler varsayılan olarak hariç; kaynağın tam metni alınamadıysa WordPress'e gönderilmez. Taslak, ilgi alanı haberle en çok eşleşen editöre atanır (eşitlikte o gün müsait olan, sonra elinde en az iş olan); eşleşen yoksa sahipsiz kalır. Atanan kişiye bildirim + e-posta. Kategori sadece sitede **var olan** kategorilerden seçilir (liste WordPress'ten okunur, yapay zekâ bu listeden seçer); etiketler önce sitede aranır, yoksa oluşturulur. Editör notları, sorular ve doğrulama listesi WordPress'e gitmez, Stüdyo'da kalır. WordPress'te editörün değiştirdiği taslağın üzerine yazılmaz. Bağlantı MCP değil WordPress REST API + Uygulama Şifresi (ayrı "Stüdyo" kullanıcısı, rolü Editör); şifre sadece Supabase Secrets'ta (`WP_URL`, `WP_USER`, `WP_APP_PASSWORD`). MCP sadece ileride Claude'un sohbetten WordPress'e erişmesi istenirse, ayrı ve isteğe bağlı. Öncelik puanının çekirdeği ekran ve sunucu ortak kullansın diye `supabase/functions/triyaj-taslak/puan.ts`'e taşındı (`oncelik.ts` oradan alır). Ayarlar: Haber Masası → Ayarlar → Otomatik taslak (kapalı başlar; WordPress bağlantısı doğrulanınca açılır). Kod: `triyaj-taslak` (seçim `secim.ts`; `{oto:true}` ile 10 dk'da bir `tr_oto_kick`), `wordpress.ts`, migration 0014.
+- **16 Ekim 2026:** WordPress tarafı kontrol edildi (Fatih'in oturumuyla). WordPress 7.1.3, PHP 8.1, sunucu LiteSpeed (Natro). "Studyo" kullanıcısı (id 12, Editör) var, uygulama şifreleri açık; 18 kategori, 81 etiket. **Engel:** sunucu yetkilendirme üst bilgisini (Authorization) WordPress'e iletmiyor (Site Sağlığı: "Yetkilendirme üst bilgisi eksik"); kalıcı bağlantıları yeniden kaydetmek düzeltmedi. Bu düzelmeden uygulama şifresiyle giriş (Stüdyo da, MCP de) 401 alır. Çözüm: Natro dosya yöneticisinde `.htaccess`'in en üstüne `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` satırı (ya da Natro desteğine yaptırmak). Sitede SEO eklentisi yok: SEO başlığı/odak kelime WordPress'e yazılmaz, meta açıklama yazı özetine gider. **MCP kararı:** sitede Elementor/Angie ile gelen bir MCP sunucusu zaten var (`/wp-json/mcp/mcp-adapter-default-server`), ama yazı oluşturma yeteneği yok; buna karşılık PHP çalıştırma, dosya okuma, kod parçası yayınlama yetenekleri açık. Haber taslağına katkısı olmadığı ve riski yüksek olduğu için Claude Desktop'a bağlanmadı; taslaklar REST API ile gider.
 ## 13. İşletme el kitabı (her şey nerede, bir şey bozulursa)
 
 Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilginin kendisi burada yazmaz; sadece **nerede durduğu** yazar.
@@ -246,7 +248,7 @@ Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilgini
 | Fonksiyon | Ne yapar | Nasıl tetiklenir |
 |---|---|---|
 | `triyaj-topla` | Kaynaklardan haber toplar, yapay zekâyla etiketler, kurallarla eler, olayları gruplar | 15 dk'da bir zamanlanmış görev + "Haberleri şimdi topla" düğmesi |
-| `triyaj-taslak` | Seçilen habere Türkçe taslak ya da çeviri yazar | Karttaki "Taslak hazırla" / "Tekrar dene" |
+| `triyaj-taslak` | Seçilen habere Türkçe taslak ya da çeviri yazar; otomatik taslak (en güçlü haber + editör seçimi); WordPress'e taslak gönderimi (`wordpress.ts`) | Karttaki "Taslak hazırla" / "Tekrar dene", taslaktaki "WordPress'e gönder", 10 dk'da bir zamanlanmış görev (`{oto:true}`) |
 | `notify-email` | Bildirim e-postaları | Veritabanı tetikleyicileri |
 | `triyaj-aktar` | Eski tablodan tek seferlik aktarım (kullanıldı, artık çalışmaz) | — |
 
@@ -258,6 +260,7 @@ Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilgini
 | Ad | Ne zaman | Ne yapar |
 |---|---|---|
 | `triyaj-topla` | 15 dk'da bir | Haber toplama fonksiyonunu çağırır |
+| `triyaj-oto-taslak` | 10 dk'da bir | Öncelik 1 haberden birine otomatik taslak yazdırır ve WordPress'e taslak gönderir (Ayarlar'dan kapatılabilir) |
 | `triyaj-is-kurtar` | Dakikada bir | 2 dk'dır nabızsız taslak/çeviri işini "hata"ya çeker (kilit açılır, kartta "Tekrar dene") |
 | `triyaj-temizlik` | Her gece 03:30 TR | Eski haberleri ve görülme kayıtlarını temizler |
 | `haftalik-hatirlatma` | Pazar 19:00 TR | Ekibe haftalık hatırlatma e-postası |
@@ -267,7 +270,7 @@ Liste SQL Editor'da: `select jobname, schedule from cron.job;`
 
 ### 13.5 Veritabanı değişikliği
 
-Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0013_is_kurtarma.sql`.
+Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0013_is_kurtarma.sql` (0014_otomatik_taslak hazır, çalıştırılacak).
 
 ### 13.6 Bir şey bozulursa
 
@@ -278,12 +281,13 @@ Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalı�
 | Yeni haber gelmiyor | Haber Masası üstündeki yapay zekâ uyarısı; Kaynaklar sekmesi | Kota dolduysa ertesi gün düzelir (Groq yedeği devreye girer). Kaynak bozuksa Kaynaklar'da kapat |
 | "Yapay zekâ kotası doldu" | Google AI Studio kotası | Ertesi gün sıfırlanır; sürekliyse ücretli plan ya da toplama aralığını uzatmak |
 | Site açılmıyor | GitHub → Actions son çalışma | Kırmızıysa son değişiklik geri alınır (`git revert`) |
+| WordPress'e gönderilmiyor | Taslaktaki kırmızı WordPress hatası; Ayarlar → "Bağlantıyı dene"; WordPress → Araçlar → Site Sağlığı'nda "Yetkilendirme üst bilgisi eksik" uyarısı | 401: uygulama şifresi yanlış ya da sunucu kimlik başlığını düşürüyor (16 Ekim'de durum buydu; `.htaccess` satırı için karar günlüğüne bak). 403: Stüdyo kullanıcısının rolü yetmiyor (Editör olmalı). 404: REST API kapalı |
 | Giriş e-postası / bildirim gelmiyor | Supabase Secrets'ta `GMAIL_APP_PASSWORD` | Gmail uygulama şifresi yenilenir |
 | Supabase projesi "paused" | Supabase paneli | "Restore" (ücretsiz plan uzun kullanılmazsa duraklatır) |
 
 ### 13.7 Haber Masası özeti
 
-Toplama (15 dk): son 24 saat, kaynak başına 10, tur başına en fazla 100 haber, fazlası sıraya girer. Yapay zekâ sadece etiket çıkarır, kararı kurallar verir (hariç marka, kampanya → elenir; rehber/liste → "Rehber fikirleri"; Türkiye'de yok ve Öncelikli değil → elenir; belirsiz → Belirsiz). Aynı olay tek kartta, diğer kaynaklar bağlantı. Elenen başlıklar Türkçe görünür, "Havuza al" ile geri alınır. Öncelik: Öncelik 1 (≥70) / 2 (≥40) / 3; puan haber türü + kaynak sayısı + tazelik; ekip oyu (👍/👎) sadece aynı marka içinde etkili; aynı markadan art arda en fazla 2. Sıralama: öncelik puanı / öncelik grubu içinde yeni→eski / haber saati / sisteme düşme saati. Taslak: Gemini (3.8 → 3.6 → 3.5 flash), iki kaynak, SEO, editöre sorular, doğrulama, görsel önerisi; hazırlayan haberi alır. "Yayına hazır" şu an sadece durum + HTML kopyala (WordPress'e gönderim yok). Kurallar: eleme `supabase/functions/triyaj-topla/index.ts`, puan `src/modules/haber-masasi/oncelik.ts`.
+Toplama (15 dk): son 24 saat, kaynak başına 10, tur başına en fazla 100 haber, fazlası sıraya girer. Yapay zekâ sadece etiket çıkarır, kararı kurallar verir (hariç marka, kampanya → elenir; rehber/liste → "Rehber fikirleri"; Türkiye'de yok ve Öncelikli değil → elenir; belirsiz → Belirsiz). Aynı olay tek kartta, diğer kaynaklar bağlantı. Elenen başlıklar Türkçe görünür, "Havuza al" ile geri alınır. Öncelik: Öncelik 1 (≥70) / 2 (≥40) / 3; puan haber türü + kaynak sayısı + tazelik; ekip oyu (👍/👎) sadece aynı marka içinde etkili; aynı markadan art arda en fazla 2. Sıralama: öncelik puanı / öncelik grubu içinde yeni→eski / haber saati / sisteme düşme saati. Taslak: Gemini (3.8 → 3.6 → 3.5 flash), iki kaynak, SEO, editöre sorular, doğrulama, görsel önerisi; hazırlayan haberi alır. Taslak "WordPress'e gönder" ile siteye taslak olarak gider (kategori sitedekilerden, etiketler eşleşir ya da açılır). Otomatik taslak: Öncelik 1, 30 dk bekleme, günde en fazla 50, ilgi alanına göre editör. Kurallar: eleme `supabase/functions/triyaj-topla/index.ts`, puan `supabase/functions/triyaj-taslak/puan.ts` (ekran `oncelik.ts` üzerinden kullanır).
 
 ### 13.8 Ekip geri bildirimleri (karşılananlar)
 
@@ -302,7 +306,7 @@ Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve 
 5. Alan adı: `studio.updated.com.tr` (Natro CNAME; sonra GitHub Pages özel alan adı, Supabase Auth izinli adresler, e-postalardaki panel adresi).
 6. Sistem Durumu sayfası (tüm ekip görür): yapay zekâ/kota, son toplama, kaynak sağlığı (Kaynaklar'dan taşınır), zamanlanmış görevler, anahtar var/yok.
 7. Kopya kart birleştirmesinin geçmiş haberler için tamamlanması (kaynak sınırına takıldı).
-8. WordPress'e taslak gönderme (WordPress "Application Password" sahip tarafından oluşturulur).
+8. WordPress'e taslak gönderme + otomatik taslak: kod hazır (15 Ekim). Kalan: WordPress'te "Stüdyo" kullanıcısı (Editör) ve Uygulama Şifresi (sahip oluşturur), Supabase Secrets'a `WP_URL`, `WP_USER`, `WP_APP_PASSWORD`, migration 0014, Ayarlar'da "Bağlantıyı dene".
 9. Takvim aboneliği + davet e-postası; format sistemi (Post 4:5 / Story 9:16 / Reels kapağı).
 10. Kurumsal e-posta, telefon bildirimi, Android uygulaması.
 11. Yeni kaynaklar: Asya sızıntı siteleri, resmi basın sayfaları, Türkiye kaynakları (Webtekno, LOG, ShiftDelete ~50'şer haber incelendi).
