@@ -270,7 +270,7 @@ Liste SQL Editor'da: `select jobname, schedule from cron.job;`
 
 ### 13.5 Veritabanı değişikliği
 
-Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0013_is_kurtarma.sql` (0014_otomatik_taslak hazır, çalıştırılacak).
+Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0014_otomatik_taslak.sql` (16 Ekim).
 
 ### 13.6 Bir şey bozulursa
 
@@ -306,7 +306,7 @@ Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve 
 5. Alan adı: `studio.updated.com.tr` (Natro CNAME; sonra GitHub Pages özel alan adı, Supabase Auth izinli adresler, e-postalardaki panel adresi).
 6. Sistem Durumu sayfası (tüm ekip görür): yapay zekâ/kota, son toplama, kaynak sağlığı (Kaynaklar'dan taşınır), zamanlanmış görevler, anahtar var/yok.
 7. Kopya kart birleştirmesinin geçmiş haberler için tamamlanması (kaynak sınırına takıldı).
-8. WordPress'e taslak gönderme + otomatik taslak: kod hazır (15 Ekim). Kalan: WordPress'te "Stüdyo" kullanıcısı (Editör) ve Uygulama Şifresi (sahip oluşturur), Supabase Secrets'a `WP_URL`, `WP_USER`, `WP_APP_PASSWORD`, migration 0014, Ayarlar'da "Bağlantıyı dene".
+8. WordPress'e taslak gönderme + otomatik taslak: yayında (16 Ekim; ekran, `triyaj-taslak`, migration 0014, Secrets `WP_URL`/`WP_USER`/`WP_APP_PASSWORD` tamam; otomatik taslak kapalı). Kalan: Natro'nun yetkilendirme üst bilgisini PHP'ye iletmesi (destek talebi açık), sonra Ayarlar → "Bağlantıyı dene" ve otomatik taslağı açmak. Natro düzeltince WordPress'teki "Yetkilendirme üst bilgisi" adlı Code Snippets kodu kapatılabilir.
 9. Takvim aboneliği + davet e-postası; format sistemi (Post 4:5 / Story 9:16 / Reels kapağı).
 10. Kurumsal e-posta, telefon bildirimi, Android uygulaması.
 11. Yeni kaynaklar: Asya sızıntı siteleri, resmi basın sayfaları, Türkiye kaynakları (Webtekno, LOG, ShiftDelete ~50'şer haber incelendi).
