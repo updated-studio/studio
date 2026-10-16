@@ -7,6 +7,7 @@
       {
         "ad": "Haber Masası",
         "maddeler": [
+          "Otomatik taslak hızlandı: güçlü haber düştükten 10 dakika sonra yazılıyor, Öncelik 2'nin üst kısmı da giriyor, günde 100'e kadar. Aynı haberin diğer kartları hiç yazılmıyor.",
           "Yapay zekâ taslakları sitenin ve Nerdesin Fatih'in tarzıyla yazıyor: iki parçalı başlık, somut ara başlıklar, kalın rakamlar, metin içinde doğal kaynak atfı, sonda Türkiye bağlamı.",
           "Taslakta \"sonuç olarak\", \"devrim niteliğinde\" gibi yapay zekâ kokan ifadeler kalırsa metin bir kez daha insanlaştırılıyor; kalanlar editör notunda yazıyor.",
           "\"Dikkat edilmesi gerekenler\" artık yazının içinde değil, editör notlarında.",
