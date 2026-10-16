@@ -3,7 +3,7 @@ import { degerlendir, ilgiEslesme } from "./puan.ts";
 
 // Varsayılanlar; Haber Masası → Ayarlar'dan (tr_settings.oto_taslak) değiştirilir.
 export const OTO_VARSAYILAN = {
-  acik: true,               // otomatik taslak çalışsın mı
+  acik: false,              // otomatik taslak çalışsın mı (kapalı başlar; Ayarlar'dan açılır)
   wordpress: true,          // hazırlanan taslak WordPress'e taslak olarak gitsin mi
   gunluk: 50,               // günde en fazla kaç otomatik taslak (İstanbul saatiyle gün)
   esik: 70,                 // en az bu öncelik puanı (70 = Öncelik 1)

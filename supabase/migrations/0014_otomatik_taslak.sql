@@ -17,8 +17,9 @@ alter table public.tr_drafts add column if not exists wp_pending boolean not nul
 create index if not exists tr_drafts_auto_idx on public.tr_drafts (auto, created_at desc);
 
 -- Ayarlar (Haber Masası → Ayarlar → Otomatik taslak). Fatih: günde en fazla 50, sadece en güçlüler (Öncelik 1).
+-- KAPALI başlar: WordPress bağlantısı (Natro yetkilendirme üst bilgisi) düzelince Ayarlar'dan açılır.
 insert into public.tr_settings (key, value) values
-  ('oto_taslak', '{"acik": true, "wordpress": true, "gunluk": 50, "esik": 70, "bekle_dk": 30, "haric_turler": ["Söylenti"]}'::jsonb)
+  ('oto_taslak', '{"acik": false, "wordpress": true, "gunluk": 50, "esik": 70, "bekle_dk": 30, "haric_turler": ["Söylenti"]}'::jsonb)
 on conflict (key) do nothing;
 
 -- Zamanlanmış görev: 10 dakikada bir, toplamadan bağımsız (fonksiyon kendi içinde 8 dk sınırı ve günlük sınırı uygular)
