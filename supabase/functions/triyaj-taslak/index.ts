@@ -10,7 +10,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { adaySec, ayniHaber, editorSec, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { wpAyar, wpDene, wpGonder, type Kategori } from "./wordpress.ts";
-import { adayListesi, commons, kuralSecim, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
+import { adayListesi, commons, kuralSecim, openverse, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -106,7 +106,37 @@ async function gemini(sistem: string, kullanici: string, modeller: string[], bit
     }
     if (!/geçersiz JSON|yanıt vermedi|→ (429|500|503)/.test(son)) break;
   }
+  // Gemini kotası dolduysa ya da yanıt vermiyorsa aynı işi Groq'a yaptır (GROQ_API_KEY, Supabase Secrets)
+  if (Deno.env.get("GROQ_API_KEY") && /geçersiz JSON|yanıt vermedi|→ (429|500|503)/.test(son)) {
+    try { return await groq(sistem, kullanici, bitis); }
+    catch (e) { son += " | Yedek (Groq): " + String((e as Error).message ?? e).slice(0, 200); }
+  }
   throw new Error("Yapay zeka yanıt vermedi. " + son);
+}
+
+// Groq (OpenAI uyumlu). Modeller sırayla denenir; her modelin kotası ayrıdır. Model kalkmışsa (404/400) sonrakine geçer.
+const GROQ_MODELLER = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "qwen/qwen3-32b", "llama-3.1-8b-instant"];
+async function groq(sistem: string, kullanici: string, bitis: number) {
+  let son = "";
+  for (const model of GROQ_MODELLER) {
+    const sure = Math.min(40_000, bitis - Date.now());
+    if (sure < 6_000) break;
+    const c = new AbortController(); const t = setTimeout(() => c.abort(), sure);
+    try {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", signal: c.signal,
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + Deno.env.get("GROQ_API_KEY") },
+        body: JSON.stringify({ model, temperature: 0.4, response_format: { type: "json_object" }, messages: [{ role: "system", content: sistem }, { role: "user", content: kullanici.slice(0, 24_000) }] }),
+      });
+      const govde = await r.text();
+      if (!r.ok) { son = model + " → " + r.status + ": " + govde.slice(0, 120); continue; }
+      const veri = jsonOku(JSON.parse(govde)?.choices?.[0]?.message?.content ?? "");
+      if (veri) return { veri, model: "groq/" + model };
+      son = model + " → geçersiz JSON";
+    } catch { son = model + " → yanıt vermedi"; }
+    finally { clearTimeout(t); }
+  }
+  throw new Error(son || "süre yetmedi");
 }
 
 const TASLAK_SISTEM = `Sen Updated (updated.com.tr) adlı Türkçe teknoloji haber sitesinin haber editörü asistanısın. Sana bir teknoloji haberinin İngilizce kaynak metinleri verilecek. Bunlardan yayına hazırlanacak Türkçe bir haber taslağı yaz.
@@ -174,9 +204,12 @@ async function gorselSec(it: { brand: string; product: string; title: string }, 
     if (bitis - Date.now() < 45_000) return { ...bos, neden: "Süre yetmedi, görsel seçilmedi." };
     const urun = [it.brand, it.product].filter(Boolean).join(" ").trim();
     const anahtar = { pexels: Deno.env.get("PEXELS_API_KEY"), pixabay: Deno.env.get("PIXABAY_API_KEY") };
-    const [c1, s1, s2] = await Promise.all([commons(urun), aramalar[0] ? stokFoto(aramalar[0], 3, anahtar) : Promise.resolve([]), aramalar[1] ? stokFoto(aramalar[1], 2, anahtar) : Promise.resolve([])]);
+    const [c1, o1, o2, s1, s2] = await Promise.all([
+      commons(urun), openverse(urun, 4), aramalar[0] ? openverse(aramalar[0], 3) : Promise.resolve([]),
+      aramalar[0] ? stokFoto(aramalar[0], 3, anahtar) : Promise.resolve([]), aramalar[1] ? stokFoto(aramalar[1], 2, anahtar) : Promise.resolve([]),
+    ]);
     const goruldu = new Set<string>();
-    const adaylar = [...c1, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
+    const adaylar = [...c1, ...o1, ...o2, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
     if (!adaylar.length) return { ...bos, neden: "Serbest lisanslı uygun fotoğraf bulunamadı." };
     let veri: Record<string, unknown>;
     try {
@@ -185,7 +218,7 @@ async function gorselSec(it: { brand: string; product: string; title: string }, 
         ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 30_000, Date.now() + 25_000)));
     } catch {
       const k = kuralSecim(adaylar, urun);
-      return { secilen: k, adaylar: adaylar.slice(0, 8), neden: k ? "Yapay zekâ yanıt vermedi; ürün adıyla birebir eşleşen Commons fotoğrafı seçildi." : "Yapay zekâ yanıt vermedi ve ürün adıyla eşleşen fotoğraf yok; görsel eklenmedi." };
+      return { secilen: k, adaylar: adaylar.slice(0, 8), neden: k ? "Yapay zekâ yanıt vermedi; ürün adıyla birebir eşleşen serbest lisanslı fotoğraf seçildi." : "Yapay zekâ yanıt vermedi ve ürün adıyla eşleşen fotoğraf yok; görsel eklenmedi." };
     }
     const i = Number(veri.secim);
     const secilen = Number.isInteger(i) && i >= 0 && i < adaylar.length ? adaylar[i] : null;
