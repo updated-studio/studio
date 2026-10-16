@@ -125,7 +125,7 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
         setA(temiz); ayar("oto_taslak", temiz, "Otomatik taslak ayarları kaydedildi.");
       }}>Kaydet</button></div>
       {son.zaman && (
-        <div className="muted">Son çalışma: {zamanOnce(son.zaman)} önce · {son.durum}{son.haber ? ` · "${son.haber}" (${son.puan} puan) → ${son.editor || "sahipsiz"}` : ""}{son.bugun !== undefined ? ` · bugün ${son.bugun}/${a.gunluk}` : ""}</div>
+        <div className="muted">Son çalışma: {zamanOnce(son.zaman)} önce · {son.durum}{son.haber ? ` · "${son.haber}"${son.puan ? ` (${son.puan} puan)` : ""} → ${son.editor || "sahipsiz"}` : ""}{son.bugun !== undefined ? ` · bugün ${son.bugun}/${a.gunluk}` : ""}</div>
       )}
     </div>
   );
