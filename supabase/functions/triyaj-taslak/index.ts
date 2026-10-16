@@ -9,7 +9,7 @@
 // Panelden yayınlarken yedi dosya birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { INSANLASTIR_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
-import { adaySec, ayniHaber, editorSec, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
+import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { wpAyar, wpDene, wpGonder, type Kategori } from "./wordpress.ts";
 import { adayListesi, commons, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
@@ -425,20 +425,19 @@ async function otoCalistir(sb: Sb) {
   const ucGun = new Date(Date.now() - 72 * 3_600_000).toISOString();
   const [{ data: sonTaslak }, { data: alinan }] = await Promise.all([
     sb.from("tr_drafts").select("item_id").gte("created_at", ucGun).not("item_id", "is", null).limit(500),
-    sb.from("tr_items").select("id,brand,product,event_key").in("status", ["alindi", "yayinda"]).gte("updated_at", ucGun).limit(1000),
+    // alınmış/yayında olanlar + şu an otomatik taslağı yazılmakta olanlar (son 30 dk; yarıda kalan aynı olayı 3 gün kilitlemesin)
+    sb.from("tr_items").select("id,brand,product,event_key").or(`status.in.(alindi,yayinda),auto_draft_at.gte.${new Date(Date.now() - 30 * 60_000).toISOString()}`).gte("updated_at", ucGun).limit(1000),
   ]);
   const taslakIdleri = ((sonTaslak ?? []) as { item_id: number }[]).map((x) => x.item_id);
   const { data: taslakHaber } = taslakIdleri.length ? await sb.from("tr_items").select("id,brand,product,event_key").in("id", taslakIdleri) : { data: [] };
   const yazilmis = [...((taslakHaber ?? []) as { brand: string; product: string; event_key: string }[]), ...((alinan ?? []) as { brand: string; product: string; event_key: string }[])];
-  const secim = adaySec(liste.filter((h) => !ayniHaber(h, yazilmis)), new Set((taslakli ?? []).map((x: { item_id: number }) => x.item_id)), ayar);
-  if (!secim) { await ozet({ durum: `Eşiği (${ayar.esik}) geçen yeni haber yok`, bugun }); return { bos: true }; }
+  // Aynı olayın sonraki kartları yapay zekâya hiç gitmez (kota harcamaz); turda birbirinin tekrarı olmayan en fazla `tur_basina` haber
+  const kalanHak = Math.max(0, ayar.gunluk - (bugun ?? 0));
+  const secimler = turAdaylari(liste.filter((h) => !ayniHaber(h, yazilmis)), new Set((taslakli ?? []).map((x: { item_id: number }) => x.item_id)), ayar,
+    Math.min(Math.max(1, ayar.tur_basina ?? 1), 3, kalanHak));
+  if (!secimler.length) { await ozet({ durum: `Eşiği (${ayar.esik}) geçen yeni haber yok`, bugun }); return { bos: true }; }
 
-  // 4) Kilit (aynı haber iki kez seçilmesin; elle "Taslak hazırla" ile çakışmasın)
-  const { data: kilit } = await sb.from("tr_items").update({ work_state: "taslak", work_error: "", touched: true, auto_draft_at: new Date().toISOString() })
-    .eq("id", secim.h.id).eq("work_state", "").is("taken_by", null).select("id");
-  if (!kilit?.length) return { atlandi: "Haber bu arada alındı" };
-
-  // 5) Editör: ilgi alanı → bugün müsait → elinde en az iş
+  // 5) Editör verisi: ilgi alanı → bugün müsait → elinde en az iş
   const [{ data: prof }, { data: gun }, { data: isler }, { data: otolar }] = await Promise.all([
     sb.from("profiles").select("id,name,interests"),
     sb.from("availability").select("user_id,status").eq("day", istanbulGun()),
@@ -448,17 +447,29 @@ async function otoCalistir(sb: Sb) {
   const musait = new Map(((gun ?? []) as { user_id: string; status: string }[]).map((g) => [g.user_id, g.status]));
   const yuk = new Map<string, number>();
   for (const x of [...((isler ?? []) as { taken_by: string | null }[]).map((i) => i.taken_by), ...((otolar ?? []) as { author: string | null }[]).map((o) => o.author)]) if (x) yuk.set(x, (yuk.get(x) ?? 0) + 1);
-  const editor = editorSec(secim.h, (prof ?? []) as Profil[], musait, yuk);
 
-  await ozet({ durum: "Taslak yazılıyor", haber: secim.h.event || secim.h.title, puan: secim.d.puan, editor: editor?.name ?? "", bugun: (bugun ?? 0) + 1 });
-  const sure = new Promise<void>((r) => setTimeout(async () => {
-    await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi. Tekrar dene." })
-      .eq("id", secim.h.id).eq("work_state", "taslak");
-    r();
-  }, 135_000));
+  const isler2: Promise<unknown>[] = [];
+  const baslayan: { id: number; puan: number; editor: string | null }[] = [];
+  for (const secim of secimler) {
+    // 4) Kilit (aynı haber iki kez seçilmesin; elle "Taslak hazırla" ile çakışmasın)
+    const { data: kilit } = await sb.from("tr_items").update({ work_state: "taslak", work_error: "", touched: true, auto_draft_at: new Date().toISOString() })
+      .eq("id", secim.h.id).eq("work_state", "").is("taken_by", null).select("id");
+    if (!kilit?.length) continue;
+    const editor = editorSec(secim.h, (prof ?? []) as Profil[], musait, yuk);
+    if (editor) yuk.set(editor.id, (yuk.get(editor.id) ?? 0) + 1);
+    baslayan.push({ id: secim.h.id, puan: secim.d.puan, editor: editor?.name ?? null });
+    const sure = new Promise<void>((r) => setTimeout(async () => {
+      await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi. Tekrar dene." })
+        .eq("id", secim.h.id).eq("work_state", "taslak");
+      r();
+    }, 135_000));
+    isler2.push(Promise.race([isle(sb, secim.h.id, "taslak", editor?.id ?? null, editor?.name ?? "", { oto: true }), sure]));
+  }
+  if (!baslayan.length) return { atlandi: "Haberler bu arada alındı" };
+  await ozet({ durum: `Taslak yazılıyor (${baslayan.length} haber)`, haber: secimler.map((s) => s.h.event || s.h.title).slice(0, baslayan.length).join(" | ").slice(0, 300), puan: baslayan[0].puan, editor: "", bugun: (bugun ?? 0) + baslayan.length });
   // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
-  EdgeRuntime.waitUntil(Promise.race([isle(sb, secim.h.id, "taslak", editor?.id ?? null, editor?.name ?? "", { oto: true }), sure]));
-  return { basladi: secim.h.id, puan: secim.d.puan, editor: editor?.name ?? null };
+  EdgeRuntime.waitUntil(Promise.all(isler2));
+  return { basladi: baslayan };
 }
 
 Deno.serve(async (req) => {

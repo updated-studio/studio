@@ -97,7 +97,7 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
   const { v } = useMasa();
   const [a, setA] = useState<OtoAyar>({ ...OTO_VARSAYILAN, ...((v.ayarlar.oto_taslak ?? {}) as Partial<OtoAyar>) });
   const son = (v.ayarlar.oto_son ?? {}) as { zaman?: string; durum?: string; haber?: string; editor?: string; puan?: number; bugun?: number };
-  const sinir = { gunluk: [1, 200], esik: [40, 150], bekle_dk: [0, 240] } as const;
+  const sinir = { gunluk: [1, 200], esik: [40, 150], bekle_dk: [0, 240], tur_basina: [1, 3] } as const;
   const sayi = (k: keyof typeof sinir) => (
     <input type="text" inputMode="numeric" value={String(a[k])} style={{ width: 80 }} aria-label={k}
       onChange={(e) => setA({ ...a, [k]: Number(e.target.value.replace(/\D/g, "")) || 0 } as OtoAyar)} />
@@ -109,8 +109,9 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
       <label className="row"><input type="checkbox" checked={a.acik} onChange={(e) => setA({ ...a, acik: e.target.checked })} /> Otomatik taslak açık</label>
       <label className="row"><input type="checkbox" checked={a.wordpress} onChange={(e) => setA({ ...a, wordpress: e.target.checked })} /> Hazırlanan taslağı WordPress'e taslak olarak gönder</label>
       <div className="row">Günde en fazla {sayi("gunluk")} taslak</div>
-      <div className="row">En az {sayi("esik")} puan <span className="muted">(70 = Öncelik 1)</span></div>
+      <div className="row">En az {sayi("esik")} puan <span className="muted">(70 = Öncelik 1, 40 = Öncelik 2)</span></div>
       <div className="row">Haber düştükten {sayi("bekle_dk")} dk sonra <span className="muted">(diğer kaynaklar aynı karta birleşsin diye)</span></div>
+      <div className="row">Her turda (10 dk) en fazla {sayi("tur_basina")} farklı haber <span className="muted">(aynı haberin diğer kartları yazılmaz)</span></div>
       <div className="muted">Bu türler otomatik yazılmaz:</div>
       <div className="row">
         {HABER_TURLERI.map((t) => (

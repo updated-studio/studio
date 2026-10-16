@@ -5,9 +5,10 @@ import { degerlendir, ilgiEslesme } from "./puan.ts";
 export const OTO_VARSAYILAN = {
   acik: false,              // otomatik taslak çalışsın mı (kapalı başlar; Ayarlar'dan açılır)
   wordpress: true,          // hazırlanan taslak WordPress'e taslak olarak gitsin mi
-  gunluk: 50,               // günde en fazla kaç otomatik taslak (İstanbul saatiyle gün)
-  esik: 70,                 // en az bu öncelik puanı (70 = Öncelik 1)
-  bekle_dk: 30,             // haber düştükten sonra bekleme (diğer kaynaklar aynı karta birleşsin)
+  gunluk: 100,              // günde en fazla kaç otomatik taslak (İstanbul saatiyle gün)
+  esik: 55,                 // en az bu öncelik puanı (70 = Öncelik 1; 55 = Öncelik 2'nin üst yarısı da girer)
+  bekle_dk: 10,             // haber düştükten sonra bekleme (diğer kaynaklar aynı karta birleşsin)
+  tur_basina: 2,            // 10 dakikalık her turda en fazla kaç farklı habere aynı anda taslak yazılır
   haric_turler: ["Söylenti"] as string[],
 };
 export type OtoAyar = typeof OTO_VARSAYILAN;
@@ -26,14 +27,29 @@ export function editorSec(h: Aday, profiller: Profil[], musait: Map<string, stri
   return adaylar[0]?.p ?? null;
 }
 
-/** Havuzdan sıradaki otomatik taslak adayını seçer (saf: test edilebilir). */
-export function adaySec(haberler: Aday[], taslakliIdler: Set<number>, ayar: OtoAyar, simdi = Date.now()) {
+/** Havuzdaki uygun adaylar, en yüksek puandan başlayarak (saf: test edilebilir). */
+export function adaySirala(haberler: Aday[], taslakliIdler: Set<number>, ayar: OtoAyar, simdi = Date.now()) {
   return haberler
     .filter((h) => !taslakliIdler.has(h.id))
     .filter((h) => simdi - Date.parse(h.created_at) >= ayar.bekle_dk * 60_000)
     .map((h) => ({ h, d: degerlendir(h, simdi) }))
     .filter(({ d }) => d.puan >= ayar.esik && !ayar.haric_turler.includes(d.tur))
-    .sort((a, b) => b.d.puan - a.d.puan || Date.parse(b.h.published_at ?? b.h.created_at) - Date.parse(a.h.published_at ?? a.h.created_at))[0] ?? null;
+    .sort((a, b) => b.d.puan - a.d.puan || Date.parse(b.h.published_at ?? b.h.created_at) - Date.parse(a.h.published_at ?? a.h.created_at));
+}
+
+/** Turun adayları: en güçlüler, birbirinin tekrarı olmayan en fazla `adet` haber (aynı olayın ikinci kartı seçilmez). */
+export function turAdaylari(haberler: Aday[], taslakliIdler: Set<number>, ayar: OtoAyar, adet: number, simdi = Date.now()) {
+  const secilen: ReturnType<typeof adaySirala> = [];
+  for (const a of adaySirala(haberler, taslakliIdler, ayar, simdi)) {
+    if (secilen.length >= adet) break;
+    if (!ayniHaber(a.h, secilen.map((x) => x.h))) secilen.push(a);
+  }
+  return secilen;
+}
+
+/** Geriye uyum: tek aday */
+export function adaySec(haberler: Aday[], taslakliIdler: Set<number>, ayar: OtoAyar, simdi = Date.now()) {
+  return adaySirala(haberler, taslakliIdler, ayar, simdi)[0] ?? null;
 }
 
 
