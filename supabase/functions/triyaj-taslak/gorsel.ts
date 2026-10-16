@@ -64,28 +64,79 @@ export async function commons(q: string, adet = 6): Promise<GorselAday[]> {
 const etiketler = (host: string) => host.toLowerCase().replace(/^www\./, "").split(".");
 const markaAnahtar = (m: string) => m.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/** Resmi basın görseli: kaynak bağlantılarından markanın kendi alan adındakilerin og:image'ı */
-export async function resmiGorsel(linkler: string[], marka: string, basinAdresleri: string[]): Promise<GorselAday[]> {
-  const m = markaAnahtar(marka);
-  const resmiHost = new Set(basinAdresleri.map((u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } }).filter(Boolean));
-  const resmi = [...new Set(linkler)].filter((u) => {
-    try { const h = new URL(u).hostname.replace(/^www\./, ""); return resmiHost.has(h) || (m.length >= 3 && etiketler(h).includes(m)); } catch { return false; }
-  }).slice(0, 2);
-  const out: GorselAday[] = [];
-  for (const u of resmi) {
-    const c = new AbortController(); const t = setTimeout(() => c.abort(), 10_000);
-    try {
-      const r = await fetch(u, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: c.signal, redirect: "follow" });
-      const h = r.ok ? await r.text() : "";
-      const og = h.match(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i)?.[1]
-        ?? h.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1];
-      if (!og) continue;
-      const resim = new URL(og.replace(/&amp;/g, "&"), u).href;
-      const baslik = h.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? "";
-      out.push({ kaynak: "Resmi basın", sayfa: u, buyuk: resim, thumb: resim, yazar: marka, lisans: "Basın görseli", aciklama: `${marka} resmi görseli — ${duz(baslik)}`.slice(0, 220), w: 1200, h: 675 });
-    } catch { /* sayfa açılmadı */ } finally { clearTimeout(t); }
+const ENGELLI_HOST = /(^|\.)(twitter|x|facebook|instagram|youtube|youtu|reddit|wikipedia|amazon|t|linkedin|tiktok|threads|google|apple\.news|bsky\.app|news\.ycombinator|flipboard|pinterest)\.(com|be|co|org|net|app)$/i;
+const hostAl = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } };
+
+async function html(u: string, ms = 8_000): Promise<string> {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(u, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: c.signal, redirect: "follow" }); return r.ok ? (await r.text()).slice(0, 1_500_000) : ""; }
+  catch { return ""; } finally { clearTimeout(t); }
+}
+const meta = (h: string, ad: string) => h.match(new RegExp(`<meta[^>]+(?:property|name)=["']${ad}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1]
+  ?? h.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${ad}["']`, "i"))?.[1];
+/** Sayfadaki bağlantılar: [adres, bağlantı metni] */
+function baglantilar(h: string, taban: string): [string, string][] {
+  const out: [string, string][] = [];
+  for (const m of h.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,300}?)<\/a>/gi)) {
+    try { out.push([new URL(m[1].replace(/&amp;/g, "&"), taban).href, duz(m[2])]); } catch { /* geçersiz */ }
   }
   return out;
+}
+const anlamli = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+
+/** Resmi basın görseli (16 Ekim (6)): markanın KENDİ sayfasının paylaşım görseli (og:image). Resmi sayfa üç yoldan bulunur:
+ *  1) haberin kaynaklarından biri zaten markanın sitesiyse,
+ *  2) kaynak haberin içinde markanın kendi duyurusuna/bloguna verilen bağlantıdan (ör. TechCrunch → bsky.social/about/blog/...),
+ *  3) markanın basın sayfasında (tr_press) haberin ürün/başlık kelimelerini taşıyan duyurudan. */
+export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: string[]; urun: string; baslik: string }): Promise<GorselAday[]> {
+  const m = markaAnahtar(o.marka);
+  if (!m) return [];
+  const basinHost = new Set(o.basin.map(hostAl).filter(Boolean));
+  const kaynakHost = new Set(o.linkler.map(hostAl));
+  const resmiMi = (h: string) => basinHost.has(h) || (m.length >= 3 && etiketler(h).includes(m));
+  const sayfalar = new Set<string>(o.linkler.filter((u) => resmiMi(hostAl(u))));
+
+  // 2) Kaynak haberlerin içindeki resmi bağlantılar
+  if (sayfalar.size < 2) {
+    const kaynakHtml = await Promise.all(o.linkler.slice(0, 2).map((u) => html(u)));
+    const adaylar: [number, string][] = [];
+    kaynakHtml.forEach((h, i) => {
+      for (const [u, metin] of baglantilar(h, o.linkler[i])) {
+        const host = hostAl(u);
+        if (!host || kaynakHost.has(host) || (ENGELLI_HOST.test(host) && !resmiMi(host))) continue;
+        const yol = (() => { try { return new URL(u).pathname; } catch { return ""; } })();
+        if (yol.length < 5) continue; // ana sayfa değil, belirli bir duyuru
+        let puan = 0;
+        if (resmiMi(host)) puan += 3;
+        if (new RegExp(`\\b${o.marka.replace(/[^\w ]/g, "")}\\b`, "i").test(metin)) puan += 1;
+        if (/blog|news|press|newsroom|announc|introduc/i.test(yol)) puan += 1;
+        if (puan >= 2) adaylar.push([puan, u]);
+      }
+    });
+    adaylar.sort((a, b) => b[0] - a[0]).slice(0, 2).forEach(([, u]) => sayfalar.add(u));
+  }
+
+  // 3) Basın sayfasında ürün/başlık kelimeleriyle eşleşen duyuru
+  if (sayfalar.size < 2 && o.basin[0]) {
+    const h = await html(o.basin[0]);
+    const aranan = [...new Set([...anlamli(o.urun), ...anlamli(o.baslik)])];
+    const en = baglantilar(h, o.basin[0])
+      .map(([u, metin]) => ({ u, n: aranan.filter((w) => anlamli(metin + " " + u).includes(w)).length }))
+      .filter((x) => x.n >= 2 && hostAl(x.u) === hostAl(o.basin[0]))
+      .sort((a, b) => b.n - a.n)[0];
+    if (en) sayfalar.add(en.u);
+  }
+
+  const sonuc = await Promise.all([...sayfalar].slice(0, 3).map(async (u): Promise<GorselAday | null> => {
+    const h = await html(u);
+    const og = meta(h, "og:image(?::secure_url)?") ?? meta(h, "twitter:image");
+    if (!og || /logo|favicon|default|placeholder|avatar/i.test(og)) return null;
+    let resim = ""; try { resim = new URL(og.replace(/&amp;/g, "&"), u).href; } catch { return null; }
+    const site = duz(meta(h, "og:site_name") ?? "") || o.marka;
+    return { kaynak: "Resmi basın", sayfa: u, buyuk: resim, thumb: resim, yazar: o.marka, lisans: "Basın görseli",
+      aciklama: `${site} (${hostAl(u)}) resmi sayfasının görseli — ${duz(meta(h, "og:title") ?? "")}`.slice(0, 220), w: 1200, h: 675 };
+  }));
+  return sonuc.filter((x): x is GorselAday => !!x);
 }
 
 /** Openverse: anahtarsız, serbest lisanslı, yatay ve büyük fotoğraflar */
