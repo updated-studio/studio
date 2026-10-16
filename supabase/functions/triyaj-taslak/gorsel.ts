@@ -88,3 +88,13 @@ KURALLAR:
 - Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.
 - Hiçbiri uygun değilse -1 döndür. Uydurma yapma.
 Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe"}`;
+
+const kelimeler = (s: string) => (s ?? "").toLowerCase().replace(/ı/g, "i").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length >= 2);
+
+/** Yapay zekâ yanıt vermezse yedek kural: açıklamasında marka + ürün adının bütün kelimeleri geçen ilk Commons fotoğrafı.
+ *  Stok fotoğraflar kuralla seçilmez (konuyla ilgisi yapay zekâsız doğrulanamaz). */
+export function kuralSecim(adaylar: GorselAday[], urun: string): GorselAday | null {
+  const aranan = kelimeler(urun);
+  if (aranan.length < 2) return null;
+  return adaylar.find((a) => a.kaynak === "Wikimedia Commons" && aranan.every((w) => kelimeler(a.aciklama).includes(w))) ?? null;
+}
