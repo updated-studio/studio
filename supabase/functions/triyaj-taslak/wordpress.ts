@@ -140,7 +140,7 @@ async function gorselYukle(a: WpAyar, g: GorselAday, alt: string, ad: string): P
     });
     const m = await y.json().catch(() => null) as { id?: number } | null;
     if (!y.ok || !m?.id) return { hata: hataMetni(y.status, JSON.stringify(m ?? {})) };
-    await wp(a, `/wp/v2/media/${m.id}`, { method: "POST", body: { alt_text: alt.slice(0, 200), caption: altyazi(g), title: alt.slice(0, 120) || dosya } });
+    await wp(a, `/wp/v2/media/${m.id}`, { method: "POST", body: { alt_text: alt.slice(0, 200), ...(altyazi(g) ? { caption: altyazi(g) } : {}), title: alt.slice(0, 120) || dosya } });
     return { id: m.id };
   } catch (e) {
     return { hata: "Görsel yüklenemedi: " + String((e as Error).message ?? e).slice(0, 120) };
