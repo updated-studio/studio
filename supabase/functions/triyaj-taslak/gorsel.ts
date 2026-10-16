@@ -1,5 +1,7 @@
 // Taslağın öne çıkan görseli (ARCHITECTURE.md, 16 Ekim 2026): telifi açık, gerçek fotoğraflardan seçilir.
 // Kaynaklar, doğruluk sırasıyla:
+//   0) Resmi basın görseli: haberin kaynaklarından biri markanın KENDİ sitesiyse (ör. apple.com/newsroom, news.samsung.com)
+//      o sayfanın paylaşım görseli (og:image). Üreticiler bunları basında kullanılsın diye yayınlar.
 //   1) Wikimedia Commons: ürünün KENDİSİNİN gerçek fotoğrafı çoğu zaman burada (marka + ürün adıyla aranır).
 //      Sadece serbest lisanslar (CC0, kamu malı, CC BY, CC BY-SA); yazar ve lisans altyazıya yazılır.
 //   2) Openverse (anahtar gerekmez): Flickr vb. kaynaklardan serbest lisanslı (CC0, kamu malı, CC BY, CC BY-SA) gerçek fotoğraflar;
@@ -7,11 +9,12 @@
 //   3) Pexels, Pixabay: sadece anahtar tanımlıysa (PEXELS_API_KEY, PIXABAY_API_KEY); şu an yok.
 // Unsplash yüklenmez: API kuralları görselin kendi sunucularından gösterilmesini istiyor (sadece öneri olarak kalır).
 // Bu dosya Deno'ya özgü bir şey kullanmaz (ekran da tiplerini içe aktarıyor); anahtarlar çağırandan gelir.
-// Haber sitelerinin kendi görselleri (og:image) ALINMAZ: başka yayının telifli fotoğrafıdır.
+// Başka haber sitelerinin görselleri ALINMAZ (16 Ekim'de Fatih "filigransız olanları kullan" dedi; telif riski nedeniyle
+// uygulanmadı, ARCHITECTURE.md 16 Ekim (4)): filigran olmaması görselin kullanım izni olduğu anlamına gelmez.
 // Hangi adayın kullanılacağına yapay zekâ karar verir; uygun aday yoksa görsel eklenmez. Yayına basma kararı yine editörde.
 
 export type GorselAday = {
-  kaynak: "Wikimedia Commons" | "Openverse" | "Pexels" | "Pixabay";
+  kaynak: "Resmi basın" | "Wikimedia Commons" | "Openverse" | "Pexels" | "Pixabay";
   sayfa: string;      // görselin kendi sayfası (altyazıda bağlantı)
   buyuk: string;      // indirilecek dosya (en fazla ~1600 px)
   thumb: string;      // ekranda küçük önizleme
@@ -58,6 +61,33 @@ export async function commons(q: string, adet = 6): Promise<GorselAday[]> {
   return out;
 }
 
+const etiketler = (host: string) => host.toLowerCase().replace(/^www\./, "").split(".");
+const markaAnahtar = (m: string) => m.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Resmi basın görseli: kaynak bağlantılarından markanın kendi alan adındakilerin og:image'ı */
+export async function resmiGorsel(linkler: string[], marka: string, basinAdresleri: string[]): Promise<GorselAday[]> {
+  const m = markaAnahtar(marka);
+  const resmiHost = new Set(basinAdresleri.map((u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } }).filter(Boolean));
+  const resmi = [...new Set(linkler)].filter((u) => {
+    try { const h = new URL(u).hostname.replace(/^www\./, ""); return resmiHost.has(h) || (m.length >= 3 && etiketler(h).includes(m)); } catch { return false; }
+  }).slice(0, 2);
+  const out: GorselAday[] = [];
+  for (const u of resmi) {
+    const c = new AbortController(); const t = setTimeout(() => c.abort(), 10_000);
+    try {
+      const r = await fetch(u, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: c.signal, redirect: "follow" });
+      const h = r.ok ? await r.text() : "";
+      const og = h.match(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i)?.[1]
+        ?? h.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1];
+      if (!og) continue;
+      const resim = new URL(og.replace(/&amp;/g, "&"), u).href;
+      const baslik = h.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? "";
+      out.push({ kaynak: "Resmi basın", sayfa: u, buyuk: resim, thumb: resim, yazar: marka, lisans: "Basın görseli", aciklama: `${marka} resmi görseli — ${duz(baslik)}`.slice(0, 220), w: 1200, h: 675 });
+    } catch { /* sayfa açılmadı */ } finally { clearTimeout(t); }
+  }
+  return out;
+}
+
 /** Openverse: anahtarsız, serbest lisanslı, yatay ve büyük fotoğraflar */
 export async function openverse(q: string, adet = 5): Promise<GorselAday[]> {
   if (!q.trim()) return [];
@@ -88,8 +118,11 @@ export async function stokFoto(q: string, adet: number, anahtar: { pexels?: stri
   return out;
 }
 
-/** WordPress altyazısı: yazar, kaynak ve lisans (CC lisanslarında zorunlu atıf) */
+/** WordPress altyazısı. Fatih: haberlerde kaynak belirtmek zorunlu değil. Ama CC BY / CC BY-SA lisansı yazar ve lisans adını
+ *  ZORUNLU tutar; bu yüzden sadece onlarda altyazı yazılır. CC0, kamu malı, Pexels, Pixabay: altyazı yok. Resmi basın: "Görsel: Marka". */
 export function altyazi(g: GorselAday): string {
+  if (g.kaynak === "Resmi basın") return `Görsel: ${g.yazar.replace(/[<>&]/g, "")}`;
+  if (!/^cc[- ]by/i.test(g.lisans)) return "";
   const k = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `Fotoğraf: ${k(g.yazar)} / <a href="${k(g.sayfa)}" target="_blank" rel="noopener">${k(g.kaynak)}</a>${/^(cc|kamu)/i.test(g.lisans) ? ` (${k(g.lisans)})` : ""}`;
 }
@@ -102,6 +135,7 @@ export function adayListesi(adaylar: GorselAday[]): string {
 export const SECIM_SISTEM = `Bir Türkçe teknoloji haberine öne çıkan görsel seçiyorsun. Sana haber başlığı ve numaralı görsel adayları verilecek.
 KURALLAR:
 - Haberin konusu olan ürünü/şirketi/olayı en doğru gösteren GERÇEK fotoğrafı seç.
+- [Resmi basın] adayı haberin konusu olan ürünün/duyurunun resmi görseliyse onu tercih et (logo ya da genel kurumsal görsel değilse).
 - Ürünün kendisinin fotoğrafı (aynı model) varsa onu tercih et. Eski model ya da başka ürünse seçme.
 - Ürünün kendisi yoksa konuyu genel olarak temsil eden gerçekçi bir fotoğraf (ör. akıllı telefon haberine telefon fotoğrafı) seçilebilir.
 - Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.

@@ -5,6 +5,7 @@ import { HABER_TURLERI } from "./oncelik";
 import { zamanOnce } from "./ortak";
 import { useMasa } from "./veri";
 import { OTO_VARSAYILAN, type OtoAyar } from "../../../supabase/functions/triyaj-taslak/secim.ts";
+import { USLUP_VARSAYILAN } from "../../../supabase/functions/triyaj-taslak/uslup.ts";
 
 // Sadece yöneticiler: otomatik taslak ve WordPress, saklama süresi, gürültü kelimeleri, Türkiye pazarı markaları, basın kiti.
 export default function Ayarlar() {
@@ -35,6 +36,7 @@ export default function Ayarlar() {
   return (
     <>
       <OtomatikTaslak ayar={ayar} />
+      <YazimUslubu ayar={ayar} />
       <WordPress ayar={ayar} />
       <div className="panel">
         <h3>Saklama</h3>
@@ -156,6 +158,25 @@ function WordPress({ ayar }: { ayar: AyarYaz }) {
           </select>
         </label>
       )}
+    </div>
+  );
+}
+
+/** Yapay zekânın taslak yazarken uyduğu üslup (uslup.ts varsayılanı; burada değiştirilir, tr_settings.yazim_uslubu) */
+function YazimUslubu({ ayar }: { ayar: AyarYaz }) {
+  const { v } = useMasa();
+  const kayitli = typeof v.ayarlar.yazim_uslubu === "string" && (v.ayarlar.yazim_uslubu as string).trim() ? (v.ayarlar.yazim_uslubu as string) : "";
+  const [metin, setMetin] = useState(kayitli || USLUP_VARSAYILAN);
+  return (
+    <div className="panel">
+      <h3>Yazım üslubu</h3>
+      <div className="muted">Taslaklar bu kurallara göre yazılır; ardından metinde yapay zekâ kokan ifade kalırsa bir kez daha "insanlaştırılır". Sitedeki yazılar, Nerdesin Fatih YouTube kanalı ve Instagram gönderilerinden çıkarıldı. Değiştirip kaydedebilirsin; yeni taslaklarda geçerli olur.</div>
+      <textarea className="alan" rows={16} value={metin} onChange={(e) => setMetin(e.target.value)} aria-label="Yazım üslubu" />
+      <div className="row">
+        <button className="btn sm" onClick={() => ayar("yazim_uslubu", metin.trim() === USLUP_VARSAYILAN.trim() ? "" : metin, "Yazım üslubu kaydedildi.")}>Kaydet</button>
+        <button className="btn ghost sm" onClick={() => { setMetin(USLUP_VARSAYILAN); ayar("yazim_uslubu", "", "Varsayılan üsluba dönüldü."); }}>Varsayılana dön</button>
+        <span className="muted">{kayitli ? "Özelleştirilmiş üslup kullanılıyor." : "Varsayılan üslup kullanılıyor."}</span>
+      </div>
     </div>
   );
 }

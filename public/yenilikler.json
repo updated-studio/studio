@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-10-16-b",
+    "tarih": "16 Ekim 2026",
+    "baslik": "Taslaklar artık Updated üslubuyla yazılıyor",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Yapay zekâ taslakları sitenin ve Nerdesin Fatih'in tarzıyla yazıyor: iki parçalı başlık, somut ara başlıklar, kalın rakamlar, metin içinde doğal kaynak atfı, sonda Türkiye bağlamı.",
+          "Taslakta \"sonuç olarak\", \"devrim niteliğinde\" gibi yapay zekâ kokan ifadeler kalırsa metin bir kez daha insanlaştırılıyor; kalanlar editör notunda yazıyor.",
+          "\"Dikkat edilmesi gerekenler\" artık yazının içinde değil, editör notlarında.",
+          "Haber markanın kendi sitesinden geliyorsa resmi basın görseli öncelikli seçiliyor. Fotoğraf altyazısı sadece lisansın zorunlu tuttuğu durumlarda yazılıyor.",
+          "Yöneticiler üslubu Ayarlar → Yazım üslubu'ndan değiştirebilir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-16-a",
     "tarih": "16 Ekim 2026",
     "baslik": "Otomatik taslak açıldı, taslaklara görsel geliyor",
