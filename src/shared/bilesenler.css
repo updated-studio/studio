@@ -130,6 +130,9 @@ textarea.alan { width: 100%; background: var(--surface); border: 1px solid var(-
 .onizleme { line-height: 1.6; overflow-wrap: anywhere; }
 .onizleme h2 { font-size: 18px; margin: 14px 0 6px; }
 .onizleme p { margin: 0 0 10px; }
+/* Sitedeki ara başlık rengi (WordPress "vivid-cyan-blue"); taslak önizlemesi siteyle aynı görünsün */
+.onizleme mark { background: transparent; color: inherit; }
+.onizleme .has-vivid-cyan-blue-color { color: var(--blue); }
 .sohbet { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow: auto; }
 .sohbet .msj { display: flex; gap: 8px; align-items: flex-start; }
 .sohbet .msj .govde { background: var(--sunk); border-radius: 12px; padding: 8px 12px; max-width: 80%; overflow-wrap: anywhere; white-space: pre-wrap; }
