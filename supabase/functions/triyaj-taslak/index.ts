@@ -215,7 +215,7 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     const iz: string[] = [];
     // Commons ve Openverse: önce marka + ürün, sonra konu aramaları (ilk ikisi). Alakasız olanları seçim adımı eler.
     const [r1, c1, o1, o2, s1, s2, c2, o3] = await Promise.all([
-      resmiGorsel({ linkler, marka: it.brand, basin: ((bk ?? []) as { url: string }[]).map((x) => x.url), urun: it.product, baslik: it.title }),
+      resmiGorsel({ linkler, marka: it.brand, basin: ((bk ?? []) as { url: string }[]).map((x) => x.url), urun: it.product, baslik: it.title }, iz),
       commons(urun, 6, iz), openverse(urun, 4, iz), aramalar[0] ? openverse(aramalar[0], 3, iz) : Promise.resolve([]),
       aramalar[0] ? stokFoto(aramalar[0], 3, anahtar) : Promise.resolve([]), aramalar[1] ? stokFoto(aramalar[1], 2, anahtar) : Promise.resolve([]),
       aramalar[0] ? commons(aramalar[0], 3, iz) : Promise.resolve([]), aramalar[1] ? openverse(aramalar[1], 2, iz) : Promise.resolve([]),
