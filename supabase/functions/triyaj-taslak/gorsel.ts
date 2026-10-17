@@ -41,7 +41,7 @@ async function json(url: string, h: Record<string, string> = {}) {
 }
 
 /** Wikimedia Commons: marka + ürün adıyla, sadece serbest lisanslı ve yeterince büyük fotoğraflar */
-export async function commons(q: string, adet = 6): Promise<GorselAday[]> {
+export async function commons(q: string, adet = 6, iz?: string[]): Promise<GorselAday[]> {
   if (!q.trim()) return [];
   const u = "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=12"
     + "&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=1600&iiextmetadatafilter=LicenseShortName|Artist|ImageDescription|ObjectName"
@@ -64,6 +64,7 @@ export async function commons(q: string, adet = 6): Promise<GorselAday[]> {
     });
     if (out.length >= adet) break;
   }
+  iz?.push(`Commons "${q.slice(0, 40)}": ${sayfalar.length} sonuç, ${out.length} uygun`);
   return out;
 }
 
@@ -146,19 +147,30 @@ export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: 
 }
 
 /** Openverse: anahtarsız, serbest lisanslı, yatay ve büyük fotoğraflar */
-export async function openverse(q: string, adet = 5): Promise<GorselAday[]> {
+export async function openverse(q: string, adet = 5, iz?: string[]): Promise<GorselAday[]> {
   if (!q.trim()) return [];
-  const j = await json("https://api.openverse.org/v1/images/?license=cc0,pdm,by,by-sa&category=photograph&aspect_ratio=wide&size=large&mature=false&page_size=12&q=" + encodeURIComponent(q));
+  // Önce sıkı filtre (büyük, yatay fotoğraf); sonuç çıkmazsa filtreler gevşetilir ve boyut/yön burada denetlenir.
+  // Openverse kayıtlarının bir kısmında boyut bilgisi yok; sıkı filtre bunları baştan eler (16-17 Ekim teşhisi: hep 0 aday).
+  const filtreler = ["&category=photograph&aspect_ratio=wide&size=large", "&category=photograph", ""];
   const out: GorselAday[] = [];
-  for (const x of ((j?.results ?? []) as any[])) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (!x.url || (x.width && x.width < 900) || (x.width && x.height && x.width < x.height)) continue;
-    const l = String(x.license ?? "").toLowerCase();
-    const lisans = l === "cc0" ? "CC0" : l === "pdm" ? "Kamu malı" : `CC ${l.toUpperCase()} ${x.license_version ?? ""}`.trim();
-    // Orijinal dosya indirilir (sıkıştırılmış kopya servisi çok yavaş); 8 MB'tan büyükse yükleme yapılmaz
-    out.push({ kaynak: "Openverse", sayfa: x.foreign_landing_url || x.url, buyuk: x.url, thumb: x.thumbnail || x.url, yazar: String(x.creator || "Bilinmiyor").slice(0, 80), lisans,
-      aciklama: [x.title, (x.tags ?? []).slice(0, 8).map((t: { name: string }) => t.name).join(", ")].filter(Boolean).join(" — ").slice(0, 220) || q, w: x.width ?? 0, h: x.height ?? 0 });
-    if (out.length >= adet) break;
+  const sayilar: string[] = [];
+  for (const f of filtreler) {
+    const j = await json("https://api.openverse.org/v1/images/?license=cc0,pdm,by,by-sa&mature=false&page_size=20" + f + "&q=" + encodeURIComponent(q));
+    const sonuc = ((j?.results ?? []) as any[]); // eslint-disable-line @typescript-eslint/no-explicit-any
+    for (const x of sonuc) {
+      if (!x.url || (x.width && x.width < 900) || (x.width && x.height && x.width < x.height)) continue;
+      if (/\.(svg|gif)(\?|$)/i.test(x.url)) continue;
+      const l = String(x.license ?? "").toLowerCase();
+      const lisans = l === "cc0" ? "CC0" : l === "pdm" ? "Kamu malı" : `CC ${l.toUpperCase()} ${x.license_version ?? ""}`.trim();
+      // Orijinal dosya indirilir (sıkıştırılmış kopya servisi çok yavaş); 8 MB'tan büyükse yükleme yapılmaz
+      out.push({ kaynak: "Openverse", sayfa: x.foreign_landing_url || x.url, buyuk: x.url, thumb: x.thumbnail || x.url, yazar: String(x.creator || "Bilinmiyor").slice(0, 80), lisans,
+        aciklama: [x.title, (x.tags ?? []).slice(0, 8).map((t: { name: string }) => t.name).join(", ")].filter(Boolean).join(" — ").slice(0, 220) || q, w: x.width ?? 0, h: x.height ?? 0 });
+      if (out.length >= adet) break;
+    }
+    sayilar.push(j ? `${j.result_count ?? sonuc.length}` : "yanıt yok");
+    if (out.length) break;
   }
+  iz?.push(`Openverse "${q.slice(0, 40)}": ${sayilar.join("→")} sonuç, ${out.length} uygun`);
   return out;
 }
 
