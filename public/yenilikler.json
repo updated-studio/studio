@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-10-17-a",
+    "tarih": "17 Ekim 2026",
+    "baslik": "Taslaklar sitedeki yazı biçimiyle geliyor",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "WordPress'e giden taslaklarda metin 16 piksel, ara başlıklar mavi; sitedeki yazılarla aynı görünüyor.",
+          "Taslak WordPress'te tek bir klasik blok olarak değil, ayrı ayrı paragraf, başlık ve liste blokları olarak açılıyor; düzenlemesi kolay."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-16-b",
     "tarih": "16 Ekim 2026",
     "baslik": "Taslaklar artık Updated üslubuyla yazılıyor",
