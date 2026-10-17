@@ -95,9 +95,9 @@ const anlamli = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u030
  *  1) haberin kaynaklarından biri zaten markanın sitesiyse,
  *  2) kaynak haberin içinde markanın kendi duyurusuna/bloguna verilen bağlantıdan (ör. TechCrunch → bsky.social/about/blog/...),
  *  3) markanın basın sayfasında (tr_press) haberin ürün/başlık kelimelerini taşıyan duyurudan. */
-export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: string[]; urun: string; baslik: string }): Promise<GorselAday[]> {
+export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: string[]; urun: string; baslik: string }, iz?: string[]): Promise<GorselAday[]> {
   const m = markaAnahtar(o.marka);
-  if (!m) return [];
+  if (!m) { iz?.push("Resmi: marka yok"); return []; }
   const basinHost = new Set(o.basin.map(hostAl).filter(Boolean));
   const kaynakHost = new Set(o.linkler.map(hostAl));
   const resmiMi = (h: string) => basinHost.has(h) || (m.length >= 3 && etiketler(h).includes(m));
@@ -106,6 +106,7 @@ export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: 
   // 2) Kaynak haberlerin içindeki resmi bağlantılar
   if (sayfalar.size < 2) {
     const kaynakHtml = await Promise.all(o.linkler.slice(0, 2).map((u) => html(u)));
+    iz?.push("Resmi: kaynak haber " + kaynakHtml.map((h, i) => `${hostAl(o.linkler[i])} ${h ? "açıldı" : "açılmadı"}`).join(", "));
     const adaylar: [number, string][] = [];
     kaynakHtml.forEach((h, i) => {
       for (const [u, metin] of baglantilar(h, o.linkler[i])) {
@@ -132,11 +133,13 @@ export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: 
       .filter((x) => x.n >= 2 && hostAl(x.u) === hostAl(o.basin[0]))
       .sort((a, b) => b.n - a.n)[0];
     if (en) sayfalar.add(en.u);
+    iz?.push(`Resmi: basın sayfası ${hostAl(o.basin[0])} ${h ? (en ? "eşleşme var" : "eşleşme yok") : "açılmadı"}`);
   }
 
   const sonuc = await Promise.all([...sayfalar].slice(0, 3).map(async (u): Promise<GorselAday | null> => {
     const h = await html(u);
     const og = meta(h, "og:image(?::secure_url)?") ?? meta(h, "twitter:image");
+    iz?.push(`Resmi sayfa ${hostAl(u)}: ${!h ? "açılmadı" : !og ? "görsel etiketi yok" : /logo|favicon|default|placeholder|avatar/i.test(og) ? "sadece logo" : "görsel var"}`);
     if (!og || /logo|favicon|default|placeholder|avatar/i.test(og)) return null;
     let resim = ""; try { resim = new URL(og.replace(/&amp;/g, "&"), u).href; } catch { return null; }
     const site = duz(meta(h, "og:site_name") ?? "") || o.marka;
