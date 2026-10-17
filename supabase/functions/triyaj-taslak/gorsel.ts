@@ -24,7 +24,7 @@ export type GorselAday = {
   w: number; h: number;
 };
 
-const UA = "UpdatedStudyo/1.0 (https://www.updated.com.tr; haber gorseli secimi)";
+const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; haber gorseli secimi)";
 const duz = (s: string) => String(s ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 const SERBEST = /^(cc0|public domain|pd|cc[- ]by(-sa)?[- ]\d)/i;
 
@@ -138,8 +138,11 @@ export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: 
 
   const sonuc = await Promise.all([...sayfalar].slice(0, 3).map(async (u): Promise<GorselAday | null> => {
     const h = await html(u);
-    const og = meta(h, "og:image(?::secure_url)?") ?? meta(h, "twitter:image");
-    iz?.push(`Resmi sayfa ${hostAl(u)}: ${!h ? "açılmadı" : !og ? "görsel etiketi yok" : /logo|favicon|default|placeholder|avatar/i.test(og) ? "sadece logo" : "görsel var"}`);
+    // og:image yoksa twitter:image, <link rel="image_src"> ya da sayfadaki yapılandırılmış veri (JSON-LD "image")
+    const og = meta(h, "og:image(?::secure_url)?") ?? meta(h, "twitter:image(?::src)?")
+      ?? h.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i)?.[1]
+      ?? h.match(/"image"\s*:\s*(?:\[\s*)?(?:\{[^}]*?"url"\s*:\s*)?"(https?:[^"]+\.(?:jpe?g|png|webp)[^"]*)"/i)?.[1];
+    iz?.push(`Resmi sayfa ${hostAl(u)}: ${!h ? "açılmadı" : !og ? `görsel etiketi yok (${h.length} karakter)` : !og ? "görsel etiketi yok" : /logo|favicon|default|placeholder|avatar/i.test(og) ? "sadece logo" : "görsel var"}`);
     if (!og || /logo|favicon|default|placeholder|avatar/i.test(og)) return null;
     let resim = ""; try { resim = new URL(og.replace(/&amp;/g, "&"), u).href; } catch { return null; }
     const site = duz(meta(h, "og:site_name") ?? "") || o.marka;
@@ -154,7 +157,9 @@ export async function openverse(q: string, adet = 5, iz?: string[]): Promise<Gor
   if (!q.trim()) return [];
   // Önce sıkı filtre (büyük, yatay fotoğraf); sonuç çıkmazsa filtreler gevşetilir ve boyut/yön burada denetlenir.
   // Openverse kayıtlarının bir kısmında boyut bilgisi yok; sıkı filtre bunları baştan eler (16-17 Ekim teşhisi: hep 0 aday).
-  const filtreler = ["&category=photograph&aspect_ratio=wide&size=large", "&category=photograph", ""];
+  // 17 Ekim teşhisi: sıkı filtre hep 0 dönüyor, art arda istekler de Openverse'te zaman aşımına düşüyor.
+  // Bu yüzden önce yalnız "fotoğraf" filtresi, sonuç yoksa filtresiz tek deneme.
+  const filtreler = ["&category=photograph", ""];
   const out: GorselAday[] = [];
   const sayilar: string[] = [];
   for (const f of filtreler) {
@@ -208,8 +213,9 @@ export const SECIM_SISTEM = `Bir Türkçe teknoloji haberine öne çıkan görse
 KURALLAR:
 - Haberin konusu olan ürünü/şirketi/olayı en doğru gösteren GERÇEK fotoğrafı seç.
 - [Resmi basın] adayı haberin konusu olan ürünün/duyurunun resmi görseliyse onu tercih et (logo ya da genel kurumsal görsel değilse).
-- Ürünün kendisinin fotoğrafı (aynı model) varsa onu tercih et. Eski model ya da başka ürünse seçme.
-- Ürünün kendisi yoksa konuyu genel olarak temsil eden gerçekçi bir fotoğraf (ör. akıllı telefon haberine telefon fotoğrafı) seçilebilir.
+- Ürünün kendisinin fotoğrafı (aynı model) varsa onu tercih et. Eski modeli ya da başka bir ürünü haberin ürünüymüş gibi sunma.
+- Ürünün kendisi yoksa AYNI ÜRÜN TÜRÜNÜ ya da konuyu açıkça temsil eden gerçekçi bir fotoğrafı SEÇ (ör. ekran kartı haberine bir ekran kartı fotoğrafı, oyun haberine oyun kumandası, yazılım/güvenlik haberine kod ekranı, akıllı gözlük haberine akıllı gözlük). Bu temsili görsel kabul edilir; editör yayından önce değiştirebilir. Gerekçede "temsili" yaz.
+- Başka bir markanın ürününü öne çıkaran (logosu/adı belirgin) fotoğrafı temsili olarak bile seçme.
 - Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.
 - Hiçbiri uygun değilse -1 döndür. Uydurma yapma.
 Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe"}`;
