@@ -11,7 +11,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { INSANLASTIR_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { wpAyar, wpDene, wpGonder, type Kategori } from "./wordpress.ts";
-import { adayListesi, commons, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
+import { adayListesi, commons, kaynakDurumu, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -219,7 +219,10 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     ]);
     const goruldu = new Set<string>();
     const adaylar = [...r1, ...c1, ...o1, ...o2, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
-    if (!adaylar.length) return { ...bos, neden: "Serbest lisanslı uygun fotoğraf bulunamadı." };
+    if (!adaylar.length) {
+      const durum = Object.entries(kaynakDurumu).map(([k, v]) => `${k}: ${v}`).join(", ");
+      return { ...bos, neden: `Uygun fotoğraf bulunamadı (resmi ${r1.length}, Commons ${c1.length}, Openverse ${o1.length + o2.length} aday${durum ? "; " + durum : ""}).` };
+    }
     let veri: Record<string, unknown>;
     try {
       // Küçük modelden başlar; kotası dolmuşsa taslağı yazan büyük modellere geçer
