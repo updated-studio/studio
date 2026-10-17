@@ -28,10 +28,16 @@ const UA = "UpdatedStudyo/1.0 (https://www.updated.com.tr; haber gorseli secimi)
 const duz = (s: string) => String(s ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 const SERBEST = /^(cc0|public domain|pd|cc[- ]by(-sa)?[- ]\d)/i;
 
+/** Teşhis: kaynak başına son istek durumu (görsel bulunamazsa taslağın "Görsel" bölümüne yazılır) */
+export const kaynakDurumu: Record<string, string> = {};
 async function json(url: string, h: Record<string, string> = {}) {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), 10_000);
-  try { const r = await fetch(url, { headers: { "User-Agent": UA, ...h }, signal: c.signal }); return r.ok ? await r.json() : null; }
-  catch { return null; } finally { clearTimeout(t); }
+  const host = (() => { try { return new URL(url).hostname.replace(/^(www|api)\./, ""); } catch { return "?"; } })();
+  try {
+    const r = await fetch(url, { headers: { "User-Agent": UA, ...h }, signal: c.signal });
+    kaynakDurumu[host] = r.ok ? "tamam" : "hata " + r.status;
+    return r.ok ? await r.json() : null;
+  } catch { kaynakDurumu[host] = "yanıt yok"; return null; } finally { clearTimeout(t); }
 }
 
 /** Wikimedia Commons: marka + ürün adıyla, sadece serbest lisanslı ve yeterince büyük fotoğraflar */
