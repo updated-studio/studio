@@ -8,7 +8,8 @@
         "ad": "Haber Masası",
         "maddeler": [
           "WordPress'e giden taslaklarda metin 16 piksel, ara başlıklar mavi; sitedeki yazılarla aynı görünüyor.",
-          "Taslak WordPress'te tek bir klasik blok olarak değil, ayrı ayrı paragraf, başlık ve liste blokları olarak açılıyor; düzenlemesi kolay."
+          "Taslak WordPress'te tek bir klasik blok olarak değil, ayrı ayrı paragraf, başlık ve liste blokları olarak açılıyor; düzenlemesi kolay.",
+          "Ürünün kendi fotoğrafı bulunamazsa taslağa konuyu gösteren gerçekçi bir temsili fotoğraf konuyor (ör. ekran kartı haberine ekran kartı). Gerekçesi taslağın Görsel bölümünde yazıyor; yayından önce değiştirebilirsin."
         ]
       }
     ]
