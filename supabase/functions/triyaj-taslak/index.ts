@@ -212,16 +212,19 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     const anahtar = { pexels: Deno.env.get("PEXELS_API_KEY"), pixabay: Deno.env.get("PIXABAY_API_KEY") };
     const { data: bk } = it.brand ? await sb.from("tr_press").select("url").ilike("brand", it.brand) : { data: [] };
     const linkler = [it.link, ...((it.other_sources ?? []).map((o) => o.link))].filter(Boolean);
-    const [r1, c1, o1, o2, s1, s2] = await Promise.all([
+    const iz: string[] = [];
+    // Commons ve Openverse: önce marka + ürün, sonra konu aramaları (ilk ikisi). Alakasız olanları seçim adımı eler.
+    const [r1, c1, o1, o2, s1, s2, c2, o3] = await Promise.all([
       resmiGorsel({ linkler, marka: it.brand, basin: ((bk ?? []) as { url: string }[]).map((x) => x.url), urun: it.product, baslik: it.title }),
-      commons(urun), openverse(urun, 4), aramalar[0] ? openverse(aramalar[0], 3) : Promise.resolve([]),
+      commons(urun, 6, iz), openverse(urun, 4, iz), aramalar[0] ? openverse(aramalar[0], 3, iz) : Promise.resolve([]),
       aramalar[0] ? stokFoto(aramalar[0], 3, anahtar) : Promise.resolve([]), aramalar[1] ? stokFoto(aramalar[1], 2, anahtar) : Promise.resolve([]),
+      aramalar[0] ? commons(aramalar[0], 3, iz) : Promise.resolve([]), aramalar[1] ? openverse(aramalar[1], 2, iz) : Promise.resolve([]),
     ]);
     const goruldu = new Set<string>();
-    const adaylar = [...r1, ...c1, ...o1, ...o2, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
+    const adaylar = [...r1, ...c1, ...o1, ...o2, ...c2, ...o3, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
     if (!adaylar.length) {
       const durum = Object.entries(kaynakDurumu).map(([k, v]) => `${k}: ${v}`).join(", ");
-      return { ...bos, neden: `Uygun fotoğraf bulunamadı (resmi ${r1.length}, Commons ${c1.length}, Openverse ${o1.length + o2.length} aday${durum ? "; " + durum : ""}).` };
+      return { ...bos, neden: `Uygun fotoğraf bulunamadı (resmi ${r1.length} aday; ${iz.join("; ")}${durum ? "; " + durum : ""}).` };
     }
     let veri: Record<string, unknown>;
     try {
@@ -234,7 +237,7 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     }
     const i = Number(veri.secim);
     const secilen = Number.isInteger(i) && i >= 0 && i < adaylar.length ? adaylar[i] : null;
-    return { secilen, adaylar: adaylar.slice(0, 8), neden: String(veri.neden ?? "").slice(0, 200) || (secilen ? "" : "Uygun görsel yok.") };
+    return { secilen, adaylar: adaylar.slice(0, 8), neden: (String(veri.neden ?? "").slice(0, 200) || (secilen ? "" : "Uygun görsel yok.")) + (secilen ? "" : ` (${iz.join("; ")})`) };
   } catch (e) {
     return { ...bos, neden: "Görsel seçilemedi: " + String((e as Error).message ?? e).slice(0, 120) };
   }
