@@ -1,10 +1,19 @@
 # Çalışma günlüğü (Claude'un sohbetler arası hafızası)
 
-Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu dosya **süreci** tutar: ne konuşuldu, ne denendi, ne yarım kaldı, kullanıcı ne dedi. Her Claude oturumu başında **"Şu an" ve son 3 günlük kaydını** okur (tamamını değil, ucuz kalsın); her iş parçasının sonunda kayıt ekler (CLAUDE.md kural 13).
+Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu dosya **süreci** tutar: ne konuşuldu, ne denendi, ne yarım kaldı, kullanıcı ne dedi. Nasıl kullanılacağı aşağıdaki "İş akışı" bölümünde (CLAUDE.md kural 13).
 
 **Depo herkese açık:** buraya şifre, anahtar, kişisel e-posta, telefon ve proje dışı özel hayat bilgisi yazılmaz. Kişisel bilgiler Claude'un kendi hafızasında kalır.
 
 ---
+
+## İş akışı (her sohbette aynen uygulanır — Enes'in isteği, 19 Ekim)
+
+1. **Başlarken:** `git pull` → ARCHITECTURE.md → ORTAK_CALISMA.md → bu dosyanın "Şu an", "Çalışma biçimi", "Teknik notlar" bölümleri ve son 3 günlük kaydı. Enes'e tek cümleyle "şuradan devam ediyoruz" de; baştan anlattırma.
+2. **Çalışırken:** Her iş parçası bitince (yayına çıkınca ya da bir karar verilince) bugünün başlığı altına kayıt ekle ve gönder. Sohbetin sonunu bekleme: sohbet her an kesilebilir (limit, kapanma).
+3. **Kayda ne girer:** ne yapıldı; ne konuşuldu ve hangi seçenekler sunuldu; Enes ne dedi, neyi beğendi, neyi beğenmedi (mümkünse kendi kelimeleriyle); ne denendi ve olmadı; ne yarım kaldı; kimi ne bekliyoruz.
+4. **Bitirirken / limit yaklaşınca:** "Şu an" bölümünü güncelle, gönder, Project'teki kopyayı (`claude/GUNLUK.md`) güncelle.
+5. **Kalıcı karar** ise ayrıca ARCHITECTURE.md karar günlüğüne; ekibin göreceği değişiklikse `yenilikler.json`'a.
+6. Eski kayıtlar silinmez; dosya çok büyürse 2 haftadan eski günler `hafiza/arsiv/AAAA-AA.md`'ye taşınır.
 
 ## Şu an (her oturumda güncellenir)
 
@@ -25,7 +34,20 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - Tasarımda: iOS tarzı cam görünüm, amatör görünen şeyleri sevmez (dokununca mavi kare, beyaz zeminli bildirim), simgeler uygulama ikonu gibi. Global örneklere bakılmasını ister ("globalde ne yapıyorlar").
 - İsimlendirmede: anlaşılır olan kazanır (Öncelik 1/2/3 seçti; "Hemen yaz/Beklet" tutmadı).
 - Tasarruf: ücretsiz kotayı korumak önemli (çeviriyi ücretsiz uca taşıma isteği, Groq yedeği).
-- Sohbetler uzayınca yeni sohbete geçmekten tedirgin; bu günlük o yüzden var. Obsidian gibi ayrı bir sistem yerine bu depoda tutmayı seçti (19 Ekim).
+- Sohbetler uzayınca yeni sohbete geçmekten tedirgin; bu günlük o yüzden var. Obsidian gibi ayrı bir sistem yerine bu depoda tutmayı seçti; Supabase'i de sordu, GitHub seçildi (iki Claude da doğrudan okuyabiliyor, sürümlü, bedava) (19 Ekim). "Her detay girsin, bu bir iş akışı olsun, yeni sohbet buna devam etsin" dedi.
+
+## Teknik notlar (Claude için; tekrar aynı duvara çarpmamak için)
+
+- **Supabase SQL:** Yıkıcı (silme içeren) sorgularda Supabase onay ister; o düğmeye Enes basar, Claude basamaz. Normal sorgular Claude'un açtığı SQL Editor sekmesinde çalışır.
+- **Fonksiyon yayını (CLI yok):** Supabase → Edge Functions → fonksiyon → Code; Monaco'ya kod GitHub'ın raw adresinden `fetch` ile alınıp `monaco.editor.getModels()[0].setValue()`; sonra "Deploy updates" ve açılan pencerede yine "Deploy updates" (pencerede JS `.click()` çalışmadı, gerçek tıklama gerekti). Yayın oldu mu: üstte "a few seconds ago".
+- **Arka plandaki Chrome sekmesi donar:** zamanlayıcı ve `fetch` çalışmaz, komutlar zaman aşımına düşer. Çözüm: yeni sekme açıp orada çalış.
+- **Bu çalışma ortamının internet çıkışı kısıtlı:** status.supabase.com, updated-studio.github.io gibi adreslere komut satırından erişilemiyor; bu kontroller Enes'in Chrome'undaki Stüdyo sekmesinden `fetch` ile yapılır.
+- **GitHub Pages yayını** bazen 10-15 dk sürüyor; "yayında" demeden önce Actions'ın bittiğini ve dosyanın sitede olduğunu kontrol et.
+- **Supabase arka plan işi** ~150 sn'de kesiliyor; uzun işler süre bütçesiyle yazılır (taslak 115 sn).
+- **Ücretsiz çeviri ucu** (translate.googleapis.com) sunucudan çalışmıyor, tarayıcıdan çalışıyor.
+- **Gemini ücretsiz kota** sabah sıfırlanıyor; dolunca Groq yedeği.
+- **Ekran testi:** Playwright `executablePath: /opt/pw-browsers/chromium`; 375 px genişlikte açık/koyu tema ekran görüntüsü alıp bak.
+- `pkill` komutu Claude'un kendi kabuğunu da öldürebiliyor; önizleme sunucusunu kapatmak için kullanma.
 
 ## Günlük (en yeni üstte)
 
@@ -33,7 +55,8 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - Fatih #1-#23 değişikliklerini PR ile birleştirmiş (otomatik taslak + WordPress'e taslak gönderimi, görsel seçimi, üslup ve kalite kontrolü, kümeleme ve gömme, migration 0014-0018). Çektim, İçerik'e dokunulmamış.
 - İki kişinin aynı anda çalışması konuşuldu: ORTAK_CALISMA.md (kurallar + iki Claude'un not panosu) ve CLAUDE.md kural 12 eklendi; Fatih'in Claude'una ilk not bırakıldı.
 - ARCHITECTURE bölüm 19: İçerik modülünün bugünkü durumu (tek dosyalık araç, sadece 4:5, şablon aileleri Cam/Dergi/Vizör/Fiş, kayıtlar tarayıcıda) ve planı.
-- Hafıza konusu: Enes yeni sohbete geçişte bilgi kaybından endişeli; "md her şeyi kapsamıyor" dedi. Bu günlük dosyası ve kural 13 eklendi.
+- Hafıza konusu: Enes yeni sohbete geçişte bilgi kaybından endişeli; "md her şeyi kapsamıyor" dedi. Obsidian'ı sordu (şimdilik hayır: iki yerde tutmak eskir, kurulum yükü, 5 Kasım yakın). Supabase'i sordu (anlık ve bedava ama Claude'lar onu ancak tarayıcıdan okuyabiliyor, uygulama verisiyle karışır; GitHub seçildi). Bu günlük, iş akışı ve teknik notlar eklendi; CLAUDE.md kural 13.
+- Sürekli yeni sohbet açmak istemiyor: öneri her iş alanına tek uzun soluklu sohbet; yeni sohbet sadece konu değişince ya da sohbet pahalılaşınca.
 
 ### 14 Ekim 2026
 - Taslaklar "hazırlanıyor"da takılıyordu: sebep Supabase'in arka plan işini ~150 sn'de kesmesi + yapay zekâ isteğinin süre sınırı olmaması (eski Apps Script'te 6 dk vardı) + aynı gün Supabase'te 16 saatlik fonksiyon arızası. Çözüm: süre bütçesi, nabız, dakikada bir kurtarma görevi (0013), takıldı eşiği 2 dk. Enes "3 dk çok, kendiliğinden sıfırlansın" dedi → böyle yapıldı.
