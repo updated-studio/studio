@@ -30,6 +30,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - Teknik değil: yapması gereken adımda sayfayı aç, linki ver, ne tıklayacağını yaz. Şifre/anahtarı asla Claude girmez.
 - **Engel ya da sorun olunca hemen söyle** (token/limit dahil). Sormadan karar değiştirme; önceki geri bildirimlerini geri alma (13 Ekim'de bu yüzden uyardı).
 - Kalıcı silme istemeden yapılmaz. Çalışan şey yenisi bitmeden kapanmaz.
+- **İşi kolaylaştıracak temel şeyleri (bağlantılar, araçlar, otomasyon) Claude kendisi baştan önersin ve kursun;** "çok basit şeyler bizi oyalamasın" (19 Ekim, Supabase bağlantısı geç önerildiği için).
 - "Ben sürekli sana yazamam": sistem kendi kendini toparlamalı, ekip Enes'e sormadan anlayabilmeli (altyapı uyarısı, hata kaynağı etiketi bu yüzden).
 - Tasarımda: iOS tarzı cam görünüm, amatör görünen şeyleri sevmez (dokununca mavi kare, beyaz zeminli bildirim), simgeler uygulama ikonu gibi. Global örneklere bakılmasını ister ("globalde ne yapıyorlar").
 - İsimlendirmede: anlaşılır olan kazanır (Öncelik 1/2/3 seçti; "Hemen yaz/Beklet" tutmadı).
@@ -38,7 +39,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Teknik notlar (Claude için; tekrar aynı duvara çarpmamak için)
 
-- **Supabase bağlantısı (connector):** 19 Ekim'de Enes'e kurulumu önerildi. Kuruluysa veritabanı sorguları ve fonksiyon yayını **bağlantıyla** yapılır, Chrome sekmesiyle değil (aşağıdaki Chrome yöntemleri sadece yedek). Fatih'in Claude'unda bağlantı büyük ihtimalle kurulu. Ders: oturum başında hangi bağlantıların var olduğuna bak; 12-19 Ekim arası bu yapılmadığı için Chrome üzerinden zahmetle çalışıldı.
+- **Supabase bağlantısı (connector):** 19 Ekim'de kuruldu ve çalışıyor (Enes onay verdi; fonksiyon listesi ve SQL denendi). Kuruluysa veritabanı sorguları ve fonksiyon yayını **bağlantıyla** yapılır, Chrome sekmesiyle değil (aşağıdaki Chrome yöntemleri sadece yedek). Fatih'in Claude'unda bağlantı büyük ihtimalle kurulu. Ders: oturum başında hangi bağlantıların var olduğuna bak; 12-19 Ekim arası bu yapılmadığı için Chrome üzerinden zahmetle çalışıldı.
 
 - **Supabase SQL:** Yıkıcı (silme içeren) sorgularda Supabase onay ister; o düğmeye Enes basar, Claude basamaz. Normal sorgular Claude'un açtığı SQL Editor sekmesinde çalışır.
 - **Fonksiyon yayını (CLI yok):** Supabase → Edge Functions → fonksiyon → Code; Monaco'ya kod GitHub'ın raw adresinden `fetch` ile alınıp `monaco.editor.getModels()[0].setValue()`; sonra "Deploy updates" ve açılan pencerede yine "Deploy updates" (pencerede JS `.click()` çalışmadı, gerçek tıklama gerekti). Yayın oldu mu: üstte "a few seconds ago".
@@ -57,6 +58,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - Fatih #1-#23 değişikliklerini PR ile birleştirmiş (otomatik taslak + WordPress'e taslak gönderimi, görsel seçimi, üslup ve kalite kontrolü, kümeleme ve gömme, migration 0014-0018). Çektim, İçerik'e dokunulmamış.
 - İki kişinin aynı anda çalışması konuşuldu: ORTAK_CALISMA.md (kurallar + iki Claude'un not panosu) ve CLAUDE.md kural 12 eklendi; Fatih'in Claude'una ilk not bırakıldı.
 - ARCHITECTURE bölüm 19: İçerik modülünün bugünkü durumu (tek dosyalık araç, sadece 4:5, şablon aileleri Cam/Dergi/Vizör/Fiş, kayıtlar tarayıcıda) ve planı.
+- Supabase bağlantısı kuruldu; bundan sonra SQL ve fonksiyon yayını Chrome yerine bağlantıyla. Zamanlanmış görevler artık 8 (Fatih'in eklediği: triyaj-oto-taslak 10 dk'da bir, triyaj-kumele saatte iki kez, triyaj-gomme-temizlik gece).
 - Hafıza konusu: Enes yeni sohbete geçişte bilgi kaybından endişeli; "md her şeyi kapsamıyor" dedi. Obsidian'ı sordu (şimdilik hayır: iki yerde tutmak eskir, kurulum yükü, 5 Kasım yakın). Supabase'i sordu (anlık ve bedava ama Claude'lar onu ancak tarayıcıdan okuyabiliyor, uygulama verisiyle karışır; GitHub seçildi). Bu günlük, iş akışı ve teknik notlar eklendi; CLAUDE.md kural 13.
 - Sürekli yeni sohbet açmak istemiyor: öneri her iş alanına tek uzun soluklu sohbet; yeni sohbet sadece konu değişince ya da sohbet pahalılaşınca.
 
