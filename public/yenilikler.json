@@ -1,5 +1,44 @@
 [
   {
+    "id": "2026-10-18-a",
+    "tarih": "18 Ekim 2026",
+    "baslik": "Haber Masası: daha dolu taslaklar, son kontrol, 10'luk önem",
+    "bolumler": [
+      {
+        "ad": "Taslaklar",
+        "maddeler": [
+          "Taslaklar haber ajansı diliyle ve bizim üslubumuzla yazılıyor; özet değil, kaynaklardaki ayrıntıyı kullanan, malzemeye göre uzayan haberler.",
+          "Aynı olayı yazan bütün kaynaklar (en fazla 5) okunup tek haberde birleştiriliyor.",
+          "Spot en fazla 210 karakter, tam 3 ara başlık. Kaynak site adı sadece gerekiyorsa geçiyor.",
+          "Etiketler kaynak sitelerin kendi etiketlerinden seçiliyor; uygun düşerse sitemizdeki eski yazılara 1-2 iç link veriliyor.",
+          "Yeni: son kalite kontrolü. Taslak yazıldıktan sonra rakamlar, özel adlar, tutarsız ve taraflı ifadeler kaynaklara karşı denetlenip düzeltiliyor; bulunanlar taslakta \"Kalite kontrolünün bulduğu\" bölümünde. Kontrol sürerken taslakta \"Kontrol ediliyor\" yazar."
+        ]
+      },
+      {
+        "ad": "Öncelik",
+        "maddeler": [
+          "Kartlarda önem artık 10 üzerinden de yazıyor (ör. Öncelik 1 · 8,4).",
+          "Konunun Türkiye'deki genel ilgisi puana ekleniyor (telefon, yapay zekâ, oyun öne çıkar).",
+          "Öncelik 1 = ana sayfa adayı (8+), Öncelik 2 = yayına değer (5,5+). Ana sayfa adayı taslaklarda rozet var."
+        ]
+      },
+      {
+        "ad": "Havuz",
+        "maddeler": [
+          "Yarım saatte bir, aynı olayı anlatan kartlar (başlıkları farklı olsa da) tek kartta birleşiyor.",
+          "Türkiye gündemindeki teknoloji başlıkları (Google Trends) ve Anadolu Ajansı, TRT Haber, Samsung Türkiye kaynak olarak eklendi; siyaset ve teknoloji dışı gündem elenir."
+        ]
+      },
+      {
+        "ad": "Görsel",
+        "maddeler": [
+          "Üzerinde yazı olan banner, afiş, kolaj, ekran görüntüsü öne çıkan görsel olarak seçilmiyor; seçim görseller görülerek yapılıyor.",
+          "Fotoğraf bulunamazsa yapay zekâ (Flux) ile yazısız görsel üretimi için Taslaklar → Görsel'de \"Flux ile görsel üret\" var; Fatih'in bilgisayarına kurulum tamamlanınca kendiliğinden üretilecek."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-17-a",
     "tarih": "17 Ekim 2026",
     "baslik": "Taslaklar sitedeki yazı biçimiyle geliyor",

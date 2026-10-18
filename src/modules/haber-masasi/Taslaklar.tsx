@@ -7,15 +7,26 @@ import { useMasa, type Taslak } from "./veri";
 
 // Markdown → HTML ortak dosyada: WordPress'e giden metin ile "HTML kopyala" aynı olsun.
 import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
+import { fluxIstem } from "../../../supabase/functions/triyaj-taslak/gorsel.ts";
 
 /** Yapay zekâ bazen liste öğesini metin yerine nesne döndürür ({iddia, kaynak} gibi): ekran çökmesin diye metne çevrilir */
 const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof x === "object" ? Object.values(x as Record<string, unknown>).map((v) => metinYap(v)).filter(Boolean).join(" — ") : String(x ?? "");
 
 /** Eski taslak dokümanının "GÖRSEL" bölümü: öneri, alt text, basın kiti, stok önerileri, yapay zekâ istemi */
 function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
+  const toast = useToast();
   const g = t.image ?? {};
+  // Flux: Fatih'in bilgisayarındaki işçi bekleyen istekleri alır, üretip yükler (bilgisayar açık ve işçi çalışıyorsa)
+  async function fluxIste() {
+    const r = await sb.from("tr_drafts").update({ image: { ...g, flux: { durum: "bekliyor", istem: fluxIstem(g.ai_istem || t.title), istendi: new Date().toISOString() } } }).eq("id", t.id);
+    toast(r.error ? r.error.message : "Flux isteği sıraya alındı; bilgisayar açıkken üretilir ve buraya gelir.");
+  }
+  const flux = g.flux;
+  const fluxSatir = flux?.durum === "bekliyor" ? <div className="muted">🎨 Flux ile yazısız bir görsel üretilecek (Fatih'in bilgisayarı açıkken). İstem: {flux.istem}</div>
+    : flux?.durum === "hata" ? <div className="msg err">Flux görseli üretilemedi: {flux.hata} <button className="linkbtn" onClick={fluxIste}>Tekrar dene</button></div>
+    : !g.secilen ? <div><button className="btn ghost sm" onClick={fluxIste}>Flux ile görsel üret</button></div> : null;
   const stok = g.stok ?? [];
-  if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem && !g.secilen && !g.gorsel_neden) return null;
+  if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem && !g.secilen && !g.gorsel_neden && !flux) return null;
   const sec = g.secilen;
   return (
     <div className="panel">
@@ -32,6 +43,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
           </div>
         </div>
       ) : g.gorsel_neden ? <div className="muted">Öne çıkan görsel eklenmedi: {g.gorsel_neden}</div> : null}
+      {fluxSatir}
       <ul>
         <li>Öneri: {g.oneri || t.image_note}</li>
         {g.alt_text && <li>Alt text: {g.alt_text}</li>}
@@ -75,6 +87,8 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
           <button key={x.id} className="satir linkbtn" style={{ color: "inherit", width: "100%" }} onClick={() => setAcik(x.id)}>
             <div className="ana"><b>{x.title || "(başlıksız)"}</b><div className="muted">{kisi(x.author)?.name ?? "?"} · {zamanOnce(x.updated_at)} önce</div></div>
             {x.auto && <span className="pill purple" title="Stüdyo kendisi hazırladı">🤖</span>}
+            {x.qc?.ana_sayfa && <span className="pill rose" title={`Önem ${x.qc.onem ?? ""}/10`}>Ana sayfa adayı</span>}
+            {(x.qc_state === "bekliyor" || x.qc_state === "calisiyor") && <span className="pill off" title="Kaynaklara karşı son kontrol, görsel ve WordPress gönderimi">Kontrol ediliyor</span>}
             {x.wp_error && <span className="pill rose" title={x.wp_error}>WordPress hatası</span>}
             <span className={"pill " + (x.status === "hazir" ? "ok" : x.status === "gonderildi" ? "blue" : "off")}>{DURUM[x.status]}</span>
           </button>
@@ -147,6 +161,8 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       </div>
       {haber && <div className="muted">Haber: <a href={haber.link} target="_blank" rel="noreferrer">{haber.event || haber.title}</a></div>}
       {t.auto && <div className="muted">🤖 Bu taslağı Stüdyo en güçlü haberlerden otomatik hazırladı{t.author ? " ve ilgi alanına göre sana verdi" : ""}. Yayından önce doğrulama listesine bak.</div>}
+      {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel{t.auto ? " ve WordPress" : ""}). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
+      {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
       {t.wp_link && <div className="msg good">WordPress'te taslak olarak duruyor{t.wp_sent_at ? " (" + zamanOnce(t.wp_sent_at) + " önce gönderildi)" : ""}. <a href={t.wp_link} target="_blank" rel="noreferrer">WordPress'te aç ↗</a></div>}
       {t.wp_error && <div className="msg err">{t.wp_error}{/düzenlenmiş/.test(t.wp_error) && <> <button className="linkbtn" onClick={() => wordpressGonder(true)}>Üzerine yaz</button></>}</div>}
       <div className="panel">
@@ -180,6 +196,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       <div className="panel">
         <h3>Editör için (yayına girmez)</h3>
         {(t.questions ?? []).length > 0 && <><b>Senin katkın için sorular</b><div className="muted">Cevabını gövdede ilgili ara başlığın içine yerleştir.</div><ul>{t.questions.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
+        {(t.qc?.sorunlar ?? []).length > 0 && <><b>Kalite kontrolünün bulduğu</b><ul>{t.qc!.sorunlar!.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
         {(t.checks ?? []).length > 0 && <><b>Yayından önce doğrula</b><ul>{t.checks.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
         <label>Notlar (yapay zekânın emin olmadıkları)<textarea className="alan" rows={3} value={d.editor_note} onChange={(e) => alan("editor_note", e.target.value)} /></label>
       </div>

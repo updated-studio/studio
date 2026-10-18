@@ -58,8 +58,31 @@ function etiket(blok: string, ad: string): string {
   const m = blok.match(new RegExp(`<${ad}(?:\\s[^>]*)?>([\\s\\S]*?)</${ad}>`, "i"));
   return m ? m[1] : "";
 }
+// Türkiye gündemi (Fatih, 18 Ekim 2026): Google Trends Türkiye RSS'i. Her gündem başlığının altındaki haber bağlantıları ayrı haber olur;
+// özete gündem kelimesi yazılır. Teknoloji dışı ve siyaset haberleri kuralla elenir (GUNDEM_KONU), rakip teknoloji siteleri alınmaz.
+// X, Instagram ve Ekşi Sözlük'ün herkese açık, kurallara uygun bir okuma yolu (API/RSS) yok; gündem bu kaynaktan izlenir.
+const RAKIP = /(^|\.)(webtekno|shiftdelete|donanimhaber|technopat|log|chip|teknoblog|megabayt|tamindir|teknolojioku|donanimarsivi|mobilsiteler|teknoseyir|sdn|cepkolik|hardwareplus|teknokulis|indir)\.(com|com\.tr|net|org)$/i;
+export const GUNDEM_KONU = new Set(["telefon", "tablet", "bilgisayar", "bileşen", "giyilebilir", "ses", "kamera", "drone", "video ekipmanı", "ev aletleri", "akıllı ev", "oyun", "yapay zeka", "yazılım", "otomobil"]);
+const gundemMi = (k: Kaynak) => /trends\.google\./i.test(k.url);
+
+function gundemCoz(xml: string, k: Kaynak): Ham[] {
+  const out: Ham[] = [];
+  for (const b of xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? []) {
+    const terim = temiz(etiket(b, "title"));
+    const ds = temiz(etiket(b, "pubDate")); const d = ds ? new Date(ds) : null;
+    for (const n of b.match(/<ht:news_item>[\s\S]*?<\/ht:news_item>/gi) ?? []) {
+      const link = temiz(etiket(n, "ht:news_item_url")), baslik = temiz(etiket(n, "ht:news_item_title")), site = temiz(etiket(n, "ht:news_item_source"));
+      let host = ""; try { host = new URL(link).hostname.replace(/^www\./, ""); } catch { continue; }
+      if (!baslik || RAKIP.test(host)) continue;
+      out.push({ source: { ...k, name: `Gündem · ${site || host}` }, title: baslik, link, date: d && !isNaN(+d) ? d : null, ozet: `Türkiye gündemi (Google Trends): "${terim}". Kaynak: ${site || host}` });
+    }
+  }
+  return out;
+}
+
 // RSS 2.0, RSS 1.0 (RDF) ve Atom
 function rssCoz(xml: string, k: Kaynak): Ham[] {
+  if (gundemMi(k)) return gundemCoz(xml, k);
   const out: Ham[] = [];
   const bloklar = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? xml.match(/<entry[\s>][\s\S]*?<\/entry>/gi) ?? [];
   for (const b of bloklar) {
@@ -305,6 +328,8 @@ async function topla(sb: ReturnType<typeof createClient>) {
     if (haric) { elenen.push(satir(h, { ...ortak, reason: "Hariç listesinde: " + haric.orj })); return; }
     if (e.tur === "rehber") { rehber.push(satir(h, { ...ortak, status: "rehber", event: String(e.neden ?? "").slice(0, 400) })); return; } // Enes: rehber/liste içerik elenmez, "Rehber fikirleri"ne düşer
     if (e.tur === "kampanya") { elenen.push(satir(h, { ...ortak, reason: "Tür: " + TUR[String(e.tur)] })); return; }
+    // Gündem kaynağı: sadece teknoloji konuları; siyaset/spor/magazin vb. elenir
+    if (gundemMi(h.source) && !GUNDEM_KONU.has(String(e.konu ?? ""))) { elenen.push(satir(h, { ...ortak, reason: "Gündem: teknoloji dışı (" + String(e.konu ?? "-") + ")" })); return; }
     if (e.turkiye === "belirsiz") { belirsiz.push(satir(h, { ...ortak, status: "belirsiz", reason: String(e.neden ?? "").slice(0, 300), event: String(e.neden ?? "").slice(0, 400), turkey: "belirsiz" })); return; }
     if (e.turkiye === "yok" && grup !== "Öncelikli") { elenen.push(satir(h, { ...ortak, reason: "Türkiye ile ilgisi yok: " + String(e.neden ?? "") })); return; }
     kalan.push({ h, e });
@@ -424,6 +449,44 @@ async function birlestir(sb: ReturnType<typeof createClient>, model: string, sad
   return { kart: liste.length, birlesen };
 }
 
+// 30 dakikada bir (Fatih, 18 Ekim 2026): son 48 saatteki kartlardan AYNI OLAYI anlatanlar markadan bağımsız tek karta birleşir.
+// Başlıkları farklı olabilir. Ekibin dokunduğu (alınmış, oylanmış, taslağı yazılmış) kart her zaman tutulan karttır; dokunulmamışlar
+// onun "diğer kaynakları"na eklenir ve silinir (bağlantıları tr_seen'e yazılır, tekrar gelmez). Böylece taslak tek kartta, bütün kaynaklarla yazılır.
+const KUME_SISTEM = `Sana numaralı haber kartları verilecek (id | marka | olay özeti | başlık). Aynı OLAYI anlatan kartları grupla: aynı ürün duyurusu, aynı sızıntı, aynı açıklama, aynı dava/karar, aynı güncelleme. Başlıklar ve diller farklı olabilir; markası boş ya da farklı yazılmış olabilir. Aynı markanın FARKLI haberleri (ör. aynı şirketin iki ayrı ürünü) ayrı kalır. Emin değilsen gruplama. Tek kartlık grup yazma.
+Sadece şu biçimde geçerli JSON döndür: {"gruplar":[[12,15],[20,31,33]]}`;
+
+async function kumele(sb: ReturnType<typeof createClient>, model: string) {
+  const bas = Date.now();
+  const { data } = await sb.from("tr_items").select("id,brand,event,title,link,source_name,other_sources,touched,status,auto_draft_at,created_at")
+    .in("status", ["aday", "belirsiz", "alindi"]).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
+    .order("created_at", { ascending: false }).limit(300);
+  type K = { id: number; brand: string; event: string; title: string; link: string; source_name: string; other_sources: { name: string; link: string }[]; touched: boolean; status: string; auto_draft_at: string | null; created_at: string };
+  const liste = (data ?? []) as K[];
+  let birlesen = 0, grup = 0;
+  if (liste.length >= 2) {
+    const v = await gemini(model, liste.map((x) => `${x.id} | ${x.brand || "-"} | ${x.event || "-"} | ${x.title}`).join("\n"), KUME_SISTEM);
+    for (const kume of (v.gruplar ?? []) as number[][]) {
+      const kartlar = [...new Set(kume.map(Number))].map((id) => liste.find((x) => x.id === id)).filter(Boolean) as K[];
+      if (kartlar.length < 2) continue;
+      // Tutulan: ekibin dokunduğu (alınmış/taslaklı/oylanmış) → en çok kaynaklı → en eski
+      const tutulan = [...kartlar].sort((a, b) => Number(b.touched || b.status === "alindi") - Number(a.touched || a.status === "alindi")
+        || b.other_sources.length - a.other_sources.length || Date.parse(a.created_at) - Date.parse(b.created_at))[0];
+      const digerleri = kartlar.filter((x) => x !== tutulan && !x.touched && x.status !== "alindi" && !x.auto_draft_at);
+      if (!digerleri.length) continue;
+      const tum = [...tutulan.other_sources];
+      digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources])
+        .forEach((o) => { if (o.link !== tutulan.link && !tum.some((t) => t.link === o.link)) tum.push(o); });
+      await sb.from("tr_items").update({ other_sources: tum }).eq("id", tutulan.id);
+      await sb.from("tr_seen").upsert(digerleri.map((x) => ({ link: x.link })), { onConflict: "link", ignoreDuplicates: true });
+      await sb.from("tr_items").delete().in("id", digerleri.map((x) => x.id)).eq("touched", false).is("auto_draft_at", null);
+      birlesen += digerleri.length; grup++;
+    }
+  }
+  const ozet = { zaman: new Date().toISOString(), kart: liste.length, grup, birlesen, sure: Date.now() - bas };
+  await sb.from("tr_settings").upsert({ key: "son_kumeleme", value: ozet });
+  return ozet;
+}
+
 const GRUP_SISTEM = `Sana aynı markaya ait numaralı haber kartları verilecek (id | olay). AYNI OLAYI anlatan kartları gruplandır (aynı ürün duyurusu, aynı sızıntı, aynı gelişme). Sadece birebir aynı olaylar bir gruba girer; emin değilsen gruplama. Tek kartlık grupları yazma.
 Sadece şu biçimde geçerli JSON döndür: {"gruplar":[[12,15],[20,31,33]]}`;
 
@@ -441,6 +504,16 @@ Deno.serve(async (req) => {
     let n = 0;
     for (let i = 0; i < l.length; i++) if (tr[i]) { await sb.from("tr_items").update({ event: tr[i].slice(0, 400) }).eq("id", l[i].id); n++; }
     return Response.json({ bulunan: l.length, cevrilen: n }, { headers: CORS });
+  }
+  // Zamanlanmış kümeleme (30 dk'da bir, tr_kumele_kick); girdi almaz, 20 dakikadan sık çalışmaz
+  if (govde?.kumele) {
+    const { data: k } = await sb.from("tr_settings").select("value").eq("key", "son_kumeleme").maybeSingle();
+    if (k?.value?.zaman && Date.now() - Date.parse(k.value.zaman) < 20 * 60_000) return Response.json({ atlandi: "Son 20 dakikada çalıştı" }, { headers: CORS });
+    const ay = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
+    if (ay.model_yedek) YEDEK_MODEL = String(ay.model_yedek);
+    // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+    EdgeRuntime.waitUntil(kumele(sb, String(ay.model_eleme ?? "gemini-3.5-flash-lite")).catch((e) => sb.from("tr_settings").upsert({ key: "son_kumeleme", value: { zaman: new Date().toISOString(), hata: String(e).slice(0, 200) } })));
+    return Response.json({ basladi: true }, { status: 202, headers: CORS });
   }
   if (govde?.birlestir) {
     const { data: u } = await sb.auth.getUser((req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, ""));

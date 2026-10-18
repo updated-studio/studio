@@ -147,6 +147,46 @@ async function gorselYukle(a: WpAyar, g: GorselAday, alt: string, ad: string): P
   } finally { clearTimeout(t); }
 }
 
+/** Sitemizin arşivinden ilgili yazılar (iç link adayı). Sadece yayındaki yazılar; aramalar sırayla, en fazla 6 sonuç. */
+export async function wpIlgili(aramalar: string[]): Promise<{ baslik: string; link: string }[]> {
+  const a = wpAyar();
+  if (!a) return [];
+  const out: { baslik: string; link: string }[] = [];
+  for (const q of aramalar.map((x) => x.trim()).filter((x) => x.length >= 3).slice(0, 3)) {
+    const r = await wp(a, `/wp/v2/posts?status=publish&per_page=4&search=${encodeURIComponent(q)}&_fields=title,link`);
+    if (!Array.isArray(r.veri)) continue;
+    for (const p of r.veri as { title: { rendered: string }; link: string }[]) {
+      if (p.link && !out.some((o) => o.link === p.link)) out.push({ baslik: coz(p.title?.rendered ?? "").replace(/<[^>]+>/g, ""), link: p.link });
+    }
+    if (out.length >= 6) break;
+  }
+  return out.slice(0, 6);
+}
+
+/** Sonradan gelen görseli (Flux) WordPress'teki taslağın öne çıkan görseli yapar: yazı hâlâ taslaksa ve öne çıkan görseli yoksa. */
+export async function wpOneCikanEkle(sb: Sb, taslakId: number): Promise<{ ok: boolean; hata?: string }> {
+  const a = wpAyar();
+  if (!a) return { ok: false, hata: "WordPress bağlantısı yok" };
+  const { data: t } = await sb.from("tr_drafts").select("id,title,seo,image,wp_post_id,wp_modified").eq("id", taslakId).single();
+  const img = (t?.image ?? {}) as { secilen?: GorselAday | null; wp_media_id?: number; alt_text?: string };
+  if (!t?.wp_post_id || !img.secilen?.buyuk) return { ok: false, hata: "Yazı ya da görsel yok" };
+  const m = await wp(a, `/wp/v2/posts/${t.wp_post_id}?context=edit&_fields=id,status,featured_media,modified_gmt`);
+  const v = m.veri as { status?: string; featured_media?: number; modified_gmt?: string } | null;
+  if (!m.ok || !v) return { ok: false, hata: hataMetni(m.status, m.metin) };
+  if (!["draft", "pending"].includes(v.status ?? "") || (v.featured_media ?? 0) > 0) return { ok: false, hata: "Yazının zaten öne çıkan görseli var ya da yayında; dokunulmadı." };
+  let medya = img.wp_media_id;
+  if (!medya) {
+    const y = await gorselYukle(a, img.secilen, img.alt_text || t.title, ((t.seo ?? {}) as { slug?: string }).slug || "");
+    medya = y.id;
+    await sb.from("tr_drafts").update({ image: { ...img, wp_media_id: y.id ?? null, yukleme_hata: y.hata ?? "" } }).eq("id", taslakId);
+    if (!medya) return { ok: false, hata: y.hata };
+  }
+  const g = await wp(a, `/wp/v2/posts/${t.wp_post_id}`, { method: "POST", body: { featured_media: medya } });
+  // Editör WordPress'te değiştirmediyse "son gördüğümüz" zamanı ilerlet (değiştirdiyse koruma sürsün)
+  if (g.ok && t.wp_modified === v.modified_gmt) await sb.from("tr_drafts").update({ wp_modified: (g.veri as { modified_gmt?: string })?.modified_gmt ?? "" }).eq("id", taslakId);
+  return g.ok ? { ok: true } : { ok: false, hata: hataMetni(g.status, g.metin) };
+}
+
 type Secenek = { zorla?: boolean; kategoriSec?: (baslik: string, oneri: string, liste: Kategori[]) => Promise<string> };
 
 /** Taslağı WordPress'e taslak olarak gönderir ya da daha önce gönderilmişse günceller. Sonucu tr_drafts'a yazar. */

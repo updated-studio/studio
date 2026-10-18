@@ -8,10 +8,11 @@
 // Dosyalar: uslup.ts (yazım üslubu, insanlaştırma), puan.ts (öncelik puanı, ekranla ortak), secim.ts (otomatik taslak: haber ve editör seçimi), gorsel.ts (öne çıkan görsel), html.ts (Markdown → HTML, ekranla ortak), wordpress.ts (WordPress REST).
 // Panelden yayınlarken yedi dosya birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { INSANLASTIR_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
+import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
+import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
-import { wpAyar, wpDene, wpGonder, type Kategori } from "./wordpress.ts";
-import { adayListesi, commons, kaynakDurumu, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
+import { wpAyar, wpDene, wpGonder, wpIlgili, wpOneCikanEkle, type Kategori } from "./wordpress.ts";
+import { adayListesi, commons, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -37,6 +38,28 @@ function htmlMetin(html: string): string {
   return (h.match(/<(p|h2|h3|li)[^>]*>[\s\S]*?<\/\1>/gi) ?? [])
     .map((p) => coz(p.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim())
     .filter((p) => p.length > 40).join("\n");
+}
+
+/** Kaynak sitenin kendi etiketleri (article:tag, news_keywords, keywords) */
+function metaEtiketler(html: string): string[] {
+  const out: string[] = [];
+  for (const m of html.matchAll(/<meta[^>]+(?:property|name)=["'](?:article:tag|news_keywords|keywords|parsely-tags|sailthru\.tags)["'][^>]*>/gi)) {
+    const c = m[0].match(/content=["']([^"']+)["']/i)?.[1];
+    if (c) out.push(...coz(c).split(/[,;|]/).map((x) => x.trim()).filter((x) => x.length >= 2 && x.length <= 40));
+  }
+  return [...new Set(out)].slice(0, 15);
+}
+
+/** Makale metni + kaynak etiketleri (Fatih, 18 Ekim: kaynak meta verisinden etiket) */
+async function kaynakOku(url: string, sinir: number): Promise<{ metin: string; etiketler: string[] }> {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), 15000);
+  let ham = "";
+  try { const r = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: c.signal, redirect: "follow" }); ham = r.ok ? await r.text() : ""; }
+  catch { /* yedek okuma servisi */ } finally { clearTimeout(t); }
+  const etiketler = metaEtiketler(ham.slice(0, 200_000));
+  const dogrudan = htmlMetin(ham);
+  if (dogrudan.length >= 600) return { metin: dogrudan.slice(0, sinir), etiketler };
+  return { metin: await makaleCek(url, sinir), etiketler };
 }
 
 // Eski makaleCek_ + okuma servisi yedeği (site doğrudan okumayı engellerse)
@@ -66,7 +89,7 @@ function jsonOku(ham: string): Record<string, any> | null { // eslint-disable-li
 // Toplam süre bütçesi: sunucu ~150 sn'de işi öldürür, ondan önce bitirip hata yazmalıyız
 const BUTCE_MS = 115_000;
 
-async function gemini(sistem: string, kullanici: string, modeller: string[], bitis = Date.now() + BUTCE_MS) {
+async function gemini(sistem: string, kullanici: string, modeller: string[], bitis = Date.now() + BUTCE_MS, resimler: { mime: string; b64: string; etiket?: string }[] = []) {
   const kalan = () => bitis - Date.now();
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY yok (Supabase Secrets)");
@@ -84,7 +107,7 @@ async function gemini(sistem: string, kullanici: string, modeller: string[], bit
           headers: { "Content-Type": "application/json", "x-goog-api-key": key },
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: sistem }] },
-            contents: [{ role: "user", parts: [{ text: kullanici }] }],
+            contents: [{ role: "user", parts: [{ text: kullanici }, ...resimler.flatMap((g, i) => [{ text: (g.etiket ?? `Resim ${i}`) + ":" }, { inline_data: { mime_type: g.mime, data: g.b64 } }])] }],
             generationConfig: { temperature: 0.4, responseMimeType: "application/json", ...(dusunme ? { thinkingConfig: { thinkingLevel: "low" } } : {}) },
           }),
         });
@@ -145,15 +168,19 @@ const taslakSistem = (uslup: string) => `Sen Updated (updated.com.tr) adlı Tür
 
 KURALLAR:
 - Çeviri yapma; bilgiyi tamamen kendi cümlelerinle, sade ve akıcı haber Türkçesiyle yeniden yaz. Kaynak cümlesini kopyalama.
-- Ters piramit: en önemli bilgi ilk paragrafta. 3-4 adet H2 ara başlık, toplam 300-450 kelime, kısa paragraflar.
+- Ters piramit: en önemli bilgi ilk paragrafta. TAM 3 adet H2 ara başlık, kısa paragraflar. Uzunluğu kaynakların zenginliği belirler (üsluptaki UZUNLUK kuralı): özet değil, gerektiği kadar ayrıntı.
+- Birden fazla kaynak verildiyse hepsini oku ve birleştir: her kaynaktaki farklı ayrıntıyı kullan, tekrar etme; kaynaklar çelişiyorsa bunu belirt ve editor_notlari'na yaz.
+- Spot en fazla 210 karakter.
+- Etiketler: önce KAYNAK SİTELERİN ETİKETLERİ'nden habere uyanlar (marka, ürün, teknoloji adı), sonra eksik kalanlar; 5-7 adet.
 - Başlık merak uyandırsın ama her iddiasının kaynakta birebir karşılığı olsun; abartı, "şok", tık tuzağı yok.
+- Haber ajansı titizliği: rakamları, özel adları, tarihleri kaynaktaki gibi aktar; tarafsız yaz, reklam dili kullanma.
 - Doğrulanmamış bilgiyi "iddiaya göre" veya "sızıntıya göre" diye açıkça işaretle.
 - Fiyatları kaynaktaki para biriminde ver, TL'ye çevirme.
 - Kaynakta olmayan bilgi, rakam veya tarih ekleme. Emin olmadığın şeyi editor_notlari'na yaz.
 - Haber resmi değilse (sızıntı, söylenti, mod) dikkat_edilmesi_gerekenler alanını doldur; resmi ise boş dizi bırak.
 - editor_sorulari: editörün habere kendi uzmanlığını ve Türkiye bağlamını katabilmesi için 2-3 somut soru (örn. Türkiye'de satış durumu, önceki modelle kendi deneyimi, sahada kullanım).
 - dogrulama: editörün yayından önce kontrol etmesi gereken iddialar; her biri için hangi kaynakta geçtiği.
-- gorsel: oneri = telif riski olmayan resmi görsel öner (üreticinin basın sayfası veya basın kiti); URL uydurma, sadece nereden bulunacağını yaz. alt_text = Türkçe alt text. aramalar = stok fotoğraf sitesinde aranacak TAM 3 farklı İngilizce arama dizisi, her biri 2-4 kelime: (1) haberin konusunu temsil eden somut ürün kategorisi/sahne (örn. mirrorless camera on tripod), (2) kullanım sahnesi (örn. videographer filming outdoors), (3) detay/atmosfer (örn. camera sensor close up). Marka veya model adı yazma, haberin konusuyla doğrudan ilgili ol, genel "technology" gibi boş kelimelerden kaçın. ai_istem = yapay zekâ görsel üreticisi için 1-2 cümlelik İngilizce istem; gerçek ürünü birebir çizmeye çalışma, konsept veya atmosfer tarif et.
+- gorsel: oneri = telif riski olmayan resmi görsel öner (üreticinin basın sayfası veya basın kiti); URL uydurma, sadece nereden bulunacağını yaz. alt_text = Türkçe alt text. aramalar = stok fotoğraf sitesinde aranacak TAM 3 farklı İngilizce arama dizisi, her biri 2-4 kelime: (1) haberin konusunu temsil eden somut ürün kategorisi/sahne (örn. mirrorless camera on tripod), (2) kullanım sahnesi (örn. videographer filming outdoors), (3) detay/atmosfer (örn. camera sensor close up). Marka veya model adı yazma, haberin konusuyla doğrudan ilgili ol, genel "technology" gibi boş kelimelerden kaçın. ai_istem = yapay zekâ görsel üreticisi (Flux) için 1-2 cümlelik İngilizce istem: haberin konusunu gösteren gerçekçi bir sahne/nesne; gerçek ürünü birebir çizmeye çalışma, marka/logo/yazı isteme.
 - Teknik terimler gerektiğinde İngilizce kalabilir.
 - dikkat_edilmesi_gerekenler editöre gider, metne girmez; metnin kendisinde de doğrulanmamış bilgiyi açıkça işaretle.
 
@@ -164,23 +191,6 @@ Sadece şu biçimde geçerli JSON döndür:
 {"focus_keyword":"","title_tag":"(en fazla 60 karakter)","slug":"turkce-karaktersiz-tireli","meta_description":"(en fazla 155 karakter)","kategori":"","etiketler":["5-7 adet"],"baslik":"","spot":"1-2 cümle","govde":[{"h2":"","paragraflar":[""]}],"dikkat_edilmesi_gerekenler":[""],"editor_sorulari":[""],"dogrulama":[""],"kaynaklar":["kaynak adı"],"gorsel":{"oneri":"","alt_text":"","aramalar":["","",""],"ai_istem":""},"editor_notlari":[""]}`;
 
 const CEVIRI_SISTEM = 'Sen bir çevirmensin. Verilen İngilizce teknoloji haberini paragraf yapısını koruyarak eksiksiz ve sadık biçimde Türkçeye çevir. Yorum, özet veya ekleme yapma. Sadece şu JSON\'u döndür: {"ceviri":"paragraflar arasında \\n\\n olan metin"}';
-
-type Stok = { kaynak: string; url: string; thumb: string; yazar: string; w: number; h: number };
-// Eski tr_stok_: Unsplash, Pixabay, Pexels (anahtarı olanlar), her aramadan 3'er
-async function stok(q: string): Promise<Stok[]> {
-  const out: Stok[] = [];
-  const uk = Deno.env.get("UNSPLASH_ACCESS_KEY"), bk = Deno.env.get("PIXABAY_API_KEY"), pk = Deno.env.get("PEXELS_API_KEY");
-  const al = async (url: string, h: Record<string, string> = {}) => { try { const r = await fetch(url, { headers: h }); return r.ok ? await r.json() : null; } catch { return null; } };
-  const [u, b, p] = await Promise.all([
-    uk ? al("https://api.unsplash.com/search/photos?per_page=3&orientation=landscape&query=" + encodeURIComponent(q), { Authorization: "Client-ID " + uk }) : null,
-    bk ? al("https://pixabay.com/api/?key=" + encodeURIComponent(bk) + "&per_page=3&orientation=horizontal&image_type=photo&safesearch=true&q=" + encodeURIComponent(q)) : null,
-    pk ? al("https://api.pexels.com/v1/search?per_page=3&orientation=landscape&query=" + encodeURIComponent(q), { Authorization: pk }) : null,
-  ]);
-  (u?.results ?? []).forEach((x: any) => out.push({ kaynak: "Unsplash", url: x.links.html, thumb: x.urls.small, yazar: x.user.name, w: x.width, h: x.height })); // eslint-disable-line @typescript-eslint/no-explicit-any
-  (b?.hits ?? []).forEach((x: any) => out.push({ kaynak: "Pixabay", url: x.pageURL, thumb: x.webformatURL, yazar: x.user, w: x.imageWidth, h: x.imageHeight })); // eslint-disable-line @typescript-eslint/no-explicit-any
-  (p?.photos ?? []).forEach((x: any) => out.push({ kaynak: "Pexels", url: x.url, thumb: x.src.medium, yazar: x.photographer, w: x.width, h: x.height })); // eslint-disable-line @typescript-eslint/no-explicit-any
-  return out;
-}
 
 type Sb = ReturnType<typeof createClient>;
 type IsSecenek = { oto?: boolean };
@@ -221,7 +231,7 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
       aramalar[0] ? commons(aramalar[0], 3, iz) : Promise.resolve([]), aramalar[1] ? openverse(aramalar[1], 2, iz) : Promise.resolve([]),
     ]);
     const goruldu = new Set<string>();
-    const adaylar = [...r1, ...c1, ...o1, ...o2, ...c2, ...o3, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 12);
+    const adaylar = [...r1, ...c1, ...o1, ...o2, ...c2, ...o3, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 10);
     if (!adaylar.length) {
       const durum = Object.entries(kaynakDurumu).map(([k, v]) => `${k}: ${v}`).join(", ");
       return { ...bos, neden: `Uygun fotoğraf bulunamadı (resmi ${r1.length} aday; ${iz.join("; ")}${durum ? "; " + durum : ""}).` };
@@ -229,8 +239,11 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     let veri: Record<string, unknown>;
     try {
       // Küçük modelden başlar; kotası dolmuşsa taslağı yazan büyük modellere geçer
-      ({ veri } = await gemini(SECIM_SISTEM, `Haber başlığı: ${baslik}\nÜrün: ${urun || "-"}\nOrijinal başlık: ${it.title}\n\nAdaylar:\n${adayListesi(adaylar)}`,
-        ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 30_000, Date.now() + 25_000)));
+      // Yapay zekâ adayların kendisini de görür (yazılı banner, logo, kolaj elensin; Fatih 18 Ekim). Küçük kopya alınamayan aday sadece açıklamayla değerlendirilir.
+      const resimler = await Promise.all(adaylar.map((a) => kucukResim(a.thumb || a.buyuk)));
+      const gorunen = resimler.map((g, i) => g ? i : -1).filter((i) => i >= 0);
+      ({ veri } = await gemini(SECIM_SISTEM, `Haber başlığı: ${baslik}\nÜrün: ${urun || "-"}\nOrijinal başlık: ${it.title}\n\nAdaylar:\n${adayListesi(adaylar)}\n\nResmi gösterilen adaylar: ${gorunen.join(", ") || "yok"} (resimler sırayla "Aday N:" etiketiyle ekte).`,
+        ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 30_000, Date.now() + 30_000), gorunen.map((i) => ({ ...resimler[i]!, etiket: `Aday ${i}` }))));
     } catch {
       const k = kuralSecim(adaylar, urun);
       return { secilen: k, adaylar: adaylar.slice(0, 8), neden: k ? "Yapay zekâ yanıt vermedi; ürün adıyla birebir eşleşen serbest lisanslı fotoğraf seçildi." : "Yapay zekâ yanıt vermedi ve ürün adıyla eşleşen fotoğraf yok; görsel eklenmedi." };
@@ -265,11 +278,16 @@ async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici:
       return;
     }
 
-    // İki kaynak: asıl haber + ilk "diğer kaynak"
-    const diger = ((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link && o.link !== it.link);
-    const [ana, ek] = await Promise.all([makaleCek(it.link, 12000), diger[0] ? makaleCek(diger[0].link, 6000) : Promise.resolve("")]);
-    const metinler = [`KAYNAK 1 (${it.source_name}) ${it.link}\n` + (ana.length >= 300 ? ana : `(Tam metin alınamadı. Başlık: ${it.title})`)];
-    if (ek.length >= 300) metinler.push(`KAYNAK 2 ${diger[0].link}\n` + ek);
+    // Kümedeki bütün kaynaklar (Fatih, 18 Ekim): asıl haber + en fazla 4 diğer kaynak, paralel okunur
+    const diger = ((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link && o.link !== it.link).slice(0, 4);
+    const [ana, ...ekler] = await Promise.all([kaynakOku(it.link, 14000), ...diger.map((o) => kaynakOku(o.link, 8000))]);
+    const metinler = [`KAYNAK 1 (${it.source_name}) ${it.link}\n` + (ana.metin.length >= 300 ? ana.metin : `(Tam metin alınamadı. Başlık: ${it.title})`)];
+    ekler.forEach((e, i) => { if (e.metin.length >= 300) metinler.push(`KAYNAK ${metinler.length + 1} (${diger[i].name}) ${diger[i].link}\n` + e.metin); });
+    // Kaynak sitelerin kendi etiketleri (meta: article:tag, news_keywords, keywords): WordPress etiketleri için aday
+    const kaynakEtiket = [...new Set([ana, ...ekler].flatMap((e) => e.etiketler))].slice(0, 25);
+    // Sitemizin arşivinden ilgili yazılar (iç link adayı)
+    const ilgili = await wpIlgili([[it.brand, it.product].filter(Boolean).join(" "), it.product, it.brand].filter(Boolean)).catch(() => []);
+    await nabiz();
     // Kategori sitedeki listeden seçilsin (liste WordPress'ten okununca saklanır; yoksa serbest yazar)
     const kategoriler = await kayitliKategoriler(sb);
     const katSatiri = kategoriler.length ? `\nKATEGORİ: "kategori" alanına SADECE şu listeden birini aynen yaz: ${kategoriler.map((k) => k.name).join(" | ")}\n` : "";
@@ -278,17 +296,23 @@ Haber özeti (sistemden): ${it.event}
 Marka: ${it.brand} · Tür: ${it.kind} · Asıl kaynak: ${it.origin || it.source_name}
 Orijinal başlık: ${it.title}
 ${katSatiri}
+KAYNAK SİTELERİN ETİKETLERİ (etiket seçerken öncelik ver; Türkçe yaygın karşılığı varsa onu yaz): ${kaynakEtiket.join(", ") || "-"}
+
+SİTEMİZDEN İLGİLİ YAZILAR (iç link için; sadece bunlar):
+${ilgili.length ? ilgili.map((x) => `- ${x.baslik} — ${x.link}`).join("\n") : "- yok (iç link verme)"}
+
 ${metinler.join("\n\n---\n\n")}`;
 
-    const { data: us } = await sb.from("tr_settings").select("value").eq("key", "yazim_uslubu").maybeSingle();
-    const uslup = typeof us?.value === "string" && us.value.trim().length > 50 ? us.value : USLUP_VARSAYILAN;
+    const uslup = await uslupAl(sb);
     await nabiz();
     const { veri: t, model } = await gemini(taslakSistem(uslup), istem, MODELLER, bitis);
     await nabiz();
     const notlar: string[] = metinListe(t.editor_notlari);
-    if (ana.length < 300) notlar.push("Kaynak sitenin tam metni otomatik alınamadı; taslak kısıtlı bilgiyle yazıldı. Kaynağı mutlaka oku.");
+    if (ana.metin.length < 300) notlar.push("Kaynak sitenin tam metni otomatik alınamadı; taslak kısıtlı bilgiyle yazıldı. Kaynağı mutlaka oku.");
+    const okunan = 1 + ekler.filter((e) => e.metin.length >= 300).length;
+    if (diger.length) notlar.push(`${okunan}/${diger.length + 1} kaynak okunarak yazıldı.`);
 
-    // Gövde: ara başlıklar + "Dikkat edilmesi gerekenler" + editör yorumu yeri
+    // Gövde: ara başlıklar + editör yorumu yeri
     const parcalar: string[] = [];
     for (const b of t.govde ?? []) {
       if (b?.h2) parcalar.push("## " + b.h2);
@@ -298,30 +322,15 @@ ${metinler.join("\n\n---\n\n")}`;
     const dikkat = metinListe(t.dikkat_edilmesi_gerekenler);
     if (dikkat.length) notlar.unshift(...dikkat.map((x: string) => "Dikkat: " + x));
     parcalar.push("**[EDİTÖR YORUMU: Buraya kendi değerlendirmeni ekle]**");
+    const baslik = String(t.baslik ?? "");
+    const spot = spotKisalt(String(t.spot ?? ""));
+    const govdeMd = linkTemizle(parcalar.join("\n\n"), ilgili.map((x) => x.link));
 
-    // İnsanlaştırma (uslup.ts): metinde yapay zekâ izi kaldıysa üsluba göre yeniden ifade ettirilir; bilgi ve yapı korunur
-    let baslik = String(t.baslik ?? ""), spot = String(t.spot ?? ""), govdeMd = parcalar.join("\n\n");
-    const izler = yapayIzler([baslik, spot, govdeMd].join("\n"));
-    if (izler.length && bitis - Date.now() > 70_000) {
-      try {
-        const { veri: h } = await gemini(INSANLASTIR_SISTEM(uslup), JSON.stringify({ izler, baslik, spot, govde: govdeMd }),
-          ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 50_000, Date.now() + 30_000));
-        const yeniGovde = String(h.govde ?? "");
-        const araBaslik = (x: string) => (x.match(/^## /gm) ?? []).length;
-        // Güvenlik: ara başlık sayısı ve editör yorumu yeri korunmuşsa ve metin kısalmadıysa kabul edilir
-        if (yeniGovde.includes("[EDİTÖR YORUMU") && araBaslik(yeniGovde) === araBaslik(govdeMd) && yeniGovde.length > govdeMd.length * 0.8) {
-          govdeMd = yeniGovde; baslik = String(h.baslik ?? "") || baslik; spot = String(h.spot ?? "") || spot;
-          const kalan = yapayIzler([baslik, spot, govdeMd].join("\n"));
-          if (kalan.length) notlar.push("Metinde hâlâ yapay zekâ kokan ifadeler var: " + kalan.join(", "));
-        }
-      } catch { notlar.push("İnsanlaştırma adımı çalışmadı (yapay zekâ yanıt vermedi); şu ifadeleri elle düzelt: " + izler.join(", ")); }
-    } else if (izler.length) notlar.push("Şu ifadeleri elle düzelt (yapay zekâ izi): " + izler.join(", "));
-
-    // Kaynaklar: ilk yazan + diğerleri + asıl kaynak
-    const kaynaklar = [`${it.source_name} — ${it.link}`, ...diger.map((o) => `${o.name} — ${o.link}`)];
+    // Kaynaklar (Stüdyo'da kalır, WordPress'e gitmez): ilk yazan + diğerleri + asıl kaynak
+    const kaynaklar = [`${it.source_name} — ${it.link}`, ...((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link !== it.link).map((o) => `${o.name} — ${o.link}`)];
     if (it.origin) kaynaklar.push("Asıl kaynak: " + it.origin);
 
-    // Görsel: basın kiti, stok önerileri (3 aramadan sırayla en fazla 6), yapay zekâ istemi
+    // Görsel önerisi (basın sayfası bağlantısı, aramalar, yapay zekâ istemi); öne çıkan görseli kalite kontrol aşaması seçer
     const g = t.gorsel ?? {};
     let basin: { url: string; kesin: boolean } | null = null;
     if (it.brand) {
@@ -329,13 +338,6 @@ ${metinler.join("\n\n---\n\n")}`;
       basin = bk?.[0]?.url ? { url: bk[0].url, kesin: true } : { url: "https://www.google.com/search?q=" + encodeURIComponent(it.brand + " official newsroom press images"), kesin: false };
     }
     const aramalar: string[] = [].concat(g.aramalar ?? g.arama ?? []).filter(Boolean).slice(0, 3);
-    const sonuc = await Promise.all(aramalar.map(stok));
-    const secilen: Stok[] = []; const goruldu = new Set<string>();
-    for (let n = 0; n < 4; n++) for (const s of sonuc) { const p = s[n]; if (p && !goruldu.has(p.url)) { goruldu.add(p.url); secilen.push(p); } }
-
-    // Öne çıkan görsel (gorsel.ts): Commons'ta ürünün kendisi, yoksa Pexels/Pixabay; yapay zekâ en uygununu seçer ya da hiçbirini
-    const oneCikan = await gorselSec(sb, it, baslik || it.title, aramalar, bitis);
-    await nabiz();
 
     const { data: yeni } = await sb.from("tr_drafts").insert({
       item_id: itemId, author: kullanici, model, auto: !!sec.oto,
@@ -343,7 +345,10 @@ ${metinler.join("\n\n---\n\n")}`;
       seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: t.etiketler ?? [] },
       sources: kaynaklar.join("\n"), image_note: String(g.oneri ?? ""), editor_note: notlar.join("\n"),
       questions: metinListe(t.editor_sorulari), checks: metinListe(t.dogrulama), notes: notlar,
-      image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: secilen.slice(0, 6), secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: oneCikan.neden, stok_anahtar: !!(Deno.env.get("UNSPLASH_ACCESS_KEY") || Deno.env.get("PIXABAY_API_KEY") || Deno.env.get("PEXELS_API_KEY")) },
+      image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: [] },
+      // Son kalite kontrolü ayrı çağrıda (süre sınırı): kaynak metinleri ve iç link adayları onun için saklanır
+      qc_state: "bekliyor", qc_at: new Date().toISOString(),
+      qc: { kaynak: metinler.join("\n\n---\n\n").slice(0, 30000), ilgili, tam_metin: ana.metin.length >= 300, ilk_govde: govdeMd },
     }).select("id").single();
 
     const zaman = istanbulZaman();
@@ -363,19 +368,10 @@ ${metinler.join("\n\n---\n\n")}`;
       const kartBaslik = baslik || it.event || it.title;
       await sb.from("tr_activity").insert({ kind: "oto", actor: null, actor_name: "Stüdyo", target: kullanici, target_name: kullanici ? ad : "", item_id: itemId, title: kartBaslik, link: it.link, note: "" });
       if (kullanici) await sb.from("notifications").insert({ user_id: kullanici, body: `Otomatik taslak sana atandı: ${kartBaslik} (Haber Masası → Taslaklar)` });
-
-      // WordPress'e taslak: bağlantı kuruluysa, ayar açıksa ve kaynağın tam metni okunabildiyse
-      const ayar = await otoAyar(sb);
-      if (yeni?.id && ayar.wordpress && wpAyar()) {
-        if (ana.length < 300) await sb.from("tr_drafts").update({ wp_error: "Kaynağın tam metni alınamadığı için WordPress'e otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", yeni.id);
-        else if (bitis - Date.now() < 40_000) await sb.from("tr_drafts").update({ wp_pending: true }).eq("id", yeni.id); // süre yetmedi: sonraki turda gönderilir
-        else await wpGonder(sb, yeni.id, { kategoriSec });
-      }
-      const { data: son } = await sb.from("tr_drafts").select("wp_post_id,wp_error,wp_pending,image").eq("id", yeni?.id ?? 0).maybeSingle();
-      const wpDurum = son?.wp_post_id ? "WordPress'e taslak olarak gitti" : son?.wp_pending ? "WordPress'e sonraki turda gidecek" : son?.wp_error ? "WordPress hatası: " + son.wp_error : "Sadece Stüdyo'da";
-      const gDurum = (son?.image as { wp_media_id?: number; secilen?: unknown } | null)?.wp_media_id ? "görsel eklendi" : (son?.image as { secilen?: unknown } | null)?.secilen ? "görsel seçildi" : "görselsiz";
-      await otoOzet(sb, { durum: `Taslak hazır · ${wpDurum} · ${gDurum}`, haber: kartBaslik, editor: kullanici ? ad : "" });
+      await otoOzet(sb, { durum: "Taslak yazıldı · kalite kontrolü sürüyor", haber: kartBaslik, editor: kullanici ? ad : "" });
     }
+    // Kalite kontrolü + görsel + (otomatikse) WordPress: ayrı çağrı, kendi süre bütçesiyle
+    if (yeni?.id) await kontrolBaslat(yeni.id);
   } catch (e) {
     const mesaj = String((e as Error).message ?? e);
     // Otomatik taslakta kota/servis hatası haberin suçu değil: haberi serbest bırak, sonraki turda yeniden denensin
@@ -389,6 +385,144 @@ ${metinler.join("\n\n---\n\n")}`;
     if (sec.oto) await otoOzet(sb, { durum: "Hata: " + mesaj.slice(0, 160), haber: it.event || it.title });
     await sb.from("tr_items").update({ work_state: "hata", work_error: mesaj.slice(0, 300) }).eq("id", itemId);
   }
+}
+
+// ---------- Son kalite kontrolü (ARCHITECTURE.md, 18 Ekim 2026) ----------
+// Taslak yazıldıktan hemen sonra ayrı bir çağrıyla çalışır (her çağrının kendi ~150 sn sınırı var):
+// 1) kaynaklara karşı doğrulama + düzeltme + insanlaştırma (uslup.ts KONTROL_SISTEM), 2) öne çıkan görsel (yoksa Flux isteği),
+// 3) otomatik taslaksa WordPress'e taslak olarak gönderim. Editör bu arada metni değiştirdiyse düzeltme metne uygulanmaz, notlara yazılır.
+
+const spotKisalt = (s: string, n = 210) => {
+  const t = s.replace(/\s+/g, " ").trim();
+  if (t.length <= n) return t;
+  const kes = t.slice(0, n);
+  const son = Math.max(kes.lastIndexOf(". "), kes.lastIndexOf("! "), kes.lastIndexOf("? "));
+  return son > 120 ? kes.slice(0, son + 1) : kes.slice(0, kes.lastIndexOf(" ")).replace(/[,;:]$/, "") + "…";
+};
+
+/** Sadece izin verilen (sitemizin arşivinden gelen) bağlantılar kalır; diğerleri düz metne çevrilir */
+function linkTemizle(md: string, izinli: string[]): string {
+  return md.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, metin, adres) => izinli.includes(adres) ? m : metin);
+}
+
+async function uslupAl(sb: Sb): Promise<string> {
+  const { data: us } = await sb.from("tr_settings").select("value").eq("key", "yazim_uslubu").maybeSingle();
+  return typeof us?.value === "string" && us.value.trim().length > 50 ? us.value : USLUP_VARSAYILAN;
+}
+
+/** Kalite kontrol çağrısını başlatır (fonksiyon kendini çağırır; yanıtı beklemez). Ulaşamazsa otomatik tur 3 dk sonra devralır. */
+async function kontrolBaslat(id: number) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), 4_000);
+  try {
+    await fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/triyaj-taslak", {
+      method: "POST", signal: c.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kontrol: id }),
+    });
+  } catch { /* zamanlanmış tur devralır */ } finally { clearTimeout(t); }
+}
+
+async function kontrol(sb: Sb, id: number) {
+  const bitis = Date.now() + BUTCE_MS;
+  // Kilit: sadece bekleyen ya da 4 dakikadır asılı kalmış kontrol alınır
+  const asili = new Date(Date.now() - 4 * 60_000).toISOString();
+  const { data: kilit } = await sb.from("tr_drafts").update({ qc_state: "calisiyor", qc_at: new Date().toISOString() })
+    .eq("id", id).or(`qc_state.eq.bekliyor,and(qc_state.eq.calisiyor,qc_at.lt.${asili})`).select("*");
+  const t = kilit?.[0];
+  if (!t) return { atlandi: "Kontrol beklemiyor" };
+  const qc = (t.qc ?? {}) as { kaynak?: string; ilgili?: { baslik: string; link: string }[]; tam_metin?: boolean; ilk_govde?: string };
+  const { data: it } = await sb.from("tr_items").select("*").eq("id", t.item_id ?? 0).maybeSingle();
+  const notlar: string[] = [];
+  let durum = "";
+  try {
+    // 1) Doğrulama + düzeltme + insanlaştırma
+    let { title: baslik, spot, body: govde } = t as { title: string; spot: string; body: string };
+    let sorunlar: string[] = [];
+    if (qc.kaynak && bitis - Date.now() > 60_000) {
+      try {
+        const uslup = await uslupAl(sb);
+        const { veri: k } = await gemini(KONTROL_SISTEM(uslup),
+          `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik, spot, govde })}`,
+          MODELLER, Math.min(bitis - 45_000, Date.now() + 55_000));
+        sorunlar = metinListe(k.sorunlar);
+        const yeniGovde = linkTemizle(String(k.govde ?? ""), (qc.ilgili ?? []).map((x) => x.link));
+        const araBaslik = (x: string) => (x.match(/^## /gm) ?? []).length;
+        // Güvenlik: editör yorumu yeri duruyor, ara başlık sayısı 2-4, metin özetlenmemiş
+        if (yeniGovde.includes("[EDİTÖR YORUMU") && araBaslik(yeniGovde) >= 2 && araBaslik(yeniGovde) <= 4 && yeniGovde.length > govde.length * 0.75) {
+          govde = yeniGovde; baslik = String(k.baslik ?? "") || baslik; spot = spotKisalt(String(k.spot ?? "") || spot);
+          durum = "kontrol edildi";
+        } else { notlar.push("Kalite kontrolünün önerdiği metin güvenlik denetiminden geçmedi (yapı bozuldu ya da kısaldı); ilk taslak korundu."); durum = "kontrol uygulanmadı"; }
+        if (k.guven === "dusuk") notlar.push("Kalite kontrolü: güven DÜŞÜK, kaynakları mutlaka oku.");
+      } catch (e) { notlar.push("Kalite kontrolü çalışmadı (" + String((e as Error).message ?? e).slice(0, 100) + "); metni kaynaklarla sen karşılaştır."); durum = "kontrol çalışmadı"; }
+    }
+    // Önem (10'luk) ve ana sayfa adaylığı editöre not olarak
+    const d = it ? degerlendir(it) : null;
+    if (d && d.puan >= ANA_SAYFA_ESIK) notlar.unshift(`Ana sayfa adayı: önem ${d.onem.toLocaleString("tr")}/10 (${d.gerekce.join(", ")}).`);
+    const kalanIz = yapayIzler([baslik, spot, govde].join("\n"));
+    if (kalanIz.length) notlar.push("Metinde hâlâ yapay zekâ kokan ifadeler var: " + kalanIz.join(", "));
+    // Editör bu arada metni değiştirdiyse üzerine yazma
+    const { data: simdi } = await sb.from("tr_drafts").select("body,editor_note,notes").eq("id", id).single();
+    const degismedi = simdi?.body === t.body;
+    const kontrolNot = [...sorunlar.map((x) => "Kontrol: " + x), ...notlar];
+    if (!degismedi && durum === "kontrol edildi") kontrolNot.unshift("Kalite kontrolü bittiğinde metni sen değiştirmiştin; düzeltmeler metne uygulanmadı, aşağıdaki sorunlara bak.");
+    await sb.from("tr_drafts").update({
+      ...(degismedi ? { title: baslik, spot, body: govde } : {}),
+      editor_note: [String(simdi?.editor_note ?? ""), ...kontrolNot].filter(Boolean).join("\n"),
+      notes: [...((simdi?.notes ?? []) as string[]), ...kontrolNot],
+      qc: { ...qc, kaynak: undefined, sorunlar, durum, onem: d?.onem ?? null, ana_sayfa: !!d && d.puan >= ANA_SAYFA_ESIK, bitti: new Date().toISOString() },
+    }).eq("id", id);
+
+    // 2) Öne çıkan görsel (yoksa Flux isteği)
+    const img = (t.image ?? {}) as Record<string, unknown> & { aramalar?: string[]; ai_istem?: string; secilen?: GorselAday | null };
+    if (it && !img.secilen) {
+      const oneCikan = await gorselSec(sb, it, baslik || it.title, img.aramalar ?? [], bitis);
+      const flux = !oneCikan.secilen ? { durum: "bekliyor", istem: fluxIstem(String(img.ai_istem || baslik)), istendi: new Date().toISOString() } : null;
+      await sb.from("tr_drafts").update({ image: { ...img, secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: oneCikan.neden, ...(flux ? { flux } : {}) } }).eq("id", id);
+    }
+
+    // 3) Otomatik taslak: WordPress'e taslak olarak (bağlantı kuruluysa, ayar açıksa, kaynağın tam metni okunduysa)
+    let wpDurum = "Sadece Stüdyo'da";
+    if (t.auto) {
+      const ayar = await otoAyar(sb);
+      if (ayar.wordpress && wpAyar()) {
+        if (!qc.tam_metin) { await sb.from("tr_drafts").update({ wp_error: "Kaynağın tam metni alınamadığı için WordPress'e otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", id); wpDurum = "tam metin yok, gönderilmedi"; }
+        else if (bitis - Date.now() < 35_000) { await sb.from("tr_drafts").update({ wp_pending: true }).eq("id", id); wpDurum = "WordPress'e sonraki turda gidecek"; }
+        else { const r = await wpGonder(sb, id, { kategoriSec }); wpDurum = r.ok ? "WordPress'e taslak olarak gitti" : "WordPress hatası: " + r.hata; }
+      }
+      const { data: son } = await sb.from("tr_drafts").select("image").eq("id", id).maybeSingle();
+      const im = (son?.image ?? {}) as { wp_media_id?: number; secilen?: unknown; flux?: unknown };
+      const gDurum = im.wp_media_id ? "görsel eklendi" : im.secilen ? "görsel seçildi" : im.flux ? "görsel Flux'ta üretilecek" : "görselsiz";
+      await otoOzet(sb, { durum: `Taslak hazır · ${durum || "kontrolsüz"} · ${wpDurum} · ${gDurum}`, haber: baslik });
+    }
+    await sb.from("tr_drafts").update({ qc_state: "tamam" }).eq("id", id);
+    return { ok: true, durum };
+  } catch (e) {
+    await sb.from("tr_drafts").update({ qc_state: "hata", editor_note: [String(t.editor_note ?? ""), "Kalite kontrolü hata verdi: " + String((e as Error).message ?? e).slice(0, 200)].filter(Boolean).join("\n") }).eq("id", id);
+    return { hata: String(e) };
+  }
+}
+
+// ---------- Flux (Fatih'in bilgisayarında çevrimdışı görsel üretimi; scripts/flux-isci) ----------
+// İşçi FLUX_TOKEN ile gelir: bekleyen işleri alır, ürettiği görseli yükler. Token Supabase Secrets'ta ve işçinin yerel ayarında.
+async function fluxIsler(sb: Sb) {
+  const { data } = await sb.from("tr_drafts").select("id,title,image").eq("image->flux->>durum", "bekliyor").order("id", { ascending: false }).limit(5);
+  return ((data ?? []) as { id: number; title: string; image: { flux?: { istem?: string } } }[]).map((d) => ({ id: d.id, baslik: d.title, istem: d.image?.flux?.istem ?? "" }));
+}
+
+async function fluxYukle(sb: Sb, id: number, b64: string, mime: string) {
+  if (!/^image\/(jpeg|png|webp)$/.test(mime)) return { hata: "Görsel türü desteklenmiyor" };
+  const veri = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  if (veri.byteLength > 8_000_000) return { hata: "Görsel çok büyük" };
+  const yol = `flux/${id}-${Date.now()}.${mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg"}`;
+  const y = await sb.storage.from("haber-gorsel").upload(yol, veri, { contentType: mime, upsert: true });
+  if (y.error) return { hata: "Depolamaya yüklenemedi: " + y.error.message };
+  const url = sb.storage.from("haber-gorsel").getPublicUrl(yol).data.publicUrl;
+  const { data: t } = await sb.from("tr_drafts").select("image,wp_post_id").eq("id", id).single();
+  const img = (t?.image ?? {}) as Record<string, unknown> & { secilen?: GorselAday | null; flux?: Record<string, unknown> };
+  const secilen: GorselAday = { kaynak: "Yapay zekâ (Flux)", sayfa: url, buyuk: url, thumb: url, yazar: "Updated (Flux)", lisans: "Yapay zekâ üretimi", aciklama: String(img.flux?.istem ?? ""), w: 1344, h: 768 };
+  // Elle seçilmiş/yüklenmiş görsel varsa ona dokunulmaz; Flux görseli sadece görselsiz taslağa konur
+  const bos = !img.secilen;
+  await sb.from("tr_drafts").update({ image: { ...img, ...(bos ? { secilen, gorsel_neden: "Uygun fotoğraf bulunamadı; Flux ile üretildi (yazısız). Yayından önce kontrol et." } : {}), flux: { ...(img.flux ?? {}), durum: "tamam", url, bitti: new Date().toISOString() } } }).eq("id", id);
+  if (bos && t?.wp_post_id) return { ok: true, url, wp: await wpOneCikanEkle(sb, id) };
+  return { ok: true, url };
 }
 
 // ---------- Otomatik taslak (ARCHITECTURE.md, 15 Ekim 2026) ----------
@@ -414,11 +548,19 @@ async function otoCalistir(sb: Sb) {
   const ozet = (o: Record<string, unknown>) => sb.from("tr_settings").upsert({ key: "oto_son", value: { zaman: new Date().toISOString(), ...o } });
   await ozet({ durum: "çalışıyor" });
 
-  // 1) Önceki turda süre yetmediği için WordPress'e gidemeyen otomatik taslaklar
+  // 0) Kalite kontrolü başlatılamamış ya da yarıda kalmış taslaklar (en fazla 2, arka planda)
+  const { data: kontrolBekleyen } = await sb.from("tr_drafts").select("id")
+    .or(`and(qc_state.eq.bekliyor,qc_at.lt.${new Date(Date.now() - 3 * 60_000).toISOString()}),and(qc_state.eq.calisiyor,qc_at.lt.${new Date(Date.now() - 5 * 60_000).toISOString()})`).limit(2);
+  const arkaPlan: Promise<unknown>[] = ((kontrolBekleyen ?? []) as { id: number }[]).map((k) => kontrol(sb, k.id).catch(() => null));
+
+  // 1) Önceki turda süre yetmediği için WordPress'e gidemeyen otomatik taslaklar (kontrolü bitmiş olanlar)
   if (ayar.wordpress && wpAyar()) {
-    const { data: bekleyen } = await sb.from("tr_drafts").select("id").eq("wp_pending", true).is("wp_post_id", null).limit(3);
+    const { data: bekleyen } = await sb.from("tr_drafts").select("id").eq("wp_pending", true).is("wp_post_id", null).eq("qc_state", "tamam").limit(3);
     for (const b of bekleyen ?? []) { await sb.from("tr_drafts").update({ wp_pending: false }).eq("id", b.id); await wpGonder(sb, b.id, { kategoriSec }); }
   }
+
+  // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+  if (arkaPlan.length) EdgeRuntime.waitUntil(Promise.all(arkaPlan));
 
   // 2) Günlük sınır (İstanbul günü; Türkiye yıl boyu UTC+3)
   const gunBasi = istanbulGun() + "T00:00:00+03:00";
@@ -493,6 +635,28 @@ Deno.serve(async (req) => {
   if (govde?.oto) {
     try { return Response.json(await otoCalistir(sb), { headers: CORS }); }
     catch (e) { await sb.from("tr_settings").upsert({ key: "oto_son", value: { zaman: new Date().toISOString(), durum: "Hata: " + String((e as Error).message ?? e).slice(0, 200) } }); return Response.json({ hata: String(e) }, { status: 500, headers: CORS }); }
+  }
+
+  // Kalite kontrol aşaması (fonksiyonun kendisi çağırır; sadece "bekliyor" durumundaki taslağa iş yapar, girdisi taslak numarası)
+  if (govde?.kontrol) {
+    // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+    EdgeRuntime.waitUntil(kontrol(sb, Number(govde.kontrol)).catch((e) => console.error("kontrol", e)));
+    return Response.json({ basladi: true }, { status: 202, headers: CORS });
+  }
+
+  // Flux işçisi (Fatih'in bilgisayarı): FLUX_TOKEN ile; token tanımlı değilse kapalı
+  if (govde?.flux) {
+    const tok = Deno.env.get("FLUX_TOKEN");
+    if (!tok || govde.token !== tok) return Response.json({ hata: "Yetkisiz" }, { status: 401, headers: CORS });
+    if (govde.flux === "isler") return Response.json({ isler: await fluxIsler(sb) }, { headers: CORS });
+    if (govde.flux === "yukle") return Response.json(await fluxYukle(sb, Number(govde.id), String(govde.b64 ?? ""), String(govde.mime ?? "image/jpeg")), { headers: CORS });
+    if (govde.flux === "hata") {
+      const { data: t } = await sb.from("tr_drafts").select("image").eq("id", Number(govde.id)).single();
+      const img = (t?.image ?? {}) as Record<string, unknown> & { flux?: Record<string, unknown> };
+      await sb.from("tr_drafts").update({ image: { ...img, flux: { ...(img.flux ?? {}), durum: "hata", hata: String(govde.mesaj ?? "").slice(0, 200) } } }).eq("id", Number(govde.id));
+      return Response.json({ ok: true }, { headers: CORS });
+    }
+    return Response.json({ hata: "Bilinmeyen istek" }, { status: 400, headers: CORS });
   }
 
   const auth = req.headers.get("Authorization") ?? "";

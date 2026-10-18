@@ -5,7 +5,10 @@
 // WordPress'te "Klasik" blok olarak değil, editörün elle yaptığıyla birebir aynı bloklar olarak açılır.
 
 export const kacis = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const satirIci = (s: string) => kacis(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+// Satır içi: **kalın**, *italik*, [bağlantı](https://...) (iç link; sadece http/https adres)
+const satirIci = (s: string) => kacis(s)
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)"]+)\)/g, '<a href="$2">$1</a>')
+  .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*\n]+?)\*/g, "$1<em>$2</em>");
 
 /** Gövde yazı boyutu ve ara başlık rengi (sitedeki yazılarla aynı) */
 export const GOVDE_PX = "16px";

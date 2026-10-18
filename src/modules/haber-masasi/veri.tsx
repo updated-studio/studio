@@ -25,8 +25,10 @@ export type Taslak = {
   image: {
     oneri?: string; alt_text?: string; aramalar?: string[]; ai_istem?: string; basin?: { url: string; kesin: boolean } | null; stok?: Stok[]; stok_anahtar?: boolean;
     secilen?: GorselAday | null; gorsel_adaylar?: GorselAday[]; gorsel_neden?: string; wp_media_id?: number | null; yukleme_hata?: string; // öne çıkan görsel (gorsel.ts)
+    flux?: { durum: "bekliyor" | "tamam" | "hata"; istem?: string; url?: string; hata?: string; istendi?: string; bitti?: string }; // Flux (Fatih'in bilgisayarı)
   };
   created_at: string; updated_at: string;
+  qc_state?: "" | "bekliyor" | "calisiyor" | "tamam" | "hata"; qc?: { sorunlar?: string[]; durum?: string; onem?: number | null; ana_sayfa?: boolean; bitti?: string }; // son kalite kontrolü
   auto: boolean; wp_post_id: number | null; wp_link: string; wp_error: string; wp_sent_at: string | null; wp_pending: boolean; // otomatik mi, WordPress karşılığı
 };
 export type Mesaj = { id: number; user_id: string; body: string; item_id: number | null; created_at: string };

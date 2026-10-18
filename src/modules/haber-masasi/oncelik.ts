@@ -8,7 +8,7 @@ import type { Haber, Oy } from "./veri";
 import { degerlendir, haberTuru } from "../../../supabase/functions/triyaj-taslak/puan.ts";
 
 // Puanın çekirdeği (haber türleri, ek puanlar, seviyeler, degerlendir) ortak dosyada: sunucudaki otomatik taslak seçimi de onu kullanır.
-export { ONCELIK_SURUMU, HABER_TURLERI, EK, SEVIYELER, degerlendir, haberTuru, ilgiEslesme, type Degerlendirme } from "../../../supabase/functions/triyaj-taslak/puan.ts";
+export { ONCELIK_SURUMU, HABER_TURLERI, KONU_ILGI, ANA_SAYFA_ESIK, YAYIN_ESIK, onem, EK, SEVIYELER, degerlendir, haberTuru, ilgiEslesme, type Degerlendirme } from "../../../supabase/functions/triyaj-taslak/puan.ts";
 
 // 4) Ekip oyu ("Bunun gibi daha çok / az", herkes kendi oyunu verir, notlu): sadece AYNI MARKANIN kendi haberleri arasında sırayı değiştirir.
 //    Markalar arası sıra oydan etkilenmez. Aynı marka + aynı türdeki her net oy: ±OY_ETKISI (en fazla ±OY_SINIRI), son OY_GUN gün.

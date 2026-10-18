@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { sb } from "../../shared/supabase";
 import { hataMetni, useToast } from "../../shared/toast";
-import { HABER_TURLERI } from "./oncelik";
+import { ANA_SAYFA_ESIK, HABER_TURLERI, YAYIN_ESIK } from "./oncelik";
 import { zamanOnce } from "./ortak";
 import { useMasa } from "./veri";
 import { OTO_VARSAYILAN, type OtoAyar } from "../../../supabase/functions/triyaj-taslak/secim.ts";
@@ -109,7 +109,7 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
       <label className="row"><input type="checkbox" checked={a.acik} onChange={(e) => setA({ ...a, acik: e.target.checked })} /> Otomatik taslak açık</label>
       <label className="row"><input type="checkbox" checked={a.wordpress} onChange={(e) => setA({ ...a, wordpress: e.target.checked })} /> Hazırlanan taslağı WordPress'e taslak olarak gönder</label>
       <div className="row">Günde en fazla {sayi("gunluk")} taslak</div>
-      <div className="row">En az {sayi("esik")} puan <span className="muted">(70 = Öncelik 1, 40 = Öncelik 2)</span></div>
+      <div className="row">En az {sayi("esik")} puan <span className="muted">(= önem {(a.esik / 10).toLocaleString("tr")}/10 · {YAYIN_ESIK} = Öncelik 2 "yayına değer", {ANA_SAYFA_ESIK} = Öncelik 1 "ana sayfa adayı")</span></div>
       <div className="row">Haber düştükten {sayi("bekle_dk")} dk sonra <span className="muted">(diğer kaynaklar aynı karta birleşsin diye)</span></div>
       <div className="row">Her turda (10 dk) en fazla {sayi("tur_basina")} farklı haber <span className="muted">(aynı haberin diğer kartları yazılmaz)</span></div>
       <div className="muted">Bu türler otomatik yazılmaz:</div>
