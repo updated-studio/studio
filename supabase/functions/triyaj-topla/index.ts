@@ -92,38 +92,26 @@ async function gundemIsaretle(sb: ReturnType<typeof createClient>, yeni: string[
 // ---------- Anlamsal benzerlik (gömme / embedding), 18 Ekim 2026 (Fatih: "birebir aynı olduğundan emin olmadan birleştirme") ----------
 // Kartlar Gemini gömme modeliyle vektöre çevrilir; iki kart ancak benzerliği eşiğin üstündeyse VE yapay zekâ "kesinlikle aynı olay"
 // derse VE ortak marka/kelime varsa birleşir. Gömme alınamazsa birleştirme yapılmaz.
-export const BENZERLIK_KUME = 0.86;   // 30 dk'lık kümelemede aday çift eşiği
-export const BENZERLIK_BAGLA = 0.82;  // toplama sırasında yeni haberi mevcut karta bağlama eşiği
-// Model sırası: ilk çalışan kullanılır. Vektörler modele göre farklı uzaydadır; sadece AYNI modelin vektörleri karşılaştırılır.
-// Kota: ücretsiz katmanda toplu istekteki her metin ayrı istek sayılır; bu yüzden her kartın vektörü bir kez hesaplanıp saklanır
-// (tr_gomme, haber bağlantısıyla; tr_items'a konmaz ki ekrana ve canlı güncellemeye büyük veri gitmesin).
-const GOMME_MODELLER = ["gemini-embedding-2", "gemini-embedding-2-preview", "gemini-embedding-001"];
+// gte-small'da ilgili ama farklı haberler de 0,8 üstü çıkabilir; eşik yüksek tutulur, asıl karar yapay zekâ onayı + ortak kelimede.
+// İlk günlerin "dağılım" istatistiğine göre ayarlanacak (son_kumeleme).
+export const BENZERLIK_KUME = 0.88;   // 30 dk'lık kümelemede aday çift eşiği
+export const BENZERLIK_BAGLA = 0.85;  // toplama sırasında yeni haberi mevcut karta bağlama eşiği
+// Model: Supabase'in kendi sunucusunda çalışan "gte-small" (Supabase.ai, ücretsiz, kota yok). Gemini gömme modelleri bu anahtarda
+// kota hatası verdi (18 Ekim: gemini-embedding-2 / -2-preview / -001 hepsi 429). gte-small İngilizce çalışır: metin = marka + ürün + özgün
+// (İngilizce) başlık; Türkçe özet katılmaz. Vektörler bir kez hesaplanıp tr_gomme'de saklanır.
+const GOMME_MODEL = "gte-small";
 let GOMME_HATA = "";
+let OTURUM: { run: (t: string, o: Record<string, unknown>) => Promise<number[]> } | null = null;
 async function gommeler(metinler: string[]): Promise<{ model: string; v: number[][] } | null> {
   GOMME_HATA = "";
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key || !metinler.length) return null;
-  for (const model of GOMME_MODELLER) {
+  if (!metinler.length) return null;
+  try {
+    // @ts-ignore Supabase Edge Runtime'da tanımlı
+    OTURUM ??= new Supabase.ai.Session(GOMME_MODEL);
     const out: number[][] = [];
-    let tamam = true;
-    for (let i = 0; i < metinler.length; i += 50) {
-      const parca = metinler.slice(i, i + 50);
-      try {
-        const istek = (boyut: boolean) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents`, {
-          method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify({ requests: parca.map((t) => ({ model: "models/" + model, content: { parts: [{ text: t.slice(0, 1500) }] }, taskType: "SEMANTIC_SIMILARITY", ...(boyut ? { outputDimensionality: 768 } : {}) })) }),
-        });
-        let r = await istek(true);
-        if (r.status === 400) r = await istek(false); // model boyut seçimini desteklemiyorsa
-        if (!r.ok) { GOMME_HATA += `${model} ${r.status}: ${(await r.text()).slice(0, 120)} | `; tamam = false; break; }
-        const j = await r.json();
-        for (const e of j.embeddings ?? []) out.push(e.values as number[]);
-        if ((j.embeddings ?? []).length !== parca.length) { tamam = false; break; }
-      } catch (e) { GOMME_HATA += `${model} istek hatası: ${String(e).slice(0, 80)} | `; tamam = false; break; }
-    }
-    if (tamam && out.length === metinler.length) return { model, v: out.map((v) => { const n = Math.hypot(...v) || 1; return v.map((x) => Math.round(x / n * 1e5) / 1e5); }) };
-  }
-  return null;
+    for (const t of metinler) out.push((await OTURUM!.run(t.slice(0, 600), { mean_pool: true, normalize: true })).map((x) => Math.round(x * 1e5) / 1e5));
+    return { model: GOMME_MODEL, v: out };
+  } catch (e) { GOMME_HATA = `${GOMME_MODEL}: ${String(e).slice(0, 160)}`; return null; }
 }
 
 /** Kartların vektörleri: saklı olanı (tr_gomme) kullanır, eksik olanı (en fazla `enFazla` kart) hesaplayıp saklar. Vektörü olmayan kart karşılaştırılmaz. */
@@ -153,7 +141,7 @@ async function gommeYaz(sb: ReturnType<typeof createClient>, satirlar: { link: s
   for (let i = 0; i < satirlar.length; i += 100) await sb.from("tr_gomme").upsert(satirlar.slice(i, i + 100).map((x) => ({ link: x.link, model, v: x.v })), { onConflict: "link" });
 }
 const benzerlik = (a: number[], b: number[]) => { let t = 0; for (let i = 0; i < a.length; i++) t += a[i] * b[i]; return t; };
-const kartMetni = (x: { brand?: string; product?: string; title: string; event?: string }) => `${x.brand ?? ""} ${x.product ?? ""}: ${x.title}. ${x.event ?? ""}`.trim();
+const kartMetni = (x: { brand?: string; product?: string; title: string; event?: string }) => `${x.brand ?? ""} ${x.product ?? ""}: ${x.title}`.trim();
 
 // RSS 2.0, RSS 1.0 (RDF) ve Atom
 function rssCoz(xml: string, k: Kaynak): Ham[] {
@@ -600,7 +588,7 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
   const ozet: Record<string, unknown> = { zaman: new Date().toISOString(), kart: liste.length, aday_cift: 0, onaylanan: 0, grup: 0, birlesen: 0 };
   if (liste.length >= 2) {
     // 1) Gömme benzerliği (saklı vektörler; eksikler en fazla 120 kart hesaplanır, vektörü olmayan kart bu tur birleşmez)
-    const { harita, model: gm } = await kartGommeleri(sb, liste);
+    const { harita, model: gm } = await kartGommeleri(sb, liste, 300);
     const E = liste.map((k) => harita.get(k.id) ?? null);
     ozet.gomme_model = gm; ozet.vektorlu = E.filter(Boolean).length;
     if (!harita.size) {
@@ -611,13 +599,13 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
     }
     else {
       if (GOMME_HATA) ozet.uyari = GOMME_HATA.slice(0, 300);
-      const dagilim = { "0.80": 0, "0.86": 0, "0.90": 0 };
+      const dagilim = { "0.80": 0, "0.85": 0, "0.88": 0, "0.92": 0 };
       const ciftler: { i: number; j: number; b: number }[] = [];
       for (let i = 0; i < liste.length; i++) for (let j = i + 1; j < liste.length; j++) {
         const ei = E[i], ej = E[j];
         if (!ei || !ej) continue;
         const b = benzerlik(ei, ej);
-        if (b >= 0.80) dagilim["0.80"]++; if (b >= 0.86) dagilim["0.86"]++; if (b >= 0.90) dagilim["0.90"]++;
+        if (b >= 0.80) dagilim["0.80"]++; if (b >= 0.85) dagilim["0.85"]++; if (b >= 0.88) dagilim["0.88"]++; if (b >= 0.92) dagilim["0.92"]++;
         if (b >= BENZERLIK_KUME && benzer(liste[i], liste[j])) ciftler.push({ i, j, b });
       }
       ciftler.sort((x, y) => y.b - x.b);
