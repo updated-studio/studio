@@ -58,31 +58,71 @@ function etiket(blok: string, ad: string): string {
   const m = blok.match(new RegExp(`<${ad}(?:\\s[^>]*)?>([\\s\\S]*?)</${ad}>`, "i"));
   return m ? m[1] : "";
 }
-// Türkiye gündemi (Fatih, 18 Ekim 2026): Google Trends Türkiye RSS'i. Her gündem başlığının altındaki haber bağlantıları ayrı haber olur;
-// özete gündem kelimesi yazılır. Teknoloji dışı ve siyaset haberleri kuralla elenir (GUNDEM_KONU), rakip teknoloji siteleri alınmaz.
+// Türkiye gündemi (Fatih, 18 Ekim 2026; güncelleme 18 Ekim öğlen): Google Trends Türkiye RSS'i SADECE SİNYAL olarak okunur.
+// Türkiye'deki haber sitelerinden haber metni ya da görsel ALINMAZ (telif; basın bültenleri hariç). Gündemdeki terimler saklanır
+// (tr_settings.gundem, 24 saat) ve bu terim yabancı kaynaklı bir kartta geçiyorsa karta işaret konur (tr_items.trend) → öncelik puanına +.
 // X, Instagram ve Ekşi Sözlük'ün herkese açık, kurallara uygun bir okuma yolu (API/RSS) yok; gündem bu kaynaktan izlenir.
-const RAKIP = /(^|\.)(webtekno|shiftdelete|donanimhaber|technopat|log|chip|teknoblog|megabayt|tamindir|teknolojioku|donanimarsivi|mobilsiteler|teknoseyir|sdn|cepkolik|hardwareplus|teknokulis|indir)\.(com|com\.tr|net|org)$/i;
-export const GUNDEM_KONU = new Set(["telefon", "tablet", "bilgisayar", "bileşen", "giyilebilir", "ses", "kamera", "drone", "video ekipmanı", "ev aletleri", "akıllı ev", "oyun", "yapay zeka", "yazılım", "otomobil"]);
 const gundemMi = (k: Kaynak) => /trends\.google\./i.test(k.url);
+const norm = (s: string) => " " + s.toLocaleLowerCase("tr").replace(/ı/g, "i").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim() + " ";
 
-function gundemCoz(xml: string, k: Kaynak): Ham[] {
-  const out: Ham[] = [];
-  for (const b of xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? []) {
-    const terim = temiz(etiket(b, "title"));
-    const ds = temiz(etiket(b, "pubDate")); const d = ds ? new Date(ds) : null;
-    for (const n of b.match(/<ht:news_item>[\s\S]*?<\/ht:news_item>/gi) ?? []) {
-      const link = temiz(etiket(n, "ht:news_item_url")), baslik = temiz(etiket(n, "ht:news_item_title")), site = temiz(etiket(n, "ht:news_item_source"));
-      let host = ""; try { host = new URL(link).hostname.replace(/^www\./, ""); } catch { continue; }
-      if (!baslik || RAKIP.test(host)) continue;
-      out.push({ source: { ...k, name: `Gündem · ${site || host}` }, title: baslik, link, date: d && !isNaN(+d) ? d : null, ozet: `Türkiye gündemi (Google Trends): "${terim}". Kaynak: ${site || host}` });
-    }
-  }
-  return out;
+function gundemTerimleri(xml: string): string[] {
+  return [...new Set((xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? []).map((b) => temiz(etiket(b, "title"))).filter((t) => t.length >= 3 && t.length <= 60 && !/^\d+$/.test(t)))];
 }
+
+/** Gündem terimlerini saklar ve son 48 saatteki kartlardan bu terimi taşıyanları işaretler */
+async function gundemIsaretle(sb: ReturnType<typeof createClient>, yeni: string[]) {
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "gundem").maybeSingle();
+  const eski = ((data?.value as { terimler?: { t: string; z: string }[] } | null)?.terimler ?? []).filter((x) => Date.now() - Date.parse(x.z) < 24 * 3600_000);
+  const simdi = new Date().toISOString();
+  const terimler = [...eski.filter((x) => !yeni.includes(x.t)), ...yeni.map((t) => ({ t, z: simdi }))].slice(-200);
+  await sb.from("tr_settings").upsert({ key: "gundem", value: { zaman: simdi, terimler } });
+  const anahtarlar = terimler.map((x) => ({ t: x.t, n: norm(x.t) })).filter((x) => x.n.trim().length >= 4);
+  if (!anahtarlar.length) return 0;
+  const { data: kartlar } = await sb.from("tr_items").select("id,title,event,brand,product").in("status", ["aday", "belirsiz", "alindi"]).is("trend", null)
+    .gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString()).limit(800);
+  let n = 0;
+  for (const k of (kartlar ?? []) as { id: number; title: string; event: string; brand: string; product: string }[]) {
+    const metin = norm(`${k.title} ${k.event} ${k.brand} ${k.product}`);
+    const bulunan = anahtarlar.find((x) => metin.includes(x.n));
+    if (bulunan) { await sb.from("tr_items").update({ trend: bulunan.t.slice(0, 60) }).eq("id", k.id); n++; }
+  }
+  return n;
+}
+
+// ---------- Anlamsal benzerlik (gömme / embedding), 18 Ekim 2026 (Fatih: "birebir aynı olduğundan emin olmadan birleştirme") ----------
+// Kartlar Gemini gömme modeliyle vektöre çevrilir; iki kart ancak benzerliği eşiğin üstündeyse VE yapay zekâ "kesinlikle aynı olay"
+// derse VE ortak marka/kelime varsa birleşir. Gömme alınamazsa birleştirme yapılmaz.
+export const BENZERLIK_KUME = 0.86;   // 30 dk'lık kümelemede aday çift eşiği
+export const BENZERLIK_BAGLA = 0.82;  // toplama sırasında yeni haberi mevcut karta bağlama eşiği
+const GOMME_MODELLER = ["gemini-embedding-001", "text-embedding-004"];
+async function gommeler(metinler: string[]): Promise<number[][] | null> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key || !metinler.length) return null;
+  for (const model of GOMME_MODELLER) {
+    const out: number[][] = [];
+    let tamam = true;
+    for (let i = 0; i < metinler.length; i += 100) {
+      const parca = metinler.slice(i, i + 100);
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents`, {
+          method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({ requests: parca.map((t) => ({ model: "models/" + model, content: { parts: [{ text: t.slice(0, 1500) }] }, taskType: "SEMANTIC_SIMILARITY", ...(model === "gemini-embedding-001" ? { outputDimensionality: 768 } : {}) })) }),
+        });
+        if (!r.ok) { tamam = false; break; }
+        const j = await r.json();
+        for (const e of j.embeddings ?? []) out.push(e.values as number[]);
+        if ((j.embeddings ?? []).length !== parca.length) { tamam = false; break; }
+      } catch { tamam = false; break; }
+    }
+    if (tamam && out.length === metinler.length) return out.map((v) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); });
+  }
+  return null;
+}
+const benzerlik = (a: number[], b: number[]) => { let t = 0; for (let i = 0; i < a.length; i++) t += a[i] * b[i]; return t; };
+const kartMetni = (x: { brand?: string; product?: string; title: string; event?: string }) => `${x.brand ?? ""} ${x.product ?? ""}: ${x.title}. ${x.event ?? ""}`.trim();
 
 // RSS 2.0, RSS 1.0 (RDF) ve Atom
 function rssCoz(xml: string, k: Kaynak): Ham[] {
-  if (gundemMi(k)) return gundemCoz(xml, k);
   const out: Ham[] = [];
   const bloklar = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? xml.match(/<entry[\s>][\s\S]*?<\/entry>/gi) ?? [];
   for (const b of bloklar) {
@@ -218,12 +258,20 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const sinir = Date.now() - SAAT * 3600_000;
 
   // --- RSS'leri çek (kaynak sırası korunur; kaynak başına sınır sırayla uygulanır) ---
+  const gundemTerim: string[] = [];
   const okunan: (Ham[] | null)[] = await Promise.all((kaynaklar ?? []).map(async (k: Kaynak) => {
     try {
       let r = await getir(k.url);
       if (r.status === 429) { await new Promise((x) => setTimeout(x, 5000)); r = await getir(k.url); }
       if (!r.ok) throw new Error("Hata " + r.status);
-      const liste = rssCoz(await r.text(), k);
+      const xml = await r.text();
+      // Gündem kaynağı haber üretmez, sadece terim verir (Türk haber sitelerinden içerik alınmaz)
+      if (gundemMi(k)) {
+        const t = gundemTerimleri(xml); gundemTerim.push(...t);
+        await sb.from("tr_sources").update({ last_check: new Date().toISOString(), item_count: t.length, last_item_at: new Date().toISOString(), error: "", status: t.length ? "Çalışıyor" : "Boş" }).eq("id", k.id);
+        return [];
+      }
+      const liste = rssCoz(xml, k);
       const son = liste.reduce((m, h) => (h.date && +h.date > m ? +h.date : m), 0);
       const gun = son ? Math.floor((Date.now() - son) / 86_400_000) : null;
       // Eski durum adları: Çalışıyor / Yavaş (3+ gün) / Ölü (7+ gün) / Boş / Hata NNN
@@ -328,8 +376,6 @@ async function topla(sb: ReturnType<typeof createClient>) {
     if (haric) { elenen.push(satir(h, { ...ortak, reason: "Hariç listesinde: " + haric.orj })); return; }
     if (e.tur === "rehber") { rehber.push(satir(h, { ...ortak, status: "rehber", event: String(e.neden ?? "").slice(0, 400) })); return; } // Enes: rehber/liste içerik elenmez, "Rehber fikirleri"ne düşer
     if (e.tur === "kampanya") { elenen.push(satir(h, { ...ortak, reason: "Tür: " + TUR[String(e.tur)] })); return; }
-    // Gündem kaynağı: sadece teknoloji konuları; siyaset/spor/magazin vb. elenir
-    if (gundemMi(h.source) && !GUNDEM_KONU.has(String(e.konu ?? ""))) { elenen.push(satir(h, { ...ortak, reason: "Gündem: teknoloji dışı (" + String(e.konu ?? "-") + ")" })); return; }
     if (e.turkiye === "belirsiz") { belirsiz.push(satir(h, { ...ortak, status: "belirsiz", reason: String(e.neden ?? "").slice(0, 300), event: String(e.neden ?? "").slice(0, 400), turkey: "belirsiz" })); return; }
     if (e.turkiye === "yok" && grup !== "Öncelikli") { elenen.push(satir(h, { ...ortak, reason: "Türkiye ile ilgisi yok: " + String(e.neden ?? "") })); return; }
     kalan.push({ h, e });
@@ -341,34 +387,59 @@ async function topla(sb: ReturnType<typeof createClient>) {
     const anahtar = String(k.e.olay || "tekil-" + i).toLowerCase().trim();
     olaylar.set(anahtar, [...(olaylar.get(anahtar) ?? []), k]);
   });
+  type MevcutKart = { id: number; other_sources: { name: string; link: string }[]; source_name: string; brand: string; event: string; title: string; product?: string };
+  // Bağlantı ADAYLARI (aynı olay kimliği ya da yapay zekâ eşleştirmesi); kesinleşmesi için gömme benzerliği şart (aşağıda)
+  const bagAday = new Map<string, MevcutKart>();
   // Önceki çalıştırmalarda aynı olay kimliğiyle gelmiş haber varsa ona bağla
   const anahtarlar = [...olaylar.keys()].filter((a) => !a.startsWith("tekil-"));
-  const mevcut = new Map<string, { id: number; other_sources: { name: string; link: string }[]; source_name: string }>();
   if (anahtarlar.length) {
-    const { data } = await sb.from("tr_items").select("id,event_key,other_sources,source_name").in("event_key", anahtarlar)
+    const { data } = await sb.from("tr_items").select("id,event_key,other_sources,source_name,brand,event,title,product").in("event_key", anahtarlar)
       .neq("status", "elendi").gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString());
-    (data ?? []).forEach((r: { id: number; event_key: string; other_sources: { name: string; link: string }[]; source_name: string }) => { if (!mevcut.has(r.event_key)) mevcut.set(r.event_key, r); });
+    (data ?? []).forEach((r: MevcutKart & { event_key: string }) => { if (!bagAday.has(r.event_key)) bagAday.set(r.event_key, r); });
   }
   // Olay kimliği tutmayanlar için: yapay zekâ yeni haberi son 48 saatteki kartlarla karşılaştırır (aynı olay farklı turda gelmesin)
-  const eslesmeyen = [...olaylar.entries()].filter(([a]) => !mevcut.has(a));
+  const eslesmeyen = [...olaylar.entries()].filter(([a]) => !bagAday.has(a));
   if (eslesmeyen.length && !hata) {
     try {
-      const { data: son } = await sb.from("tr_items").select("id,brand,event,title,other_sources,source_name,event_key")
+      const { data: son } = await sb.from("tr_items").select("id,brand,event,title,product,other_sources,source_name,event_key")
         .in("status", ["aday", "alindi", "yayinda", "pas", "belirsiz"]).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
         .order("created_at", { ascending: false }).limit(250);
-      const liste = (son ?? []) as { id: number; brand: string; event: string; title: string; other_sources: { name: string; link: string }[]; source_name: string; event_key: string }[];
+      const liste = (son ?? []) as (MevcutKart & { event_key: string })[];
       if (liste.length) {
         const istem = `MEVCUT KARTLAR (id | marka | olay):\n${liste.map((x) => `${x.id} | ${x.brand} | ${x.event || x.title}`).join("\n")}\n\nYENİ HABERLER (n | marka | olay | başlık):\n${eslesmeyen.map(([, g], n) => `${n} | ${g[0].e.marka ?? ""} | ${g[0].e.neden ?? ""} | ${g[0].h.title}`).join("\n")}`;
         const v = await gemini(model, istem, AYNI_SISTEM);
         for (const e of (v.eslesme ?? []) as { yeni: number; mevcut: number | null }[]) {
           const kart = liste.find((x) => x.id === Number(e.mevcut));
           const grup = eslesmeyen[Number(e.yeni)];
-          // Güvenlik (18 Ekim): yapay zekâ eşleştirmesi ortak marka ya da en az iki ortak kelimeyle doğrulanır
-          if (kart && grup && benzer({ brand: String(grup[1][0].e.marka ?? ""), title: grup[1][0].h.title, event: String(grup[1][0].e.neden ?? "") }, kart)) mevcut.set(grup[0], kart);
+          // Güvenlik (18 Ekim): ortak marka ya da en az iki ortak kelime
+          if (kart && grup && benzer({ brand: String(grup[1][0].e.marka ?? ""), title: grup[1][0].h.title, event: String(grup[1][0].e.neden ?? "") }, kart)) bagAday.set(grup[0], kart);
         }
       }
     } catch (e) { console.error("eşleştirme hatası", e); }
   }
+  // Gömme doğrulaması (18 Ekim, Fatih: "emin olmadan birleştirme"): (1) mevcut karta bağlanacak her yeni olay, (2) bu turda aynı olay
+  // kimliğini almış haberler birbirine anlamca yeterince yakın olmalı. Gömme alınamazsa hiçbir bağlama/gruplama yapılmaz.
+  const yeniMetin = (k: { h: Ham; e: Etiket }) => kartMetni({ brand: String(k.e.marka ?? ""), product: String(k.e.urun ?? ""), title: k.h.title, event: String(k.e.neden ?? "") });
+  const ciftler = [...bagAday.entries()].filter(([a]) => olaylar.has(a));
+  const coklu = [...olaylar.entries()].filter(([, g]) => g.length > 1);
+  const metinler = [...ciftler.flatMap(([a, k]) => [yeniMetin(olaylar.get(a)![0]), kartMetni(k)]), ...coklu.flatMap(([, g]) => g.map(yeniMetin))];
+  const E = metinler.length ? await gommeler(metinler) : [];
+  const mevcut = new Map<string, MevcutKart>();
+  let reddedilen = 0;
+  ciftler.forEach(([a, k], i) => {
+    if (E && benzerlik(E[2 * i], E[2 * i + 1]) >= BENZERLIK_BAGLA) mevcut.set(a, k); else reddedilen++;
+  });
+  let ofs = ciftler.length * 2;
+  for (const [a, g] of coklu) {
+    const ilk = ofs;
+    const ayri = g.filter((_, j) => j > 0 && !(E && benzerlik(E[ilk], E[ilk + j]) >= BENZERLIK_BAGLA));
+    ofs += g.length;
+    if (!ayri.length) continue;
+    olaylar.set(a, g.filter((x) => !ayri.includes(x)));
+    ayri.forEach((x, j) => olaylar.set(`tekil-ayri-${a}-${j}`, [x]));
+    reddedilen += ayri.length;
+  }
+  if (reddedilen) console.log(JSON.stringify({ gomme_reddi: reddedilen, gomme: !!E }));
   const yeniAday: Record<string, unknown>[] = [];
   const goruldu: string[] = [];
   for (const [anahtar, g] of olaylar) {
@@ -406,7 +477,11 @@ async function topla(sb: ReturnType<typeof createClient>) {
     if (goruldu.length) await sb.from("tr_seen").upsert(goruldu.map((link) => ({ link })), { onConflict: "link", ignoreDuplicates: true });
   } catch (e) { hata = String((e as Error).message ?? e).slice(0, 300); }
 
+  let gundemIsaret = 0;
+  try { if (gundemTerim.length) gundemIsaret = await gundemIsaretle(sb, gundemTerim); } catch (e) { console.error("gündem", e); }
+
   const ozet = {
+    gundem: gundemTerim.length, gundemIsaret,
     kaynak: kaynaklar?.length ?? 0, okunan: tumLinkler.length, yeni: gorulen.size, kural: onElenen.length, sirada,
     yapayZeka: islenen.size, aday: yeniAday.length, elenen: elenen.length, belirsiz: belirsiz.length, rehber: rehber.length,
     bekleyen: sirada + adaylar.length - islenen.size, hata, yedek: YEDEK_KULLANILDI, sure: Date.now() - bas,
@@ -451,13 +526,17 @@ async function birlestir(sb: ReturnType<typeof createClient>, model: string, sad
 }
 
 // 30 dakikada bir (Fatih, 18 Ekim 2026): son 48 saatteki kartlardan AYNI OLAYI anlatanlar markadan bağımsız tek karta birleşir.
-// Başlıkları farklı olabilir. Ekibin dokunduğu (alınmış, oylanmış, taslağı yazılmış) kart her zaman tutulan karttır; dokunulmamışlar
-// onun "diğer kaynakları"na eklenir ve silinir (bağlantıları tr_seen'e yazılır, tekrar gelmez). Böylece taslak tek kartta, bütün kaynaklarla yazılır.
-const KUME_SISTEM = `Sana numaralı haber kartları verilecek (id | marka | olay özeti | başlık). Aynı OLAYI anlatan kartları grupla: aynı ürün duyurusu, aynı sızıntı, aynı açıklama, aynı dava/karar, aynı güncelleme. Başlıklar ve diller farklı olabilir; markası boş ya da farklı yazılmış olabilir. Aynı markanın FARKLI haberleri (ör. aynı şirketin iki ayrı ürünü) ayrı kalır. Emin değilsen gruplama. Tek kartlık grup yazma.
-Sadece şu biçimde geçerli JSON döndür: {"gruplar":[[12,15],[20,31,33]]}`;
+// "Emin olmadan birleştirme" (Fatih, 18 Ekim öğlen): üç kapı birden geçilmeli:
+//   1) gömme (embedding) benzerliği ≥ BENZERLIK_KUME, 2) yapay zekâ o çift için "kesinlikle aynı olay" der, 3) ortak marka ya da en az iki ortak kelime.
+// Zincirleme yok: bir kart ancak tutulan kartla DOĞRUDAN onaylanmışsa ona katılır. Ekibin dokunduğu kart her zaman tutulan karttır;
+// dokunulmamışlar onun "diğer kaynakları"na eklenir ve silinir (bağlantıları tr_seen'e yazılır, tekrar gelmez).
+const CIFT_SISTEM = `Sana numaralı haber çiftleri verilecek. Her çift için iki haberin BİREBİR AYNI OLAYI anlatıp anlatmadığına karar ver.
+AYNI OLAY: aynı ürünün aynı duyurusu, aynı sızıntı, aynı açıklama, aynı dava kararı, aynı güncelleme (başlık ve dil farklı olabilir).
+AYNI DEĞİL: aynı şirketin farklı ürünü ya da farklı haberi; aynı ürünle ilgili farklı gelişmeler (ör. tanıtım ile fiyat ayrı haberdir; sızıntı ile resmi duyuru ayrıdır; inceleme ile duyuru ayrıdır); benzer konu.
+Kesin emin değilsen "hayir" de.
+Sadece şu JSON'u döndür: {"kararlar":[{"n":0,"karar":"evet|hayir"}]}`;
 
-// Güvenlik: yapay zekâ yanlış gruplarsa (ör. bir el konsolu haberine mikroplastik haberi) birleşmesin diye kartların başlık/özetinde
-// ortak anlamlı kelime ya da aynı marka aranır.
+// Güvenlik: kartların başlık/özetinde ortak anlamlı kelime ya da aynı marka aranır.
 const DOLGU = new Set(["the", "and", "for", "with", "that", "this", "from", "your", "will", "have", "has", "new", "its", "are", "after", "about", "into", "over", "more", "than", "yeni", "için", "ile", "olan", "daha", "gibi", "bir", "ve", "da", "de", "en"]);
 const kelimeler = (s: string) => new Set(s.toLocaleLowerCase("tr").replace(/[^a-z0-9ğüşıöç]+/g, " ").split(" ").filter((w) => w.length >= 3 && !DOLGU.has(w)));
 function benzer(a: { brand: string; title: string; event: string }, b: { brand: string; title: string; event: string }) {
@@ -468,32 +547,64 @@ function benzer(a: { brand: string; title: string; event: string }, b: { brand: 
 
 async function kumele(sb: ReturnType<typeof createClient>, model: string) {
   const bas = Date.now();
-  const { data } = await sb.from("tr_items").select("id,brand,event,title,link,source_name,other_sources,touched,status,auto_draft_at,created_at")
+  const { data } = await sb.from("tr_items").select("id,brand,product,event,title,link,source_name,other_sources,touched,status,auto_draft_at,created_at")
     .in("status", ["aday", "belirsiz", "alindi"]).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
     .order("created_at", { ascending: false }).limit(300);
-  type K = { id: number; brand: string; event: string; title: string; link: string; source_name: string; other_sources: { name: string; link: string }[]; touched: boolean; status: string; auto_draft_at: string | null; created_at: string };
+  type K = { id: number; brand: string; product: string; event: string; title: string; link: string; source_name: string; other_sources: { name: string; link: string }[]; touched: boolean; status: string; auto_draft_at: string | null; created_at: string };
   const liste = (data ?? []) as K[];
-  let birlesen = 0, grup = 0;
+  const ozet: Record<string, unknown> = { zaman: new Date().toISOString(), kart: liste.length, aday_cift: 0, onaylanan: 0, grup: 0, birlesen: 0 };
   if (liste.length >= 2) {
-    const v = await gemini(model, liste.map((x) => `${x.id} | ${x.brand || "-"} | ${x.event || "-"} | ${x.title}`).join("\n"), KUME_SISTEM);
-    for (const kume of (v.gruplar ?? []) as number[][]) {
-      const kartlar = [...new Set(kume.map(Number))].map((id) => liste.find((x) => x.id === id)).filter(Boolean) as K[];
-      if (kartlar.length < 2) continue;
-      // Tutulan: ekibin dokunduğu (alınmış/taslaklı/oylanmış) → en çok kaynaklı → en eski
-      const tutulan = [...kartlar].sort((a, b) => Number(b.touched || b.status === "alindi") - Number(a.touched || a.status === "alindi")
-        || b.other_sources.length - a.other_sources.length || Date.parse(a.created_at) - Date.parse(b.created_at))[0];
-      const digerleri = kartlar.filter((x) => x !== tutulan && !x.touched && x.status !== "alindi" && !x.auto_draft_at && benzer(x, tutulan));
-      if (!digerleri.length) continue;
-      const tum = [...tutulan.other_sources];
-      digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources])
-        .forEach((o) => { if (o.link !== tutulan.link && !tum.some((t) => t.link === o.link)) tum.push(o); });
-      await sb.from("tr_items").update({ other_sources: tum }).eq("id", tutulan.id);
-      await sb.from("tr_seen").upsert(digerleri.map((x) => ({ link: x.link })), { onConflict: "link", ignoreDuplicates: true });
-      await sb.from("tr_items").delete().in("id", digerleri.map((x) => x.id)).eq("touched", false).is("auto_draft_at", null);
-      birlesen += digerleri.length; grup++;
+    // 1) Gömme benzerliği
+    const E = await gommeler(liste.map(kartMetni));
+    if (!E) { ozet.hata = "Gömme (embedding) alınamadı; emin olunamadığı için birleştirme yapılmadı."; }
+    else {
+      const ciftler: { i: number; j: number; b: number }[] = [];
+      for (let i = 0; i < liste.length; i++) for (let j = i + 1; j < liste.length; j++) {
+        const b = benzerlik(E[i], E[j]);
+        if (b >= BENZERLIK_KUME && benzer(liste[i], liste[j])) ciftler.push({ i, j, b });
+      }
+      ciftler.sort((x, y) => y.b - x.b);
+      const sorulan = ciftler.slice(0, 80);
+      ozet.aday_cift = ciftler.length;
+      // 2) Yapay zekâ her çifti ayrı onaylar
+      const onay = new Set<string>();
+      if (sorulan.length) {
+        const v = await gemini(model, sorulan.map((c, n) => `${n}) A: ${liste[c.i].title} [${liste[c.i].brand}] — ${liste[c.i].event}\n   B: ${liste[c.j].title} [${liste[c.j].brand}] — ${liste[c.j].event}`).join("\n"), CIFT_SISTEM);
+        for (const k of (v.kararlar ?? []) as { n: number; karar: string }[]) {
+          const c = sorulan[Number(k.n)];
+          if (c && String(k.karar).toLowerCase() === "evet") onay.add(`${liste[c.i].id}-${liste[c.j].id}`);
+        }
+      }
+      ozet.onaylanan = onay.size;
+      const onayli = (a: number, b: number) => onay.has(`${a}-${b}`) || onay.has(`${b}-${a}`);
+      // 3) Gruplar: onaylı çiftlerden bağlantılı kümeler; her kümede tutulan karta DOĞRUDAN onaylı olanlar katılır
+      const bag = new Map<number, Set<number>>();
+      for (const key of onay) { const [a, b] = key.split("-").map(Number); (bag.get(a) ?? bag.set(a, new Set()).get(a)!).add(b); (bag.get(b) ?? bag.set(b, new Set()).get(b)!).add(a); }
+      const islendi = new Set<number>();
+      let birlesen = 0, grup = 0;
+      const benzerlikler: number[] = [];
+      for (const kok of bag.keys()) {
+        if (islendi.has(kok)) continue;
+        const kume: number[] = []; const yigin = [kok];
+        while (yigin.length) { const x = yigin.pop()!; if (islendi.has(x)) continue; islendi.add(x); kume.push(x); yigin.push(...(bag.get(x) ?? [])); }
+        const kartlar = kume.map((id) => liste.find((x) => x.id === id)!).filter(Boolean);
+        const tutulan = [...kartlar].sort((a, b) => Number(b.touched || b.status === "alindi") - Number(a.touched || a.status === "alindi")
+          || b.other_sources.length - a.other_sources.length || Date.parse(a.created_at) - Date.parse(b.created_at))[0];
+        const digerleri = kartlar.filter((x) => x !== tutulan && onayli(x.id, tutulan.id) && !x.touched && x.status !== "alindi" && !x.auto_draft_at);
+        if (!digerleri.length) continue;
+        digerleri.forEach((x) => benzerlikler.push(Math.round(benzerlik(E[liste.indexOf(x)], E[liste.indexOf(tutulan)]) * 1000) / 1000));
+        const tum = [...tutulan.other_sources];
+        digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources])
+          .forEach((o) => { if (o.link !== tutulan.link && !tum.some((t) => t.link === o.link)) tum.push(o); });
+        await sb.from("tr_items").update({ other_sources: tum }).eq("id", tutulan.id);
+        await sb.from("tr_seen").upsert(digerleri.map((x) => ({ link: x.link })), { onConflict: "link", ignoreDuplicates: true });
+        await sb.from("tr_items").delete().in("id", digerleri.map((x) => x.id)).eq("touched", false).is("auto_draft_at", null);
+        birlesen += digerleri.length; grup++;
+      }
+      Object.assign(ozet, { grup, birlesen, en_dusuk_benzerlik: benzerlikler.length ? Math.min(...benzerlikler) : null });
     }
   }
-  const ozet = { zaman: new Date().toISOString(), kart: liste.length, grup, birlesen, sure: Date.now() - bas };
+  ozet.sure = Date.now() - bas;
   await sb.from("tr_settings").upsert({ key: "son_kumeleme", value: ozet });
   return ozet;
 }

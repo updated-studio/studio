@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-18-b",
+    "tarih": "18 Ekim 2026",
+    "baslik": "Telif ve kümeleme güvenliği",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Türkiye'deki haber sitelerinden (basın bültenleri hariç) haber ve görsel alınmıyor. Anadolu Ajansı ve TRT Haber kaynakları kapatıldı, onlardan gelmiş kartlar Elenenler'de.",
+          "Türkiye gündemi (Google Trends) artık sadece işaret: gündemdeki terim yabancı kaynaklı bir haberde geçiyorsa kartta \"gündemde\" yazar ve önceliği artar.",
+          "Kartlar sadece birebir aynı olayı anlattıklarından emin olunursa birleşiyor: anlam benzerliği, haber haber yapay zekâ onayı ve ortak kelime şartı birlikte aranıyor. Aynı ürünün tanıtımı ile fiyat haberi gibi farklı gelişmeler ayrı kalıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-18-a",
     "tarih": "18 Ekim 2026",
     "baslik": "Haber Masası: daha dolu taslaklar, son kontrol, 10'luk önem",

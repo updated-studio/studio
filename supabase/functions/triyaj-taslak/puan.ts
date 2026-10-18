@@ -5,7 +5,7 @@
 // Kural değişince: değerleri güncelle, ONCELIK_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz (CLAUDE.md kural 10).
 // Enes'in kararları: puan markadan bağımsız; Öncelikli marka listesi puanı etkilemez (sadece elemede kullanılır).
 
-export const ONCELIK_SURUMU = "18 Ekim 2026";
+export const ONCELIK_SURUMU = "18 Ekim 2026 (2)";
 
 // 1) Haberin türü: markadan bağımsız temel değer. Yapay zekâ her haberi bu listeden birine koyar ("tip" etiketi).
 export const HABER_TURLERI: { ad: string; puan: number; aciklama: string }[] = [
@@ -35,6 +35,7 @@ export const EK = {
   kaynakBasina: 8, kaynakEnFazla: 24,                        // aynı haberi yazan her ek kaynak
   taze: [[3, 20], [12, 12], [24, 6]] as [number, number][],   // [saatten yeni, puan]
   turkiyeZayif: -16,                                          // Öncelikli marka olduğu için elenmeyen "Türkiye'de yok" haberi
+  gundem: 10,                                                 // konusu Türkiye gündeminde (Google Trends TR terimi haberde geçiyor; sadece sinyal, içerik alınmaz)
 };
 
 // 3) Seviyeler ve 10'luk önem (Fatih, 18 Ekim 2026). Önem = puan / 10 (en az 1, en fazla 10, bir ondalık).
@@ -51,7 +52,7 @@ export const onem = (puan: number) => Math.min(10, Math.max(1, Math.round(puan) 
 
 /** Puan için gereken haber alanları (ekrandaki Haber tipi ve veritabanı satırı bununla uyumludur). */
 export type PuanHaber = {
-  news_type: string | null; kind: string; topic?: string | null; source_name: string; turkey: string;
+  news_type: string | null; kind: string; topic?: string | null; trend?: string | null; source_name: string; turkey: string;
   other_sources: { name: string; link: string }[] | null; published_at: string | null; created_at: string;
 };
 export type Degerlendirme = { puan: number; onem: number; seviye: (typeof SEVIYELER)[number]; tur: string; gerekce: string[] };
@@ -73,6 +74,7 @@ export function degerlendir(h: PuanHaber, simdi = Date.now()): Degerlendirme {
   const saat = (simdi - Date.parse(h.published_at ?? h.created_at)) / 3_600_000;
   const t = EK.taze.find(([s]) => saat < s);
   if (t) { puan += t[1]; gerekce.push(saat < 1 ? "yeni" : `${Math.round(saat)} sa önce`); }
+  if (h.trend) { puan += EK.gundem; gerekce.push(`gündemde: ${h.trend}`); }
   if (h.turkey === "yok") { puan += EK.turkiyeZayif; gerekce.push("Türkiye ilgisi zayıf"); }
   if (h.turkey === "global") gerekce.push("global ilgi");
   puan = Math.max(0, Math.round(puan));

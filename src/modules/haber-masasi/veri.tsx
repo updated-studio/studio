@@ -13,6 +13,7 @@ export type Haber = {
   work_error: string; touched: boolean; updated_at: string; updated_by: string | null;
   origin: string; turkey: string; event_key: string; draft_url: string; transfer_note: string; last_action: string;
   auto_draft_at: string | null; // otomatik taslak için seçildiği an
+  trend?: string | null; // Türkiye gündemindeki terim (Google Trends TR), varsa
 };
 export type Oy = { id: number; item_id: number | null; user_id: string; value: number; note: string; created_at: string; brand: string; topic: string; event: string; link: string };
 export type Etkinlik = { id: number; created_at: string; kind: string; actor: string | null; target: string | null; actor_name: string; target_name: string; item_id: number | null; title: string; link: string; note: string; read_by: string[] };
