@@ -95,7 +95,9 @@ async function gundemIsaretle(sb: ReturnType<typeof createClient>, yeni: string[
 export const BENZERLIK_KUME = 0.86;   // 30 dk'lık kümelemede aday çift eşiği
 export const BENZERLIK_BAGLA = 0.82;  // toplama sırasında yeni haberi mevcut karta bağlama eşiği
 const GOMME_MODELLER = ["gemini-embedding-001", "text-embedding-004"];
+let GOMME_HATA = "";
 async function gommeler(metinler: string[]): Promise<number[][] | null> {
+  GOMME_HATA = "";
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key || !metinler.length) return null;
   for (const model of GOMME_MODELLER) {
@@ -108,12 +110,13 @@ async function gommeler(metinler: string[]): Promise<number[][] | null> {
           method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
           body: JSON.stringify({ requests: parca.map((t) => ({ model: "models/" + model, content: { parts: [{ text: t.slice(0, 1500) }] }, taskType: "SEMANTIC_SIMILARITY", ...(model === "gemini-embedding-001" ? { outputDimensionality: 768 } : {}) })) }),
         });
-        if (!r.ok) { tamam = false; break; }
+        if (!r.ok) { GOMME_HATA += `${model} ${r.status}: ${(await r.text()).slice(0, 160)} | `; tamam = false; break; }
         const j = await r.json();
         for (const e of j.embeddings ?? []) out.push(e.values as number[]);
         if ((j.embeddings ?? []).length !== parca.length) { tamam = false; break; }
-      } catch { tamam = false; break; }
+      } catch (e) { GOMME_HATA += `${model} istek hatası: ${String(e).slice(0, 80)} | `; tamam = false; break; }
     }
+    if (tamam && out.length !== metinler.length) GOMME_HATA += `${model}: ${out.length}/${metinler.length} vektör | `;
     if (tamam && out.length === metinler.length) return out.map((v) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); });
   }
   return null;
@@ -556,7 +559,12 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
   if (liste.length >= 2) {
     // 1) Gömme benzerliği
     const E = await gommeler(liste.map(kartMetni));
-    if (!E) { ozet.hata = "Gömme (embedding) alınamadı; emin olunamadığı için birleştirme yapılmadı."; }
+    if (!E) {
+      // Teşhis: hangi gömme modelleri açık?
+      let modeller = "";
+      try { const m = await (await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY") ?? "" } })).json(); modeller = (m.models ?? []).filter((x: { name: string; supportedGenerationMethods?: string[] }) => (x.supportedGenerationMethods ?? []).some((g) => /embed/i.test(g))).map((x: { name: string }) => x.name).join(", "); } catch { /* yok */ }
+      ozet.hata = "Gömme (embedding) alınamadı; emin olunamadığı için birleştirme yapılmadı. " + GOMME_HATA + (modeller ? " Açık gömme modelleri: " + modeller : "");
+    }
     else {
       const ciftler: { i: number; j: number; b: number }[] = [];
       for (let i = 0; i < liste.length; i++) for (let j = i + 1; j < liste.length; j++) {
@@ -630,7 +638,7 @@ Deno.serve(async (req) => {
   // Zamanlanmış kümeleme (30 dk'da bir, tr_kumele_kick); girdi almaz, 20 dakikadan sık çalışmaz
   if (govde?.kumele) {
     const { data: k } = await sb.from("tr_settings").select("value").eq("key", "son_kumeleme").maybeSingle();
-    if (k?.value?.zaman && Date.now() - Date.parse(k.value.zaman) < 20 * 60_000) return Response.json({ atlandi: "Son 20 dakikada çalıştı" }, { headers: CORS });
+    if (!govde.zorla && k?.value?.zaman && Date.now() - Date.parse(k.value.zaman) < 20 * 60_000) return Response.json({ atlandi: "Son 20 dakikada çalıştı" }, { headers: CORS });
     const ay = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
     if (ay.model_yedek) YEDEK_MODEL = String(ay.model_yedek);
     // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
