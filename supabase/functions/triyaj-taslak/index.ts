@@ -171,7 +171,7 @@ KURALLAR:
 - Ters piramit: en önemli bilgi ilk paragrafta. TAM 3 adet H2 ara başlık, kısa paragraflar. Uzunluğu kaynakların zenginliği belirler (üsluptaki UZUNLUK kuralı): özet değil, gerektiği kadar ayrıntı.
 - Birden fazla kaynak verildiyse hepsini oku ve birleştir: her kaynaktaki farklı ayrıntıyı kullan, tekrar etme; kaynaklar çelişiyorsa bunu belirt ve editor_notlari'na yaz. Kaynaklardan biri BAŞKA bir olayı anlatıyorsa (yanlış eşleşmiş) onu tamamen yok say ve editor_notlari'na "Kaynak N bu haberle ilgisiz" yaz.
 - Spot en fazla 210 karakter.
-- Etiketler: önce KAYNAK SİTELERİN ETİKETLERİ'nden habere uyanlar (marka, ürün, teknoloji adı), sonra eksik kalanlar; 5-7 adet.
+- Etiketler: önce KAYNAK SİTELERİN ETİKETLERİ'nden habere uyanlar (marka, ürün, teknoloji adı), sonra eksik kalanlar; 5-7 adet. "haber", "teknoloji", "son dakika" gibi genel etiketleri ve kaynak sitenin/ajansın adını etiket yapma.
 - Başlık merak uyandırsın ama her iddiasının kaynakta birebir karşılığı olsun; abartı, "şok", tık tuzağı yok.
 - Haber ajansı titizliği: rakamları, özel adları, tarihleri kaynaktaki gibi aktar; tarafsız yaz, reklam dili kullanma.
 - Doğrulanmamış bilgiyi "iddiaya göre" veya "sızıntıya göre" diye açıkça işaretle.
@@ -342,7 +342,7 @@ ${metinler.join("\n\n---\n\n")}`;
     const { data: yeni } = await sb.from("tr_drafts").insert({
       item_id: itemId, author: kullanici, model, auto: !!sec.oto,
       title: baslik, spot, body: govdeMd,
-      seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: t.etiketler ?? [] },
+      seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: etiketSuz(metinListe(t.etiketler), [it.source_name, ...diger.map((o) => o.name)]) },
       sources: kaynaklar.join("\n"), image_note: String(g.oneri ?? ""), editor_note: notlar.join("\n"),
       questions: metinListe(t.editor_sorulari), checks: metinListe(t.dogrulama), notes: notlar,
       image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: [] },
@@ -399,6 +399,13 @@ const spotKisalt = (s: string, n = 210) => {
   const son = Math.max(kes.lastIndexOf(". "), kes.lastIndexOf("! "), kes.lastIndexOf("? "));
   return son > 120 ? kes.slice(0, son + 1) : kes.slice(0, kes.lastIndexOf(" ")).replace(/[,;:]$/, "") + "…";
 };
+
+/** Genel etiketler ve kaynak site/ajans adları etiket olmaz */
+const GENEL_ETIKET = /^(haber|haberler|son dakika|gündem|teknoloji|teknoloji haberleri|news|tech|technology|güncel|bilim|bilim-teknoloji|bilim teknoloji)$/i;
+function etiketSuz(etiketler: string[], kaynaklar: string[]): string[] {
+  const k = kaynaklar.map((x) => x.toLocaleLowerCase("tr").replace(/^gündem · /, "").replace(/\s*(bilim-teknoloji|bilim teknoloji)$/, "").trim()).filter(Boolean);
+  return etiketler.map((e) => e.trim()).filter((e) => e && !GENEL_ETIKET.test(e) && !k.some((x) => { const l = e.toLocaleLowerCase("tr"); return l === x || x.includes(l) && l.length >= 4; })).slice(0, 7);
+}
 
 /** Sadece izin verilen (sitemizin arşivinden gelen) bağlantılar kalır; diğerleri düz metne çevrilir */
 function linkTemizle(md: string, izinli: string[]): string {
