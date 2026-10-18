@@ -233,6 +233,16 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **17 Ekim 2026:** (Fatih) Taslak gövdesi WordPress blok biçimiyle gider (`triyaj-taslak/html.ts`): paragraf ve listeler 16px (`GOVDE_PX`), ara başlıklar mavi (WordPress "vivid-cyan-blue" satır içi rengi). Biçim, sitede elle düzenlenmiş yazıdan (LG Display FLiPP) birebir alındı; taslak WordPress'te klasik blok yerine normal bloklar olarak açılır. Ekrandaki önizleme ve "HTML kopyala" da aynı çıktıyı kullanır.
 - **17 Ekim 2026 (2):** Görsel teşhisi: Commons ve Openverse yanıt veriyor ("tamam") ama 0 aday dönüyordu. Openverse aramasında sıkı filtre (büyük + yatay + fotoğraf) sonuç vermezse filtreler sırayla gevşetilir, boyut/yön kodda denetlenir; Commons konu aramasıyla (aramalar[0]) ve Openverse ikinci konu aramasıyla da denenir. Alakasız adayları seçim adımı zaten eler. Görsel çıkmazsa "Görsel" bölümünde her aramanın sonuç/uygun sayısı yazar.
 - **17 Ekim 2026 (3):** (Fatih'in "her taslak görselli gitsin" isteği) Teşhis sonuçları: Openverse sıkı filtreyle hep 0 dönüyor, art arda isteklerde zaman aşımına düşüyor → yalnız "fotoğraf" filtresi + filtresiz tek deneme. Resmi sayfalar (asus.com, xbox.com) açılıyor ama og:image yok → twitter:image, image_src ve JSON-LD "image" de okunur; istek kimliği "Mozilla/5.0 (compatible; UpdatedStudyo/1.0 ...)" biçimine alındı. Seçim kuralı: ürünün kendi fotoğrafı yoksa aynı ürün türünü ya da konuyu açıkça gösteren gerçekçi fotoğraf "temsili" olarak seçilir (başka markanın ürününü öne çıkaran fotoğraf hariç); editör yayından önce değiştirir.
+- **18 Ekim 2026:** **Haber Masası büyük güncellemesi** (Fatih). Önce yedek alındı: kod `yedek/haber-masasi-2026-10-18` dalı, veritabanı `yedek_20261018` şeması (tr_* tabloları + zamanlanmış görev listesi, migration 0015). Değişenler:
+  (1) **Yazım:** üsluba "ajans / haber sitesi dili" temeli eklendi (tarafsız, 5N1K ilk iki paragrafta) + Updated sesi. Özet değil haber: uzunluk malzemeye göre (az ise 250-350, zenginse 500-800 kelime), dolgu yok. Spot en fazla 210 karakter, TAM 3 ara başlık. Kaynak/referans site adı rutin olarak yazılmaz; sadece bilginin değerini belirliyorsa (resmi açıklama, sızıntının kaynağı). (16 Ekim'deki "cümle içi kaynak atfı" kuralının yerini aldı.)
+  (2) **Kümedeki bütün kaynaklar okunur:** taslak asıl haber + en fazla 4 diğer kaynağın tam metniyle yazılır (önce 2 kaynaktı); kaynaklar farklı ayrıntı veriyorsa birleştirilir, çelişki editör notuna.
+  (3) **Etiketler kaynak meta verisinden:** kaynak sitelerin `article:tag` / `news_keywords` / `keywords` etiketleri yapay zekâya aday olarak verilir.
+  (4) **İç link:** sitemizin arşivinde (WordPress araması, yayındaki yazılar) marka/ürünle ilgili en fazla 6 yazı bulunur; yapay zekâ bağlam katıyorsa 1-2'sine cümle içinde bağlantı verir. Listede olmayan adres metinden silinir.
+  (5) **Son kalite kontrolü** (yeni aşama, ayrı çağrı; `uslup.ts` `KONTROL_SISTEM`): taslak kaynak metinlere karşı denetlenir: rakamlar, özel adlar, kaynakta olmayan iddia, tutarsızlık, taraflılık, biçim; düzeltilmiş metin + sorunlar listesi döner ve aynı adımda insanlaştırılır (eski "insanlaştırma" adımı bunun içine alındı). Güvenlik: editör yorumu yeri duruyor, 2-4 ara başlık, metin %25'ten fazla kısalmamış; değilse ilk taslak korunur. Editör bu arada metni değiştirdiyse düzeltme uygulanmaz, notlara yazılır. Görsel seçimi ve (otomatikse) WordPress'e gönderim bu aşamada, kontrolden SONRA yapılır. Taslak `qc_state`: bekliyor → calisiyor → tamam/hata (migration 0016); başlatılamayan/yarıda kalan kontrolü otomatik tur 3-5 dk sonra devralır.
+  (6) **Öncelik 10'luk ölçek + Türkiye ilgisi:** önem = puan ÷ 10 (1-10). Konunun Türkiye'deki genel ilgisi puana eklenir (`puan.ts` `KONU_ILGI`: telefon +10, yapay zeka +8, oyun +6, otomobil/bilgisayar/kamera +5 ... sektör −2, diğer −4). Seviyeler: Öncelik 1 = **ana sayfa adayı** (önem 8+), Öncelik 2 = **yayına değer** (5,5+; otomatik taslak varsayılan eşiği), Öncelik 3 = beklet. "Öncelik 1/2/3" adları korundu (Enes'in kararı), yanına önem yazılır. Ana sayfa adayı taslakta rozet + editör notu; sitede ana sayfaya alma kararı editörde.
+  (7) **30 dakikada bir olay kümeleme** (`triyaj-topla` `{kumele:true}`, görev `triyaj-kumele`): son 48 saatteki kartlardan aynı olayı anlatanlar markadan bağımsız (başlık farklı olsa da) tek karta birleşir; dokunulmuş/taslaklı kart tutulur, dokunulmamışlar onun diğer kaynakları olur ve silinir. Az taslak, az kota.
+  (8) **Görsel:** üzerinde yazı olan görsel (banner, afiş, yazı bindirmeli kart, kolaj, filigran, infografik, ekran görüntüsü) seçilmez; yapay zekâ adayların kendisini görerek seçer (Gemini'ye küçük kopyalar gider). Fotoğraf bulunamazsa **Flux** isteği sıraya girer: Fatih'in Mac'inde çevrimdışı FLUX.1-schnell (Apache 2.0) yazısız, gerçekçi görsel üretir, Stüdyo'ya yükler (`scripts/flux-isci`, Secrets `FLUX_TOKEN`, depo `haber-gorsel`); WordPress'teki taslağın öne çıkan görseli yoksa oraya da eklenir; altyazı "Görsel yapay zekâ ile üretilmiştir." Editör Taslaklar'dan elle de isteyebilir. **Telifli dış görsel kredi verilerek kullanılmaz:** kredi vermek kullanım izni sağlamaz; resmi basın görselleri (basına açık) "Görsel: Marka" kredisiyle kullanılmaya devam eder.
+  (9) **Türkiye gündemi ve Türkçe kaynaklar:** Google Trends Türkiye RSS'i kaynak oldu: gündemdeki başlıkların altındaki haberler alınır, sadece teknoloji konuları kalır (siyaset/spor/magazin elenir, rakip teknoloji siteleri hiç alınmaz). X, Instagram ve Ekşi Sözlük'ün herkese açık, kurallarına uygun okuma yolu (API/RSS) olmadığı için doğrudan okunmuyor. Rakip olmayan güvenilir Türkçe kaynak: Anadolu Ajansı ve TRT Haber bilim-teknoloji, Samsung Newsroom Türkiye (çalışmayan kaynak Kaynaklar'da kapatılır).
 ## 13. İşletme el kitabı (her şey nerede, bir şey bozulursa)
 
 Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilginin kendisi burada yazmaz; sadece **nerede durduğu** yazar.
@@ -249,7 +259,7 @@ Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilgini
 
 ### 13.2 Gizli bilgiler (sadece Supabase → Edge Functions → Secrets)
 
-`GEMINI_API_KEY` (Google AI Studio, ücretsiz kota), `GROQ_API_KEY` (Gemini kotası dolunca yedek, ücretsiz), `GMAIL_APP_PASSWORD` + `MAIL_FROM` (bildirim e-postaları, Enes'in Gmail'i), isteğe bağlı `UNSPLASH_ACCESS_KEY` / `PIXABAY_API_KEY` / `PEXELS_API_KEY` (taslakta stok görsel önerisi; şu an yok). Tarayıcıdaki "publishable" anahtar gizli değildir, kodda durur. Kural: şifre/anahtar asla koda ya da sohbete yazılmaz.
+`GEMINI_API_KEY` (Google AI Studio, ücretsiz kota), `GROQ_API_KEY` (Gemini kotası dolunca yedek, ücretsiz), `GMAIL_APP_PASSWORD` + `MAIL_FROM` (bildirim e-postaları, Enes'in Gmail'i), isteğe bağlı `UNSPLASH_ACCESS_KEY` / `PIXABAY_API_KEY` / `PEXELS_API_KEY` (taslakta stok görsel önerisi; şu an yok), `FLUX_TOKEN` (Fatih'in Mac'indeki Flux işçisi; aynı değer Mac'te `~/updated-flux/ayar.json`). Tarayıcıdaki "publishable" anahtar gizli değildir, kodda durur. Kural: şifre/anahtar asla koda ya da sohbete yazılmaz.
 
 ### 13.3 Sunucu fonksiyonları (supabase/functions)
 
@@ -269,6 +279,7 @@ Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilgini
 |---|---|---|
 | `triyaj-topla` | 15 dk'da bir | Haber toplama fonksiyonunu çağırır |
 | `triyaj-oto-taslak` | 10 dk'da bir | Öncelik 1 haberden birine otomatik taslak yazdırır ve WordPress'e taslak gönderir (Ayarlar'dan kapatılabilir) |
+| `triyaj-kumele` | Saatte iki kez (:01, :31) | Son 48 saatte aynı olayı anlatan kartları tek kartta birleştirir |
 | `triyaj-is-kurtar` | Dakikada bir | 2 dk'dır nabızsız taslak/çeviri işini "hata"ya çeker (kilit açılır, kartta "Tekrar dene") |
 | `triyaj-temizlik` | Her gece 03:30 TR | Eski haberleri ve görülme kayıtlarını temizler |
 | `haftalik-hatirlatma` | Pazar 19:00 TR | Ekibe haftalık hatırlatma e-postası |
@@ -278,7 +289,7 @@ Liste SQL Editor'da: `select jobname, schedule from cron.job;`
 
 ### 13.5 Veritabanı değişikliği
 
-Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0014_otomatik_taslak.sql` (16 Ekim).
+Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0016_kalite_kontrol_kume_flux.sql` (18 Ekim).
 
 ### 13.6 Bir şey bozulursa
 
@@ -295,13 +306,17 @@ Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalı�
 
 ### 13.7 Haber Masası özeti
 
-Toplama (15 dk): son 24 saat, kaynak başına 10, tur başına en fazla 100 haber, fazlası sıraya girer. Yapay zekâ sadece etiket çıkarır, kararı kurallar verir (hariç marka, kampanya → elenir; rehber/liste → "Rehber fikirleri"; Türkiye'de yok ve Öncelikli değil → elenir; belirsiz → Belirsiz). Aynı olay tek kartta, diğer kaynaklar bağlantı. Elenen başlıklar Türkçe görünür, "Havuza al" ile geri alınır. Öncelik: Öncelik 1 (≥70) / 2 (≥40) / 3; puan haber türü + kaynak sayısı + tazelik; ekip oyu (👍/👎) sadece aynı marka içinde etkili; aynı markadan art arda en fazla 2. Sıralama: öncelik puanı / öncelik grubu içinde yeni→eski / haber saati / sisteme düşme saati. Taslak: Gemini (3.8 → 3.6 → 3.5 flash), iki kaynak, SEO, editöre sorular, doğrulama, görsel önerisi; hazırlayan haberi alır. Taslak "WordPress'e gönder" ile siteye taslak olarak gider (kategori sitedekilerden, etiketler eşleşir ya da açılır). Otomatik taslak: eşik 55 (Öncelik 1 + Öncelik 2'nin üstü), 10 dk bekleme, turda en fazla 2 farklı haber, günde en fazla 100, aynı haberin diğer kartları atlanır, ilgi alanına göre editör. Kurallar: eleme `supabase/functions/triyaj-topla/index.ts`, puan `supabase/functions/triyaj-taslak/puan.ts` (ekran `oncelik.ts` üzerinden kullanır).
+Toplama (15 dk): son 24 saat, kaynak başına 10, tur başına en fazla 100 haber, fazlası sıraya girer. Yapay zekâ sadece etiket çıkarır, kararı kurallar verir (hariç marka, kampanya → elenir; rehber/liste → "Rehber fikirleri"; Türkiye'de yok ve Öncelikli değil → elenir; belirsiz → Belirsiz). Aynı olay tek kartta, diğer kaynaklar bağlantı. Elenen başlıklar Türkçe görünür, "Havuza al" ile geri alınır. Öncelik: Öncelik 1 (≥70) / 2 (≥40) / 3; puan haber türü + kaynak sayısı + tazelik; ekip oyu (👍/👎) sadece aynı marka içinde etkili; aynı markadan art arda en fazla 2. Sıralama: öncelik puanı / öncelik grubu içinde yeni→eski / haber saati / sisteme düşme saati. Taslak: Gemini (3.8 → 3.6 → 3.5 flash), iki kaynak, SEO, editöre sorular, doğrulama, görsel önerisi; hazırlayan haberi alır. Taslak "WordPress'e gönder" ile siteye taslak olarak gider (kategori sitedekilerden, etiketler eşleşir ya da açılır). Önem 10'luk (puan ÷ 10); Öncelik 1 ≥ 80 ana sayfa adayı, Öncelik 2 ≥ 55 yayına değer; konu Türkiye ilgisine göre ek puan alır. Taslak kümedeki bütün kaynaklarla yazılır, ayrı çağrıda son kalite kontrolünden geçer (doğrulama + insanlaştırma), sonra görsel (yazısız; yoksa Flux) ve WordPress. 30 dk'da bir aynı olay kartları birleşir. Otomatik taslak: eşik 55 (önem 5,5), 10 dk bekleme, turda en fazla 2 farklı haber, günde en fazla 100, aynı haberin diğer kartları atlanır, ilgi alanına göre editör. Kurallar: eleme `supabase/functions/triyaj-topla/index.ts`, puan `supabase/functions/triyaj-taslak/puan.ts` (ekran `oncelik.ts` üzerinden kullanır).
 
 ### 13.8 Ekip geri bildirimleri (karşılananlar)
 
 Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve sisteme düşme saatine göre yeniden eskiye sıralama → eklendi. Öncelik grubu içinde zamana göre sıralama → eklendi. Kopya kartlar → tek kartta birleşiyor. Elenenler İngilizceydi → Türkçe. Bildirimler altta ve beyaz zeminliydi → üstte, cam görünüm. Mobil menü (dock) bozuktu → düzeltildi; dokununca mavi kare kalktı.
 
-### 13.9 Yapılacaklar (14 Ekim itibarıyla, sırayla)
+### 13.9 Haber Masası yol haritası (Fatih, 18 Ekim; sıra yeniden düzenlendi)
+
+1. ✔ Yedek (kod dalı + veritabanı şeması). 2. ✔ Ajans dili + Updated üslubu, uzunluk, spot 210, 3 ara başlık, kaynak adı sadece gerekiyorsa. 3. ✔ Kümedeki bütün kaynaklar + 30 dk'da bir kümeleme. 4. ✔ Son kalite kontrolü (doğrulama + insanlaştırma). 5. ✔ 10'luk önem, Türkiye ilgisi, yayın (5,5) ve ana sayfa (8) eşiği. 6. ✔ İç link (sitemizin arşivi). 7. ✔ Kaynak meta etiketleri. 8. ✔ Yazılı banner/afiş görsel yasağı + görerek seçim. 9. ◐ Flux (Mac'te çevrimdışı): kod ve kuyruk hazır; Mac'e kurulum ve `FLUX_TOKEN` bekliyor. 10. ◐ Türkiye gündemi (Google Trends TR) + Türkçe kaynaklar: eklendi, ilk turlarda sağlıkları izlenecek. 11. Açık: X/Instagram/Ekşi Sözlük (resmi erişim yolu yok; ücretli API ya da elle takip kararı Fatih'te). 12. Öneri: ana sayfa adayı haberlerin WordPress'te otomatik "Öne çıkan" (sticky) yapılması; şimdilik sadece rozet + not.
+
+### 13.10 Yapılacaklar (14 Ekim itibarıyla, sırayla)
 
 1. **Fatih'i sahip yapmak** (Enes 14 Ekim'de dört daveti de gönderdi; Fatih'in kabul etmesi ve Stüdyo'da hesap oluşturması bekleniyor; Fatih'in Gmail adresi Enes'te, depo herkese açık olduğu için buraya yazılmaz):
    a. GitHub `updated-studio` organizasyonuna Owner olarak davet.
@@ -321,7 +336,7 @@ Taslak/Tekrar dene çalışmıyordu → düzeltildi (14 Ekim). Haber saatine ve 
 12. Fonksiyonların GitHub'dan otomatik yayını (13.3).
 13. Yeni marka kiti gelince: `assets/marka/` güncellenir, `python3 scripts/ikonlar.py`, Marka Kiti modülüne logolar.
 
-### 13.10 Marka ve ikonlar
+### 13.11 Marka ve ikonlar
 
 İkonlar tek komutla üretilir: `python3 scripts/ikonlar.py` (kaynak `assets/marka/up-isaret.png`). Ana ekran ikonu: koyu zemin (#1B1D21) üstünde beyaz UP; açılış ekranı aynı renk ve işaret (dikiş görünmesin). Sekme ikonu: yuvarlak köşeli marka mavisi (#2563FF) kare. Üst bölümde "UPDATED" yazısı (`src/assets/logo.png`). İkon değişince `src/shared/IkonUyarisi.tsx` içindeki tarih güncellenir (iPhone ikonu kendiliğinden yenilemez).
 
@@ -423,19 +438,15 @@ Asıl metinler kodda durur; burada ne söylediğimizin tam özeti var. Değişti
 - Öncelik 1 ≥ 70, Öncelik 2 ≥ 40, altı Öncelik 3. Kartta gerekçe yazar; "Öncelik nasıl hesaplanır?" ekranda.
 - Ekip oyu: her 👍/👎 aynı marka + tür haberlerine ±6 (en fazla ±18, son 60 gün). Aynı markadan art arda en fazla 2 haber.
 
-**6. Taslak talimatı** (`triyaj-taslak`)
-- Rol: Updated'ın haber editörü asistanı; İngilizce kaynaktan yayına hazırlanacak Türkçe taslak.
-- Çeviri yapma, kendi cümlelerinle sade haber Türkçesi; kaynak cümlesini kopyalama.
-- Ters piramit; 2-4 ara başlık; 250-450 kelime; kısa paragraflar.
-- Başlık merak uyandırsın ama her iddiası kaynakta olsun; abartı, "şok", soru tuzağı yok.
-- Doğrulanmamış bilgi "iddiaya göre / sızıntıya göre" diye işaretlenir. Fiyat kaynaktaki para biriminde, TL'ye çevrilmez.
-- **Kaynakta olmayan bilgi, rakam, tarih eklenmez**; emin olunmayan şey editör notuna yazılır.
-- Resmi değilse "Dikkat edilmesi gerekenler" bölümü.
-- Editöre 2-3 somut soru (Türkiye durumu, kendi deneyimi, sahada kullanım) ve yayından önce doğrulanacak iddialar listesi (hangi kaynakta geçtiğiyle).
-- Görsel: telif riski olmayan resmi görsel önerisi (basın sayfası; URL uydurma yasak), Türkçe alt metin, stok sitesi için 3 İngilizce arama (ürün/kategori, kullanım sahnesi, detay; marka adı yok), yapay zekâ görsel istemi (gerçek ürünü çizmeye çalışmadan).
-- SEO: odak kelime, başlık etiketi (≤60), slug, meta açıklama (≤155), kategori, 5-7 etiket.
-- Sona "[EDİTÖR YORUMU]" yeri eklenir. Kaynaklar listesi (ilk yazan + diğerleri + asıl kaynak). Tam metin alınamadıysa notla uyarır.
-- Yapay zekâya ayrıca söylenir: "özet ve tür etiketi otomatik, hatalı olabilir; resmi mi sızıntı mı, sadece kaynak metne bakarak kendin belirle."
+**6. Taslak talimatı** (`triyaj-taslak`, 18 Ekim 2026 itibarıyla)
+- Rol: Updated'ın haber editörü; kümedeki bütün kaynaklardan (asıl + en fazla 4) yayına hazırlanacak Türkçe haber. Üslup `uslup.ts`: ajans/haber sitesi dili temeli + Updated/Nerdesin Fatih sesi.
+- Çeviri yapma, kendi cümlelerinle; ters piramit; TAM 3 ara başlık; spot ≤210 karakter; uzunluk malzemeye göre (250-350 / 500-800 kelime), özet değil, dolgu yok.
+- Başlık iki parçalı, her iddiası kaynakta; abartı ve tık tuzağı yok. Kaynak site adı rutin yazılmaz, sadece bilginin değerini belirliyorsa.
+- Doğrulanmamış bilgi "iddiaya göre / sızıntıya göre". Fiyat kaynaktaki para biriminde. **Kaynakta olmayan bilgi eklenmez**; çelişki editör notuna.
+- Etiketler önce kaynak sitelerin meta etiketlerinden; iç link sadece sitemizin arşivinden verilen listeden, 1-2 adet.
+- Editöre sorular, doğrulama listesi, dikkat notları (metne girmez), görsel önerisi (Flux istemi: gerçekçi, yazısız, logosuz), SEO, sona "[EDİTÖR YORUMU]".
+- **Son kalite kontrolü** (`KONTROL_SISTEM`, ayrı çağrı): rakamlar, özel adlar, kaynakta olmayan iddia, tutarsızlık, taraflılık, biçim, yapay zekâ izi → düzeltilmiş metin + sorunlar listesi (Stüdyo'da "Kalite kontrolünün bulduğu").
+- Görsel seçimi: yapay zekâ adayları görerek seçer; üzerinde yazı olan banner/afiş/kolaj/filigran/ekran görüntüsü seçilmez; yoksa Flux.
 
 **7. Çeviri talimatı:** paragraf yapısını koruyarak eksiksiz, sadık çeviri; yorum, özet, ekleme yok.
 

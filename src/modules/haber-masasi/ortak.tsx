@@ -5,7 +5,7 @@ import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
 import { hataKaynagi, useAltyapi } from "../../shared/altyapi";
-import { ART_ARDA_EN_FAZLA, degerlendir, EK, ilgiEslesme, HABER_TURLERI, ONCELIK_SURUMU, OY_ETKISI, OY_GUN, OY_SINIRI, SEVIYELER, type Degerlendirme } from "./oncelik";
+import { ART_ARDA_EN_FAZLA, degerlendir, EK, ilgiEslesme, HABER_TURLERI, KONU_ILGI, ONCELIK_SURUMU, OY_ETKISI, OY_GUN, OY_SINIRI, SEVIYELER, type Degerlendirme } from "./oncelik";
 import { useMasa, type Haber } from "./veri";
 
 export const KONUMLAR_ETIKET: Record<string, string> = { aday: "Havuz", belirsiz: "Belirsiz", elendi: "Elendi", alindi: "Alındı", pas: "Pas", yayinda: "Yayında" };
@@ -40,7 +40,7 @@ export function useOnerilen() {
 }
 
 export function Seviye({ d }: { d: Degerlendirme }) {
-  return <span className={"pill " + d.seviye.sinif} title={"Öncelik puanı " + d.puan}>{d.seviye.ad}</span>;
+  return <span className={"pill " + d.seviye.sinif} title={`${d.seviye.aciklama} · önem ${d.onem.toLocaleString("tr")}/10 (puan ${d.puan})`}>{d.seviye.ad} · {d.onem.toLocaleString("tr")}</span>;
 }
 
 /** "Öncelik nasıl hesaplanır?" — oncelik.ts'teki kurallardan üretilir, kural değişince kendiliğinden güncellenir. */
@@ -51,10 +51,11 @@ export function OncelikBilgisi() {
       <div className="muted">Puan markadan bağımsızdır: Apple ile PlayStation aynı türde haberde aynı yerden başlar. Öncelikli marka listesi puanı etkilemez, sadece elemede kullanılır.</div>
       <div className="liste">
         <div className="satir"><div className="ana"><b>Haber türü</b> (temel puan)<div className="muted">{HABER_TURLERI.map((t) => `${t.ad} ${t.puan}`).join(" · ")}</div></div></div>
+        <div className="satir"><div className="ana"><b>Konunun Türkiye'deki genel ilgisi</b><div className="muted">{Object.entries(KONU_ILGI).map(([k, p]) => `${k} ${p > 0 ? "+" : ""}${p}`).join(" · ")}</div></div></div>
         <div className="satir"><div className="ana"><b>Aynı haberi yazan her ek kaynak</b><div className="muted">+{EK.kaynakBasina}, en fazla +{EK.kaynakEnFazla}</div></div></div>
         <div className="satir"><div className="ana"><b>Tazelik</b><div className="muted">{EK.taze.map(([s, p]) => `${s} saatten yeni +${p}`).join(" · ")}</div></div></div>
         <div className="satir"><div className="ana"><b>Öncelikli marka olduğu için elenmeyen "Türkiye'de yok" haberi</b><div className="muted">{EK.turkiyeZayif}</div></div></div>
-        <div className="satir"><div className="ana"><b>Seviye</b><div className="muted">{SEVIYELER.map((s) => `${s.ad}: ${s.enAz}+`).join(" · ")}</div></div></div>
+        <div className="satir"><div className="ana"><b>Seviye</b><div className="muted">Önem 10 üzerinden = puan ÷ 10. {SEVIYELER.map((s) => `${s.ad} (${s.aciklama}): ${(s.enAz / 10).toLocaleString("tr")}+`).join(" · ")}. Otomatik taslak eşiği Ayarlar'da.</div></div></div>
         <div className="satir"><div className="ana"><b>👍 / 👎 (bunun gibi daha çok / az)</b><div className="muted">Herkes kendi oyunu verir, not ekleyebilir. Oy sadece aynı markanın kendi haberleri arasında sırayı değiştirir (aynı tür için net oy başına ±{OY_ETKISI}, en fazla ±{OY_SINIRI}, son {OY_GUN} gün). Markayı diğer markaların önüne ya da arkasına atmaz. Al ve Pas puanı etkilemez.</div></div></div>
         <div className="satir"><div className="ana"><b>Çeşitlilik</b><div className="muted">Havuzda aynı markadan art arda en fazla {ART_ARDA_EN_FAZLA} haber gelir.</div></div></div>
         <div className="satir"><div className="ana"><b>Toplama sırasında elenenler</b><div className="muted">Hariç marka · kampanya ve rehber yazıları · Türkiye'de yok (Öncelikli marka değilse) · gürültü kelimeleri. Türkiye bilgisi belirsiz olanlar Belirsiz'e düşer.</div></div></div>

@@ -14,7 +14,7 @@
 // Hangi adayın kullanılacağına yapay zekâ karar verir; uygun aday yoksa görsel eklenmez. Yayına basma kararı yine editörde.
 
 export type GorselAday = {
-  kaynak: "Resmi basın" | "Wikimedia Commons" | "Openverse" | "Pexels" | "Pixabay";
+  kaynak: "Resmi basın" | "Wikimedia Commons" | "Openverse" | "Pexels" | "Pixabay" | "Yapay zekâ (Flux)";
   sayfa: string;      // görselin kendi sayfası (altyazıda bağlantı)
   buyuk: string;      // indirilecek dosya (en fazla ~1600 px)
   thumb: string;      // ekranda küçük önizleme
@@ -199,9 +199,30 @@ export async function stokFoto(q: string, adet: number, anahtar: { pexels?: stri
  *  ZORUNLU tutar; bu yüzden sadece onlarda altyazı yazılır. CC0, kamu malı, Pexels, Pixabay: altyazı yok. Resmi basın: "Görsel: Marka". */
 export function altyazi(g: GorselAday): string {
   if (g.kaynak === "Resmi basın") return `Görsel: ${g.yazar.replace(/[<>&]/g, "")}`;
+  if (g.kaynak === "Yapay zekâ (Flux)") return "Görsel yapay zekâ ile üretilmiştir.";
   if (!/^cc[- ]by/i.test(g.lisans)) return "";
   const k = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `Fotoğraf: ${k(g.yazar)} / <a href="${k(g.sayfa)}" target="_blank" rel="noopener">${k(g.kaynak)}</a>${/^(cc|kamu)/i.test(g.lisans) ? ` (${k(g.lisans)})` : ""}`;
+}
+
+/** Seçimde yapay zekâya resmin kendisini göstermek için küçük kopya (base64). Büyük ya da yavaşsa atlanır. */
+export async function kucukResim(url: string, ms = 6_000): Promise<{ mime: string; b64: string } | null> {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try {
+    const r = await fetch(url, { headers: { "User-Agent": UA }, signal: c.signal });
+    const mime = (r.headers.get("content-type") ?? "").split(";")[0];
+    if (!r.ok || !/^image\/(jpeg|png|webp)$/.test(mime)) return null;
+    const b = new Uint8Array(await r.arrayBuffer());
+    if (b.byteLength > 1_500_000) return null;
+    let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+    return { mime, b64: btoa(s) };
+  } catch { return null; } finally { clearTimeout(t); }
+}
+
+/** Flux (Fatih'in bilgisayarında, çevrimdışı) için görsel istemi: gerçekçi fotoğraf, yazısız, logosuz */
+export function fluxIstem(konu: string): string {
+  const k = konu.replace(/\s+/g, " ").trim().slice(0, 400);
+  return `${k}. Photorealistic editorial technology news photo, natural lighting, shallow depth of field, clean composition, 16:9. No text, no letters, no words, no captions, no logos, no watermark, no brand names, no UI overlays.`;
 }
 
 /** Yapay zekâya gösterilecek aday listesi */
@@ -216,6 +237,7 @@ KURALLAR:
 - Ürünün kendisinin fotoğrafı (aynı model) varsa onu tercih et. Eski modeli ya da başka bir ürünü haberin ürünüymüş gibi sunma.
 - Ürünün kendisi yoksa AYNI ÜRÜN TÜRÜNÜ ya da konuyu açıkça temsil eden gerçekçi bir fotoğrafı SEÇ (ör. ekran kartı haberine bir ekran kartı fotoğrafı, oyun haberine oyun kumandası, yazılım/güvenlik haberine kod ekranı, akıllı gözlük haberine akıllı gözlük). Bu temsili görsel kabul edilir; editör yayından önce değiştirebilir. Gerekçede "temsili" yaz.
 - Başka bir markanın ürününü öne çıkaran (logosu/adı belirgin) fotoğrafı temsili olarak bile seçme.
+- ÜZERİNDE YAZI OLAN GÖRSEL SEÇME (Fatih, 18 Ekim): başlık/slogan/fiyat yazılı banner, afiş, kampanya görseli, yazı bindirmeli tanıtım kartı, kolaj, filigranlı görsel, infografik, ekran görüntüsü seçilmez. Ürünün üzerindeki kendi küçük logosu sorun değil. Görseller sana resim olarak da verildiyse bunu görerek denetle; resmi verilmeyen adayda açıklamada "banner, poster, logo, text, infographic, screenshot" geçiyorsa seçme.
 - Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.
 - Hiçbiri uygun değilse -1 döndür. Uydurma yapma.
 Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe"}`;

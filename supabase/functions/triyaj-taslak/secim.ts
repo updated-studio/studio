@@ -6,7 +6,7 @@ export const OTO_VARSAYILAN = {
   acik: false,              // otomatik taslak çalışsın mı (kapalı başlar; Ayarlar'dan açılır)
   wordpress: true,          // hazırlanan taslak WordPress'e taslak olarak gitsin mi
   gunluk: 100,              // günde en fazla kaç otomatik taslak (İstanbul saatiyle gün)
-  esik: 55,                 // en az bu öncelik puanı (70 = Öncelik 1; 55 = Öncelik 2'nin üst yarısı da girer)
+  esik: 55,                 // en az bu öncelik puanı = önem 5,5/10 (Öncelik 2 "yayına değer"; 80 = Öncelik 1 "ana sayfa adayı")
   bekle_dk: 10,             // haber düştükten sonra bekleme (diğer kaynaklar aynı karta birleşsin)
   tur_basina: 2,            // 10 dakikalık her turda en fazla kaç farklı habere aynı anda taslak yazılır
   haric_turler: ["Söylenti"] as string[],
