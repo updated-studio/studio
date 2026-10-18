@@ -363,7 +363,8 @@ async function topla(sb: ReturnType<typeof createClient>) {
         for (const e of (v.eslesme ?? []) as { yeni: number; mevcut: number | null }[]) {
           const kart = liste.find((x) => x.id === Number(e.mevcut));
           const grup = eslesmeyen[Number(e.yeni)];
-          if (kart && grup) mevcut.set(grup[0], kart);
+          // Güvenlik (18 Ekim): yapay zekâ eşleştirmesi ortak marka ya da en az iki ortak kelimeyle doğrulanır
+          if (kart && grup && benzer({ brand: String(grup[1][0].e.marka ?? ""), title: grup[1][0].h.title, event: String(grup[1][0].e.neden ?? "") }, kart)) mevcut.set(grup[0], kart);
         }
       }
     } catch (e) { console.error("eşleştirme hatası", e); }
@@ -455,6 +456,16 @@ async function birlestir(sb: ReturnType<typeof createClient>, model: string, sad
 const KUME_SISTEM = `Sana numaralı haber kartları verilecek (id | marka | olay özeti | başlık). Aynı OLAYI anlatan kartları grupla: aynı ürün duyurusu, aynı sızıntı, aynı açıklama, aynı dava/karar, aynı güncelleme. Başlıklar ve diller farklı olabilir; markası boş ya da farklı yazılmış olabilir. Aynı markanın FARKLI haberleri (ör. aynı şirketin iki ayrı ürünü) ayrı kalır. Emin değilsen gruplama. Tek kartlık grup yazma.
 Sadece şu biçimde geçerli JSON döndür: {"gruplar":[[12,15],[20,31,33]]}`;
 
+// Güvenlik: yapay zekâ yanlış gruplarsa (ör. bir el konsolu haberine mikroplastik haberi) birleşmesin diye kartların başlık/özetinde
+// ortak anlamlı kelime ya da aynı marka aranır.
+const DOLGU = new Set(["the", "and", "for", "with", "that", "this", "from", "your", "will", "have", "has", "new", "its", "are", "after", "about", "into", "over", "more", "than", "yeni", "için", "ile", "olan", "daha", "gibi", "bir", "ve", "da", "de", "en"]);
+const kelimeler = (s: string) => new Set(s.toLocaleLowerCase("tr").replace(/[^a-z0-9ğüşıöç]+/g, " ").split(" ").filter((w) => w.length >= 3 && !DOLGU.has(w)));
+function benzer(a: { brand: string; title: string; event: string }, b: { brand: string; title: string; event: string }) {
+  if (a.brand && b.brand && a.brand.toLocaleLowerCase("tr") === b.brand.toLocaleLowerCase("tr")) return true;
+  const x = kelimeler(a.title + " " + a.event), y = kelimeler(b.title + " " + b.event);
+  return [...x].filter((w) => y.has(w)).length >= 2;
+}
+
 async function kumele(sb: ReturnType<typeof createClient>, model: string) {
   const bas = Date.now();
   const { data } = await sb.from("tr_items").select("id,brand,event,title,link,source_name,other_sources,touched,status,auto_draft_at,created_at")
@@ -471,7 +482,7 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
       // Tutulan: ekibin dokunduğu (alınmış/taslaklı/oylanmış) → en çok kaynaklı → en eski
       const tutulan = [...kartlar].sort((a, b) => Number(b.touched || b.status === "alindi") - Number(a.touched || a.status === "alindi")
         || b.other_sources.length - a.other_sources.length || Date.parse(a.created_at) - Date.parse(b.created_at))[0];
-      const digerleri = kartlar.filter((x) => x !== tutulan && !x.touched && x.status !== "alindi" && !x.auto_draft_at);
+      const digerleri = kartlar.filter((x) => x !== tutulan && !x.touched && x.status !== "alindi" && !x.auto_draft_at && benzer(x, tutulan));
       if (!digerleri.length) continue;
       const tum = [...tutulan.other_sources];
       digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources])
@@ -512,7 +523,8 @@ Deno.serve(async (req) => {
     const ay = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
     if (ay.model_yedek) YEDEK_MODEL = String(ay.model_yedek);
     // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
-    EdgeRuntime.waitUntil(kumele(sb, String(ay.model_eleme ?? "gemini-3.5-flash-lite")).catch((e) => sb.from("tr_settings").upsert({ key: "son_kumeleme", value: { zaman: new Date().toISOString(), hata: String(e).slice(0, 200) } })));
+    // Gruplama hatası taslağı bozar (yanlış kaynak okunur): eleme modelinden güçlü olan taslak modeli kullanılır, saatte 2 istek
+    EdgeRuntime.waitUntil(kumele(sb, String(ay.model_taslak ?? ay.model_eleme ?? "gemini-3.5-flash-lite")).catch((e) => sb.from("tr_settings").upsert({ key: "son_kumeleme", value: { zaman: new Date().toISOString(), hata: String(e).slice(0, 200) } })));
     return Response.json({ basladi: true }, { status: 202, headers: CORS });
   }
   if (govde?.birlestir) {

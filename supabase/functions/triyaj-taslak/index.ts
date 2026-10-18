@@ -169,7 +169,7 @@ const taslakSistem = (uslup: string) => `Sen Updated (updated.com.tr) adlı Tür
 KURALLAR:
 - Çeviri yapma; bilgiyi tamamen kendi cümlelerinle, sade ve akıcı haber Türkçesiyle yeniden yaz. Kaynak cümlesini kopyalama.
 - Ters piramit: en önemli bilgi ilk paragrafta. TAM 3 adet H2 ara başlık, kısa paragraflar. Uzunluğu kaynakların zenginliği belirler (üsluptaki UZUNLUK kuralı): özet değil, gerektiği kadar ayrıntı.
-- Birden fazla kaynak verildiyse hepsini oku ve birleştir: her kaynaktaki farklı ayrıntıyı kullan, tekrar etme; kaynaklar çelişiyorsa bunu belirt ve editor_notlari'na yaz.
+- Birden fazla kaynak verildiyse hepsini oku ve birleştir: her kaynaktaki farklı ayrıntıyı kullan, tekrar etme; kaynaklar çelişiyorsa bunu belirt ve editor_notlari'na yaz. Kaynaklardan biri BAŞKA bir olayı anlatıyorsa (yanlış eşleşmiş) onu tamamen yok say ve editor_notlari'na "Kaynak N bu haberle ilgisiz" yaz.
 - Spot en fazla 210 karakter.
 - Etiketler: önce KAYNAK SİTELERİN ETİKETLERİ'nden habere uyanlar (marka, ürün, teknoloji adı), sonra eksik kalanlar; 5-7 adet.
 - Başlık merak uyandırsın ama her iddiasının kaynakta birebir karşılığı olsun; abartı, "şok", tık tuzağı yok.
