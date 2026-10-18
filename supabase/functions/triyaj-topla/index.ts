@@ -94,32 +94,63 @@ async function gundemIsaretle(sb: ReturnType<typeof createClient>, yeni: string[
 // derse VE ortak marka/kelime varsa birleşir. Gömme alınamazsa birleştirme yapılmaz.
 export const BENZERLIK_KUME = 0.86;   // 30 dk'lık kümelemede aday çift eşiği
 export const BENZERLIK_BAGLA = 0.82;  // toplama sırasında yeni haberi mevcut karta bağlama eşiği
-const GOMME_MODELLER = ["gemini-embedding-001", "text-embedding-004"];
+// Model sırası: ilk çalışan kullanılır. Vektörler modele göre farklı uzaydadır; sadece AYNI modelin vektörleri karşılaştırılır.
+// Kota: ücretsiz katmanda toplu istekteki her metin ayrı istek sayılır; bu yüzden her kartın vektörü bir kez hesaplanıp saklanır
+// (tr_gomme, haber bağlantısıyla; tr_items'a konmaz ki ekrana ve canlı güncellemeye büyük veri gitmesin).
+const GOMME_MODELLER = ["gemini-embedding-2", "gemini-embedding-2-preview", "gemini-embedding-001"];
 let GOMME_HATA = "";
-async function gommeler(metinler: string[]): Promise<number[][] | null> {
+async function gommeler(metinler: string[]): Promise<{ model: string; v: number[][] } | null> {
   GOMME_HATA = "";
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key || !metinler.length) return null;
   for (const model of GOMME_MODELLER) {
     const out: number[][] = [];
     let tamam = true;
-    for (let i = 0; i < metinler.length; i += 100) {
-      const parca = metinler.slice(i, i + 100);
+    for (let i = 0; i < metinler.length; i += 50) {
+      const parca = metinler.slice(i, i + 50);
       try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents`, {
+        const istek = (boyut: boolean) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents`, {
           method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify({ requests: parca.map((t) => ({ model: "models/" + model, content: { parts: [{ text: t.slice(0, 1500) }] }, taskType: "SEMANTIC_SIMILARITY", ...(model === "gemini-embedding-001" ? { outputDimensionality: 768 } : {}) })) }),
+          body: JSON.stringify({ requests: parca.map((t) => ({ model: "models/" + model, content: { parts: [{ text: t.slice(0, 1500) }] }, taskType: "SEMANTIC_SIMILARITY", ...(boyut ? { outputDimensionality: 768 } : {}) })) }),
         });
-        if (!r.ok) { GOMME_HATA += `${model} ${r.status}: ${(await r.text()).slice(0, 160)} | `; tamam = false; break; }
+        let r = await istek(true);
+        if (r.status === 400) r = await istek(false); // model boyut seçimini desteklemiyorsa
+        if (!r.ok) { GOMME_HATA += `${model} ${r.status}: ${(await r.text()).slice(0, 120)} | `; tamam = false; break; }
         const j = await r.json();
         for (const e of j.embeddings ?? []) out.push(e.values as number[]);
         if ((j.embeddings ?? []).length !== parca.length) { tamam = false; break; }
       } catch (e) { GOMME_HATA += `${model} istek hatası: ${String(e).slice(0, 80)} | `; tamam = false; break; }
     }
-    if (tamam && out.length !== metinler.length) GOMME_HATA += `${model}: ${out.length}/${metinler.length} vektör | `;
-    if (tamam && out.length === metinler.length) return out.map((v) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); });
+    if (tamam && out.length === metinler.length) return { model, v: out.map((v) => { const n = Math.hypot(...v) || 1; return v.map((x) => Math.round(x / n * 1e5) / 1e5); }) };
   }
   return null;
+}
+
+/** Kartların vektörleri: saklı olanı (tr_gomme) kullanır, eksik olanı (en fazla `enFazla` kart) hesaplayıp saklar. Vektörü olmayan kart karşılaştırılmaz. */
+async function kartGommeleri(sb: ReturnType<typeof createClient>, kartlar: { id: number; link: string; brand?: string; product?: string; title: string; event?: string }[], enFazla = 120) {
+  const harita = new Map<number, number[]>();
+  const saklı = new Map<string, { model: string; v: number[] }>();
+  for (let i = 0; i < kartlar.length; i += 100) {
+    const { data } = await sb.from("tr_gomme").select("link,model,v").in("link", kartlar.slice(i, i + 100).map((k) => k.link));
+    for (const x of (data ?? []) as { link: string; model: string; v: number[] }[]) saklı.set(x.link, { model: x.model, v: x.v });
+  }
+  const modelSay = new Map<string, number>();
+  saklı.forEach((x) => modelSay.set(x.model, (modelSay.get(x.model) ?? 0) + 1));
+  let model = [...modelSay.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+  kartlar.forEach((k) => { const x = saklı.get(k.link); if (x && x.model === model) harita.set(k.id, x.v); });
+  const eksik = kartlar.filter((k) => !harita.has(k.id)).slice(0, enFazla);
+  if (eksik.length) {
+    const g = await gommeler(eksik.map(kartMetni));
+    if (g && (!model || g.model === model)) {
+      model = g.model;
+      eksik.forEach((k, i) => harita.set(k.id, g.v[i]));
+      await gommeYaz(sb, eksik.map((k, i) => ({ link: k.link, v: g.v[i] })), g.model);
+    } else if (g && model && g.model !== model) GOMME_HATA += `Model değişti (${model} → ${g.model}) | `;
+  }
+  return { harita, model };
+}
+async function gommeYaz(sb: ReturnType<typeof createClient>, satirlar: { link: string; v: number[] }[], model: string) {
+  for (let i = 0; i < satirlar.length; i += 100) await sb.from("tr_gomme").upsert(satirlar.slice(i, i + 100).map((x) => ({ link: x.link, model, v: x.v })), { onConflict: "link" });
 }
 const benzerlik = (a: number[], b: number[]) => { let t = 0; for (let i = 0; i < a.length; i++) t += a[i] * b[i]; return t; };
 const kartMetni = (x: { brand?: string; product?: string; title: string; event?: string }) => `${x.brand ?? ""} ${x.product ?? ""}: ${x.title}. ${x.event ?? ""}`.trim();
@@ -423,26 +454,37 @@ async function topla(sb: ReturnType<typeof createClient>) {
   // Gömme doğrulaması (18 Ekim, Fatih: "emin olmadan birleştirme"): (1) mevcut karta bağlanacak her yeni olay, (2) bu turda aynı olay
   // kimliğini almış haberler birbirine anlamca yeterince yakın olmalı. Gömme alınamazsa hiçbir bağlama/gruplama yapılmaz.
   const yeniMetin = (k: { h: Ham; e: Etiket }) => kartMetni({ brand: String(k.e.marka ?? ""), product: String(k.e.urun ?? ""), title: k.h.title, event: String(k.e.neden ?? "") });
+  // Bu turun BÜTÜN yeni haberlerinin vektörü tek seferde alınır (sonra karta yazılır, kümelemede yeniden hesaplanmaz)
+  const tumYeni = [...olaylar.values()].flat();
+  const G = tumYeni.length ? await gommeler(tumYeni.map(yeniMetin)) : null;
+  const vek = new Map<{ h: Ham; e: Etiket }, number[]>();
+  if (G) tumYeni.forEach((x, i) => vek.set(x, G.v[i]));
   const ciftler = [...bagAday.entries()].filter(([a]) => olaylar.has(a));
-  const coklu = [...olaylar.entries()].filter(([, g]) => g.length > 1);
-  const metinler = [...ciftler.flatMap(([a, k]) => [yeniMetin(olaylar.get(a)![0]), kartMetni(k)]), ...coklu.flatMap(([, g]) => g.map(yeniMetin))];
-  const E = metinler.length ? await gommeler(metinler) : [];
+  // Mevcut kartların vektörleri (saklıysa okunur, yoksa hesaplanır); yeni haberlerle aynı model olmalı
+  const kartV = new Map<number, number[]>();
+  if (G && ciftler.length) {
+    const ids = [...new Set(ciftler.map(([, k]) => k.id))];
+    const { data: kv } = await sb.from("tr_items").select("id,link,brand,product,title,event").in("id", ids);
+    const { harita, model: km } = await kartGommeleri(sb, (kv ?? []) as { id: number; link: string; brand: string; product: string; title: string; event: string }[], 40);
+    if (km === G.model) harita.forEach((v, id) => kartV.set(id, v));
+  }
   const mevcut = new Map<string, MevcutKart>();
   let reddedilen = 0;
-  ciftler.forEach(([a, k], i) => {
-    if (E && benzerlik(E[2 * i], E[2 * i + 1]) >= BENZERLIK_BAGLA) mevcut.set(a, k); else reddedilen++;
-  });
-  let ofs = ciftler.length * 2;
-  for (const [a, g] of coklu) {
-    const ilk = ofs;
-    const ayri = g.filter((_, j) => j > 0 && !(E && benzerlik(E[ilk], E[ilk + j]) >= BENZERLIK_BAGLA));
-    ofs += g.length;
+  for (const [a, k] of ciftler) {
+    const yv = vek.get(olaylar.get(a)![0]), kvv = kartV.get(k.id);
+    if (yv && kvv && benzerlik(yv, kvv) >= BENZERLIK_BAGLA) mevcut.set(a, k); else reddedilen++;
+  }
+  for (const [a, g] of [...olaylar.entries()].filter(([, g]) => g.length > 1)) {
+    const ilk = vek.get(g[0]);
+    const ayri = g.filter((x, j) => { const v = vek.get(x); return j > 0 && !(ilk && v && benzerlik(ilk, v) >= BENZERLIK_BAGLA); });
     if (!ayri.length) continue;
     olaylar.set(a, g.filter((x) => !ayri.includes(x)));
     ayri.forEach((x, j) => olaylar.set(`tekil-ayri-${a}-${j}`, [x]));
     reddedilen += ayri.length;
   }
-  if (reddedilen) console.log(JSON.stringify({ gomme_reddi: reddedilen, gomme: !!E }));
+  // Yeni haberlerin vektörleri saklanır (kümeleme yeniden hesaplamasın)
+  if (G) await gommeYaz(sb, tumYeni.map((x) => ({ link: x.h.link, v: vek.get(x)! })), G.model).catch(() => null);
+  if (reddedilen || !G) console.log(JSON.stringify({ gomme_reddi: reddedilen, gomme: !!G, hata: GOMME_HATA }));
   const yeniAday: Record<string, unknown>[] = [];
   const goruldu: string[] = [];
   for (const [anahtar, g] of olaylar) {
@@ -557,23 +599,30 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
   const liste = (data ?? []) as K[];
   const ozet: Record<string, unknown> = { zaman: new Date().toISOString(), kart: liste.length, aday_cift: 0, onaylanan: 0, grup: 0, birlesen: 0 };
   if (liste.length >= 2) {
-    // 1) Gömme benzerliği
-    const E = await gommeler(liste.map(kartMetni));
-    if (!E) {
+    // 1) Gömme benzerliği (saklı vektörler; eksikler en fazla 120 kart hesaplanır, vektörü olmayan kart bu tur birleşmez)
+    const { harita, model: gm } = await kartGommeleri(sb, liste);
+    const E = liste.map((k) => harita.get(k.id) ?? null);
+    ozet.gomme_model = gm; ozet.vektorlu = E.filter(Boolean).length;
+    if (!harita.size) {
       // Teşhis: hangi gömme modelleri açık?
       let modeller = "";
       try { const m = await (await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY") ?? "" } })).json(); modeller = (m.models ?? []).filter((x: { name: string; supportedGenerationMethods?: string[] }) => (x.supportedGenerationMethods ?? []).some((g) => /embed/i.test(g))).map((x: { name: string }) => x.name).join(", "); } catch { /* yok */ }
       ozet.hata = "Gömme (embedding) alınamadı; emin olunamadığı için birleştirme yapılmadı. " + GOMME_HATA + (modeller ? " Açık gömme modelleri: " + modeller : "");
     }
     else {
+      if (GOMME_HATA) ozet.uyari = GOMME_HATA.slice(0, 300);
+      const dagilim = { "0.80": 0, "0.86": 0, "0.90": 0 };
       const ciftler: { i: number; j: number; b: number }[] = [];
       for (let i = 0; i < liste.length; i++) for (let j = i + 1; j < liste.length; j++) {
-        const b = benzerlik(E[i], E[j]);
+        const ei = E[i], ej = E[j];
+        if (!ei || !ej) continue;
+        const b = benzerlik(ei, ej);
+        if (b >= 0.80) dagilim["0.80"]++; if (b >= 0.86) dagilim["0.86"]++; if (b >= 0.90) dagilim["0.90"]++;
         if (b >= BENZERLIK_KUME && benzer(liste[i], liste[j])) ciftler.push({ i, j, b });
       }
       ciftler.sort((x, y) => y.b - x.b);
       const sorulan = ciftler.slice(0, 80);
-      ozet.aday_cift = ciftler.length;
+      ozet.aday_cift = ciftler.length; ozet.dagilim = dagilim;
       // 2) Yapay zekâ her çifti ayrı onaylar
       const onay = new Set<string>();
       if (sorulan.length) {
@@ -600,7 +649,7 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
           || b.other_sources.length - a.other_sources.length || Date.parse(a.created_at) - Date.parse(b.created_at))[0];
         const digerleri = kartlar.filter((x) => x !== tutulan && onayli(x.id, tutulan.id) && !x.touched && x.status !== "alindi" && !x.auto_draft_at);
         if (!digerleri.length) continue;
-        digerleri.forEach((x) => benzerlikler.push(Math.round(benzerlik(E[liste.indexOf(x)], E[liste.indexOf(tutulan)]) * 1000) / 1000));
+        digerleri.forEach((x) => benzerlikler.push(Math.round(benzerlik(E[liste.indexOf(x)]!, E[liste.indexOf(tutulan)]!) * 1000) / 1000));
         const tum = [...tutulan.other_sources];
         digerleri.flatMap((x) => [{ name: x.source_name, link: x.link }, ...x.other_sources])
           .forEach((o) => { if (o.link !== tutulan.link && !tum.some((t) => t.link === o.link)) tum.push(o); });
