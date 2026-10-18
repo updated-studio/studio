@@ -279,7 +279,8 @@ async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici:
     }
 
     // Kümedeki bütün kaynaklar (Fatih, 18 Ekim): asıl haber + en fazla 4 diğer kaynak, paralel okunur
-    const diger = ((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link && o.link !== it.link).slice(0, 4);
+    // Türkiye'deki haber sitelerinden metin alınmaz (Fatih, 18 Ekim: telif; basın bültenleri hariç)
+    const diger = ((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link && o.link !== it.link && !turkHaberSitesi(o.link)).slice(0, 4);
     const [ana, ...ekler] = await Promise.all([kaynakOku(it.link, 14000), ...diger.map((o) => kaynakOku(o.link, 8000))]);
     const metinler = [`KAYNAK 1 (${it.source_name}) ${it.link}\n` + (ana.metin.length >= 300 ? ana.metin : `(Tam metin alınamadı. Başlık: ${it.title})`)];
     ekler.forEach((e, i) => { if (e.metin.length >= 300) metinler.push(`KAYNAK ${metinler.length + 1} (${diger[i].name}) ${diger[i].link}\n` + e.metin); });
@@ -399,6 +400,10 @@ const spotKisalt = (s: string, n = 210) => {
   const son = Math.max(kes.lastIndexOf(". "), kes.lastIndexOf("! "), kes.lastIndexOf("? "));
   return son > 120 ? kes.slice(0, son + 1) : kes.slice(0, kes.lastIndexOf(" ")).replace(/[,;:]$/, "") + "…";
 };
+
+/** Türkiye'deki haber siteleri (alan adı .tr ya da bilinen yayınlar). Basın bülteni sayfaları (marka siteleri) bu kapsamda değil. */
+const TURK_HABER = /^(https?:\/\/)?([a-z0-9-]+\.)*(haberturk|cnnturk|trthaber|ensonhaber|haberler|mynet|webtekno|shiftdelete|donanimhaber|technopat|onedio|internethaber|haber7|bloomberght|t24|odatv|sozcu|aksam|yenisafak|sabah|milliyet|hurriyet|ntv|aa|chip|log|teknoblog|megabayt)\.(com|net|org|tv|com\.tr)(\/|$|\?)/i;
+const turkHaberSitesi = (u: string) => { try { const h = new URL(u).hostname; return /\.tr$/i.test(h) && !/\.(gov|edu)\.tr$/i.test(h) && !/news\.|newsroom|basin|press/i.test(u) || TURK_HABER.test(u); } catch { return false; } };
 
 /** Genel etiketler ve kaynak site/ajans adları etiket olmaz */
 const GENEL_ETIKET = /^(haber|haberler|son dakika|gündem|teknoloji|teknoloji haberleri|news|tech|technology|güncel|bilim|bilim-teknoloji|bilim teknoloji)$/i;
@@ -576,7 +581,7 @@ async function otoCalistir(sb: Sb) {
 
   // 3) Aday: havuzda, kimse almamış, daha önce otomatik denenmemiş, iş sürmüyor, son 24 saatte düşmüş
   const { data: havuz } = await sb.from("tr_items")
-    .select("id,brand,topic,product,news_type,kind,source_name,turkey,other_sources,published_at,created_at,title,event,event_key")
+    .select("id,brand,topic,product,news_type,kind,source_name,turkey,other_sources,published_at,created_at,title,event,event_key,trend")
     .eq("status", "aday").is("taken_by", null).is("auto_draft_at", null).eq("work_state", "")
     .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString()).limit(1000);
   const liste = (havuz ?? []) as Aday[];

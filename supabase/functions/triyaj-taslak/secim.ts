@@ -13,7 +13,7 @@ export const OTO_VARSAYILAN = {
 };
 export type OtoAyar = typeof OTO_VARSAYILAN;
 
-export type Aday = { event_key?: string; id: number; brand: string; topic: string; product: string; news_type: string; kind: string; source_name: string; turkey: string; other_sources: { name: string; link: string }[]; published_at: string | null; created_at: string; title: string; event: string };
+export type Aday = { event_key?: string; trend?: string | null; id: number; brand: string; topic: string; product: string; news_type: string; kind: string; source_name: string; turkey: string; other_sources: { name: string; link: string }[]; published_at: string | null; created_at: string; title: string; event: string };
 export type Profil = { id: string; name: string; interests: string };
 
 /** Editör seçimi: ilgi alanı eşleşmesi en çok olan; eşitlikte bugün müsait olan, sonra elinde en az iş olan. Eşleşen yoksa null. */
