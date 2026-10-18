@@ -38,6 +38,8 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Teknik notlar (Claude için; tekrar aynı duvara çarpmamak için)
 
+- **Supabase bağlantısı (connector):** 19 Ekim'de Enes'e kurulumu önerildi. Kuruluysa veritabanı sorguları ve fonksiyon yayını **bağlantıyla** yapılır, Chrome sekmesiyle değil (aşağıdaki Chrome yöntemleri sadece yedek). Fatih'in Claude'unda bağlantı büyük ihtimalle kurulu. Ders: oturum başında hangi bağlantıların var olduğuna bak; 12-19 Ekim arası bu yapılmadığı için Chrome üzerinden zahmetle çalışıldı.
+
 - **Supabase SQL:** Yıkıcı (silme içeren) sorgularda Supabase onay ister; o düğmeye Enes basar, Claude basamaz. Normal sorgular Claude'un açtığı SQL Editor sekmesinde çalışır.
 - **Fonksiyon yayını (CLI yok):** Supabase → Edge Functions → fonksiyon → Code; Monaco'ya kod GitHub'ın raw adresinden `fetch` ile alınıp `monaco.editor.getModels()[0].setValue()`; sonra "Deploy updates" ve açılan pencerede yine "Deploy updates" (pencerede JS `.click()` çalışmadı, gerçek tıklama gerekti). Yayın oldu mu: üstte "a few seconds ago".
 - **Arka plandaki Chrome sekmesi donar:** zamanlayıcı ve `fetch` çalışmaz, komutlar zaman aşımına düşer. Çözüm: yeni sekme açıp orada çalış.
