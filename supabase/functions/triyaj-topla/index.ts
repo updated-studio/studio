@@ -92,30 +92,38 @@ async function gundemIsaretle(sb: ReturnType<typeof createClient>, yeni: string[
 // ---------- Anlamsal benzerlik (gömme / embedding), 18 Ekim 2026 (Fatih: "birebir aynı olduğundan emin olmadan birleştirme") ----------
 // Kartlar Gemini gömme modeliyle vektöre çevrilir; iki kart ancak benzerliği eşiğin üstündeyse VE yapay zekâ "kesinlikle aynı olay"
 // derse VE ortak marka/kelime varsa birleşir. Gömme alınamazsa birleştirme yapılmaz.
-// gte-small'da ilgili ama farklı haberler de 0,8 üstü çıkabilir; eşik yüksek tutulur, asıl karar yapay zekâ onayı + ortak kelimede.
+// Eşik aday çifti süzer; asıl karar yapay zekâ onayı + ortak kelimede.
 // İlk günlerin "dağılım" istatistiğine göre ayarlanacak (son_kumeleme).
-export const BENZERLIK_KUME = 0.88;   // 30 dk'lık kümelemede aday çift eşiği
-export const BENZERLIK_BAGLA = 0.85;  // toplama sırasında yeni haberi mevcut karta bağlama eşiği
-// Model: Supabase'in kendi sunucusunda çalışan "gte-small" (Supabase.ai, ücretsiz, kota yok). Gemini gömme modelleri bu anahtarda
-// kota hatası verdi (18 Ekim: gemini-embedding-2 / -2-preview / -001 hepsi 429). gte-small İngilizce çalışır: metin = marka + ürün + özgün
-// (İngilizce) başlık; Türkçe özet katılmaz. Vektörler bir kez hesaplanıp tr_gomme'de saklanır.
-const GOMME_MODEL = "gte-small";
+export const BENZERLIK_KUME = 0.86;   // 30 dk'lık kümelemede aday çift eşiği
+export const BENZERLIK_BAGLA = 0.82;  // toplama sırasında yeni haberi mevcut karta bağlama eşiği
+// Model: Gemini "gemini-embedding-001" (tek model; vektörler sadece aynı modelle karşılaştırılır). 18 Ekim denemeleri:
+// - ücretsiz kotada toplu istekteki her metin ayrı istek sayılıyor; 300 kartı bir anda göndermek 429 verdi → her çağrıda en fazla 40 metin,
+//   her haberin vektörü bir kez hesaplanıp tr_gomme'de saklanır (kümeleme birkaç turda doldurur);
+// - gemini-embedding-2 / -2-preview bu anahtarda 429; text-embedding-004 kaldırılmış (404);
+// - Supabase'in kendi gte-small modeli fonksiyonun işlemci süresini aşıyor ("CPU Time exceeded").
+const GOMME_MODEL = "gemini-embedding-001";
+const GOMME_PARTI = 40;
 let GOMME_HATA = "";
-let OTURUM: { run: (t: string, o: Record<string, unknown>) => Promise<number[]> } | null = null;
 async function gommeler(metinler: string[]): Promise<{ model: string; v: number[][] } | null> {
   GOMME_HATA = "";
-  if (!metinler.length) return null;
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key || !metinler.length) return null;
+  if (metinler.length > GOMME_PARTI) { GOMME_HATA = `En fazla ${GOMME_PARTI} metin`; return null; }
   try {
-    // @ts-ignore Supabase Edge Runtime'da tanımlı
-    OTURUM ??= new Supabase.ai.Session(GOMME_MODEL);
-    const out: number[][] = [];
-    for (const t of metinler) out.push((await OTURUM!.run(t.slice(0, 600), { mean_pool: true, normalize: true })).map((x) => Math.round(x * 1e5) / 1e5));
-    return { model: GOMME_MODEL, v: out };
-  } catch (e) { GOMME_HATA = `${GOMME_MODEL}: ${String(e).slice(0, 160)}`; return null; }
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GOMME_MODEL}:batchEmbedContents`, {
+      method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ requests: metinler.map((t) => ({ model: "models/" + GOMME_MODEL, content: { parts: [{ text: t.slice(0, 1500) }] }, taskType: "SEMANTIC_SIMILARITY", outputDimensionality: 768 })) }),
+    });
+    if (!r.ok) { GOMME_HATA = `${GOMME_MODEL} ${r.status}: ${(await r.text()).slice(0, 160)}`; return null; }
+    const j = await r.json();
+    const v = ((j.embeddings ?? []) as { values: number[] }[]).map((e) => { const n = Math.hypot(...e.values) || 1; return e.values.map((x) => Math.round(x / n * 1e5) / 1e5); });
+    if (v.length !== metinler.length) { GOMME_HATA = `${v.length}/${metinler.length} vektör`; return null; }
+    return { model: GOMME_MODEL, v };
+  } catch (e) { GOMME_HATA = `${GOMME_MODEL}: ${String(e).slice(0, 120)}`; return null; }
 }
 
 /** Kartların vektörleri: saklı olanı (tr_gomme) kullanır, eksik olanı (en fazla `enFazla` kart) hesaplayıp saklar. Vektörü olmayan kart karşılaştırılmaz. */
-async function kartGommeleri(sb: ReturnType<typeof createClient>, kartlar: { id: number; link: string; brand?: string; product?: string; title: string; event?: string }[], enFazla = 120) {
+async function kartGommeleri(sb: ReturnType<typeof createClient>, kartlar: { id: number; link: string; brand?: string; product?: string; title: string; event?: string }[], enFazla = GOMME_PARTI) {
   const harita = new Map<number, number[]>();
   const saklı = new Map<string, { model: string; v: number[] }>();
   for (let i = 0; i < kartlar.length; i += 100) {
@@ -141,7 +149,7 @@ async function gommeYaz(sb: ReturnType<typeof createClient>, satirlar: { link: s
   for (let i = 0; i < satirlar.length; i += 100) await sb.from("tr_gomme").upsert(satirlar.slice(i, i + 100).map((x) => ({ link: x.link, model, v: x.v })), { onConflict: "link" });
 }
 const benzerlik = (a: number[], b: number[]) => { let t = 0; for (let i = 0; i < a.length; i++) t += a[i] * b[i]; return t; };
-const kartMetni = (x: { brand?: string; product?: string; title: string; event?: string }) => `${x.brand ?? ""} ${x.product ?? ""}: ${x.title}`.trim();
+const kartMetni = (x: { brand?: string; product?: string; title: string; event?: string }) => `${x.brand ?? ""} ${x.product ?? ""}: ${x.title}. ${x.event ?? ""}`.trim();
 
 // RSS 2.0, RSS 1.0 (RDF) ve Atom
 function rssCoz(xml: string, k: Kaynak): Ham[] {
@@ -444,9 +452,10 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const yeniMetin = (k: { h: Ham; e: Etiket }) => kartMetni({ brand: String(k.e.marka ?? ""), product: String(k.e.urun ?? ""), title: k.h.title, event: String(k.e.neden ?? "") });
   // Bu turun BÜTÜN yeni haberlerinin vektörü tek seferde alınır (sonra karta yazılır, kümelemede yeniden hesaplanmaz)
   const tumYeni = [...olaylar.values()].flat();
-  const G = tumYeni.length ? await gommeler(tumYeni.map(yeniMetin)) : null;
+  // En fazla GOMME_PARTI yeni haber (en yeniler); vektörü alınamayan haber bu turda hiçbir karta bağlanmaz (sonraki kümeleme dener)
+  const G = tumYeni.length ? await gommeler(tumYeni.slice(0, GOMME_PARTI).map(yeniMetin)) : null;
   const vek = new Map<{ h: Ham; e: Etiket }, number[]>();
-  if (G) tumYeni.forEach((x, i) => vek.set(x, G.v[i]));
+  if (G) tumYeni.slice(0, GOMME_PARTI).forEach((x, i) => vek.set(x, G.v[i]));
   const ciftler = [...bagAday.entries()].filter(([a]) => olaylar.has(a));
   // Mevcut kartların vektörleri (saklıysa okunur, yoksa hesaplanır); yeni haberlerle aynı model olmalı
   const kartV = new Map<number, number[]>();
@@ -471,7 +480,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
     reddedilen += ayri.length;
   }
   // Yeni haberlerin vektörleri saklanır (kümeleme yeniden hesaplamasın)
-  if (G) await gommeYaz(sb, tumYeni.map((x) => ({ link: x.h.link, v: vek.get(x)! })), G.model).catch(() => null);
+  if (G) await gommeYaz(sb, tumYeni.filter((x) => vek.has(x)).map((x) => ({ link: x.h.link, v: vek.get(x)! })), G.model).catch(() => null);
   if (reddedilen || !G) console.log(JSON.stringify({ gomme_reddi: reddedilen, gomme: !!G, hata: GOMME_HATA }));
   const yeniAday: Record<string, unknown>[] = [];
   const goruldu: string[] = [];
@@ -588,7 +597,7 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
   const ozet: Record<string, unknown> = { zaman: new Date().toISOString(), kart: liste.length, aday_cift: 0, onaylanan: 0, grup: 0, birlesen: 0 };
   if (liste.length >= 2) {
     // 1) Gömme benzerliği (saklı vektörler; eksikler en fazla 120 kart hesaplanır, vektörü olmayan kart bu tur birleşmez)
-    const { harita, model: gm } = await kartGommeleri(sb, liste, 300);
+    const { harita, model: gm } = await kartGommeleri(sb, liste, GOMME_PARTI);
     const E = liste.map((k) => harita.get(k.id) ?? null);
     ozet.gomme_model = gm; ozet.vektorlu = E.filter(Boolean).length;
     if (!harita.size) {
