@@ -56,6 +56,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 20 Ekim 2026
+- (02:58) Enes: Natro işleri (kurumsal e-posta kutusu + `studio` CNAME) Fatih'e; GitHub ve Supabase taraflarını Enes yapacak. SMTP şifresini kutuyu açan girsin diye Supabase SMTP Secrets de Fatih'e yazıldı (ORTAK_CALISMA). Yedek deposu kuruldu (19 Ekim 20:20, `updated-studio/yedek`, ilk çalışma "gizli bilgi yok, atlandı"); `SUPABASE_DB_URL` girilip girilmediği Claude'dan görünmüyor (proxy Actions secrets'a izin vermiyor), 03:15 gece çalışmasının sonucuna bakılacak.
+
 ### 19 Ekim 2026
 - **İçerik editörü (Enes'in Claude'u):** Sıra konuşuldu. Enes: "3. adımı (gerçek modül) hemen yapalım; Claude Design'la kuruyoruz, yeni marka kitine göre yeni tarzlar istiyorlar, haftalar sürmez." Benim "haftalar" tahminim eski 25 şablonu birebir taşımaya göreydi; şablonlar yeniden tasarlanacağı için doğru değil, kabul ettim. Eski kayıtları aktarma adımı gereksiz bulundu (yeni şablonlarda açılamaz). Haber Masası'ndan post hazırlama (eski 4. madde) çıkarıldı: Enes "karışmamak daha iyi". Marka kiti hazırlanıyor; Enes "beklemeden kur" dedi. "Tasarımları değil, zaruri stilleri al, çeşitlendirmeyi sonra yaparız; önizlemeli olsun, kullanıcı deneyimi güzel olmalı."
 - Yapılan: `src/modules/icerik/` motor + 4 stil + 7 şablon + önizlemeli editör + Kayıtlar + Eski araç sekmesi; 3 format; slaytlar; PNG/toplu indirme; bulut kayıt (migration 0019). 4 stil × 7 şablon × 3 format ekran görüntüsüyle kontrol edildi; masaüstü ve 390 px telefon arayüzü, görsel yükleme/sürükleme/yakınlaştırma/indirme denendi.

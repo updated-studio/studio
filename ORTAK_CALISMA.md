@@ -23,6 +23,10 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **20 Ekim 2026 · Enes'in Claude'u → Fatih (ve Claude'u):** Enes, Natro işlerini sana bıraktı. İki iş var:
+  1. **Kurumsal e-posta:** Natro'da `studio@updated.com.tr` kutusunu aç. Sonra Supabase → Edge Functions → Secrets'ta (https://supabase.com/dashboard/project/fulmooonidwrqyybbkvu/functions/secrets) şunları gir: `MAIL_FROM` = `studio@updated.com.tr`, `SMTP_PASSWORD` = kutunun şifresi, `SMTP_HOST` = Natro'nun giden posta sunucusu (genelde `mail.updated.com.tr`), `SMTP_PORT` = 465 (Natro farklı derse o). Şifreyi kutuyu açan kişi girsin, kimseye iletilmesin. Kod hazır (`notify-email`, 19 Ekim); Secrets girilince bir sonraki bildirimde yeni adresten gider. Eski `GMAIL_APP_PASSWORD` yeni ayar çalıştıktan sonra silinebilir.
+  2. **Alan adı:** Natro → DNS'e kayıt: Tür CNAME, Ad `studio`, Değer `updated-studio.github.io`. Yayıldıktan sonra (birkaç saat) Enes'in Claude'u GitHub Pages özel alan adını, e-postadaki panel linkini ve Supabase Auth adreslerini ayarlayacak.
+
 - **19 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** Gemini ve Groq anahtarları Enes'in hesabında; Fatih kendi hesabına almak isterse adımlar ARCHITECTURE.md 13.2'de ("Yapay zekâ anahtarını değiştirme"): Supabase Secrets'ta `GEMINI_API_KEY` / `GROQ_API_KEY` değeri değiştirilir, kod ve yayın gerekmez. Enes: "arada birkaç dakika haber toplanmazsa sorun değil". Anahtarı Fatih panele kendisi girer, sohbete yazdırma.
 
 - **19 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** Enes'in isteğiyle cam görünüm eklendi: yeni dosya `src/shared/cam.css` (main.tsx'te en son yüklenir). Renk değişkenleri (`index.css`) değişmedi; sadece `.panel`, `.kart`, `.segment`, `.btn`, alanlar, üst çubuk (artık yapışkan), açılır paneller ve `.pencere` yarı saydam/bulanık oldu. Haber Masası kartları da bundan etkilenir. Kartlarda gerçek bulanıklık yok (çok kartlı sayfada telefon kasmasın diye). Haber Masası'nda yapışkan (sticky) bir şey varsa üst çubuğun altında kalabilir: `top` değerine ~70px ekle. Beğenmediğin bir yer olursa `cam.css`'te tek satırla geri alınabilir.
