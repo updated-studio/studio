@@ -1,6 +1,6 @@
 // Tasarımların bulutta (Supabase) saklanması: tablo icerik_projeler, görseller 'icerik' deposu (migration 0019).
 import { sb } from "../../shared/supabase";
-import type { FormatId, Gorsel, GorselKey, Proje, Slayt, StilId } from "./motor";
+import type { FormatId, Gorsel, GorselKey, Proje, SablonId, Slayt, StilId } from "./motor";
 
 export type KayitSatiri = { id: string; ad: string; kapak: string | null; olusturan: string | null; guncelleyen: string | null; updated_at: string; veri: { format: FormatId; stil: StilId; slaytlar: Slayt[] } };
 
@@ -69,3 +69,19 @@ export async function sil(id: string) {
 }
 
 export const satirdanProje = (r: KayitSatiri): Proje => ({ id: r.id, ad: r.ad, kapak: r.kapak, updated_at: r.updated_at, ...r.veri });
+
+// ---------- Hazır düzenler (migration 0021): sadece yerleşim, içerik değil ----------
+export type Duzen = { id: string; ad: string; sablon: SablonId; serbest: Slayt["serbest"]; olusturan: string | null; created_at: string };
+export async function duzenler(sablon: SablonId): Promise<Duzen[]> {
+  const { data, error } = await sb.from("icerik_duzenler").select("id,ad,sablon,serbest,olusturan,created_at").eq("sablon", sablon).order("created_at", { ascending: false }).limit(50);
+  if (error) throw error;
+  return data as Duzen[];
+}
+export async function duzenKaydet(ad: string, sablon: SablonId, serbest: Slayt["serbest"]) {
+  const { error } = await sb.from("icerik_duzenler").insert({ ad, sablon, serbest });
+  if (error) throw error;
+}
+export async function duzenSil(id: string) {
+  const { error } = await sb.from("icerik_duzenler").delete().eq("id", id);
+  if (error) throw error;
+}

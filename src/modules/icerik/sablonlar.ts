@@ -233,7 +233,11 @@ function bTirnak(c: Ciz): Blok {
 const yok = (b: (Blok | null | false)[]) => b.filter(Boolean) as Blok[];
 // Blokları yerleştirir ama çizmez: her biri bir katman olarak kaydedilir, slaytCiz sırayla (serbest düzende dönüşümle) çizer.
 function D(c: Ciz, r: Rect, b: Blok[], hiza: "ust" | "alt" | "orta" = "ust") {
-  dizilim(r, b, hiza, (bl, yer, k) => c.katmanlar.push({ id: bl.id ?? "blok" + c.katmanlar.length, r: yer, ciz: () => bl.c(yer, k) }));
+  dizilim(r, b, hiza, (bl, yer, k) => c.katmanlar.push({
+    id: bl.id ?? "blok" + c.katmanlar.length, r: yer,
+    // f: yazı boyutu (bloktaki her ölçü k ile çarpıldığı için k büyütülür), g: sütun genişliği
+    ciz: (t) => bl.c(t?.g && t.g !== 1 ? { ...yer, w: yer.w * t.g } : yer, k * (t?.f ?? 1)),
+  }));
 }
 
 // ---------- şablonlar ----------
@@ -243,7 +247,8 @@ const haber: Sablon = {
   gorseller: [{ k: "gorsel", l: "Görsel", yardim: "Cam stilinde arka planı silinmiş ürün görseli (PNG) en iyi sonucu verir." }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "cam" ? undefined : "gorsel");
-    D(c, z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "urun"), bBaslik(c, c.I.baslik, c.I.vurgu, 100), bMetin(c, c.I.metin, 34, 3, undefined, 20)]), z.hiza);
+    const foto = !z.fotoAlindi && !!c.I.gorsel; // görsel yoksa görselsiz kapak: büyük başlık, alta yaslı
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), foto && bFoto(c, "gorsel", "urun"), bBaslik(c, c.I.baslik, c.I.vurgu, foto || z.fotoAlindi ? 100 : 124, 5), bMetin(c, c.I.metin, 34, 3, undefined, 20)]), foto || z.fotoAlindi ? z.hiza : "alt");
   },
 };
 const liste: Sablon = {
@@ -271,7 +276,8 @@ const puan: Sablon = {
   gorseller: [{ k: "gorsel", l: "Ürün görseli" }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "vizor" ? "gorsel" : undefined);
-    D(c, z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "urun", 1, 200), bBaslik(c, c.I.baslik, "", 72, 2, 20), bPuan(c), bKarar(c, c.I.karar)]), z.hiza);
+    const foto = !z.fotoAlindi && !!c.I.gorsel;
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), foto && bFoto(c, "gorsel", "urun", 1, 200), bBaslik(c, c.I.baslik, "", 72, 2, 20), bPuan(c), bKarar(c, c.I.karar)]), foto || z.fotoAlindi ? z.hiza : "orta");
   },
 };
 const karsilastirma: Sablon = {
@@ -280,7 +286,8 @@ const karsilastirma: Sablon = {
   gorseller: [{ k: "gorselA", l: "Ürün A görseli" }, { k: "gorselB", l: "Ürün B görseli" }],
   ciz(c) {
     const z = c.S.zemin(c);
-    D(c, z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 80, 2, 20), bIkiFoto(c), bTablo(c, c.I.satirlar), bKarar(c, c.I.karar)]), z.hiza);
+    const foto = !!(c.I.gorselA || c.I.gorselB);
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 80, 2, 20), foto && bIkiFoto(c), bTablo(c, c.I.satirlar), bKarar(c, c.I.karar)]), foto ? z.hiza : "orta");
   },
 };
 const madde: Sablon = {
@@ -289,7 +296,8 @@ const madde: Sablon = {
   gorseller: [{ k: "gorsel", l: "Madde görseli" }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "cam" ? undefined : "gorsel", 0.85);
-    D(c, z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "kare"), bBaslik(c, c.I.baslik, "", 84, 2, 20), bMetin(c, c.I.metin, 32, 3, undefined, 16), bBilgiler(c, c.I.bilgiler, 2)]), z.hiza);
+    const foto = !z.fotoAlindi && !!c.I.gorsel;
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), foto && bFoto(c, "gorsel", "kare"), bBaslik(c, c.I.baslik, "", 84, 2, 20), bMetin(c, c.I.metin, 32, 3, undefined, 16), bBilgiler(c, c.I.bilgiler, 2)]), foto || z.fotoAlindi ? z.hiza : "orta");
   },
 };
 const ozet: Sablon = {
@@ -298,7 +306,8 @@ const ozet: Sablon = {
   gorseller: [{ k: "gorsel", l: "Görsel" }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "cam" ? undefined : "gorsel", 0.62);
-    D(c, z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 84, 2, 20), !z.fotoAlindi && bFoto(c, "gorsel", "kare", 1, 220), bBilgiler(c, c.I.bilgiler, 4)]), z.hiza);
+    const foto = !z.fotoAlindi && !!c.I.gorsel;
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 84, 2, 20), foto && bFoto(c, "gorsel", "kare", 1, 220), bBilgiler(c, c.I.bilgiler, 4)]), foto || z.fotoAlindi ? z.hiza : "orta");
   },
 };
 
@@ -319,9 +328,11 @@ export function katmanSirasi(ids: string[], serbest?: Serbest) {
 // Seçim kutusu, hizalama, ortalama ve döndürme merkezi bu alana göre yapılır. Küçük ölçekte çizilip saydam olmayan
 // piksellerden bulunur; içerik değişmedikçe önbellekten gelir (sürüklerken yeniden hesaplanmaz).
 const sikiOnbellek = new Map<string, Record<string, Rect>>();
-function sikiKutular(format: FormatId, stil: StilId, sablon: SablonId, I: Icerik): Record<string, Rect> {
+function sikiKutular(format: FormatId, stil: StilId, sablon: SablonId, I: Icerik, serbest?: Serbest): Record<string, Rect> {
   const gorselOzet = (g?: { src: string }) => (g ? g.src.length + ":" + g.src.slice(-24) : "");
-  const anahtar = [format, stil, sablon, JSON.stringify({ ...I, gorsel: gorselOzet(I.gorsel), gorselA: gorselOzet(I.gorselA), gorselB: gorselOzet(I.gorselB) })].join("|");
+  // yazı boyutu / genişlik boyalı alanı değiştirir; taşıma, boyut, açı değiştirmez (o yüzden sürüklerken önbellekten gelir)
+  const fg = Object.entries(serbest?.katman ?? {}).filter(([, t]) => (t.f ?? 1) !== 1 || (t.g ?? 1) !== 1).map(([id, t]) => `${id}:${t.f ?? 1}:${t.g ?? 1}`).join(",");
+  const anahtar = [format, stil, sablon, fg, JSON.stringify({ ...I, gorsel: gorselOzet(I.gorsel), gorselA: gorselOzet(I.gorselA), gorselB: gorselOzet(I.gorselB) })].join("|");
   const v = sikiOnbellek.get(anahtar); if (v) return v;
   const F = FORMATLAR[format], o = 0.25, w = Math.ceil(F.w * o), h = Math.ceil(F.h * o);
   const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
@@ -332,7 +343,7 @@ function sikiKutular(format: FormatId, stil: StilId, sablon: SablonId, I: Icerik
   const sonuc: Record<string, Rect> = {};
   for (const k of c.katmanlar) {
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h); ctx.restore();
-    k.ciz();
+    k.ciz(serbest?.katman[k.id]);
     const d = ctx.getImageData(0, 0, w, h).data;
     let x0 = w, y0 = h, x1 = -1, y1 = -1;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -345,7 +356,8 @@ function sikiKutular(format: FormatId, stil: StilId, sablon: SablonId, I: Icerik
 
 // Bir slaytı verilen tuvale çizer. Zemin (arka plan, logo, alt yazı) sabittir; bloklar katman olarak çizilir.
 // serbest verilirse katmanlar kullanıcının ayarladığı yer/boyut/açı/sırayla, gizliler atlanarak çizilir.
-export function slaytCiz(cv: HTMLCanvasElement, format: FormatId, stil: StilId, sablon: SablonId, I: Icerik, cikti = false, olcek = 1, serbest?: Serbest): CizimSonuc {
+// siki: düzenleyicide seçim kutuları için serbest düzen kapalıyken de gerçek boyalı alan hesaplansın.
+export function slaytCiz(cv: HTMLCanvasElement, format: FormatId, stil: StilId, sablon: SablonId, I: Icerik, cikti = false, olcek = 1, serbest?: Serbest, siki = false): CizimSonuc {
   const F = FORMATLAR[format];
   const w = Math.round(F.w * olcek), h = Math.round(F.h * olcek);
   if (cv.width !== w) cv.width = w; if (cv.height !== h) cv.height = h;
@@ -354,10 +366,10 @@ export function slaytCiz(cv: HTMLCanvasElement, format: FormatId, stil: StilId, 
   SABLONLAR[sablon].ciz(c);
   const harita = new Map(c.katmanlar.map((k) => [k.id, k]));
   // Serbest düzende kutular gerçek boyalı alana göre (editör, dışa aktarma ve küçük önizleme aynı hesabı kullanır).
-  const siki = serbest ? sikiKutular(format, stil, sablon, I) : {};
+  const sikiR = serbest || siki ? sikiKutular(format, stil, sablon, I, serbest) : {};
   const sonuc: KatmanSonuc[] = [];
   for (const id of katmanSirasi(c.katmanlar.map((k) => k.id), serbest)) {
-    const k = harita.get(id)!; const t = serbest?.katman[id] ?? BOS_AYAR; const r = siki[id] ?? k.r;
+    const k = harita.get(id)!; const t = serbest?.katman[id] ?? BOS_AYAR; const r = sikiR[id] ?? k.r;
     sonuc.push({ id, ad: KATMAN_AD[id] ?? id, r, t });
     if (t.gizli) continue;
     ctx.save();
@@ -365,7 +377,7 @@ export function slaytCiz(cv: HTMLCanvasElement, format: FormatId, stil: StilId, 
       const m = merkez(r);
       ctx.translate(m.x + t.x, m.y + t.y); ctx.rotate((t.r * Math.PI) / 180); ctx.scale(t.s, t.s); ctx.translate(-m.x, -m.y);
     }
-    c.aktifKatman = id; k.ciz(); c.aktifKatman = undefined;
+    c.aktifKatman = id; k.ciz(serbest ? t : undefined); c.aktifKatman = undefined;
     ctx.restore();
   }
   ctx.restore();

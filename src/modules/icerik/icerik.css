@@ -52,7 +52,8 @@
 
 /* Serbest düzen: katman listesi ve seçili öğe ayarları */
 .ie-ust:focus { outline: none; }
-.ie-ust:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.ie-ust:focus-visible { outline: none; }
+@media (hover: hover) and (pointer: fine) { .ie-ust:focus-visible { outline: 2px solid color-mix(in srgb, var(--blue) 60%, transparent); outline-offset: 3px; } } /* dokunmatikte halka çıkmasın */
 .ie-anahtar { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
 .ie-anahtar input { width: 36px; height: 20px; appearance: none; border-radius: 99px; background: var(--sunk); border: 1px solid var(--line); position: relative; cursor: pointer; transition: background .15s; margin: 0; }
 .ie-anahtar input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .25); transition: transform .15s; }
@@ -72,3 +73,8 @@
 .ie-ayar summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 4px 0; }
 .ie-ayar[open] { display: flex; flex-direction: column; gap: 8px; }
 .ie-ayar .btn { align-self: flex-start; }
+/* Seçili öğe kartı: önizlemede dokunulan öğenin kendi ayarları */
+.ie-oge { border-color: color-mix(in srgb, var(--blue) 45%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 14%, transparent); scroll-margin-top: 90px; }
+@media (max-width: 899px) { .ie-oge { scroll-margin-top: calc(42vh + 80px); } }
+.ie-duzenler { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ie-duzenler .ie-katman { gap: 6px; }

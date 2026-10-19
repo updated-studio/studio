@@ -1,5 +1,23 @@
 [
   {
+    "id": "2026-10-19-oge",
+    "tarih": "19 Ekim 2026",
+    "baslik": "İçerik: dokun, düzenle",
+    "bolumler": [
+      {
+        "ad": "İçerik",
+        "maddeler": [
+          "Önizlemede bir öğeye (başlık, metin, etiket, görsel, puan, kartlar...) dokun: sağda en üstte o öğenin kendi kartı açılır. Yazısı, görseli, boyutu, açısı, yazı boyutu ve genişliği orada.",
+          "Ayrıca açmana gerek yok: bir öğeyi sürüklemeye başladığın an serbest düzen kendiliğinden açılır. \"Şablon düzenine dön\" ile her şey geri gelir.",
+          "Fotoğraflı öğeye ikinci kez dokun (ya da kartta \"Fotoğrafı düzenle\"): çerçeve aynı kalır, içindeki fotoğrafı sürükleyip kaydırır, köşeden büyütür, üstteki noktadan döndürürsün. Dergi, Vizör ve Fiş'teki arka plan fotoğrafına tek dokunuş yeter.",
+          "Yazı boyutu ve genişlik öğe başına ayarlanır: başlığı büyütünce kutusu değil yazısı büyür, satırlar yeniden dizilir.",
+          "Hazır düzenler: beğendiğin yerleşimi \"Bu düzeni kaydet\" ile ekibe kaydet; başka habere \"Uygula\" deyince sadece yerleşim gelir, yazılar ve görseller korunur.",
+          "Görsel eklemezsen düzen görselsiz hâline geçer (boş yer kalmaz)."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-19-serbest",
     "tarih": "19 Ekim 2026",
     "baslik": "İçerik: serbest düzen ve katmanlar",

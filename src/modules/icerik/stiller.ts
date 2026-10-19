@@ -2,11 +2,11 @@
 // Şablonlar (sablonlar.ts) yerleşimi belirler, görünüşü buradan alır. Yeni marka kiti gelince sadece bu dosya değişir.
 import {
   FORMATLAR, YAZI, buyukHarf, gorselAl, gorselCiz, logo, yuvarlak,
-  type Ctx, type Format, type GorselKey, type Icerik, type Rect, type StilId,
+  type Ctx, type Format, type GorselKey, type Icerik, type KatmanAyar, type Rect, type StilId,
 } from "./motor";
 
 export type Slot = { k: GorselKey; r: Rect; mod: "cover" | "contain"; ox: number; oy: number; katman?: string };
-export type Katman = { id: string; r: Rect; ciz: () => void };
+export type Katman = { id: string; r: Rect; ciz: (t?: KatmanAyar) => void };
 // katmanlar: şablonun yerleştirdiği bloklar (serbest düzende taşınabilir); aktifKatman: şu an çizilen katman (görsel alanları ona bağlanır)
 export type Ciz = { ctx: Ctx; F: Format; S: Stil; I: Icerik; slotlar: Slot[]; cikti: boolean; katmanlar: Katman[]; aktifKatman?: string };
 export type Zemin = { r: Rect; fotoAlindi: boolean; hiza: "ust" | "alt" | "orta" };
@@ -126,7 +126,7 @@ const dergi: Stil = {
     ctx.font = YAZI.mono(22); ctx.fillStyle = this.r.soluk; ctx.textAlign = "right"; ctx.fillText(`SAYI · ${ay()}`, s.x + s.w, ku); ctx.textAlign = "left";
     ctx.fillStyle = "#141414"; ctx.fillRect(s.x, ku + 26, s.w, 4);
     let ust = ku + 58, alindi = false;
-    if (foto) {
+    if (foto && c.I[foto]) { // görsel yoksa yer ayrılmaz, düzen toparlanır
       const h = Math.round(F.h * (F.h > 1400 ? 0.4 : 0.42) * oran);
       const r = { x: 0, y: ust, w: F.w, h };
       slotCiz(c, foto, r, "cover", () => { ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); }, () => { ctx.fillStyle = "#E3DED3"; ctx.fillRect(r.x, r.y, r.w, r.h); bosKutu(c, { x: s.x, y: r.y + 24, w: s.w, h: r.h - 48 }, "#9A9488", 8); });
@@ -237,7 +237,7 @@ const fis: Stil = {
     if (l) { const lw = (l.width / l.height) * 60; ctx.drawImage(l, F.w / 2 - lw / 2, y, lw, 60); }
     y += 84; kesikCizgi(ctx, ic.x, y, ic.w, "#141414"); y += 30;
     let alindi = false;
-    if (foto) {
+    if (foto && c.I[foto]) {
       const h = Math.round(ph * (F.h > 1400 ? 0.3 : 0.28) * oran);
       const r = { x: ic.x, y, w: ic.w, h };
       slotCiz(c, foto, r, "cover", () => { ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); }, () => bosKutu(c, r, "#9A9A94", 2));
