@@ -28,7 +28,11 @@ jobs:
           DB: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          test -n "$DB" || { echo "SUPABASE_DB_URL gizli bilgisi yok"; exit 1; }
+          if [ -z "$DB" ]; then
+            # Kurulum anında gizli bilgi henüz girilmemiş olabilir: o zaman sessizce bekle. Gece çalışmasında yoksa hata ver (fark edilsin).
+            if [ "${{ github.event_name }}" = "schedule" ]; then echo "SUPABASE_DB_URL gizli bilgisi yok"; exit 1; fi
+            echo "SUPABASE_DB_URL henüz girilmemiş; yedek atlandı." >> "$GITHUB_STEP_SUMMARY"; echo "ATLA=1" >> "$GITHUB_ENV"; exit 0
+          fi
           mkdir -p yedek
           supabase db dump --db-url "$DB" -f yedek/roller.sql --role-only
           supabase db dump --db-url "$DB" -f yedek/sema.sql
@@ -36,6 +40,7 @@ jobs:
           date -u +"%Y-%m-%dT%H:%M:%SZ" > yedek/SON_YEDEK.txt
           ls -la yedek
       - name: Depoya kaydet
+        if: env.ATLA != '1'
         run: |
           git config user.name "Stüdyo yedek"
           git config user.email "yedek@users.noreply.github.com"
