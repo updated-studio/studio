@@ -23,6 +23,7 @@ const P: Record<string, string> = {
   saat: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
   sil: "M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13",
   cikis: "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10",
+  sohbet: "M4 5h16v11H9l-5 4z",
 };
 
 export function Ikon({ ad }: { ad: string }) {

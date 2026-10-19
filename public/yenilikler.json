@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-10-19-sohbet",
+    "tarih": "19 Ekim 2026",
+    "baslik": "Sohbet her sayfada",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Ekip sohbeti sağ üstte, bildirim zilinin yanında. Her sayfadan açılır, okunmamış mesaj sayısı düğmede görünür. Haber Masası'ndaki sohbetle aynı kanal."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-19-isler",
     "tarih": "19 Ekim 2026",
     "baslik": "İşler yenilendi",

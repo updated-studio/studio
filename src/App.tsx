@@ -4,6 +4,7 @@ import { Ikon } from "./shared/Ikon";
 import ProfilMenu from "./shared/ProfilMenu";
 import { MODULLER } from "./modules";
 import Bildirimler from "./shared/Bildirimler";
+import SohbetDugme from "./shared/SohbetDugme";
 import SurumUyarisi from "./shared/SurumUyarisi";
 import AltyapiUyari from "./shared/altyapi";
 import IkonUyarisi from "./shared/IkonUyarisi";
@@ -20,6 +21,7 @@ function Kabuk() {
     <div className="wrap">
       <header className="row" style={{ gap: 12 }}>
         <div className="brand" style={{ marginRight: "auto" }}><span className="logo" role="img" aria-label="Updated" /><span>Stüdyo</span></div>
+        <SohbetDugme />
         <Bildirimler />
         <ProfilMenu moduller={profilde} />
       </header>

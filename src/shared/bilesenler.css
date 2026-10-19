@@ -173,3 +173,8 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .is-ic-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .is-textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; width: 100%; font: inherit; color: var(--ink); resize: vertical; }
 .is-sayi { margin-left: 6px; font: 500 11px var(--mono); background: var(--blue-soft); color: var(--blue); border-radius: 99px; padding: 1px 6px; }
+
+/* Üstteki ekip sohbeti paneli (SohbetDugme) */
+.sohbet-panel { width: min(380px, calc(100vw - 32px)); max-height: none; overflow: visible; }
+.sohbet-panel .sohbet { max-height: min(55vh, 460px); }
+@media (max-width: 560px) { .sohbet-panel { position: fixed; left: 16px; right: 16px; top: calc(64px + env(safe-area-inset-top, 0px)); width: auto; } }
