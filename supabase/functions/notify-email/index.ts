@@ -1,5 +1,8 @@
 // Yeni bildirimleri e-posta olarak gönderir. Tetikleyici: notifications tablosuna ekleme (0003).
-// Gizli bilgi: GMAIL_APP_PASSWORD ve MAIL_FROM (Supabase > Edge Functions > Secrets). Koda yazılmaz.
+// Gizli bilgi (Supabase > Edge Functions > Secrets; koda yazılmaz):
+//   MAIL_FROM: gönderen adres. SMTP_PASSWORD: o adresin şifresi (yoksa eski GMAIL_APP_PASSWORD kullanılır).
+//   SMTP_HOST / SMTP_PORT: posta sunucusu (yoksa Gmail: smtp.gmail.com / 465). Kurumsal adres (Natro) için
+//   SMTP_HOST'a Natro'nun verdiği sunucu (genelde mail.<alan adı>) yazılır. SMTP_USER yoksa MAIL_FROM kullanılır.
 // Not: Supabase panelinde "Verify JWT" kapalı; fonksiyon girdi almaz, sadece bekleyen bildirimleri işler.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.14";
@@ -16,8 +19,11 @@ function serviceKey(): string {
 }
 
 Deno.serve(async () => {
-  const pass = Deno.env.get("GMAIL_APP_PASSWORD");
-  if (!pass || !FROM) return new Response("GMAIL_APP_PASSWORD veya MAIL_FROM yok", { status: 500 });
+  const pass = Deno.env.get("SMTP_PASSWORD") ?? Deno.env.get("GMAIL_APP_PASSWORD");
+  if (!pass || !FROM) return new Response("SMTP_PASSWORD (ya da GMAIL_APP_PASSWORD) veya MAIL_FROM yok", { status: 500 });
+  const host = Deno.env.get("SMTP_HOST") || "smtp.gmail.com";
+  const port = Number(Deno.env.get("SMTP_PORT") || 465);
+  const user = Deno.env.get("SMTP_USER") || FROM;
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
 
   const { data: rows, error } = await sb.from("notifications")
@@ -34,8 +40,8 @@ Deno.serve(async () => {
     .select("id,email,name,notify_email").in("id", ids);
 
   const tx = nodemailer.createTransport({
-    host: "smtp.gmail.com", port: 465, secure: true,
-    auth: { user: FROM, pass: pass.replace(/\s/g, "") },
+    host, port, secure: port === 465,
+    auth: { user, pass: host === "smtp.gmail.com" ? pass.replace(/\s/g, "") : pass },
   });
 
   let sent = 0;
@@ -47,7 +53,7 @@ Deno.serve(async () => {
     const text = "Merhaba " + p.name + ",\n\n" + mine.map((r) => "- " + r.body).join("\n") +
       "\n\nPanel: " + PANEL + "\n\nBu e-postalari Studyo'da Ekip > Profilim bolumunden kapatabilirsin.";
     try {
-      await tx.sendMail({ from: '"Updated Ekip Paneli" <' + FROM + ">", to: p.email, subject: "Updated: " + subject, text });
+      await tx.sendMail({ from: '"Updated Stüdyo" <' + FROM + ">", to: p.email, subject: "Updated: " + subject, text });
       sent++;
     } catch (e) {
       errs.push(String(e));

@@ -143,8 +143,8 @@ updated-studio/
 
 | Servis | Şu an kimde | Hedef |
 |---|---|---|
-| Supabase (organizasyon "Updated") | Enes | Fatih de sahip |
-| GitHub | `updated-studio` organizasyonu (ücretsiz plan), sahip Enes | Fatih de sahip (ücretsiz planda sınırsız sahip/üye) |
+| Supabase (organizasyon "Updated") | Enes + Fatih (sahip) | — |
+| GitHub | `updated-studio` organizasyonu (ücretsiz plan), sahip Enes + Fatih | — |
 | E-posta gönderimi | Enes'in Gmail'i | Kurumsal adres (updated.com.tr) |
 | Alan adı ve DNS (Natro) | Fatih | Fatih |
 | Triyaj (Google) | Kapatıldı (13 Ekim): Haber Masası'na taşındı; eski tablo Enes'in Google hesabında arşiv | — |
@@ -248,6 +248,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 - **19 Ekim 2026 (2):** (Enes) **İçerik editörü Stüdyo'nun kendi kodu olarak yeniden yazıldı** (iframe'deki eski aracın taşınması yerine; şablonlar yeni marka kitiyle zaten yeniden tasarlanacağı için). Yapı: `motor.ts` (formatlar, tuval yardımcıları, dikey yerleşim: bloklar ölçülür, fotoğraf kalan alanı alır, sığmazsa yazı orantılı küçülür), `stiller.ts` (Cam / Dergi / Vizör / Fiş: renk, yazı, zemin, etiket, kart, fotoğraf çizimi; **yeni marka kiti sadece bu dosyayı değiştirir**), `sablonlar.ts` (7 yerleşim: haber kapağı, inceleme puanı, karşılaştırma, liste, yorum, madde slaytı, özet slaytı; her stil ve formatta çalışır). Formatlar: Post 1080×1350, Story 1080×1920 (güvenli alan üst 250 / alt 340), Reels kapağı 1080×1920 (ızgarada ortadaki 3:4). Önizleme odaklı arayüz: şablon/stil galerisi kullanıcının kendi metniyle canlı küçük önizleme; görsel önizlemede sürüklenir/yakınlaştırılır; slaytta sadece değiştirilen alanlar saklanır, gerisi şablonun örneği. Kayıt: `icerik_projeler` tablosu + `icerik` deposu (migration 0019; ekip ortak, silme oluşturan/yönetici), taslak ayrıca tarayıcıda. Eski kayıtların aktarımı yapılmayacak (şablonlar değiştiği için açılamaz); eski araç "Eski araç" sekmesinde, ekip geçince kapanır (kural 9).
 - **19 Ekim 2026 (3):** (Enes) **İşler disiplini.** İş açma Yönetim'den Ekip → İşler'e taşındı (`ekip/IsFormu.tsx`). `jobs`'a öncelik (acil/yüksek/normal/düşük), aşama (alındı → çekim → kurgu → onay → yayında), yedek kişi, brief, teslim linki, aşama notu eklendi (migration 0020). Aşamayı sorumlu, yedek ya da yönetici `job_stage` ile ilerletir; "onay"a gelince yöneticilere bildirim; yönetici `complete_job` ile bitirir (aşama kendiliğinden "yayında") ya da notla düzeltme ister (sorumluya bildirim). Zorunlu alan sadece marka, başlık, son gün (fazla alan ekibi yavaşlatmasın diye). Sıralama: geciken → öncelik → son gün. Sorumlu seçilirse iş havuza düşmeden atanır.
 - **19 Ekim 2026 (4):** (Enes) Ekip sohbeti üst bölüme, zilin yanına alındı (`src/shared/SohbetDugme.tsx`, aynı `tr_chat` kanalı, canlı; okunmamış sayısı tarayıcıda tutulan son görülme zamanına göre). Haber Masası'ndaki Sohbet sekmesine dokunulmadı (Fatih'in alanı); kaldırılıp kaldırılmayacağı ORTAK_CALISMA'da Fatih'e soruldu. Yönetim sayfasında iş formu yok; iş açma/düzenleme sadece Ekip → İşler'de.
+- **19 Ekim 2026 (5):** E-posta gönderimi sunucudan bağımsız: `notify-email` SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD Secrets'ını okur (yoksa Gmail + GMAIL_APP_PASSWORD). Kurumsal adrese (Natro) geçiş kod değiştirmeden Secrets ile yapılır. Supabase ücretsiz planında otomatik yedek olmadığı teyit edildi; haftalık yedek özel depoda kurulacak. Fatih her hesapta sahip (Enes teyit etti).
 
 ## 13. İşletme el kitabı (her şey nerede, bir şey bozulursa)
 
