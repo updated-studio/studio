@@ -295,7 +295,7 @@ Liste SQL Editor'da: `select jobname, schedule from cron.job;`
 
 ### 13.5 Veritabanı değişikliği
 
-Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0018_gomme_vektor.sql` (18 Ekim). `0019_icerik_projeler.sql` ve `0020_is_disiplini.sql` (19 Ekim) yazıldı, çalıştırılması bekleniyor.
+Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalıştırılır. Eski dosyalar değiştirilmez. Silme içeren SQL'de Supabase onay ister; onaya sahip basar. Son çalışan: `0018_gomme_vektor.sql` (18 Ekim). `0019_icerik_projeler.sql` ve `0020_is_disiplini.sql` (19 Ekim, Supabase bağlantısıyla).
 
 ### 13.6 Bir şey bozulursa
 

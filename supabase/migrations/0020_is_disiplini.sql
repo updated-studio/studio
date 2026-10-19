@@ -22,8 +22,7 @@ begin
   if new.status = 'havuz' then new.stage := 'alindi'; end if;
   return new;
 end $$;
-drop trigger if exists jobs_stage_sync on public.jobs;
-create trigger jobs_stage_sync before update on public.jobs for each row execute function public.job_stage_sync();
+create or replace trigger jobs_stage_sync before update on public.jobs for each row execute function public.job_stage_sync();
 
 create or replace function public.job_stage(p_job bigint, p_stage text, p_link text default null, p_note text default null) returns void
 language plpgsql security definer set search_path = public as $$

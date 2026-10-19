@@ -15,8 +15,7 @@ create index if not exists icerik_projeler_guncel on public.icerik_projeler (upd
 
 create or replace function public.icerik_guncel() returns trigger language plpgsql as $$
 begin new.updated_at := now(); new.guncelleyen := auth.uid(); return new; end $$;
-drop trigger if exists icerik_guncel on public.icerik_projeler;
-create trigger icerik_guncel before update on public.icerik_projeler for each row execute function public.icerik_guncel();
+create or replace trigger icerik_guncel before update on public.icerik_projeler for each row execute function public.icerik_guncel();
 
 alter table public.icerik_projeler enable row level security;
 create policy icerik_oku on public.icerik_projeler for select to authenticated using (is_member());
