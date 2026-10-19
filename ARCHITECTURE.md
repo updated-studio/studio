@@ -481,6 +481,8 @@ Asıl metinler kodda durur; burada ne söylediğimizin tam özeti var. Değişti
 
 ## 19. İçerik modülü: bugünkü durum ve plan (Enes, 19 Ekim'de başlıyor)
 
+**Planlanan (19 Ekim, Enes): siteden otomatik post.** Sitede yayınlanan her yazı İçerik'e "Siteden gelenler" olarak kendiliğinden düşer; yazının türüne göre (kategori/etiket: haber → Haber kapağı, inceleme → İnceleme puanı, karşılaştırma → Karşılaştırma, liste → Liste) şablon seçilir, başlık / alt metin / öne çıkan görsel alanlara yerleşir, ekip bakıp indirir ya da düzenler. Kaynak WordPress'in herkese açık yazı listesi; Haber Masası'na dokunmaz. Instagram'a otomatik paylaşım ayrı bir adım (Meta işletme hesabı ve uygulama onayı gerekir), şimdilik "paylaşıma hazır PNG". Marka kiti şablonlarından sonra; mevcut Telegram post otomasyonunun yerine geçebilir.
+
 **Bugün ne var.** `src/modules/icerik/Icerik.tsx` sadece bir çerçeve: eski post aracını (`public/araclar/post/index.html`, ~750 KB tek dosya; yazı tipleri ve örnek görseller içine gömülü) olduğu gibi Stüdyo içinde açıyor. Araç tuval (canvas) üzerinde çiziyor, çıktı **sadece 1080×1350 (4:5)**. Şablonlar dört stil ailesinde: **Cam** (8), **Dergi** (7), **Vizör** (7), **Fiş** (3); her ailede haber kapağı, karşılaştırma, inceleme puanı, tek post (yorum / liste), kaydırmalı (özet ve madde slaytı). Kişinin yazdıkları ve "düzeni kaydet" kayıtları **tarayıcıda (localStorage)** duruyor; ekip arasında paylaşılmıyor, cihaz değişince kayboluyor. Aynı aracın eski kopyası eski adreste (eneshsahin.github.io/updated-panel) hâlâ açık ve ekibin eski kayıtları orada.
 
 **Planlanan (öncelik sırası Enes'le netleşecek).**
