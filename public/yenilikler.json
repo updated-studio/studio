@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-19-cam",
+    "tarih": "19 Ekim 2026",
+    "baslik": "Yeni görünüm: cam",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Stüdyo'nun görünümü yenilendi: marka renklerinde yumuşak zemin, yarı saydam kartlar, bulanık cam üst çubuk ve menüler.",
+          "Üst çubuk artık sayfayı kaydırınca da üstte kalıyor; sohbet, bildirim ve profil her an elinin altında.",
+          "Cihazında \"Saydamlığı azalt\" açıksa her şey düz ve tam okunur görünür."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-19-sohbet",
     "tarih": "19 Ekim 2026",
     "baslik": "Sohbet her sayfada",

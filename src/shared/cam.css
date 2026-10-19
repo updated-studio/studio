@@ -1,0 +1,99 @@
+/* Cam görünüm (iOS tarzı, hafif bulanık). index.css ve bilesenler.css'ten SONRA yüklenir, sadece görünüşü değiştirir.
+   Kural: gerçek bulanıklık (backdrop-filter) sadece üstte duran katmanlarda: üst çubuk, dock, açılır paneller, pencereler,
+   segment. İçerik kartları yarı saydam + ince ışık kenarı; bulanıklık yok (onlarca kartta telefon kasmasın, yazı okunur kalsın).
+   Saydamlığı azalt ayarı açık olan cihazda ve bulanıklığı desteklemeyen tarayıcıda düz renge döner. */
+
+:root {
+  --cam-kart: color-mix(in srgb, var(--surface) 80%, transparent);
+  --cam-ust: color-mix(in srgb, var(--surface) 78%, transparent);
+  --cam-acilir: color-mix(in srgb, var(--surface) 88%, transparent);
+  --cam-kenar: color-mix(in srgb, var(--line) 55%, rgb(255 255 255 / .55));
+  --cam-isik: inset 0 1px 0 rgb(255 255 255 / .7);
+  --cam-golge: 0 1px 2px rgb(14 26 51 / .04), 0 8px 24px rgb(14 26 51 / .06);
+  --cam-golge-ust: 0 12px 40px rgb(14 26 51 / .16);
+  --cam-bulanik: blur(30px) saturate(1.8);
+  --cam-zemin-mavi: rgb(37 99 235 / .16);
+  --cam-zemin-turuncu: rgb(255 107 26 / .10);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cam-kart: color-mix(in srgb, var(--surface) 74%, transparent);
+    --cam-ust: color-mix(in srgb, var(--surface) 76%, transparent);
+    --cam-acilir: color-mix(in srgb, var(--surface) 90%, transparent);
+    --cam-kenar: rgb(255 255 255 / .09);
+    --cam-isik: inset 0 1px 0 rgb(255 255 255 / .07);
+    --cam-golge: 0 1px 2px rgb(0 0 0 / .25), 0 8px 24px rgb(0 0 0 / .18);
+    --cam-golge-ust: 0 16px 44px rgb(0 0 0 / .45);
+    --cam-zemin-mavi: rgb(37 99 235 / .22);
+    --cam-zemin-turuncu: rgb(255 107 26 / .09);
+  }
+}
+
+/* Zemin: marka renklerinde yumuşak ışık (camın arkasında görünecek bir şey olsun) */
+body { background: var(--bg); }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vmax 50vmax at 88% -10%, var(--cam-zemin-mavi), transparent 70%),
+    radial-gradient(55vmax 45vmax at -10% 105%, var(--cam-zemin-turuncu), transparent 70%),
+    radial-gradient(40vmax 35vmax at 15% 20%, color-mix(in srgb, var(--cam-zemin-mavi) 50%, transparent), transparent 70%);
+}
+
+/* İçerik yüzeyleri: yarı saydam, ince ışık kenarı */
+.panel, .kart {
+  background: var(--cam-kart);
+  border: 1px solid var(--cam-kenar);
+  border-radius: 18px;
+  box-shadow: var(--cam-isik), var(--cam-golge);
+}
+.empty { border-radius: 18px; border-color: var(--cam-kenar); background: color-mix(in srgb, var(--surface) 40%, transparent); }
+
+/* Üstte duran katmanlar: gerçek cam */
+.wrap > header {
+  position: sticky; top: 0; z-index: 7;
+  /* tam genişlik çubuk: .wrap'in (en fazla 1040 px) dışına taşar, içerik yine ortada hizalı */
+  margin: -14px calc(50% - 50vw) 0; padding: calc(10px + env(safe-area-inset-top, 0px)) max(16px, calc(50vw - 504px)) 10px;
+  border-bottom: 1px solid var(--cam-kenar);
+}
+.wrap > header > * { position: relative; z-index: 1; }
+/* Bulanıklık çubuğun kendisinde değil, arkasındaki katmanda: çubukta backdrop-filter olursa içinden açılan
+   paneller (bildirim, sohbet, profil) sayfayı bulanıklaştıramaz, arkadaki düğmeler net görünür. */
+.wrap > header::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: var(--cam-ust);
+  -webkit-backdrop-filter: var(--cam-bulanik); backdrop-filter: var(--cam-bulanik);
+}
+html { padding-top: 0; }
+.bildirimler, .profilpanel, .pencere, .sohbet-panel {
+  background: var(--cam-acilir);
+  -webkit-backdrop-filter: var(--cam-bulanik); backdrop-filter: var(--cam-bulanik);
+  border: 1px solid var(--cam-kenar); border-radius: 20px;
+  box-shadow: var(--cam-isik), var(--cam-golge-ust);
+}
+.perde { background: rgb(0 0 0 / .32); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.segment {
+  background: color-mix(in srgb, var(--sunk) 70%, transparent);
+  -webkit-backdrop-filter: var(--cam-bulanik); backdrop-filter: var(--cam-bulanik);
+  border: 1px solid var(--cam-kenar); border-radius: 14px;
+}
+.segment button { border-radius: 10px; }
+.segment button[aria-pressed=true] { background: var(--surface); box-shadow: var(--cam-isik), 0 1px 4px rgb(0 0 0 / .12); }
+
+/* Düğmeler ve alanlar */
+.btn { border-radius: 12px; box-shadow: inset 0 1px 0 rgb(255 255 255 / .22), 0 1px 3px color-mix(in srgb, var(--blue) 30%, transparent); }
+.btn.ghost { background: color-mix(in srgb, var(--surface) 55%, transparent); border-color: var(--cam-kenar); box-shadow: var(--cam-isik); }
+.btn.ok { box-shadow: inset 0 1px 0 rgb(255 255 255 / .22), 0 1px 3px color-mix(in srgb, var(--ok) 30%, transparent); }
+input[type=text], input[type=email], input[type=password], input[type=date], input[type=url], select, textarea {
+  background: color-mix(in srgb, var(--surface) 70%, transparent); border-color: var(--cam-kenar); border-radius: 12px;
+}
+.chip { background: color-mix(in srgb, var(--sunk) 75%, transparent); }
+
+/* Bulanıklık yoksa ya da kullanıcı saydamlığı azaltmak istiyorsa: düz yüzey (okunurluk önce) */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .wrap > header::before, .bildirimler, .profilpanel, .pencere, .sohbet-panel, .segment { background: var(--surface); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .panel, .kart, .wrap > header::before, .bildirimler, .profilpanel, .pencere, .sohbet-panel, .segment, .btn.ghost,
+  input[type=text], input[type=email], input[type=password], input[type=date], input[type=url], select, textarea { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  body::before { display: none; }
+}

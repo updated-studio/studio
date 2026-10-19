@@ -1,0 +1,41 @@
+# Stüdyo veritabanının günlük yedeği. Bu dosya ÖZEL depoya (updated-studio/yedek) .github/workflows/ altına konur.
+# Bu (herkese açık) depoda sadece şablon olarak durur; burada çalışmaz.
+# GitHub'ın kendi sunucularında, her gece kendiliğinden çalışır; kimsenin bilgisayarı ya da Claude gerekmez.
+# Gerekli tek gizli bilgi: yedek deposu → Settings → Secrets and variables → Actions → SUPABASE_DB_URL
+#   (Supabase → Connect → "Session pooler" bağlantı adresi, şifresi içinde; IPv4 olduğu için pooler kullanılır).
+# Geri yükleme: ARCHITECTURE.md 13.6 "Veritabanı bozuldu / silindi".
+name: Veritabanı yedeği
+on:
+  schedule:
+    - cron: "15 0 * * *"   # her gün 03:15 (Türkiye)
+  workflow_dispatch: {}    # Actions sekmesinden "Run workflow" ile elle de çalışır
+permissions:
+  contents: write
+jobs:
+  yedek:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Yedek al
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DB" || { echo "SUPABASE_DB_URL gizli bilgisi yok"; exit 1; }
+          mkdir -p yedek
+          supabase db dump --db-url "$DB" -f yedek/roller.sql --role-only
+          supabase db dump --db-url "$DB" -f yedek/sema.sql
+          supabase db dump --db-url "$DB" -f yedek/veri.sql --data-only --use-copy
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > yedek/SON_YEDEK.txt
+          ls -la yedek
+      - name: Depoya kaydet
+        run: |
+          git config user.name "Stüdyo yedek"
+          git config user.email "yedek@users.noreply.github.com"
+          git add yedek
+          git commit -m "Yedek $(date -u +%Y-%m-%d)" || echo "Değişiklik yok"
+          git push
