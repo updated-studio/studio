@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **19 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** (1) İçerik editörü yeniden yazıldı (`src/modules/icerik/`), migration **0019** (`icerik_projeler` + `icerik` deposu) bizde; sıradaki numara 0020. (2) Enes, Stüdyo'nun genel görünümünü marka renkleriyle iOS tarzı cam tasarıma geçirmek istiyor. Bu `src/index.css` değişkenlerini ve `src/shared/*` görünümünü değiştirir, Haber Masası ekranlarını da etkiler (kural 6). Başlamadan önce burada plan yazacağız; Haber Masası'nda sabit renk ya da özel CSS kullandığın yer varsa buraya not düşersen ona göre yaparız.
+
 - **19 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** `hafiza/GUNLUK.md` açıldı (CLAUDE.md kural 13): sohbetler arası çalışma günlüğü. Sen de kendi oturumlarının sonunda o günün başlığı altına "Fatih:" diye başlayan kısa kayıt eklersen iki taraf da neyin neden yapıldığını görür.
 
 - **19 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** Merhaba. Enes bu hafta İçerik modülünü (Instagram post aracı, `src/modules/icerik/` ve `public/araclar/post/`) geliştirecek; Haber Masası'na ve `triyaj-*` fonksiyonlarına dokunmayacağız. Senin #1-#23 değişikliklerini çektim, çakışma yok. Ortak dosyalara (karar günlüğü, yenilikler.json, index.css) sadece ekleme yapacağız. İçerik için sunucu gerekirse `icerik-` ile başlayan ayrı fonksiyon ve yeni numaralı migration açacağız; migration açmadan önce senin son numarana bakacağız (şu an 0018). Sen de İçerik'e dokunman gerekirse buraya not bırakırsan Enes'e iletirim.

@@ -1,5 +1,24 @@
 [
   {
+    "id": "2026-10-19-icerik",
+    "tarih": "19 Ekim 2026",
+    "baslik": "Yeni İçerik editörü (deneme)",
+    "bolumler": [
+      {
+        "ad": "İçerik",
+        "maddeler": [
+          "Post aracı Stüdyo'nun kendi editörü olarak yeniden yapıldı: Post (4:5), Story (9:16) ve Reels kapağı tek yerden.",
+          "Şablon ve stil seçerken küçük önizlemelerde kendi yazdığın metni görürsün; dokununca uygulanır.",
+          "Stiller: Cam, Dergi, Vizör, Fiş. Şablonlar: haber kapağı, inceleme puanı, karşılaştırma, liste, yorum, madde ve özet slaytı.",
+          "Görseli önizlemede sürükleyerek kaydır, tekerlek ya da iki parmakla yakınlaştır. Kılavuz düğmesi Story ve Reels'in güvenli alanını gösterir.",
+          "Kaydırmalı post için slayt ekle; hepsini tek seferde indir (telefonda paylaşım menüsü açılır).",
+          "\"Buluta kaydet\" ile tasarım ekipte ortak saklanır; Kayıtlar sekmesinden herkes açabilir.",
+          "Eski post aracı \"Eski araç\" sekmesinde açık kalıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-18-b",
     "tarih": "18 Ekim 2026",
     "baslik": "Telif ve kümeleme güvenliği",
