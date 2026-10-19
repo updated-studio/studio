@@ -49,3 +49,26 @@
   .ie-slaytlar, .ie-slayt-arac, .ie-eylem { order: 0; }
   .ie-alan input, .ie-alan textarea { font-size: 16px; }
 }
+
+/* Serbest düzen: katman listesi ve seçili öğe ayarları */
+.ie-ust:focus { outline: none; }
+.ie-ust:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.ie-anahtar { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.ie-anahtar input { width: 36px; height: 20px; appearance: none; border-radius: 99px; background: var(--sunk); border: 1px solid var(--line); position: relative; cursor: pointer; transition: background .15s; margin: 0; }
+.ie-anahtar input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .25); transition: transform .15s; }
+.ie-anahtar input:checked { background: var(--blue); border-color: var(--blue); }
+.ie-anahtar input:checked::after { transform: translateX(16px); }
+.ie-anahtar input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ie-katmanlar { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.ie-katman { display: flex; align-items: center; gap: 2px; border-radius: 9px; }
+.ie-katman[aria-current=true] { background: var(--blue-soft); }
+.ie-katman-ad { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 8px 10px; font-size: 14px; color: var(--ink); border-radius: 8px; }
+.ie-katman[aria-current=true] .ie-katman-ad { color: var(--blue); font-weight: 600; }
+.ie-mini-btn { width: 32px; height: 32px; display: grid; place-items: center; border: 0; background: none; border-radius: 8px; color: var(--muted); padding: 0; font-size: 15px; }
+.ie-mini-btn:hover:not(:disabled) { background: var(--sunk); color: var(--ink); }
+.ie-mini-btn:disabled { opacity: .3; cursor: default; }
+.ie-mini-btn svg.i { width: 17px; height: 17px; }
+.ie-secili { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--sunk); }
+.ie-ayar summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 4px 0; }
+.ie-ayar[open] { display: flex; flex-direction: column; gap: 8px; }
+.ie-ayar .btn { align-self: flex-start; }

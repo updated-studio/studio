@@ -85,7 +85,7 @@ export default function Icerik() {
     setKaydediliyor(true);
     try {
       const cv = document.createElement("canvas"); const s = p.slaytlar[0];
-      slaytCiz(cv, p.format, p.stil, s.sablon, etkin(s.sablon, s.icerik), true, 0.34);
+      slaytCiz(cv, p.format, p.stil, s.sablon, etkin(s.sablon, s.icerik), true, 0.34, s.serbest?.[p.format]);
       const kapak = await new Promise<Blob | null>((ok) => cv.toBlob(ok, "image/jpeg", 0.82));
       const sonuc = await bulutaKaydet(p, kapak);
       // Kaydederken kullanıcı yazmaya devam ettiyse onun son hâli korunur, sadece kimlik ve adresler işlenir.

@@ -15,7 +15,8 @@ export const FORMATLAR: Record<FormatId, Format> = {
   reels: { id: "reels", ad: "Reels kapağı", aciklama: "9:16 · ızgarada 3:4", w: 1080, h: 1920, guvenli: { x: 84, y: 300, w: 912, h: 1320 }, izgara: { x: 0, y: 240, w: 1080, h: 1440 } },
 };
 
-export type Gorsel = { src: string; z: number; x: number; y: number }; // z: yakınlaştırma (1 = sığdır), x/y: kaydırma (-1..1)
+export type Gorsel = { src: string; z: number; x: number; y: number; p?: number; k?: number; d?: number };
+// z: yakınlaştırma (1 = sığdır), x/y: kaydırma (-1..1), p/k/d: parlaklık / kontrast / doygunluk (-100..100, 0 = dokunulmamış)
 export type GorselKey = "gorsel" | "gorselA" | "gorselB";
 
 export type Icerik = {
@@ -27,7 +28,16 @@ export type MetinKey = Exclude<keyof Icerik, GorselKey>;
 
 export type StilId = "cam" | "dergi" | "vizor" | "fis";
 export type SablonId = "haber" | "liste" | "yorum" | "puan" | "karsilastirma" | "madde" | "ozet";
-export type Slayt = { id: string; sablon: SablonId; icerik: Partial<Icerik> }; // sadece kullanıcının değiştirdiği alanlar
+// Serbest düzen: şablonun yerleştirdiği her blok bir katman. Kullanıcı katmanı taşır (x, y: piksel), boyutlandırır (s: oran),
+// döndürür (r: derece), gizler; sira alttan üste çizim sırası. Her format için ayrı saklanır (Post'ta taşınan Story'yi bozmasın).
+export type KatmanAyar = { x: number; y: number; s: number; r: number; gizli?: boolean };
+export type Serbest = { katman: Record<string, KatmanAyar>; sira: string[] };
+export const BOS_AYAR: KatmanAyar = { x: 0, y: 0, s: 1, r: 0 };
+export type Slayt = { id: string; sablon: SablonId; icerik: Partial<Icerik>; serbest?: Partial<Record<FormatId, Serbest>> }; // icerik: sadece kullanıcının değiştirdiği alanlar
+export const KATMAN_AD: Record<string, string> = {
+  etiket: "Etiket", foto: "Görsel", baslik: "Başlık", metin: "Metin", maddeler: "Maddeler", bilgiler: "Kartlar", puan: "Puan",
+  karar: "Karar kutusu", ikiFoto: "Ürün görselleri", tablo: "Tablo", tirnak: "Tırnak işareti", imza: "İmza",
+};
 export type Proje = { id?: string; ad: string; format: FormatId; stil: StilId; slaytlar: Slayt[]; guncelleyen?: string; updated_at?: string; kapak?: string | null };
 
 export const yeniId = () => Math.random().toString(36).slice(2, 10);
@@ -125,20 +135,25 @@ export function kes(ctx: Ctx, satirlar: string[], w: number, max: number) {
 }
 
 // Görseli dikdörtgene yerleştirir. cover: alanı doldurur; contain: tamamı görünür (arka plansız ürün).
+export const filtreVar = (() => { try { return typeof document.createElement("canvas").getContext("2d")?.filter === "string"; } catch { return false; } })();
 export function gorselCiz(ctx: Ctx, im: HTMLImageElement, g: Gorsel, r: Rect, mod: "cover" | "contain") {
   const iw = im.naturalWidth, ih = im.naturalHeight;
+  const ayarli = filtreVar && (g.p || g.k || g.d);
+  if (ayarli) { ctx.save(); ctx.filter = `brightness(${1 + (g.p ?? 0) / 100}) contrast(${1 + (g.k ?? 0) / 100}) saturate(${1 + (g.d ?? 0) / 100})`; }
   const s = (mod === "cover" ? Math.max(r.w / iw, r.h / ih) : Math.min(r.w / iw, r.h / ih)) * g.z;
   const dw = iw * s, dh = ih * s;
   const ox = mod === "cover" ? (dw - r.w) / 2 : r.w / 2, oy = mod === "cover" ? (dh - r.h) / 2 : r.h / 2;
   ctx.drawImage(im, r.x + (r.w - dw) / 2 + g.x * ox, r.y + (r.h - dh) / 2 + g.y * oy, dw, dh);
+  if (ayarli) ctx.restore();
   return { ox: Math.max(ox, 1), oy: Math.max(oy, 1) };
 }
 
 // ---------- Dikey yerleşim ----------
 // Her blok önce ölçülür (o), sonra çizilir (c). esnek bloklar (fotoğraf, boşluk) kalan yüksekliği paylaşır.
 // İçerik sığmazsa yazılar orantılı küçültülür (k: 1 → 0.6).
-export type Blok = { o: (w: number, k: number) => number; c: (r: Rect, k: number) => void; esnek?: number; enAz?: number; bosluk?: number };
-export function dizilim(r: Rect, bloklar: Blok[], hiza: "ust" | "alt" | "orta" = "ust") {
+export type Blok = { id?: string; o: (w: number, k: number) => number; c: (r: Rect, k: number) => void; esnek?: number; enAz?: number; bosluk?: number };
+// kayit verilirse bloklar hemen çizilmez, yerleri kaydedilir (serbest düzen için katman olurlar).
+export function dizilim(r: Rect, bloklar: Blok[], hiza: "ust" | "alt" | "orta" = "ust", kayit?: (b: Blok, r: Rect, k: number) => void) {
   const b = bloklar.filter(Boolean);
   let k = 1, olc: number[] = [], top = 0;
   for (; k >= 0.6; k -= 0.04) {
@@ -154,7 +169,31 @@ export function dizilim(r: Rect, bloklar: Blok[], hiza: "ust" | "alt" | "orta" =
   b.forEach((x, i) => {
     if (i) y += (x.bosluk ?? 28) * k;
     const h = olc[i] + (x.esnek && esnekTop ? (artan * x.esnek) / esnekTop : 0);
-    x.c({ x: r.x, y, w: r.w, h }, k);
+    const yer = { x: r.x, y, w: r.w, h };
+    if (kayit) kayit(x, yer, k); else x.c(yer, k);
     y += h;
   });
 }
+
+// ---------- Katman geometrisi (serbest düzen) ----------
+export type Nokta = { x: number; y: number };
+export const merkez = (r: Rect): Nokta => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+// Katmanın dört köşesi, dönüşüm uygulanmış hâliyle (sol üst, sağ üst, sağ alt, sol alt).
+export function koseler(r: Rect, t: KatmanAyar): Nokta[] {
+  const m = merkez(r), a = (t.r * Math.PI) / 180, cs = Math.cos(a), sn = Math.sin(a);
+  return [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]].map(([x, y]) => {
+    const dx = (x - m.x) * t.s, dy = (y - m.y) * t.s;
+    return { x: m.x + t.x + dx * cs - dy * sn, y: m.y + t.y + dx * sn + dy * cs };
+  });
+}
+export function kutu(r: Rect, t: KatmanAyar): Rect {
+  const k = koseler(r, t), xs = k.map((p) => p.x), ys = k.map((p) => p.y);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+// Ekrandaki noktayı katmanın kendi (dönüşümsüz) koordinatına çevirir; isabet testi için.
+export function geriCevir(p: Nokta, r: Rect, t: KatmanAyar): Nokta {
+  const m = merkez(r), a = (-t.r * Math.PI) / 180, dx = p.x - m.x - t.x, dy = p.y - m.y - t.y;
+  return { x: m.x + (dx * Math.cos(a) - dy * Math.sin(a)) / t.s, y: m.y + (dx * Math.sin(a) + dy * Math.cos(a)) / t.s };
+}
+export const icinde = (p: Nokta, r: Rect, pay = 0) => p.x >= r.x - pay && p.x <= r.x + r.w + pay && p.y >= r.y - pay && p.y <= r.y + r.h + pay;

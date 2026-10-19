@@ -1,5 +1,23 @@
 [
   {
+    "id": "2026-10-19-serbest",
+    "tarih": "19 Ekim 2026",
+    "baslik": "İçerik: serbest düzen ve katmanlar",
+    "bolumler": [
+      {
+        "ad": "İçerik",
+        "maddeler": [
+          "Sağdaki \"Katmanlar\" bölümünden ya da önizlemenin üstündeki dört oklu düğmeden \"Serbest düzen\"i aç: her öğe (başlık, metin, etiket, görsel, kartlar...) ayrı bir katman olur.",
+          "Önizlemede öğeye dokun ve sürükle: taşınır. Köşeden çek: büyür/küçülür. Üstteki noktadan çevir: döner. Telefonda iki parmakla boyut ve açı, bilgisayarda ok tuşlarıyla ince ayar.",
+          "Taşırken pembe hizalama çizgileri çıkar; öğe tuvalin ortasına, güvenli alanın kenarına ya da diğer öğelere yaklaşınca oraya oturur. Öğe güvenli alanın dışına taşarsa turuncu uyarı görünür.",
+          "Katman listesinden öğeyi gizle, öne getir / arkaya gönder, yatayda ya da dikeyde ortala, boyut ve açıyı kaydırıcıyla ayarla.",
+          "Logo ve zemin sabit kalır. Ayar sadece o format için geçerli (Post'ta yaptığın Story'yi bozmaz). \"Şablon düzenine dön\" ile her şey eski hâline gelir.",
+          "Görsellerde yeni ayarlar: yatay/dikey konum, parlaklık, kontrast, doygunluk (\"Konum ve renk ayarları\")."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-19-cam",
     "tarih": "19 Ekim 2026",
     "baslik": "Yeni görünüm: cam",

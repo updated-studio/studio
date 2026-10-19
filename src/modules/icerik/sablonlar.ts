@@ -1,8 +1,8 @@
 // Şablonlar: her biri bir yerleşim (hangi blok hangi sırada). Görünüşü seçili stil verir (stiller.ts).
 // Aynı şablon her stilde ve her formatta (Post / Story / Reels kapağı) çalışır.
 import {
-  FORMATLAR, dizilim, kes, sar, satirlariAyir, buyukHarf, type Blok, type FormatId, type GorselKey, type Icerik,
-  type MetinKey, type Rect, type SablonId, type StilId,
+  BOS_AYAR, FORMATLAR, KATMAN_AD, dizilim, kes, merkez, sar, satirlariAyir, buyukHarf, type Blok, type FormatId, type GorselKey, type Icerik,
+  type KatmanAyar, type MetinKey, type Rect, type SablonId, type Serbest, type StilId,
 } from "./motor";
 import { STILLER, type Ciz, type FotoTercih, type Slot } from "./stiller";
 
@@ -46,6 +46,7 @@ const KONTROL_SATIR = 4;
 function bEtiket(c: Ciz, metin: string, bosluk = 0): Blok | null {
   if (!metin.trim()) return null;
   return {
+    id: "etiket",
     bosluk,
     o: (_w, k) => c.S.etiket(c, 0, 0, metin, k, false).h,
     c: (r, k) => { c.S.etiket(c, r.x, r.y, metin, k); },
@@ -64,6 +65,7 @@ function baslikDuzen(c: Ciz, t1: string, t2: string, w: number, k: number, taban
 function bBaslik(c: Ciz, t1: string, t2: string, taban = 96, maxSatir = 4, bosluk?: number): Blok | null {
   if (!t1.trim() && !t2.trim()) return null;
   return {
+    id: "baslik",
     bosluk,
     o: (w, k) => { const d = baslikDuzen(c, t1, t2, w, k, taban, maxSatir); return (d.a.length + d.b.length) * d.lh; },
     c: (r, k) => {
@@ -79,6 +81,7 @@ function bMetin(c: Ciz, metin: string, taban = 34, maxSatir = 4, renk?: string, 
   if (!metin.trim()) return null;
   const duzen = (w: number, k: number) => { c.ctx.font = c.S.f.metin(taban * k); return kes(c.ctx, sar(c.ctx, metin.trim(), w), w, maxSatir); };
   return {
+    id: "metin",
     bosluk,
     o: (w, k) => duzen(w, k).length * taban * k * 1.35,
     c: (r, k) => {
@@ -88,7 +91,7 @@ function bMetin(c: Ciz, metin: string, taban = 34, maxSatir = 4, renk?: string, 
   };
 }
 function bFoto(c: Ciz, k: GorselKey, tercih: FotoTercih, esnek = 1, enAz = 260): Blok {
-  return { esnek, enAz, o: () => enAz, c: (r) => c.S.foto(c, k, r, tercih) };
+  return { id: "foto", esnek, enAz, o: () => enAz, c: (r) => c.S.foto(c, k, r, tercih) };
 }
 function bMaddeler(c: Ciz, metin: string, max = KONTROL_SATIR): Blok | null {
   const m = satirlariAyir(metin, max); if (!m.length) return null;
@@ -102,6 +105,7 @@ function bMaddeler(c: Ciz, metin: string, max = KONTROL_SATIR): Blok | null {
     });
   };
   return {
+    id: "maddeler",
     o: (w, k) => olc(w, k).reduce((a, x) => a + x.h, 0) + (m.length - 1) * 44 * k,
     c: (r, k) => {
       const d = olc(r.w, k); let y = r.y; const no = 64 * k;
@@ -126,6 +130,7 @@ function bBilgiler(c: Ciz, metin: string, max: number, kolon = 2): Blok | null {
   const { ctx, S } = c; const satir = Math.ceil(m.length / kolon);
   const hucre = (k: number) => 168 * k;
   return {
+    id: "bilgiler",
     o: (_w, k) => satir * hucre(k) + (satir - 1) * 20 * k,
     c: (r, k) => {
       const ara = 20 * k, hw = (r.w - ara * (kolon - 1)) / kolon, hh = hucre(k);
@@ -146,6 +151,7 @@ function bPuan(c: Ciz): Blok {
   const { ctx, S, I } = c; const alt = satirlariAyir(I.altPuanlar, 4);
   const ust = (k: number) => 190 * k;
   return {
+    id: "puan",
     o: (_w, k) => ust(k) + (alt.length ? 30 * k + alt.length * 66 * k : 0),
     c: (r, k) => {
       ctx.font = S.f.rakam(200 * k); ctx.fillStyle = S.r.vurgu; ctx.textBaseline = "alphabetic";
@@ -169,6 +175,7 @@ function bKarar(c: Ciz, metin: string, etiket?: string): Blok | null {
   const duzen = (w: number, k: number) => { ctx.font = S.f.guclu(32 * k); return kes(ctx, sar(ctx, metin.trim(), w - p * 2 * k), w - p * 2 * k, 3); };
   const ek = (k: number) => (etiket ? 40 * k : 0);
   return {
+    id: "karar",
     o: (w, k) => p * 2 * k + ek(k) + duzen(w, k).length * 42 * k,
     c: (r, k) => {
       S.kart(c, r); let y = r.y + p * k;
@@ -181,6 +188,7 @@ function bKarar(c: Ciz, metin: string, etiket?: string): Blok | null {
 function bIkiFoto(c: Ciz, enAz = 300): Blok {
   const { ctx, S, I } = c;
   return {
+    id: "ikiFoto",
     esnek: 1, enAz, o: () => enAz,
     c: (r, k) => {
       const ara = 24 * k, w = (r.w - ara) / 2, ad = 54 * k, h = r.h - ad;
@@ -201,6 +209,7 @@ function bTablo(c: Ciz, metin: string): Blok | null {
   const m = satirlariAyir(metin, 5, 3); if (!m.length) return null;
   const { ctx, S } = c; const sh = 64;
   return {
+    id: "tablo",
     o: (_w, k) => m.length * sh * k,
     c: (r, k) => {
       const col = r.w * 0.36, cw = (r.w - col) / 2;
@@ -219,9 +228,13 @@ function bTablo(c: Ciz, metin: string): Blok | null {
   };
 }
 function bTirnak(c: Ciz): Blok {
-  return { o: (_w, k) => 90 * k, c: (r, k) => { c.ctx.font = c.S.f.baslik(200 * k); c.ctx.fillStyle = c.S.r.vurgu; c.ctx.textBaseline = "alphabetic"; c.ctx.fillText("“", r.x - 8 * k, r.y + 150 * k); } };
+  return { id: "tirnak", o: (_w, k) => 90 * k, c: (r, k) => { c.ctx.font = c.S.f.baslik(200 * k); c.ctx.fillStyle = c.S.r.vurgu; c.ctx.textBaseline = "alphabetic"; c.ctx.fillText("“", r.x - 8 * k, r.y + 150 * k); } };
 }
 const yok = (b: (Blok | null | false)[]) => b.filter(Boolean) as Blok[];
+// Blokları yerleştirir ama çizmez: her biri bir katman olarak kaydedilir, slaytCiz sırayla (serbest düzende dönüşümle) çizer.
+function D(c: Ciz, r: Rect, b: Blok[], hiza: "ust" | "alt" | "orta" = "ust") {
+  dizilim(r, b, hiza, (bl, yer, k) => c.katmanlar.push({ id: bl.id ?? "blok" + c.katmanlar.length, r: yer, ciz: () => bl.c(yer, k) }));
+}
 
 // ---------- şablonlar ----------
 const haber: Sablon = {
@@ -230,7 +243,7 @@ const haber: Sablon = {
   gorseller: [{ k: "gorsel", l: "Görsel", yardim: "Cam stilinde arka planı silinmiş ürün görseli (PNG) en iyi sonucu verir." }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "cam" ? undefined : "gorsel");
-    dizilim(z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "urun"), bBaslik(c, c.I.baslik, c.I.vurgu, 100), bMetin(c, c.I.metin, 34, 3, undefined, 20)]), z.hiza);
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "urun"), bBaslik(c, c.I.baslik, c.I.vurgu, 100), bMetin(c, c.I.metin, 34, 3, undefined, 20)]), z.hiza);
   },
 };
 const liste: Sablon = {
@@ -239,7 +252,7 @@ const liste: Sablon = {
   gorseller: [],
   ciz(c) {
     const z = c.S.zemin(c);
-    dizilim(z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 88, 3), bMaddeler(c, c.I.maddeler)]), c.F.h > 1400 ? "orta" : z.hiza);
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 88, 3), bMaddeler(c, c.I.maddeler)]), c.F.h > 1400 ? "orta" : z.hiza);
   },
 };
 const yorum: Sablon = {
@@ -248,8 +261,8 @@ const yorum: Sablon = {
   gorseller: [],
   ciz(c) {
     const z = c.S.zemin(c);
-    const imza: Blok | null = c.I.karar.trim() ? { o: (_w, k) => 40 * k, c: (r, k) => { c.ctx.font = c.S.f.etiket(24 * k); c.ctx.fillStyle = c.S.r.soluk; c.ctx.textBaseline = "alphabetic"; c.ctx.fillText("— " + c.I.karar, r.x, r.y + 30 * k); } } : null;
-    dizilim(z.r, yok([bEtiket(c, c.I.kategori), bTirnak(c), bBaslik(c, c.I.baslik, c.I.vurgu, 92, 5, 10), bMetin(c, c.I.metin, 34, 4), imza]), "orta");
+    const imza: Blok | null = c.I.karar.trim() ? { id: "imza", o: (_w, k) => 40 * k, c: (r, k) => { c.ctx.font = c.S.f.etiket(24 * k); c.ctx.fillStyle = c.S.r.soluk; c.ctx.textBaseline = "alphabetic"; c.ctx.fillText("— " + c.I.karar, r.x, r.y + 30 * k); } } : null;
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), bTirnak(c), bBaslik(c, c.I.baslik, c.I.vurgu, 92, 5, 10), bMetin(c, c.I.metin, 34, 4), imza]), "orta");
   },
 };
 const puan: Sablon = {
@@ -258,7 +271,7 @@ const puan: Sablon = {
   gorseller: [{ k: "gorsel", l: "Ürün görseli" }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "vizor" ? "gorsel" : undefined);
-    dizilim(z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "urun", 1, 200), bBaslik(c, c.I.baslik, "", 72, 2, 20), bPuan(c), bKarar(c, c.I.karar)]), z.hiza);
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "urun", 1, 200), bBaslik(c, c.I.baslik, "", 72, 2, 20), bPuan(c), bKarar(c, c.I.karar)]), z.hiza);
   },
 };
 const karsilastirma: Sablon = {
@@ -267,7 +280,7 @@ const karsilastirma: Sablon = {
   gorseller: [{ k: "gorselA", l: "Ürün A görseli" }, { k: "gorselB", l: "Ürün B görseli" }],
   ciz(c) {
     const z = c.S.zemin(c);
-    dizilim(z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 80, 2, 20), bIkiFoto(c), bTablo(c, c.I.satirlar), bKarar(c, c.I.karar)]), z.hiza);
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 80, 2, 20), bIkiFoto(c), bTablo(c, c.I.satirlar), bKarar(c, c.I.karar)]), z.hiza);
   },
 };
 const madde: Sablon = {
@@ -276,7 +289,7 @@ const madde: Sablon = {
   gorseller: [{ k: "gorsel", l: "Madde görseli" }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "cam" ? undefined : "gorsel", 0.85);
-    dizilim(z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "kare"), bBaslik(c, c.I.baslik, "", 84, 2, 20), bMetin(c, c.I.metin, 32, 3, undefined, 16), bBilgiler(c, c.I.bilgiler, 2)]), z.hiza);
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), !z.fotoAlindi && bFoto(c, "gorsel", "kare"), bBaslik(c, c.I.baslik, "", 84, 2, 20), bMetin(c, c.I.metin, 32, 3, undefined, 16), bBilgiler(c, c.I.bilgiler, 2)]), z.hiza);
   },
 };
 const ozet: Sablon = {
@@ -285,21 +298,77 @@ const ozet: Sablon = {
   gorseller: [{ k: "gorsel", l: "Görsel" }],
   ciz(c) {
     const z = c.S.zemin(c, c.S.id === "cam" ? undefined : "gorsel", 0.62);
-    dizilim(z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 84, 2, 20), !z.fotoAlindi && bFoto(c, "gorsel", "kare", 1, 220), bBilgiler(c, c.I.bilgiler, 4)]), z.hiza);
+    D(c, z.r, yok([bEtiket(c, c.I.kategori), bBaslik(c, c.I.baslik, c.I.vurgu, 84, 2, 20), !z.fotoAlindi && bFoto(c, "gorsel", "kare", 1, 220), bBilgiler(c, c.I.bilgiler, 4)]), z.hiza);
   },
 };
 
 export const SABLONLAR: Record<SablonId, Sablon> = { haber, liste, yorum, puan, karsilastirma, madde, ozet };
 export const SABLON_SIRA: SablonId[] = ["haber", "puan", "karsilastirma", "liste", "yorum", "madde", "ozet"];
 
-// Bir slaytı verilen tuvale çizer; sürüklenebilir görsel alanlarını döndürür.
-export function slaytCiz(cv: HTMLCanvasElement, format: FormatId, stil: StilId, sablon: SablonId, I: Icerik, cikti = false, olcek = 1): Slot[] {
+export type KatmanSonuc = { id: string; ad: string; r: Rect; t: KatmanAyar };
+export type CizimSonuc = { slotlar: Slot[]; katmanlar: KatmanSonuc[] };
+
+// Katmanların çizim sırası: kayıtlı sıra (silinen katmanlar atlanır) + sonradan gelenler şablondaki yerinde.
+export function katmanSirasi(ids: string[], serbest?: Serbest) {
+  if (!serbest?.sira.length) return ids;
+  const kalan = serbest.sira.filter((x) => ids.includes(x));
+  return [...kalan, ...ids.filter((x) => !kalan.includes(x))];
+}
+
+// Katmanın gerçekte boyalı olduğu alan (metin bloğu sütun genişliğinde yerleşir ama yazı daha kısa olabilir).
+// Seçim kutusu, hizalama, ortalama ve döndürme merkezi bu alana göre yapılır. Küçük ölçekte çizilip saydam olmayan
+// piksellerden bulunur; içerik değişmedikçe önbellekten gelir (sürüklerken yeniden hesaplanmaz).
+const sikiOnbellek = new Map<string, Record<string, Rect>>();
+function sikiKutular(format: FormatId, stil: StilId, sablon: SablonId, I: Icerik): Record<string, Rect> {
+  const gorselOzet = (g?: { src: string }) => (g ? g.src.length + ":" + g.src.slice(-24) : "");
+  const anahtar = [format, stil, sablon, JSON.stringify({ ...I, gorsel: gorselOzet(I.gorsel), gorselA: gorselOzet(I.gorselA), gorselB: gorselOzet(I.gorselB) })].join("|");
+  const v = sikiOnbellek.get(anahtar); if (v) return v;
+  const F = FORMATLAR[format], o = 0.25, w = Math.ceil(F.w * o), h = Math.ceil(F.h * o);
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d", { willReadFrequently: true })!;
+  ctx.setTransform(o, 0, 0, o, 0, 0);
+  const c: Ciz = { ctx, F, S: STILLER[stil], I, slotlar: [], cikti: false, katmanlar: [] };
+  SABLONLAR[sablon].ciz(c);
+  const sonuc: Record<string, Rect> = {};
+  for (const k of c.katmanlar) {
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h); ctx.restore();
+    k.ciz();
+    const d = ctx.getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 >= 0) { const pay = 6; sonuc[k.id] = { x: x0 / o - pay, y: y0 / o - pay, w: (x1 - x0 + 1) / o + pay * 2, h: (y1 - y0 + 1) / o + pay * 2 }; }
+  }
+  if (sikiOnbellek.size > 60) sikiOnbellek.clear();
+  sikiOnbellek.set(anahtar, sonuc);
+  return sonuc;
+}
+
+// Bir slaytı verilen tuvale çizer. Zemin (arka plan, logo, alt yazı) sabittir; bloklar katman olarak çizilir.
+// serbest verilirse katmanlar kullanıcının ayarladığı yer/boyut/açı/sırayla, gizliler atlanarak çizilir.
+export function slaytCiz(cv: HTMLCanvasElement, format: FormatId, stil: StilId, sablon: SablonId, I: Icerik, cikti = false, olcek = 1, serbest?: Serbest): CizimSonuc {
   const F = FORMATLAR[format];
   const w = Math.round(F.w * olcek), h = Math.round(F.h * olcek);
   if (cv.width !== w) cv.width = w; if (cv.height !== h) cv.height = h;
   const ctx = cv.getContext("2d")!; ctx.save(); ctx.setTransform(olcek, 0, 0, olcek, 0, 0); ctx.clearRect(0, 0, F.w, F.h);
-  const c: Ciz = { ctx, F, S: STILLER[stil], I, slotlar: [], cikti };
-  SABLONLAR[sablon].ciz(c); ctx.restore();
-  return c.slotlar;
+  const c: Ciz = { ctx, F, S: STILLER[stil], I, slotlar: [], cikti, katmanlar: [] };
+  SABLONLAR[sablon].ciz(c);
+  const harita = new Map(c.katmanlar.map((k) => [k.id, k]));
+  // Serbest düzende kutular gerçek boyalı alana göre (editör, dışa aktarma ve küçük önizleme aynı hesabı kullanır).
+  const siki = serbest ? sikiKutular(format, stil, sablon, I) : {};
+  const sonuc: KatmanSonuc[] = [];
+  for (const id of katmanSirasi(c.katmanlar.map((k) => k.id), serbest)) {
+    const k = harita.get(id)!; const t = serbest?.katman[id] ?? BOS_AYAR; const r = siki[id] ?? k.r;
+    sonuc.push({ id, ad: KATMAN_AD[id] ?? id, r, t });
+    if (t.gizli) continue;
+    ctx.save();
+    if (serbest && (t.x || t.y || t.s !== 1 || t.r)) {
+      const m = merkez(r);
+      ctx.translate(m.x + t.x, m.y + t.y); ctx.rotate((t.r * Math.PI) / 180); ctx.scale(t.s, t.s); ctx.translate(-m.x, -m.y);
+    }
+    c.aktifKatman = id; k.ciz(); c.aktifKatman = undefined;
+    ctx.restore();
+  }
+  ctx.restore();
+  return { slotlar: c.slotlar, katmanlar: sonuc };
 }
 export type { Rect };

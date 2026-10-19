@@ -5,8 +5,10 @@ import {
   type Ctx, type Format, type GorselKey, type Icerik, type Rect, type StilId,
 } from "./motor";
 
-export type Slot = { k: GorselKey; r: Rect; mod: "cover" | "contain"; ox: number; oy: number };
-export type Ciz = { ctx: Ctx; F: Format; S: Stil; I: Icerik; slotlar: Slot[]; cikti: boolean };
+export type Slot = { k: GorselKey; r: Rect; mod: "cover" | "contain"; ox: number; oy: number; katman?: string };
+export type Katman = { id: string; r: Rect; ciz: () => void };
+// katmanlar: şablonun yerleştirdiği bloklar (serbest düzende taşınabilir); aktifKatman: şu an çizilen katman (görsel alanları ona bağlanır)
+export type Ciz = { ctx: Ctx; F: Format; S: Stil; I: Icerik; slotlar: Slot[]; cikti: boolean; katmanlar: Katman[]; aktifKatman?: string };
 export type Zemin = { r: Rect; fotoAlindi: boolean; hiza: "ust" | "alt" | "orta" };
 export type FotoTercih = "urun" | "kare";
 
@@ -30,9 +32,9 @@ export function slotCiz(c: Ciz, k: GorselKey, r: Rect, mod: "cover" | "contain",
   if (g && im) {
     ctx.save(); if (kirp) { kirp(); ctx.clip(); }
     const o = gorselCiz(ctx, im, g, r, mod); ctx.restore();
-    c.slotlar.push({ k, r, mod, ...o });
+    c.slotlar.push({ k, r, mod, ...o, katman: c.aktifKatman });
   } else {
-    c.slotlar.push({ k, r, mod, ox: 1, oy: 1 });
+    c.slotlar.push({ k, r, mod, ox: 1, oy: 1, katman: c.aktifKatman });
     if (!c.cikti && bos) bos();
   }
 }
