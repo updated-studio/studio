@@ -8,6 +8,9 @@ export type Is = {
   id: number; brand: string; category: string; type: string; title: string;
   due: string; embargo: string | null; status: "havuz" | "atandi" | "bitti";
   assignee: string | null; transfer_to: string | null; req: string[]; done_at?: string | null;
+  // 0020: iş disiplini (eski kayıtlarda boş gelebilir)
+  priority?: "acil" | "yuksek" | "normal" | "dusuk"; stage?: "alindi" | "cekim" | "kurgu" | "onay" | "yayinda";
+  backup?: string | null; brief?: string; link?: string | null; stage_note?: string | null; stage_at?: string | null; created_at?: string;
 };
 export type Ekipman = { id: number; name: string; category: string; status: "elimizde" | "yolda"; holder: string | null; day: string | null };
 export type Etkinlik = { id: number; title: string; brand: string; start_day: string; end_day: string | null; certainty: "kesin" | "tahmini"; note: string };

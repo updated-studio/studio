@@ -19,7 +19,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 - **Son güncelleme:** 19 Ekim 2026, Enes'in Claude'u.
 - **Kim ne yapıyor:** Fatih Haber Masası'nda (otomatik taslak, WordPress, görsel, kümeleme). Enes İçerik modülüne başlıyor (Instagram post aracı). Ayrıntı: ORTAK_CALISMA.md.
-- **Enes'in sıradaki işi:** İçerik editörü yazıldı (deneme). Bekleyen: migration 0019'un çalıştırılması (onay), Enes'in denemesi, yeni marka kiti gelince `stiller.ts`. Sonra: Ekip > İşler yeniden düzeni ("iş ekle" İşler'e, işlerin disiplini) ve Stüdyo genel tasarımı (iOS cam, marka renkleri).
+- **Enes'in sıradaki işi:** İçerik editörü ve İşler yenilemesi yazıldı. Bekleyen: migration 0019 + 0020'nin SQL Editor'da çalıştırılması, Enes'in denemesi, yeni marka kiti gelince `stiller.ts`. Sonra: Ekip > İşler yeniden düzeni ("iş ekle" İşler'e, işlerin disiplini) ve Stüdyo genel tasarımı (iOS cam, marka renkleri).
 - **Bekleyen (kullanıcıda):** Fatih'in GitHub/Supabase/Stüdyo davetlerini kabul etmesi (14 Ekim'de gönderildi). Natro erişimi (alan adı). Yeni marka kiti (Enes hazırlıyor).
 - **Bilinen açıklar:** Kopya kart birleştirmesi geçmiş haberler için yarım. Sistem Durumu sayfası yapılmadı. Eski post aracı adresi kayıtlar taşınana kadar açık.
 - **Tarihler:** Enes 5 Kasım 2026'da askere gidiyor; video aracı hariç her şey ondan önce.
@@ -50,14 +50,16 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - **Ücretsiz çeviri ucu** (translate.googleapis.com) sunucudan çalışmıyor, tarayıcıdan çalışıyor.
 - **Gemini ücretsiz kota** sabah sıfırlanıyor; dolunca Groq yedeği.
 - **Ekran testi:** Playwright `executablePath: /opt/pw-browsers/chromium`; 375 px genişlikte açık/koyu tema ekran görüntüsü alıp bak.
-- `pkill` komutu Claude'un kendi kabuğunu da öldürebiliyor; önizleme sunucusunu kapatmak için kullanma.
+- `pkill` komutu Claude'un kendi kabuğunu da öldürebiliyor; önizleme sunucusunu kapatmak için kullanma (19 Ekim'de yine oldu).
+- Supabase bağlantısında `apply_migration` "cancelled" dönüyor (19 Ekim, iki kez); okuma (`execute_sql` select) çalışıyor. Migration'lar şimdilik SQL Editor'dan.
 
 ## Günlük (en yeni üstte)
 
 ### 19 Ekim 2026
 - **İçerik editörü (Enes'in Claude'u):** Sıra konuşuldu. Enes: "3. adımı (gerçek modül) hemen yapalım; Claude Design'la kuruyoruz, yeni marka kitine göre yeni tarzlar istiyorlar, haftalar sürmez." Benim "haftalar" tahminim eski 25 şablonu birebir taşımaya göreydi; şablonlar yeniden tasarlanacağı için doğru değil, kabul ettim. Eski kayıtları aktarma adımı gereksiz bulundu (yeni şablonlarda açılamaz). Haber Masası'ndan post hazırlama (eski 4. madde) çıkarıldı: Enes "karışmamak daha iyi". Marka kiti hazırlanıyor; Enes "beklemeden kur" dedi. "Tasarımları değil, zaruri stilleri al, çeşitlendirmeyi sonra yaparız; önizlemeli olsun, kullanıcı deneyimi güzel olmalı."
 - Yapılan: `src/modules/icerik/` motor + 4 stil + 7 şablon + önizlemeli editör + Kayıtlar + Eski araç sekmesi; 3 format; slaytlar; PNG/toplu indirme; bulut kayıt (migration 0019). 4 stil × 7 şablon × 3 format ekran görüntüsüyle kontrol edildi; masaüstü ve 390 px telefon arayüzü, görsel yükleme/sürükleme/yakınlaştırma/indirme denendi.
-- Migration 0019 Supabase bağlantısıyla çalıştırılmak istendi, onay penceresi iptal oldu; Enes'e soruldu.
+- Migration 0019 Supabase bağlantısıyla iki kez çalıştırılmak istendi, ikisinde de "cancelled" döndü (okuma sorguları çalışıyor, yazan migration engelleniyor). 0019 + 0020 birleşik SQL Enes'e SQL Editor'da çalıştırması için verildi.
+- Enes "önerilerine uyalım, başla" dedi. İşler yapıldı: iş açma İşler'e taşındı, öncelik/aşama/yedek/brief/teslim linki, onay akışı (migration 0020). Sahte veriyle masaüstü ve telefon görüntüsü kontrol edildi. Sırada: Stüdyo genel cam tasarımı (önce ORTAK_CALISMA'da plan).
 - Enes yeni iki istek söyledi (araya): (1) Ekip'teki "iş ekleme" İşler bölümüne alınsın, işlerin disiplini/ayrıntısı artsın; (2) Stüdyo'nun genel tasarımı marka renkleriyle iOS 27 tarzı cam görünüme geçsin. İkincisi `src/index.css` ve ortak dosyalara dokunur, Fatih'in ekranlarını da etkiler: ORTAK_CALISMA'ya not bırakıldı.
 - Fatih #1-#23 değişikliklerini PR ile birleştirmiş (otomatik taslak + WordPress'e taslak gönderimi, görsel seçimi, üslup ve kalite kontrolü, kümeleme ve gömme, migration 0014-0018). Çektim, İçerik'e dokunulmamış.
 - İki kişinin aynı anda çalışması konuşuldu: ORTAK_CALISMA.md (kurallar + iki Claude'un not panosu) ve CLAUDE.md kural 12 eklendi; Fatih'in Claude'una ilk not bırakıldı.

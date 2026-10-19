@@ -1,31 +1,29 @@
 import { type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
 import { Ikon } from "../../shared/Ikon";
 import { sb } from "../../shared/supabase";
-import { BU_HAFTA, GUN, ekle, iso, kalan, kisaY } from "../../shared/tarih";
+import { BU_HAFTA, GUN, iso, kalan, kisaY } from "../../shared/tarih";
 import { hataMetni, useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
-import { adOf, bosGunler, KATEGORILER, TURLER } from "./ortak";
+import { adOf, bosGunler, KATEGORILER } from "./ortak";
 
 type Sonuc = PromiseLike<{ error: { message: string } | null }>;
 
-// Profil menüsünden açılan sayfa. İşler'deki "Düzenle" buraya #/yonetim?is=<id> ile gelir.
+// Profil menüsünden açılan sayfa. İş açma/düzenleme Ekip → İşler'de (IsFormu).
 export default function YonetimSayfa() {
   const { yukleniyor, hata } = useVeri();
-  const [sp] = useSearchParams();
   const git = useNavigate();
   if (yukleniyor) return <div className="muted">Yükleniyor…</div>;
   if (hata) return <div className="empty">Veri yüklenemedi: {hata}</div>;
-  return <Yonetim duzenlenen={Number(sp.get("is")) || null} bitti={(isler) => git(isler ? "/ekip?b=isler" : "/yonetim")} />;
+  return <Yonetim bitti={(isler) => git(isler ? "/ekip?b=isler" : "/yonetim")} />;
 }
 
-function Yonetim({ duzenlenen, bitti }: { duzenlenen: number | null; bitti: (isler?: boolean) => void }) {
+function Yonetim({ bitti }: { bitti: (isler?: boolean) => void }) {
   const { veri, yenile } = useVeri();
   const { profile } = useAuth();
   const toast = useToast();
   const uid = profile!.id;
-  const ej = duzenlenen ? veri.jobs.find((j) => j.id === duzenlenen) : undefined;
   const bekleyen = veri.jobs.filter((j) => j.status === "havuz" && j.req.length);
   const kayitli = veri.invites.filter((i) => !veri.profiles.some((p) => p.email.toLowerCase() === i.email.toLowerCase()));
 
@@ -37,13 +35,6 @@ function Yonetim({ duzenlenen, bitti }: { duzenlenen: number | null; bitti: (isl
   }
   const al = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
-  async function isKaydet(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const row = { brand: al(f, "marka"), category: al(f, "kat"), type: al(f, "tur"), title: al(f, "baslik"), due: al(f, "son"), embargo: al(f, "ambargo") || null };
-    const ok = await yap(ej ? sb.from("jobs").update(row).eq("id", ej.id) : sb.from("jobs").insert(row), ej ? "İş güncellendi." : "Bekleyen işlere eklendi.");
-    if (ok) { e.currentTarget.reset(); bitti(true); }
-  }
   async function ekipmanEkle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget), st = al(f, "durum");
@@ -80,19 +71,11 @@ function Yonetim({ duzenlenen, bitti }: { duzenlenen: number | null; bitti: (isl
         ))) : <div className="muted">Bekleyen talep yok.</div>}
       </div></div>
 
-      <h3>{ej ? "İşi düzenle" : "Yeni iş aç"}</h3>
-      <div className="panel">
-        <form className="grid" onSubmit={isKaydet} key={ej?.id ?? "yeni"}>
-          <label htmlFor="j-marka">Marka<input id="j-marka" name="marka" type="text" required placeholder="Sony" defaultValue={ej?.brand} /></label>
-          <label htmlFor="j-kat">Kategori<select id="j-kat" name="kat" defaultValue={ej?.category ?? "kamera"}>{KATEGORILER.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-          <label htmlFor="j-tur">Tür<select id="j-tur" name="tur" defaultValue={ej?.type ?? TURLER[0]}>{TURLER.map((t) => <option key={t}>{t}</option>)}</select></label>
-          <label htmlFor="j-baslik">Başlık<input id="j-baslik" name="baslik" type="text" required placeholder="İlk bakış videosu" defaultValue={ej?.title} /></label>
-          <label htmlFor="j-son">Son gün<input id="j-son" name="son" type="date" required defaultValue={ej?.due ?? iso(ekle(7))} /></label>
-          <label htmlFor="j-amb">Ambargo (isteğe bağlı)<input id="j-amb" name="ambargo" type="date" defaultValue={ej?.embargo ?? ""} /></label>
-          <button className="btn">{ej ? "Değişiklikleri kaydet" : <><Ikon ad="plus" />Bekleyenlere ekle</>}</button>
-          {ej && <button type="button" className="btn ghost" onClick={() => bitti()}>Vazgeç</button>}
-        </form>
-      </div>
+      <h3>İşler</h3>
+      <div className="panel"><div className="row">
+        <div style={{ flex: "1 1 180px" }}>İş açma ve düzenleme artık Ekip → İşler'de ("Yeni iş" düğmesi).</div>
+        <button className="btn ghost" onClick={() => bitti(true)}>İşler'e git</button>
+      </div></div>
 
       <h3>Etkinlik / lansman ekle</h3>
       <div className="panel">

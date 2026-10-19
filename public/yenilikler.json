@@ -1,5 +1,23 @@
 [
   {
+    "id": "2026-10-19-isler",
+    "tarih": "19 Ekim 2026",
+    "baslik": "İşler yenilendi",
+    "bolumler": [
+      {
+        "ad": "Ekip → İşler",
+        "maddeler": [
+          "Yeni iş açma artık İşler sayfasında (\"Yeni iş\"). Zorunlu olan sadece marka, başlık ve son gün.",
+          "Her işin önceliği (Acil, Yüksek, Normal, Düşük), yedek kişisi ve brief'i olabilir. İş açarken sorumlu seçilirse doğrudan ona atanır.",
+          "İşler aşama aşama ilerler: Alındı → Çekim → Kurgu → Onayda → Yayında. Kartta çubuk olarak görünür.",
+          "İşi bitiren \"Onaya gönder\" der ve teslim linkini ekler. Yönetici \"Onayla, bitir\" ya da notla \"Düzeltme iste\" der; not kartta görünür ve bildirim gider.",
+          "Geciken işler kırmızı, üstte kaç işin geciktiği ve kaçının onay beklediği yazar. Sıralama: geciken, öncelik, son gün.",
+          "Sekmeler: Bekleyen, Devam eden, Benim, Biten."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-19-icerik",
     "tarih": "19 Ekim 2026",
     "baslik": "Yeni İçerik editörü (deneme)",
