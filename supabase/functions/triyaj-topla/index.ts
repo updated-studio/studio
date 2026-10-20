@@ -325,7 +325,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   for (let i = 0; i < tumLinkler.length; i += 1000) {
     const parca = tumLinkler.slice(i, i + 1000);
     const { data, error } = await sb.rpc("tr_bilinen_linkler", { linkler: parca });
-    if (!error) { ((data ?? []) as string[]).forEach((l) => bilinen.add(l)); continue; }
+    if (!error) { ((data ?? []) as unknown[]).forEach((l) => bilinen.add(typeof l === "string" ? l : String(Object.values(l as object)[0]))); continue; }
     console.error("tr_bilinen_linkler", error.message); // RPC yoksa eski yola düş (adres satırında, 200'lük parça)
     for (let j = 0; j < parca.length; j += 200) {
       const p = parca.slice(j, j + 200);
