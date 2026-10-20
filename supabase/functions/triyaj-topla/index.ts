@@ -321,14 +321,17 @@ async function topla(sb: ReturnType<typeof createClient>) {
   // --- Daha önce görülenleri ayıkla (tr_items + aynı olaya bağlanmış bağlantılar) ---
   const tumLinkler = [...new Set(okunan.flat().filter(Boolean).map((h) => (h as Ham).link))];
   const bilinen = new Set<string>();
-  for (let i = 0; i < tumLinkler.length; i += 200) {
-    const parca = tumLinkler.slice(i, i + 200);
-    const [a, b] = await Promise.all([
-      sb.from("tr_items").select("link").in("link", parca),
-      sb.from("tr_seen").select("link").in("link", parca),
-    ]);
-    (a.data ?? []).forEach((r: { link: string }) => bilinen.add(r.link));
-    (b.data ?? []).forEach((r: { link: string }) => bilinen.add(r.link));
+  // Tek RPC (POST gövdesi): uzun bağlantı listesi adres satırına yazılmaz, kayıt (log) şişmez (migration 0022).
+  for (let i = 0; i < tumLinkler.length; i += 1000) {
+    const parca = tumLinkler.slice(i, i + 1000);
+    const { data, error } = await sb.rpc("tr_bilinen_linkler", { linkler: parca });
+    if (!error) { ((data ?? []) as string[]).forEach((l) => bilinen.add(l)); continue; }
+    console.error("tr_bilinen_linkler", error.message); // RPC yoksa eski yola düş (adres satırında, 200'lük parça)
+    for (let j = 0; j < parca.length; j += 200) {
+      const p = parca.slice(j, j + 200);
+      const [a, b] = await Promise.all([sb.from("tr_items").select("link").in("link", p), sb.from("tr_seen").select("link").in("link", p)]);
+      [...(a.data ?? []), ...(b.data ?? [])].forEach((r: { link: string }) => bilinen.add(r.link));
+    }
   }
 
   const satir = (h: Ham, ek: Record<string, unknown>) => ({
