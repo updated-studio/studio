@@ -270,7 +270,7 @@ Bu bölüm, sohbetleri okumadan sistemi devralacak kişi içindir. Gizli bilgini
 
 `GEMINI_API_KEY` (Google AI Studio, ücretsiz kota), `GROQ_API_KEY` (Gemini kotası dolunca yedek, ücretsiz), `GMAIL_APP_PASSWORD` + `MAIL_FROM` (bildirim e-postaları, Enes'in Gmail'i), isteğe bağlı `UNSPLASH_ACCESS_KEY` / `PIXABAY_API_KEY` / `PEXELS_API_KEY` (taslakta stok görsel önerisi; şu an yok), `FLUX_TOKEN` (Fatih'in Mac'indeki Flux işçisi; aynı değer Mac'te `~/updated-flux/ayar.json`). Tarayıcıdaki "publishable" anahtar gizli değildir, kodda durur. Kural: şifre/anahtar asla koda ya da sohbete yazılmaz.
 
-E-posta için (19 Ekim'den beri) `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` de okunur; yoksa Gmail ayarı (`smtp.gmail.com`, `GMAIL_APP_PASSWORD`) kullanılır.
+E-posta için (19 Ekim'den beri) `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` de okunur; yoksa Gmail ayarı (`smtp.gmail.com`, `GMAIL_APP_PASSWORD`) kullanılır. Kurumsal adres `studio@updated.com.tr` (Natro Xmail): `SMTP_HOST` = `mail.kurumsaleposta.com`, `SMTP_PORT` = `465` (SSL/TLS), kullanıcı adı tam e-posta adresi (Natro yardım sayfasından, 20 Ekim).
 
 **Yapay zekâ anahtarını değiştirme (ör. Fatih'in kendi hesabına geçiş):**
 1. Yeni anahtarı al: Gemini → https://aistudio.google.com/apikey (Create API key), Groq → https://console.groq.com/keys.
@@ -279,7 +279,7 @@ E-posta için (19 Ekim'den beri) `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PA
 4. Kontrol: Haber Masası'nda üstte kota/yapay zekâ uyarısı çıkmıyorsa ve Ayarlar → "Son toplama" yeni bir saat gösteriyorsa çalışıyor. Hata varsa Supabase → Edge Functions → `triyaj-topla` → Logs.
 Kota anahtarın sahibine göre işler: yeni hesapta ücretsiz kota sıfırdan başlar.
 
-**Yedek:** Supabase ücretsiz planında otomatik yedek yoktur (Pro planda günlük). Günlük yedek özel depo `updated-studio/yedek`'te GitHub Actions ile alınır (şablon: `scripts/yedek/veritabani-yedegi.yml`; gizli bilgi o deponun Secrets'ında `SUPABASE_DB_URL`). Yedek sadece veritabanıdır; depolama dosyaları (profil fotoğrafları, İçerik görselleri) dahil değildir.
+**Yedek:** Supabase ücretsiz planında otomatik yedek yoktur (Pro planda günlük). Günlük yedek özel depo `updated-studio/yedek`'te GitHub Actions ile alınır (şablon: `scripts/yedek/veritabani-yedegi.yml`; gizli bilgiler o deponun Secrets'ında: `SUPABASE_DB_URL` (Connect → Session pooler adresi, kopyalandığı gibi) + `SUPABASE_DB_PASSWORD` (veritabanı şifresi; şifre değişince sadece bu güncellenir)). Yedek sadece veritabanıdır; depolama dosyaları (profil fotoğrafları, İçerik görselleri) dahil değildir.
 
 ### 13.3 Sunucu fonksiyonları (supabase/functions)
 
@@ -324,7 +324,7 @@ Yeni dosya `supabase/migrations/00NN_ad.sql`; Supabase → SQL Editor'da çalı�
 | WordPress'e gönderilmiyor | Taslaktaki kırmızı WordPress hatası; Ayarlar → "Bağlantıyı dene"; WordPress → Araçlar → Site Sağlığı'nda "Yetkilendirme üst bilgisi eksik" uyarısı | 401: uygulama şifresi yanlış ya da sunucu kimlik başlığını düşürüyor (16 Ekim'de durum buydu; `.htaccess` satırı için karar günlüğüne bak). 403: Stüdyo kullanıcısının rolü yetmiyor (Editör olmalı). 404: REST API kapalı |
 | Giriş e-postası / bildirim gelmiyor | Supabase Secrets'ta `SMTP_PASSWORD` (ya da eski `GMAIL_APP_PASSWORD`); `notify-email` → Logs | Posta kutusunun şifresi değiştiyse Secrets'ta güncellenir |
 | Veritabanı bozuldu / veri silindi | `updated-studio/yedek` deposunda son yedeğin tarihi (`yedek/SON_YEDEK.txt`) | Supabase SQL Editor'da sırayla `roller.sql`, `sema.sql`, `veri.sql` (yeni/boş projeye). Mevcut projeye yazmadan önce mutlaka Fatih karar verir |
-| Yedek alınmıyor | yedek deposu → Actions → son çalışma kırmızı mı | Genelde `SUPABASE_DB_URL` (veritabanı şifresi değiştiyse) güncellenir |
+| Yedek alınmıyor | yedek deposu → Actions → son çalışma kırmızı mı | Genelde veritabanı şifresi değişmiştir: yedek deposunda `SUPABASE_DB_PASSWORD` güncellenir |
 | Supabase projesi "paused" | Supabase paneli | "Restore" (ücretsiz plan uzun kullanılmazsa duraklatır) |
 | Yapay zekâ anahtarını başka hesaba almak | 13.2 "Yapay zekâ anahtarını değiştirme" | Secrets'ta değer değişir, kod değişmez |
 

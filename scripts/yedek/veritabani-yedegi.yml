@@ -1,8 +1,10 @@
 # Stüdyo veritabanının günlük yedeği. Bu dosya ÖZEL depoya (updated-studio/yedek) .github/workflows/ altına konur.
 # Bu (herkese açık) depoda sadece şablon olarak durur; burada çalışmaz.
 # GitHub'ın kendi sunucularında, her gece kendiliğinden çalışır; kimsenin bilgisayarı ya da Claude gerekmez.
-# Gerekli tek gizli bilgi: yedek deposu → Settings → Secrets and variables → Actions → SUPABASE_DB_URL
-#   (Supabase → Connect → "Session pooler" bağlantı adresi, şifresi içinde; IPv4 olduğu için pooler kullanılır).
+# Gizli bilgiler (yedek deposu → Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL: Supabase → Connect → "Session pooler" adresi, KOPYALANDIĞI GİBİ ([YOUR-PASSWORD] içinde kalabilir).
+#   SUPABASE_DB_PASSWORD: veritabanı şifresi. Adresteki [YOUR-PASSWORD] yerine bu konur (adrese şifre elle yazıldıysa gerekmez).
+#   IPv4 olduğu için "Session pooler" adresi kullanılır.
 # Geri yükleme: ARCHITECTURE.md 13.6 "Veritabanı bozuldu / silindi".
 name: Veritabanı yedeği
 on:
@@ -25,9 +27,16 @@ jobs:
           version: latest
       - name: Yedek al
         env:
-          DB: ${{ secrets.SUPABASE_DB_URL }}
+          DB_HAM: ${{ secrets.SUPABASE_DB_URL }}
+          DB_SIFRE: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
+          # adresteki [YOUR-PASSWORD] yerine şifre (adrese uygun biçimde kodlanarak) konur
+          DB=$(python3 -c 'import os,urllib.parse as u; a=os.environ.get("DB_HAM","").strip(); p=os.environ.get("DB_SIFRE",""); print(a.replace("[YOUR-PASSWORD]", u.quote(p, safe="")) if p else a)')
+          # birleştirilmiş adres ve kodlanmış şifre kayıtlarda (log) görünmesin
+          [ -n "$DB" ] && echo "::add-mask::$DB"
+          [ -n "$DB_SIFRE" ] && echo "::add-mask::$(python3 -c 'import os,urllib.parse as u; print(u.quote(os.environ["DB_SIFRE"], safe=""))')"
+          if [ -n "$DB" ] && [[ "$DB" == *"[YOUR-PASSWORD]"* ]]; then echo "Adreste [YOUR-PASSWORD] duruyor ama SUPABASE_DB_PASSWORD girilmemiş"; exit 1; fi
           if [ -z "$DB" ]; then
             # Kurulum anında gizli bilgi henüz girilmemiş olabilir: o zaman sessizce bekle. Gece çalışmasında yoksa hata ver (fark edilsin).
             if [ "${{ github.event_name }}" = "schedule" ]; then echo "SUPABASE_DB_URL gizli bilgisi yok"; exit 1; fi
