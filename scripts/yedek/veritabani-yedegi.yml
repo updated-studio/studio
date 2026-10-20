@@ -29,18 +29,39 @@ jobs:
         env:
           DB_HAM: ${{ secrets.SUPABASE_DB_URL }}
           DB_SIFRE: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJE: fulmooonidwrqyybbkvu
+          BOLGE: eu-central-1
         run: |
           set -euo pipefail
-          # adresteki [YOUR-PASSWORD] yerine şifre (adrese uygun biçimde kodlanarak) konur
-          DB=$(python3 -c 'import os,urllib.parse as u; a=os.environ.get("DB_HAM","").strip(); p=os.environ.get("DB_SIFRE",""); print(a.replace("[YOUR-PASSWORD]", u.quote(p, safe="")) if p else a)')
-          # birleştirilmiş adres ve kodlanmış şifre kayıtlarda (log) görünmesin
-          [ -n "$DB" ] && echo "::add-mask::$DB"
+          # Bağlantı adresi: SUPABASE_DB_URL girildiyse o ([YOUR-PASSWORD] yerine şifre konur), yoksa ya da çalışmazsa
+          # proje kimliği ve bölgeden Supabase'in "Session pooler" adresi kurulur (iki olası sunucu denenir). Gereken tek gizli bilgi şifre.
+          sudo apt-get install -y -qq postgresql-client >/dev/null 2>&1 || true
+          ADAYLAR=$(python3 - <<'PY'
+          import os, urllib.parse as u
+          ref, bolge = os.environ["PROJE"], os.environ["BOLGE"]
+          ham, sifre = os.environ.get("DB_HAM", "").strip(), os.environ.get("DB_SIFRE", "")
+          q = u.quote(sifre, safe="")
+          out = []
+          if ham.startswith("postgres"): out.append(ham.replace("[YOUR-PASSWORD]", q) if sifre else ham)
+          if sifre:
+              for n in ("aws-0", "aws-1"):
+                  out.append(f"postgresql://postgres.{ref}:{q}@{n}-{bolge}.pooler.supabase.com:5432/postgres")
+          print("\n".join(out))
+          PY
+          )
+          DB=""
+          while IFS= read -r aday; do
+            [ -z "$aday" ] && continue
+            echo "::add-mask::$aday"
+            if PGCONNECT_TIMEOUT=15 psql "$aday" -tAc "select 1" >/dev/null 2>&1; then DB="$aday"; break; fi
+          done <<< "$ADAYLAR"
           [ -n "$DB_SIFRE" ] && echo "::add-mask::$(python3 -c 'import os,urllib.parse as u; print(u.quote(os.environ["DB_SIFRE"], safe=""))')"
-          if [ -n "$DB" ] && [[ "$DB" == *"[YOUR-PASSWORD]"* ]]; then echo "Adreste [YOUR-PASSWORD] duruyor ama SUPABASE_DB_PASSWORD girilmemiş"; exit 1; fi
           if [ -z "$DB" ]; then
-            # Kurulum anında gizli bilgi henüz girilmemiş olabilir: o zaman sessizce bekle. Gece çalışmasında yoksa hata ver (fark edilsin).
-            if [ "${{ github.event_name }}" = "schedule" ]; then echo "SUPABASE_DB_URL gizli bilgisi yok"; exit 1; fi
-            echo "SUPABASE_DB_URL henüz girilmemiş; yedek atlandı." >> "$GITHUB_STEP_SUMMARY"; echo "ATLA=1" >> "$GITHUB_ENV"; exit 0
+            if [ -z "$DB_SIFRE" ] && [ -z "$DB_HAM" ] && [ "${{ github.event_name }}" != "schedule" ]; then
+              # kurulum anında gizli bilgi henüz girilmemiş: sessizce bekle
+              echo "Veritabanı şifresi (SUPABASE_DB_PASSWORD) henüz girilmemiş; yedek atlandı." >> "$GITHUB_STEP_SUMMARY"; echo "ATLA=1" >> "$GITHUB_ENV"; exit 0
+            fi
+            echo "Veritabanına bağlanılamadı. SUPABASE_DB_PASSWORD doğru mu? (Supabase'te şifre değiştiyse burada da güncellenmeli)"; exit 1
           fi
           mkdir -p yedek
           supabase db dump --db-url "$DB" -f yedek/roller.sql --role-only
