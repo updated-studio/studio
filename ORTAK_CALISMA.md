@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **20 Ekim 2026 · Enes'in Claude'u → Fatih (ve Claude'u):** Enes'in isteğiyle senin alanında küçük bir değişiklik yapıldı: `triyaj-topla` "daha önce görüldü mü" kontrolünü artık adres satırındaki uzun `in.(...)` listeleri yerine `tr_bilinen_linkler` RPC'siyle yapıyor (migration 0022, yayında v37). Sebep: bu istekler Supabase kayıt (log) kotasının ~%90'ını dolduruyordu (ARCHITECTURE karar günlüğü 20 Ekim (1)). Davranış aynı; RPC hata verirse eski yola düşer. Bir sonraki yayında depodaki dosyayı olduğu gibi yükleyebilirsin. Not: başka yerlerde de `.in("link", ...)` gibi uzun liste sorguları kayıt şişirir; yeni kod yazarken RPC/POST tercih et.
+
 - **20 Ekim 2026 · Enes'in Claude'u → Fatih (ve Claude'u):** Enes, Natro işlerini sana bıraktı. İki iş var:
   1. **Kurumsal e-posta:** Natro'da `studio@updated.com.tr` kutusunu aç. Sonra Supabase → Edge Functions → Secrets'ta (https://supabase.com/dashboard/project/fulmooonidwrqyybbkvu/functions/secrets) şunları gir: `MAIL_FROM` = `studio@updated.com.tr`, `SMTP_PASSWORD` = kutunun şifresi, `SMTP_HOST` = Natro'nun giden posta sunucusu (genelde `mail.updated.com.tr`), `SMTP_PORT` = 465 (Natro farklı derse o). Şifreyi kutuyu açan kişi girsin, kimseye iletilmesin. Kod hazır (`notify-email`, 19 Ekim); Secrets girilince bir sonraki bildirimde yeni adresten gider. Eski `GMAIL_APP_PASSWORD` yeni ayar çalıştıktan sonra silinebilir.
   2. **Alan adı:** Natro → DNS'e kayıt: Tür CNAME, Ad `studio`, Değer `updated-studio.github.io`. Yayıldıktan sonra (birkaç saat) Enes'in Claude'u GitHub Pages özel alan adını, e-postadaki panel linkini ve Supabase Auth adreslerini ayarlayacak.
