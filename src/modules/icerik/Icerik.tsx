@@ -1,7 +1,7 @@
-// İçerik modülü. Enes (21 Ekim): ana editör eski post aracının kendisi, bütün özellikleriyle (public/araclar/post/;
-// her parça ayrı düzenlenir, 29 şablon, kayıtlı düzenler, otomasyondan gelen post). Kayıtlı düzenleri Stüdyo'da ekiple ortak
-// (icerik_duzenler, sablon "klasik:..."; araç window.parent.__studio.sb ile bağlanır). Story/Reels için yeni editör ikinci sekmede.
-import { useCallback, useEffect, useRef, useState } from "react";
+// İçerik modülü. Enes (21 Ekim): eski post aracının bütün özellikleri Stüdyo'nun kendi editörüne taşındı (klasik/:
+// motor eski araçtan birebir, arayüz Stüdyo'da). Story/Reels için yeni editör ikinci sekmede; eski araç (iframe) yenisi
+// ekipte onaylanana kadar son sekmede yedek olarak duruyor (kural 9).
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
@@ -12,9 +12,11 @@ import { kaydet as bulutaKaydet } from "./kayit";
 import { yeniId, type Proje } from "./motor";
 import { etkin, slaytCiz } from "./sablonlar";
 import "./icerik.css";
+// Klasik şablonlar ~700 KB (gömülü logolar ve örnek görseller); sadece açılınca yüklenir
+const KlasikEditor = lazy(() => import("./klasik/KlasikEditor"));
 
-type Bolum = "post" | "editor" | "kayitlar";
-const BOLUMLER: [Bolum, string][] = [["post", "Post editörü"], ["editor", "Story / Reels (yeni)"], ["kayitlar", "Yeni editör kayıtları"]];
+type Bolum = "post" | "editor" | "kayitlar" | "eski";
+const BOLUMLER: [Bolum, string][] = [["post", "Post editörü"], ["editor", "Story / Reels"], ["kayitlar", "Story / Reels kayıtları"], ["eski", "Eski araç (yedek)"]];
 // Çerçevedeki post aracı Stüdyo'nun oturumunu buradan kullanır (aynı adres, aynı giriş)
 (window as unknown as { __studio?: unknown }).__studio = { sb };
 const TASLAK = "icerik-taslak-v1";
@@ -113,8 +115,12 @@ export default function Icerik() {
           kaydet={kaydet} kaydediliyor={kaydediliyor} kirli={kirli} yeni={yeni} />
       )}
       {bolum === "kayitlar" && <Kayitlar ac={ac} acikId={proje.id} />}
-      {bolum === "post" && (
-        <iframe src="araclar/post/index.html" title="Post editörü" className="arac-cerceve" allow="clipboard-write; web-share" />
+      {bolum === "post" && <Suspense fallback={<div className="muted">Post editörü yükleniyor…</div>}><KlasikEditor /></Suspense>}
+      {bolum === "eski" && (
+        <>
+          <div className="muted">Eski post aracı, yeni Post editörü ekipte onaylanana kadar yedek olarak burada. Kayıtlı düzenler ikisinde de ortak.</div>
+          <iframe src="araclar/post/index.html" title="Eski post aracı" className="arac-cerceve" allow="clipboard-write; web-share" />
+        </>
       )}
     </>
   );

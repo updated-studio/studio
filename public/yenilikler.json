@@ -1,22 +1,17 @@
 [
   {
-    "id": "2026-10-21-a",
+    "id": "2026-10-21-b",
     "tarih": "21 Ekim 2026",
-    "baslik": "Post editörü eski hâline döndü, kayıtlı düzenler ekipte ortak",
+    "baslik": "Post editörü Stüdyo'nun kendi editörü oldu, eski aracın bütün özellikleriyle",
     "bolumler": [
       {
         "ad": "İçerik",
         "maddeler": [
-          "İçerik'i açınca artık eski post aracı açılıyor, bütün özellikleriyle: her parça ayrı taşınır, büyütülür, döndürülür; 29 şablon; logo seçimi; geri al; otomasyondan gelen postu açma.",
-          "\"Kayıtlı düzenler\" artık ekiple ortak: birinin kaydettiği düzeni herkes görür ve uygular. Bu tarayıcıda kalmış eski kayıtların ilk açılışta kendiliğinden ortak kayıtlara aktarılır.",
-          "Eski adresteki (eneshsahin.github.io) kayıtların için: orada \"Tüm kayıtları dışa aktar\", burada \"İçe aktar\".",
-          "Story ve Reels boyutları için yeni editör şimdilik ikinci sekmede."
-        ]
-      },
-      {
-        "ad": "Genel",
-        "maddeler": [
-          "E-postalardaki panel linki artık studio.updated.com.tr."
+          "\"Post editörü\" sekmesi artık Stüdyo'nun kendi ekranı; eski post aracının bütün özellikleri burada: 29 şablon (Cam, Vizör, Fiş, Dergi), her öğe ayrı taşınır, büyütülür, döndürülür; katman sırası, yazı boyutları, fotoğrafın çerçeve içinde kadrajı, logo çeşidi, geri al / ileri al / tümünü geri al, önceki şablonun içeriğini getir, sıfırlama, PNG indir.",
+          "Çizimler eski araçla piksel piksel aynı (29 şablonun hepsi karşılaştırıldı).",
+          "\"Kayıtlı düzenler\" ekipte ortak; eski adresteki kayıtların için \"Dosyaya aktarma\" bölümü var.",
+          "Otomasyondan gelen post (.updated.json ya da UPD1: kodu) aynı şekilde açılıyor.",
+          "Story ve Reels için ikinci sekme duruyor; eski araç son sekmede yedek olarak kaldı."
         ]
       }
     ]
