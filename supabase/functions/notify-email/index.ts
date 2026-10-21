@@ -9,7 +9,7 @@ import nodemailer from "npm:nodemailer@6.9.14";
 
 // Gönderen adres Supabase Secrets'taki MAIL_FROM'dan okunur (depo açık olduğu için kodda yazılmaz).
 const FROM = Deno.env.get("MAIL_FROM") ?? "";
-const PANEL = "https://updated-studio.github.io/studio/";
+const PANEL = "https://studio.updated.com.tr/"; // eski adres (updated-studio.github.io/studio) buraya yönlenir
 
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

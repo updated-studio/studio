@@ -17,7 +17,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Şu an (her oturumda güncellenir)
 
-- **Son güncelleme:** 21 Ekim 2026, Enes'in Claude'u.
+- **Son güncelleme:** 21 Ekim 2026 15:50, Enes'in Claude'u. İçerik'te ana editör yeniden eski post aracı (bütün özellikleriyle), kayıtlı düzenler ekipte ortak; Enes'in denemesi bekleniyor.
 - **Kim ne yapıyor:** Fatih Haber Masası'nda (otomatik taslak, WordPress, görsel, kümeleme). Enes İçerik modülüne başlıyor (Instagram post aracı). Ayrıntı: ORTAK_CALISMA.md.
 - **Enes'in sıradaki işi:** İçerik editörü ve İşler yenilemesi yazıldı. Veritabanı güncel (0019, 0020 çalıştı). Bekleyen: Enes'in denemesi, Enes'in denemesi, yeni marka kiti gelince `stiller.ts`. Sonra: Ekip > İşler yeniden düzeni ("iş ekle" İşler'e, işlerin disiplini) ve Stüdyo genel tasarımı (iOS cam, marka renkleri).
 - **Sıra (19 Ekim 14:48 güncel):** ✔ cam tasarım, ✔ serbest düzen. Sırada: 1) yedek (Enes `updated-studio/yedek` özel deposunu açacak) 2) kurumsal e-posta (Natro'da kutu + Secrets) 3) Gemini/Groq anahtarları Fatih'e (adımlar ARCHITECTURE 13.2; Fatih'in işi) 4) ~~post otomasyonu deposunu taşımak~~ gerekmeyecek: siteden otomatik post onun yerine geçecek (Enes 14:52); o gelene kadar eskisi olduğu gibi çalışır 5) `studio.updated.com.tr` 6) Sistem Durumu sayfası 7) telefon bildirimi 8) takvim aboneliği 9) marka kiti → şablonlar + genel arayüz tek turda (bu turda: bölümleri açıldığında yükleme / code splitting; 20 Ekim'de tek parça 668 KB, gzip 197 KB) (Enes ve ekip bu hafta "yavaşlatan şeyler" notu tutacak) 10) **siteden otomatik post** (aşağıda) 11) Android.
@@ -58,6 +58,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 21 Ekim 2026
+- (15:45) Enes: `studio.updated.com.tr` çalışıyor; Gemini/Groq anahtarlarını boşver ("bir şey olursa o alır"). İçerik editörü için: "çok eksiklik var, bir öncekini tamamen incelememişsin, her şey birbirinden ayrı düzenlenebiliyordu; gerekirse kopyala, birebir tüm özellikler olsun, sonra şablonları arttıracağız". Yapılan: eski post aracı ana editör yapıldı (sekme 1), kayıtlı düzenler buluta bağlandı (taklit istemciyle denendi: yükleme, ekleme, silme; tek başına açılınca yerel çalışıyor). Eski aracın tam özellik listesi ARCHITECTURE bölüm 19'a yazıldı. Ders: bir aracı yeniden yazarken önce eskisinin özellik listesini çıkar ve kullanıcıya göster. `notify-email` v18 (panel linki yeni adres). Bekleyen: Supabase Auth Site URL / izinli adreslere `https://studio.updated.com.tr` eklenmesi (bağlantıda bu ayar yok; panelden). Sıradaki: Enes'in denemesi, sonra yeni şablonlar ve Story/Reels'in eski motora eklenmesi.
 - Enes sordu: diğer Claude not yazdı mı? Hayır; Fatih 18 Ekim'den beri depoda çalışmamış. Panoya "okuduğunda 'okundu' yaz" isteği eklendi. Yedek ve DNS kontrol edildi (yukarıda). Sıradaki işler Enes'e listelendi.
 
 ### 20 Ekim 2026

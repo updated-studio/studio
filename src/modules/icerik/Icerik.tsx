@@ -1,8 +1,10 @@
-// İçerik modülü: Instagram post / story / reels kapağı editörü (Stüdyo'nun kendi kodu).
-// Eski post aracı (public/araclar/post/) yenisi ekipte oturana kadar "Eski araç" sekmesinde açık kalır (kural 9).
+// İçerik modülü. Enes (21 Ekim): ana editör eski post aracının kendisi, bütün özellikleriyle (public/araclar/post/;
+// her parça ayrı düzenlenir, 29 şablon, kayıtlı düzenler, otomasyondan gelen post). Kayıtlı düzenleri Stüdyo'da ekiple ortak
+// (icerik_duzenler, sablon "klasik:..."; araç window.parent.__studio.sb ile bağlanır). Story/Reels için yeni editör ikinci sekmede.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
+import { sb } from "../../shared/supabase";
 import { useToast, hataMetni } from "../../shared/toast";
 import Editor from "./Editor";
 import Kayitlar from "./Kayitlar";
@@ -11,8 +13,10 @@ import { yeniId, type Proje } from "./motor";
 import { etkin, slaytCiz } from "./sablonlar";
 import "./icerik.css";
 
-type Bolum = "editor" | "kayitlar" | "eski";
-const BOLUMLER: [Bolum, string][] = [["editor", "Editör"], ["kayitlar", "Kayıtlar"], ["eski", "Eski araç"]];
+type Bolum = "post" | "editor" | "kayitlar";
+const BOLUMLER: [Bolum, string][] = [["post", "Post editörü"], ["editor", "Story / Reels (yeni)"], ["kayitlar", "Yeni editör kayıtları"]];
+// Çerçevedeki post aracı Stüdyo'nun oturumunu buradan kullanır (aynı adres, aynı giriş)
+(window as unknown as { __studio?: unknown }).__studio = { sb };
 const TASLAK = "icerik-taslak-v1";
 
 const bosProje = (): Proje => ({ ad: "", format: "post", stil: "cam", slaytlar: [{ id: yeniId(), sablon: "haber", icerik: {} }] });
@@ -33,7 +37,7 @@ const imza = (p: Proje) => JSON.stringify({ a: p.ad, f: p.format, s: p.stil, l: 
 export default function Icerik() {
   const [sp, setSp] = useSearchParams();
   const ilk = sp.get("b") as Bolum | null;
-  const [bolum, setBolum] = useState<Bolum>(ilk && BOLUMLER.some(([k]) => k === ilk) ? ilk : "editor");
+  const [bolum, setBolum] = useState<Bolum>(ilk && BOLUMLER.some(([k]) => k === ilk) ? ilk : "post");
   useEffect(() => { if (ilk) setSp({}, { replace: true }); }, [ilk, setSp]);
   const toast = useToast();
   const { profile } = useAuth();
@@ -109,11 +113,8 @@ export default function Icerik() {
           kaydet={kaydet} kaydediliyor={kaydediliyor} kirli={kirli} yeni={yeni} />
       )}
       {bolum === "kayitlar" && <Kayitlar ac={ac} acikId={proje.id} />}
-      {bolum === "eski" && (
-        <>
-          <div className="muted">Eski post aracı, yeni editör ekipte oturana kadar burada açık. Eski kayıtların bu tarayıcıda duruyor.</div>
-          <iframe src="araclar/post/index.html" title="Eski post aracı" className="arac-cerceve" allow="clipboard-write; web-share" />
-        </>
+      {bolum === "post" && (
+        <iframe src="araclar/post/index.html" title="Post editörü" className="arac-cerceve" allow="clipboard-write; web-share" />
       )}
     </>
   );

@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-21-a",
+    "tarih": "21 Ekim 2026",
+    "baslik": "Post editörü eski hâline döndü, kayıtlı düzenler ekipte ortak",
+    "bolumler": [
+      {
+        "ad": "İçerik",
+        "maddeler": [
+          "İçerik'i açınca artık eski post aracı açılıyor, bütün özellikleriyle: her parça ayrı taşınır, büyütülür, döndürülür; 29 şablon; logo seçimi; geri al; otomasyondan gelen postu açma.",
+          "\"Kayıtlı düzenler\" artık ekiple ortak: birinin kaydettiği düzeni herkes görür ve uygular. Bu tarayıcıda kalmış eski kayıtların ilk açılışta kendiliğinden ortak kayıtlara aktarılır.",
+          "Eski adresteki (eneshsahin.github.io) kayıtların için: orada \"Tüm kayıtları dışa aktar\", burada \"İçe aktar\".",
+          "Story ve Reels boyutları için yeni editör şimdilik ikinci sekmede."
+        ]
+      },
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "E-postalardaki panel linki artık studio.updated.com.tr."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-19-oge",
     "tarih": "19 Ekim 2026",
     "baslik": "İçerik: dokun, düzenle",

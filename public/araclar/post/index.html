@@ -890,8 +890,49 @@ document.getElementById('reset').addEventListener('click', function(){ touch(); 
 
 /* ================= kayıtlı düzenler (hafıza) ================= */
 var SAVEKEY = 'updated-kayitlar';
-function loadSaves(){ try { var o = JSON.parse(localStorage.getItem(SAVEKEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; } }
-function storeSaves(o){ try { localStorage.setItem(SAVEKEY, JSON.stringify(o)); return true; } catch(e){ return false; } }
+function yerelSaves(){ try { var o = JSON.parse(localStorage.getItem(SAVEKEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; } }
+/* Stüdyo içinde açıldıysa "Kayıtlı düzenler" ekipte ortak, bulutta (icerik_duzenler, sablon = "klasik:<şablon>").
+   Tek başına açılırsa eskisi gibi bu tarayıcıda. Biçim aynı: { şablon: [{ n, s, _id }] } */
+var BULUT = null, bulutSaves = null;
+try { if (window.parent && window.parent !== window && window.parent.__studio && window.parent.__studio.sb) BULUT = window.parent.__studio; } catch(e){}
+function kayitMsg(t){ var m = document.getElementById('save-msg'); if (m) m.textContent = t; }
+function bulutYukle(){
+  if (!BULUT) return;
+  BULUT.sb.from('icerik_duzenler').select('id,ad,sablon,serbest,olusturan,created_at').like('sablon', 'klasik:%').order('created_at', { ascending: false }).limit(1000).then(function(r){
+    if (r.error){ kayitMsg('Ortak kayıtlar alınamadı: ' + r.error.message); return; }
+    var o = {}; (r.data || []).forEach(function(x){ var t = x.sablon.slice(7); (o[t] = o[t] || []).push({ n: x.ad, s: x.serbest, _id: x.id }); });
+    bulutSaves = o;
+    // Bu tarayıcıda kalmış eski kayıtlar bir kez buluta aktarılır (aynı şablonda aynı adlı olan atlanır)
+    try { if (!localStorage.getItem('updated-kayitlar-buluta')) { var yerel = yerelSaves(), eklenecek = [];
+      Object.keys(yerel).forEach(function(t){ (yerel[t] || []).forEach(function(sv){ if (!(o[t] || []).some(function(x){ return x.n === sv.n; })) eklenecek.push({ ad: String(sv.n).slice(0, 40), sablon: 'klasik:' + t, serbest: sv.s }); }); });
+      localStorage.setItem('updated-kayitlar-buluta', '1');
+      if (eklenecek.length) BULUT.sb.from('icerik_duzenler').insert(eklenecek).then(function(r2){ if (!r2.error){ kayitMsg(eklenecek.length + ' eski kaydın ekiple ortak kayıtlara aktarıldı.'); bulutYukle(); } });
+    } } catch(e){}
+    if (typeof buildSaves === 'function') buildSaves();
+  });
+}
+setTimeout(function(){ try { bulutYukle(); } catch(e){ console.error(e); } }, 0);
+window.__kopruDurum = function(){ return { bulut: !!BULUT, sablon: cur, kayitlar: bulutSaves }; };
+function loadSaves(){ if (BULUT) return JSON.parse(JSON.stringify(bulutSaves || {})); return yerelSaves(); }
+function storeSaves(o){
+  if (!BULUT){ try { localStorage.setItem(SAVEKEY, JSON.stringify(o)); return true; } catch(e){ return false; } }
+  if (!bulutSaves){ kayitMsg('Ortak kayıtlar henüz yüklenmedi; birkaç saniye sonra tekrar dene.'); return false; }
+  var eski = {}, kalan = {}, ekle = [];
+  Object.keys(bulutSaves).forEach(function(t){ bulutSaves[t].forEach(function(x){ eski[x._id] = 1; }); });
+  Object.keys(o).forEach(function(t){ (o[t] || []).forEach(function(x){ if (x._id) kalan[x._id] = 1; else ekle.push({ ad: String(x.n).slice(0, 40), sablon: 'klasik:' + t, serbest: x.s }); }); });
+  var sil = Object.keys(eski).filter(function(id){ return !kalan[id]; });
+  bulutSaves = JSON.parse(JSON.stringify(o));
+  var isler = [];
+  if (ekle.length) isler.push(BULUT.sb.from('icerik_duzenler').insert(ekle));
+  if (sil.length) isler.push(BULUT.sb.from('icerik_duzenler').delete().in('id', sil).select('id'));
+  Promise.all(isler).then(function(r){
+    var h = r.find(function(x){ return x.error; });
+    if (h) kayitMsg('Ortak kayıt güncellenemedi: ' + h.error.message);
+    else if (sil.length && r[r.length - 1].data && r[r.length - 1].data.length < sil.length) kayitMsg('Bu kaydı sadece oluşturan kişi ya da yönetici silebilir.');
+    bulutYukle();
+  });
+  return true;
+}
 function applySaved(sv, withContent){ var t = cur, s = state[t]; touch();
   Object.keys(s._adj).forEach(function(k){ var v = sv._adj && sv._adj[k]; if (v) Object.keys(s._adj[k]).forEach(function(p){ if (isFinite(v[p])) s._adj[k][p] = +v[p]; }); });
   if (Array.isArray(sv._order)){ var known = defaults(t)._order, o = sv._order.filter(function(k){ return known.indexOf(k) >= 0; }); known.forEach(function(k){ if (o.indexOf(k) < 0) o.push(k); }); s._order = o; }
@@ -987,6 +1028,7 @@ Promise.all(Object.keys(A).map(function(k){ return loadImg(A[k]).then(function(i
   if (document.fonts && document.fonts.load){ Promise.all(fs.map(function(f){ return document.fonts.load(f, 'İğüşöç 0123'); })).then(draw, draw); document.fonts.ready.then(draw); }
 });
 })();
+
 </script>
 </body>
 </html>
