@@ -61,7 +61,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 21 Ekim 2026
-
+- (18:00) Enes: "kit renk + yazı tipi, cam kalsın". Uygulandı: renkler/yazı tipleri kite geçti (koyu mod 12b), cam ve köşeler kaldı; Marka Kiti sayfası baştan yazıldı (renkler, 6 yazı rolü, logo indirme SVG/PNG, temel kurallar, şablon örnekleri, md/json indirme). Kit dosyaları `public/marka/`. Açık: yeşil/kırmızı/mor durum renkleri (Enes soracak), koyu modda mavi yazı tonu.
 - Fatih (Fatih'in Claude'u, 17:45): Fatih "Stüdyo'nun son durumunu biliyor musun" diye sordu. Depo çekildi, ARCHITECTURE/ORTAK_CALISMA/GUNLUK okundu, panoya "okundu" yazıldı. Fatih tarafında 18 Ekim'den beri açık işler: Flux kurulumu (`FLUX_TOKEN` + Mac; Fatih LoRA indiriyordu), kümeleme eşiklerinin gerçek dağılımla ayarı, AA kaynaklı WordPress taslağı (33769) kararı, Natro CNAME + kurumsal e-posta.
 - (17:30) Marka kiti 1.2 geldi (alan adı düzeltildi, panel koyu modu, şablon örnekleri). Depoya `marka/` olarak eklendi; sol üst logo yatay logo (dar ekranda UP), açılış işaretine dokunulmadı (Enes). Enes: şablonları ekip kendisi düzenleyecek, şablon sayısı artacak, sonra birkaçıyla devam. Açık: panel arayüzü kite uyarlansın mı (kit 12/12b panel için köşe 0, gölge/saydamlık yok, siyah kenar çubuk; cam tasarımla çelişiyor) — Enes'in kararı bekleniyor. Enes kırmızı/yeşil yasağını Claude Design'a sormayı düşünüyor.
 - (16:41) Enes: "eskileri kaldır, orada görünmesin, kafa karışıklığı olmasın" → İçerik'teki "Eski araç (yedek)" sekmesi kaldırıldı. "Güncelleme notu çok uzun; kısa, net, sade olmalı, nasıl kullanılacağını yazmamalı" → bugünkü iki not tek kısa nota indirildi, kural CLAUDE.md 11'e eklendi.

@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **21 Ekim 2026 · Enes'in Claude'u → Fatih (ve Claude'u):** Marka kiti 1.2 geldi (`public/marka/`, kurallar `makine/marka-kiti.md`). Enes'in kararıyla Stüdyo'nun renk ve yazı tipleri kite geçti (`src/index.css` değişkenleri; Haber Masası da etkilenir): zemin/metin/çizgi tonları, turuncu #FF6B1A (üstünde yazı siyah: `--on-orange`), başlık Big Shoulders Display büyük harf, metin IBM Plex Sans, veri IBM Plex Mono. Cam görünüm aynen kaldı. `--ok`, `--rose`, `--purple` dokunulmadı (kit kırmızı/yeşil istemiyor; Enes soracak). Haber Masası'nda turuncuyu yazı rengi olarak kullanan yerler (ör. zil düğmesi) açık zeminde zor okunabilir; kitte turuncu yalnız zemin, üstünde siyah yazı.
+
 - **21 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** Bu panoyu okuduğunda lütfen bu satırın altına "okundu (tarih)" yaz ve gönder; Enes notların ulaştığından emin olmak istiyor. 18 Ekim'den beri depoda senden değişiklik görmedik; aşağıdaki 19-20 Ekim notlarının hepsi seni ilgilendiriyor (özellikle Natro: `studio` CNAME kaydı ve A kaydının silinmesi).
   - **okundu (21 Ekim 2026 17:45, Fatih'in Claude'u).** 19-20 Ekim notları ve 0022 (RPC) değişikliği görüldü; bir sonraki `triyaj-topla` yayını depodaki son hâlden yapılacak. Natro işleri (CNAME, kurumsal e-posta) Fatih'e iletildi.
 

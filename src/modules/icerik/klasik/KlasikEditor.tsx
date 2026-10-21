@@ -291,7 +291,7 @@ export default function KlasikEditor() {
               {prevT && prevT !== t ? `İçeriği getir: ${T[prevT].group}, ${T[prevT].name}` : "Önceki şablonun içeriğini getir"}
             </button>
             <button type="button" className="btn ghost sm" onClick={() => { klasik.sablonuSifirla(); setMesaj('Bu şablon ilk hâline döndü. "Geri al" ile vazgeçebilirsin.'); }}>Bu şablonu sıfırla</button>
-            <button type="button" className={"btn sm" + (sifirlaOnay ? "" : " ghost")} style={sifirlaOnay ? { background: "var(--orange)" } : undefined}
+            <button type="button" className={"btn sm" + (sifirlaOnay ? "" : " ghost")} style={sifirlaOnay ? { background: "var(--orange)", color: "var(--on-orange)" } : undefined}
               onClick={() => { if (!sifirlaOnay) { setSifirlaOnay(true); window.setTimeout(() => setSifirlaOnay(false), 12000); return; } setSifirlaOnay(false); klasik.hepsiniSifirla(); setMesaj("Tüm şablonlar ilk hâline döndü."); }}>
               {sifirlaOnay ? "Evet, hepsini sıfırla" : "Tüm şablonları sıfırla"}
             </button>

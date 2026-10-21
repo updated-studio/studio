@@ -1,0 +1,17 @@
+/* Marka Kiti sayfası. Örnek kutularında kitin gerçek renkleri kullanılır (gösterim amaçlı). */
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.mk-renkler { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.mk-renk { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.mk-ornek { height: 72px; border-radius: 10px; border: 1px solid var(--line); display: grid; place-items: center; font: 900 30px var(--display); }
+.mk-nokta { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); display: inline-block; }
+.mk-yazi { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.mk-yazi:last-child { border-bottom: 0; }
+.mk-logolar { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.mk-logo { display: flex; flex-direction: column; gap: 8px; }
+.mk-logo-zemin { height: 140px; border-radius: 10px; border: 1px solid var(--line); display: grid; place-items: center; padding: 20px; }
+.mk-logo-zemin img { max-width: 80%; max-height: 100px; }
+.mk-kurallar { margin: 0; padding: 14px 14px 14px 32px; display: flex; flex-direction: column; gap: 6px; }
+.mk-ornekler { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.mk-sablon { display: flex; flex-direction: column; gap: 6px; color: var(--ink); text-decoration: none; font-size: 13px; }
+.mk-sablon img { width: 100%; aspect-ratio: 4 / 5; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); }
+@media (max-width: 560px) { .mk-yazi { flex-direction: column; align-items: flex-start; } .mk-yazi .stack:last-child { text-align: left !important; } }

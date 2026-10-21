@@ -1,19 +1,22 @@
 /* Updated Stüdyo ortak tasarım. Modüller renk icat etmez, buradaki değişkenleri kullanır. */
 html { -webkit-tap-highlight-color: transparent; }
 :root {
-  --bg: #F3F6FC; --surface: #FFFFFF; --sunk: #E9EEF8; --ink: #0E1A33; --muted: #57657F; --line: #D9E0EE;
-  --blue: #2563EB; --blue-soft: #DCE7FF; --orange: #E85A0C; --orange-soft: #FFE6D6;
+  /* Renk ve yazı tipi: marka kiti 1.2 (marka/makine/tokens.json). Cam görünüm (cam.css) Enes'in kararıyla korunuyor (21 Ekim). */
+  --bg: #F2F2F2; --surface: #FFFFFF; --sunk: #F2F2F2; --ink: #171717; --muted: #55585C; --line: #E2E2E2;
+  --blue: #2563EB; --blue-soft: #DCE7FF; --orange: #FF6B1A; --orange-soft: #FFE6D6; --on-orange: #000000;
   --ok: #12804A; --ok-soft: #D6F3E3; --rose: #E11D48; --rose-soft: #FFE4E9; --purple: #7C3AED; --purple-soft: #EDE4FF;
   --busy: #7C879B; --busy-soft: #E4E8F0; --on-accent: #FFFFFF; --err: #C62828;
   --brand-blue: #2563EB; --brand-orange: #FF6B1A;
-  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --display: "Big Shoulders Display", Impact, sans-serif; /* Başlık rolü: 900, büyük harf, 20 px altında kullanılmaz */
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --quote: "Newsreader", Georgia, serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1B1D21; --surface: #26292F; --sunk: #31353C; --ink: #F1F3F6; --muted: #A8AFBA; --line: #3B4049;
-    --blue: #6A98F8; --blue-soft: #1B2C55; --orange: #FF8A47; --orange-soft: #44240F;
+    /* Koyu mod: kit 12b. Mavi koyu zeminde yazı olarak yetersiz kaldığı için yazıda açık ton kalıyor. */
+    --bg: #121212; --surface: #1C1C1C; --sunk: #262626; --ink: #F2F2F2; --muted: #B4B7BB; --line: #333333;
+    --blue: #6A98F8; --blue-soft: #1B2C55; --orange: #FF6B1A; --orange-soft: #44240F;
     --ok: #3DD68C; --ok-soft: #113524; --rose: #FB7185; --rose-soft: #4A1724; --purple: #B794F6; --purple-soft: #3A2A5C;
     --busy: #9AA1AD; --busy-soft: #353941; --on-accent: #14161A; --err: #FF8A80;
     color-scheme: dark;
@@ -29,13 +32,13 @@ button { cursor: pointer; }
 svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
 .wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 48px; display: flex; flex-direction: column; gap: 16px; }
-.brand { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -.02em; }
+.brand { font-family: var(--body); font-weight: 600; font-size: 24px; }
 .brand { display: flex; align-items: center; gap: 10px; }
 /* Sol üst logo: marka kiti 1.2 yatay logo (dar ekranda UP). Açılış ekranındaki işaret ayrı, index.html'de. */
 .brand .logo { display: block; width: 100px; height: 22px; background: var(--ink); -webkit-mask: url("./assets/logo-yatay.svg") center / contain no-repeat; mask: url("./assets/logo-yatay.svg") center / contain no-repeat; }
 @media (max-width: 560px) { .brand .logo { width: 20px; height: 27px; -webkit-mask-image: url("./assets/logo-up.svg"); mask-image: url("./assets/logo-up.svg"); } }
 .brand span:not(.logo) { color: var(--muted); font-weight: 600; font-size: 17px; }
-h2 { font-family: var(--display); font-size: 22px; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 900; font-size: 26px; line-height: 1.2; text-transform: uppercase; margin: 0; text-wrap: balance; }
 h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; font-weight: 600; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

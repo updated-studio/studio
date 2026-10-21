@@ -2,12 +2,14 @@
   {
     "id": "2026-10-21-c",
     "tarih": "21 Ekim 2026",
-    "baslik": "Yeni logo",
+    "baslik": "Yeni marka kiti",
     "bolumler": [
       {
         "ad": "Genel",
         "maddeler": [
-          "Sol üstte yeni UPDATED logosu."
+          "Sol üstte yeni UPDATED logosu.",
+          "Renkler ve yazı tipleri yeni marka kitine geçti.",
+          "Marka Kiti sayfası yenilendi: logolar indirilebilir, kurallar ve şablon örnekleri orada."
         ]
       }
     ]

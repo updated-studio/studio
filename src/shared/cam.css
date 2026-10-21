@@ -9,8 +9,8 @@
   --cam-acilir: color-mix(in srgb, var(--surface) 88%, transparent);
   --cam-kenar: color-mix(in srgb, var(--line) 55%, rgb(255 255 255 / .55));
   --cam-isik: inset 0 1px 0 rgb(255 255 255 / .7);
-  --cam-golge: 0 1px 2px rgb(14 26 51 / .04), 0 8px 24px rgb(14 26 51 / .06);
-  --cam-golge-ust: 0 12px 40px rgb(14 26 51 / .16);
+  --cam-golge: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
+  --cam-golge-ust: 0 12px 40px rgb(0 0 0 / .16);
   --cam-bulanik: blur(30px) saturate(1.8);
   --cam-zemin-mavi: rgb(37 99 235 / .16);
   --cam-zemin-turuncu: rgb(255 107 26 / .10);

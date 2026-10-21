@@ -2,7 +2,7 @@
 .chip { background: var(--sunk); border: 1px solid transparent; border-radius: 99px; padding: 6px 12px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
 .chip[aria-pressed=true] { background: var(--blue); color: var(--on-accent); }
 .pill { border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; display: inline-flex; gap: 5px; align-items: center; }
-.pill.wait { background: var(--orange-soft); color: var(--orange); }
+.pill.wait { background: var(--orange); color: var(--on-orange); }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
 .pill.off { background: var(--busy-soft); color: var(--busy); }
 .pill.blue { background: var(--blue-soft); color: var(--blue); }
@@ -14,11 +14,11 @@
 .kart .baslik { font-weight: 500; overflow-wrap: anywhere; }
 .kart .alt { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: auto; }
 .kart select { width: auto; }
-.bname { font-family: var(--display); font-weight: 800; font-size: 16px; line-height: 1.1; }
+.bname { font-family: var(--body); font-weight: 600; font-size: 16px; line-height: 1.1; }
 .caticon { width: 38px; height: 38px; border-radius: 10px; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; flex: none; }
-.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-family: var(--display); font-weight: 800; flex: none; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-family: var(--body); font-weight: 600; flex: none; }
 .due { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); }
-.due.soon { color: var(--orange); }
+.due.soon { color: var(--ink); font-weight: 600; text-decoration: underline 2px var(--orange); text-underline-offset: 3px; }
 .liste { display: flex; flex-direction: column; }
 .satir { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .satir:last-child { border-bottom: 0; }
@@ -36,7 +36,7 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .hafta { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .gun { background: var(--sunk); border: 2px solid transparent; border-radius: 12px; padding: 10px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .gun small { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-.gun strong { font-family: var(--display); font-size: 20px; }
+.gun strong { font-family: var(--display); font-weight: 900; font-size: 22px; line-height: 1.2; }
 .gun i { font-style: normal; font-size: 10px; font-weight: 600; }
 .gun.bos { background: var(--ok-soft); } .gun.bos i { color: var(--ok); }
 .gun.dolu { background: var(--busy-soft); } .gun.dolu i { color: var(--busy); }
@@ -47,7 +47,7 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
   color: var(--ink); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); box-shadow: inset 0 1px 0 rgb(255 255 255 / .08), 0 10px 30px rgb(0 0 0 / .25);
   padding: 11px 18px; border-radius: 16px; font-size: 14px; font-weight: 500; max-width: calc(100vw - 32px); width: max-content; text-align: center; }
 .zil { position: relative; }
-.zil em { position: absolute; top: -6px; right: -6px; background: var(--orange); color: var(--on-accent); font: 500 11px var(--mono); border-radius: 99px; padding: 1px 6px; font-style: normal; }
+.zil em { position: absolute; top: -6px; right: -6px; background: var(--orange); color: var(--on-orange); font: 600 11px var(--mono); border-radius: 99px; padding: 1px 6px; font-style: normal; }
 .bildirimler { position: absolute; right: 0; top: 48px; width: min(340px, calc(100vw - 32px)); z-index: 5; box-shadow: 0 12px 30px rgb(0 0 0 / .18); max-height: 70vh; overflow: auto; }
 .surum { background: var(--blue-soft); color: var(--blue); border-radius: 10px; padding: 8px 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; font-size: 13px; }
 
