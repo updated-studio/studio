@@ -31,6 +31,9 @@ const PNG_VAR = new Set(["yatay", "dikey", "up"]); // 2048 px PNG'si olan türle
 const ORNEKLER = [
   ["ig-haber-karti", "Instagram haber kartı"], ["ig-carousel-kapak", "Carousel kapak"], ["ig-carousel-ic-sayfa", "Carousel iç sayfa"],
   ["ig-story-haber", "Story haber"], ["ig-story-etkilesim", "Story etkileşim"], ["ig-reels-kapak", "Reels kapak"],
+  ["yt-thumbnail-haber", "YouTube thumbnail haber"], ["yt-thumbnail-inceleme", "Thumbnail inceleme"], ["yt-thumbnail-karsilastirma", "Thumbnail karşılaştırma"],
+  ["yt-isim-bandi", "Video isim bandı"], ["yt-bolum-karti", "Video bölüm kartı"], ["yt-bitis-ekrani", "Video bitiş ekranı"],
+  ["web-ust-menu", "Web üst menü"], ["web-haber-kartlari", "Web haber kartları"], ["web-haber-sayfasi", "Web haber sayfası"], ["web-puan-kutusu", "Web puan kutusu"],
   ["bulten-haftalik", "Haftalık bülten"], ["bulten-son-dakika", "Son dakika e-postası"],
   ["panel-yerlesim", "Panel yerleşim"], ["panel-durum-tablo", "Panel durum ve tablo"], ["panel-koyu-mod", "Panel koyu mod"],
 ];
