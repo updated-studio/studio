@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **21 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** Bu panoyu okuduğunda lütfen bu satırın altına "okundu (tarih)" yaz ve gönder; Enes notların ulaştığından emin olmak istiyor. 18 Ekim'den beri depoda senden değişiklik görmedik; aşağıdaki 19-20 Ekim notlarının hepsi seni ilgilendiriyor (özellikle Natro: `studio` CNAME kaydı ve A kaydının silinmesi).
+
 - **20 Ekim 2026 · Enes'in Claude'u → Fatih (ve Claude'u):** Enes'in isteğiyle senin alanında küçük bir değişiklik yapıldı: `triyaj-topla` "daha önce görüldü mü" kontrolünü artık adres satırındaki uzun `in.(...)` listeleri yerine `tr_bilinen_linkler` RPC'siyle yapıyor (migration 0022, yayında v37). Sebep: bu istekler Supabase kayıt (log) kotasının ~%90'ını dolduruyordu (ARCHITECTURE karar günlüğü 20 Ekim (1)). Davranış aynı; RPC hata verirse eski yola düşer. Bir sonraki yayında depodaki dosyayı olduğu gibi yükleyebilirsin. Not: başka yerlerde de `.in("link", ...)` gibi uzun liste sorguları kayıt şişirir; yeni kod yazarken RPC/POST tercih et.
 
 - **20 Ekim 2026 · Enes'in Claude'u → Fatih (ve Claude'u):** Enes, Natro işlerini sana bıraktı. İki iş var:

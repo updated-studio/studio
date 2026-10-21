@@ -17,11 +17,12 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Şu an (her oturumda güncellenir)
 
-- **Son güncelleme:** 19 Ekim 2026, Enes'in Claude'u.
+- **Son güncelleme:** 21 Ekim 2026, Enes'in Claude'u.
 - **Kim ne yapıyor:** Fatih Haber Masası'nda (otomatik taslak, WordPress, görsel, kümeleme). Enes İçerik modülüne başlıyor (Instagram post aracı). Ayrıntı: ORTAK_CALISMA.md.
 - **Enes'in sıradaki işi:** İçerik editörü ve İşler yenilemesi yazıldı. Veritabanı güncel (0019, 0020 çalıştı). Bekleyen: Enes'in denemesi, Enes'in denemesi, yeni marka kiti gelince `stiller.ts`. Sonra: Ekip > İşler yeniden düzeni ("iş ekle" İşler'e, işlerin disiplini) ve Stüdyo genel tasarımı (iOS cam, marka renkleri).
 - **Sıra (19 Ekim 14:48 güncel):** ✔ cam tasarım, ✔ serbest düzen. Sırada: 1) yedek (Enes `updated-studio/yedek` özel deposunu açacak) 2) kurumsal e-posta (Natro'da kutu + Secrets) 3) Gemini/Groq anahtarları Fatih'e (adımlar ARCHITECTURE 13.2; Fatih'in işi) 4) ~~post otomasyonu deposunu taşımak~~ gerekmeyecek: siteden otomatik post onun yerine geçecek (Enes 14:52); o gelene kadar eskisi olduğu gibi çalışır 5) `studio.updated.com.tr` 6) Sistem Durumu sayfası 7) telefon bildirimi 8) takvim aboneliği 9) marka kiti → şablonlar + genel arayüz tek turda (bu turda: bölümleri açıldığında yükleme / code splitting; 20 Ekim'de tek parça 668 KB, gzip 197 KB) (Enes ve ekip bu hafta "yavaşlatan şeyler" notu tutacak) 10) **siteden otomatik post** (aşağıda) 11) Android.
 - **Bekleyen (kullanıcıda):** Natro'da e-posta kutusu, yedek deposu, depo transferi, marka kiti dosyaları. Fatih her hesapta sahip (Enes 19 Ekim'de teyit etti; davetler kabul edilmiş).
+- **21 Ekim kontrol:** Fatih'in Claude'unun not panosunu okuduğuna dair iz yok (18 Ekim'den beri Fatih'ten değişiklik yok); panoya "okundu yaz" isteği eklendi. Yedek her gece çalışıyor (19-21 Ekim başarılı, yedek deposuna günlük kayıt düşüyor). `studio.updated.com.tr` DNS'te henüz çözülmüyor (Fatih'in CNAME işi bekliyor).
 - **Bilinen açıklar:** Kopya kart birleştirmesi geçmiş haberler için yarım. Sistem Durumu sayfası yapılmadı. Eski post aracı adresi kayıtlar taşınana kadar açık.
 - **Tarihler:** Enes 5 Kasım 2026'da askere gidiyor; video aracı hariç her şey ondan önce.
 
@@ -55,6 +56,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - Supabase bağlantısında `apply_migration`, içinde `drop ...` ya da `for delete` gibi yıkıcı görünen ifade varsa onay ister; kullanıcı ekranda değilse "cancelled" döner. Çözüm: `drop trigger` yerine `create or replace trigger`, silme kuralları ayrı küçük migration'da. 0019 ve 0020 böyle çalıştırıldı (19 Ekim).
 
 ## Günlük (en yeni üstte)
+
+### 21 Ekim 2026
+- Enes sordu: diğer Claude not yazdı mı? Hayır; Fatih 18 Ekim'den beri depoda çalışmamış. Panoya "okuduğunda 'okundu' yaz" isteği eklendi. Yedek ve DNS kontrol edildi (yukarıda). Sıradaki işler Enes'e listelendi.
 
 ### 20 Ekim 2026
 - (11:15) Supabase kullanım: Log Ingestion 2,25/1 GB aşıldı. Ölçüldü: kaynağı `triyaj-topla`nın uzun GET listeleri (edge_logs ~340 MB/gün). Enes "sen yap, Fatih'e gerek yok" dedi → RPC `tr_bilinen_linkler` (0022) + `triyaj-topla` v37 yayında; Fatih'e not bırakıldı. Pro gerekmez (kota aynı). Enes "aşımı temizleyelim / otomatik temizleyen bir şey" dedi → alınmış kayıt silinmez, sayaç dönem başında sıfırlanır; önlem kaynağı kesmek. Kurumsal e-posta testi geçti (00:35, 2 gönderim, hata yok). Alan adı: Natro'da A kaydı + yönlendirme döngü yaptı (ERR_TOO_MANY_REDIRECTS); Fatih'e "A kaydını sil, CNAME `studio` → `updated-studio.github.io`" iletildi, bekleniyor; sonra e-posta PANEL linki çevrilecek.
