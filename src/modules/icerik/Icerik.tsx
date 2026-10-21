@@ -1,6 +1,6 @@
 // İçerik modülü. Enes (21 Ekim): eski post aracının bütün özellikleri Stüdyo'nun kendi editörüne taşındı (klasik/:
-// motor eski araçtan birebir, arayüz Stüdyo'da). Story/Reels için yeni editör ikinci sekmede; eski araç (iframe) yenisi
-// ekipte onaylanana kadar son sekmede yedek olarak duruyor (kural 9).
+// motor eski araçtan birebir, arayüz Stüdyo'da). Story/Reels için yeni editör ikinci sekmede. Eski araç sekmesi Enes'in isteğiyle
+// kaldırıldı (21 Ekim); dosyası public/araclar/post/ altında duruyor, menüde görünmüyor.
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
