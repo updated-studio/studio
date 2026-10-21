@@ -123,6 +123,9 @@ function photoCard(img, x, y, w, h, r, a){
 }
 function cutout(img, bx, by, bw, bh, glow){ if (!img) return; ctx.save(); if (!measuring){ ctx.shadowColor = glow; ctx.shadowBlur = 70*scaleOf(); ctx.shadowOffsetY = 30*scaleOf(); } drawFit(img, bx, by, bw, bh, false); ctx.restore(); }
 var LOGOS = [['up-white', 'UP, beyaz'], ['up-black', 'UP, siyah'], ['up-blue', 'UP, mavi'], ['mark-solid-white', 'UPDATED, dolu beyaz'], ['mark-solid-black', 'UPDATED, dolu siyah'], ['mark-solid-blue', 'UPDATED, dolu mavi'], ['mark-outline-white', 'UPDATED, çizgili beyaz'], ['mark-outline-black', 'UPDATED, çizgili siyah'], ['social-black', 'Kare rozet, siyah zemin'], ['social-white', 'Kare rozet, beyaz zemin'], ['social-blue', 'Kare rozet, mavi zemin']];
+['up', 'yatay'].forEach(function(tur){ ['white', 'black', 'blue', 'orange'].forEach(function(r){ A['lg-kit-' + tur + '-' + r] = 'marka/logo/svg/updated-' + tur + '-' + r + '.svg'; }); });
+LOGOS.unshift(['kit-up-white', 'UP (yeni kit), beyaz'], ['kit-up-black', 'UP (yeni kit), siyah'], ['kit-up-blue', 'UP (yeni kit), mavi'], ['kit-up-orange', 'UP (yeni kit), turuncu'],
+  ['kit-yatay-white', 'UPDATED yatay (yeni kit), beyaz'], ['kit-yatay-black', 'UPDATED yatay (yeni kit), siyah'], ['kit-yatay-blue', 'UPDATED yatay (yeni kit), mavi'], ['kit-yatay-orange', 'UPDATED yatay (yeni kit), turuncu']);
 var LG = null, measuring = false;
 function logoW(x, y, w){ var img = LG || IMG.upw, h = w*288/212, nw = h*img.width/img.height; ctx.drawImage(img, x + (w - nw)/2, y, nw, h); }
 function brackets(l, t, w, h, col, s, th){
@@ -463,6 +466,28 @@ T.dergivs = { group: 'Dergi', name: 'Karşılaştırma', fixed: [{ k: 'imga', l:
     L('names', 'Ürün adları', [540, 690], function(){ textShadow(true); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; fit(s.na || '', 800, 34, 340, 18, F, -0.03); ctx.fillStyle = '#FFFFFF'; ctx.fillText(s.na || '', 259, 702); fit(s.nb || '', 800, 34, 340, 18, F, -0.03); ctx.fillText(s.nb || '', 821, 702); track(0); textShadow(false); if (s.slab){ font(800, 26); var w = ctx.measureText(s.slab).width + 36; slab(s.slab, 540 - w/2, 668); } }, ['na', 'slab', 'nb']),
     DMAST(false), DFOLIO(s) ]; } };
 
+/* ================= Şeffaf zemin (Stüdyo ekleme, 21 Ekim 2026, Enes) =================
+   Arka planı boş, sadece kategori etiketi ve logo. PNG saydam (alfa kanallı) iner; SVG'si KlasikEditor'da üretilir.
+   Etiket ve logo marka kiti 1.2'ye göre: Big Shoulders Display 900 büyük harf, köşe 0; renk kategoriye göre kitten. */
+var KF = "'Big Shoulders Display', Impact, sans-serif";
+var KIT_ETIKET = [[/son ?dakika/i, '#FF6B1A', '#000000'], [/inceleme|karşılaştırma|karsilastirma/i, '#2563EB', '#FFFFFF'], [/sızıntı|sizinti|iddia/i, '#000000', '#FFFFFF'], [/rehber|sponsorlu/i, '#F2F2F2', '#000000']];
+function kitEtiketRenk(text){ for (var i = 0; i < KIT_ETIKET.length; i++) if (KIT_ETIKET[i][0].test(text)) return [KIT_ETIKET[i][1], KIT_ETIKET[i][2]]; return ['#FF6B1A', '#000000']; }
+var SEFFAF = { logo: [64, 96, 90], etiket: { x: 64, y: 248, size: 44, px: 18, py: 9 } };
+function kitEtiketOlcu(text){ var e = SEFFAF.etiket, t = String(text || '').toLocaleUpperCase('tr-TR'); font(900, e.size, KF); track(0); var w = Math.ceil(ctx.measureText(t).width); return { t: t, w: w + e.px*2, h: Math.round(e.size*1.0) + e.py*2 }; }
+function kitEtiket(text){
+  if (!text) return; var e = SEFFAF.etiket, o = kitEtiketOlcu(text), c = kitEtiketRenk(text);
+  ctx.fillStyle = c[0]; ctx.fillRect(e.x, e.y, o.w, o.h);
+  if (c[0] === '#F2F2F2' || c[0] === '#FFFFFF') { ctx.strokeStyle = '#000000'; ctx.lineWidth = 2; ctx.strokeRect(e.x + 1, e.y + 1, o.w - 2, o.h - 2); }
+  font(900, e.size, KF); ctx.fillStyle = c[1]; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillText(o.t, e.x + e.px, e.y + o.h/2 + e.size*0.4); // büyük harf yüksekliği 0,8 em: tam ortada
+}
+T.seffaf = { group: 'Şeffaf', name: 'Kategori + logo (şeffaf zemin)', transparent: true, images: [],
+  fields: [ { k: 'cat', l: 'Kategori', d: 'Son dakika', max: 24, help: 'Renk kategoriye göre kendiliğinden gelir (marka kiti): Son dakika turuncu, İnceleme ve Karşılaştırma mavi, Sızıntı siyah, Rehber ve Sponsorlu gri. Diğerleri turuncu.' } ],
+  bg: function(){},
+  layers: function(s){ var l = SEFFAF.logo, e = SEFFAF.etiket, o = s.cat ? kitEtiketOlcu(s.cat) : { w: 0, h: 0 };
+    return [ L('logo', 'Logo', [l[0] + l[2]/2, l[1] + l[2]*288/212/2], function(){ logoW(l[0], l[1], l[2]); }),
+      L('cat', 'Kategori', [e.x + o.w/2, e.y + o.h/2], function(){ kitEtiket(s.cat); }) ];
+  } };
+
 /* ================= durum ================= */
 var KEY = 'updated-post-araci-v4';
 var XDEF = { w: 0, h: 0, ls: 0, vs: 0, iz: 1, ix: 0, iy: 0, ir: 0 };
@@ -475,7 +500,7 @@ function save(){ if (DINLE.kaydet) DINLE.kaydet(); }
 
 /* ================= çizim döngüsü ================= */
 function withAdj(a, anchor, fn){ ctx.save(); ctx.translate(anchor[0] + a.x, anchor[1] + a.y); ctx.rotate((a.r || 0)*Math.PI/180); ctx.scale(a.s, a.s); ctx.translate(-anchor[0], -anchor[1]); fn(); ctx.restore(); }
-function defLogo(t){ return T[t].group === 'Dergi' ? 'mark-solid-white' : 'up-white'; }
+function defLogo(t){ return T[t].group === 'Şeffaf' ? 'kit-up-white' : T[t].group === 'Dergi' ? 'mark-solid-white' : 'up-white'; }
 function layerList(t, s, im, ad){ var ls = T[t].layers(s, im, ad), map = {}; ls.forEach(function(l){ map[l.k] = l; }); return map; }
 function render(){
   if (!ctx) return;
@@ -595,11 +620,12 @@ function decodeCode(code){ var m = String(code).trim().match(/UPD1:([A-Za-z0-9_\
 var hazir = null;
 export var klasik = {
   W: W, H: H, T: T, LOGOS: LOGOS,
-  GORDER: ['Cam', 'Vizör', 'Fiş', 'Dergi'],
+  GORDER: ['Cam', 'Vizör', 'Fiş', 'Dergi', 'Şeffaf'],
+  SEFFAF: SEFFAF, kitEtiketRenk: kitEtiketRenk,
   TORDER: ['Haber kapağı', 'Kaydırmalı: madde', 'Kaydırmalı: özet', 'Tek post: liste', 'Tek post: yorum', 'İnceleme puanı', 'Karşılaştırma'],
   dinle: function(o){ Object.assign(DINLE, o); },
   /* Görselleri (logolar, örnek fotoğraflar) yükler, her şablonun başlangıç durumunu kurar. */
-  hazirla: function(){ if (!hazir) hazir = Promise.all(Object.keys(A).map(function(k){ return loadImg(A[k]).then(function(i){ IMG[k] = i; }); })).then(function(){ Object.keys(T).forEach(function(t){ state[t] = defaults(t); images[t] = freshImages(t); }); }); return hazir; },
+  hazirla: function(){ if (!hazir) hazir = Promise.all(Object.keys(A).map(function(k){ return loadImg(A[k]).then(function(i){ IMG[k] = i; }, function(){ /* yeni kit logosu açılmazsa eski logo kullanılır */ }); })).then(function(){ Object.keys(T).forEach(function(t){ state[t] = defaults(t); images[t] = freshImages(t); }); }); return hazir; },
   bagla: function(canvas, overlay){
     if (baglantiKes) baglantiKes();
     cv = canvas; ctx = canvas.getContext('2d'); ov = overlay; octx = overlay.getContext('2d');

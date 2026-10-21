@@ -14,6 +14,7 @@ import {
 } from "./motor";
 import { SABLONLAR, SABLON_SIRA, etkin, katmanSirasi, slaytCiz, type KatmanSonuc } from "./sablonlar";
 import { STILLER, STIL_SIRA, type Slot } from "./stiller";
+import OnizlemeKutu from "./OnizlemeKutu";
 
 type Props = {
   proje: Proje; degistir: (p: Proje, birlestir?: string) => void;
@@ -543,6 +544,7 @@ export default function Editor({ proje, degistir, geri, ileri, geriVar, ileriVar
     <div className="ie">
       <input ref={dosya} type="file" accept="image/*" hidden onChange={dosyaSecildi} />
       <section className="ie-sahne" aria-label="Önizleme">
+        <OnizlemeKutu>
         <div className="ie-arac">
           <div className="segment" role="group" aria-label="Format">
             {(Object.keys(FORMATLAR) as FormatId[]).map((f) => (
@@ -561,6 +563,7 @@ export default function Editor({ proje, degistir, geri, ileri, geriVar, ileriVar
             onPointerLeave={(e) => { if (!ks.current && !gs.current) e.currentTarget.style.cursor = "default"; }} />
         </div>
         <p className="ie-ipucu">{ipucu}</p>
+        </OnizlemeKutu>
         <div className="ie-slaytlar" role="list" aria-label="Slaytlar">
           {proje.slaytlar.map((s, n) => (
             <button key={s.id} role="listitem" className="ie-slayt" aria-current={n === i} onClick={() => setAktif(n)} aria-label={`Slayt ${n + 1}: ${SABLONLAR[s.sablon].ad}`}>

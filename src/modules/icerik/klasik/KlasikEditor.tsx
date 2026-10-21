@@ -7,10 +7,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { sb } from "../../../shared/supabase";
 import { klasik } from "./motor.js";
+import OnizlemeKutu from "../OnizlemeKutu";
 
 type Alan = { k: string; l: string; d?: string; max?: number; type?: string; help?: string; sz?: [string, string, number, number, number] };
 type GorselTanim = { k: string; l: string; help?: string; in?: string; sample?: string };
-type Sablon = { group: string; name: string; fields: Alan[]; images?: GorselTanim[]; extras?: Record<string, string[]>; inner?: Record<string, [number, number]>; fixed?: { k: string; l: string }[] };
+type Sablon = { group: string; name: string; transparent?: boolean; fields: Alan[]; images?: GorselTanim[]; extras?: Record<string, string[]>; inner?: Record<string, [number, number]>; fixed?: { k: string; l: string }[] };
 type Ayar = Record<string, number>;
 type Durum = Record<string, unknown> & { _adj: Record<string, Ayar>; _order: string[]; _logo: string };
 type Kayit = { n: string; s: Durum; _id?: string };
@@ -91,7 +92,7 @@ export default function KlasikEditor() {
       if (iptal) return;
       try { klasik.yukle(JSON.parse(localStorage.getItem(SAKLA) || "null")); } catch { /* bozuk kayıt */ }
       setHazir(true);
-      const fs = ["400 34px Inter", "500 26px Inter", "600 28px Inter", "700 88px Inter", "800 330px Inter", "500 26px 'IBM Plex Mono'", "600 28px 'IBM Plex Mono'"];
+      const fs = ["900 44px 'Big Shoulders Display'", "400 34px Inter", "500 26px Inter", "600 28px Inter", "700 88px Inter", "800 330px Inter", "500 26px 'IBM Plex Mono'", "600 28px 'IBM Plex Mono'"];
       Promise.all(fs.map((f) => document.fonts.load(f, "İğüşöç 0123"))).then(() => klasik.ciz(), () => klasik.ciz());
       document.fonts.ready.then(() => klasik.ciz());
     });
@@ -174,6 +175,15 @@ export default function KlasikEditor() {
         <div><button type="button" className="btn ghost sm" disabled={!im[g.k]} onClick={() => klasik.gorsel(g.k, null)}>Görseli kaldır</button></div>
       </div>
     );
+  }
+
+  async function svgIndir() {
+    setMesaj("Hazırlanıyor…");
+    try {
+      const { seffafSvg } = await import("./seffafSvg");
+      const svg = await seffafSvg();
+      setMesaj(await dosyaVer(new Blob([svg], { type: "image/svg+xml" }), "updated-" + t + ".svg", "image/svg+xml"));
+    } catch (e) { setMesaj("SVG oluşturulamadı: " + (e as Error).message); }
   }
 
   async function pngIndir() {
@@ -262,19 +272,24 @@ export default function KlasikEditor() {
   return (
     <div className="ie">
       <div className="ie-sahne">
+        <OnizlemeKutu>
         <div className="ie-arac">
           <div className="row">
             <button type="button" className="ie-ikon" title="Geri al" aria-label="Geri al" disabled={!klasik.geriVar()} onClick={() => { klasik.geri(); setMesaj("Son adım geri alındı."); }}>↶</button>
             <button type="button" className="ie-ikon" title="İleri al" aria-label="İleri al" disabled={!klasik.ileriVar()} onClick={() => { klasik.ileri(); setMesaj("Adım yeniden uygulandı."); }}>↷</button>
             <button type="button" className="btn ghost sm" disabled={!klasik.geriVar()} onClick={() => { klasik.hepsiniGeri(); setMesaj('Bu şablondaki tüm değişiklikler geri alındı. "İleri al" ile dönebilirsin.'); }}>Tümünü geri al</button>
           </div>
-          <button type="button" className="btn sm" onClick={pngIndir}>PNG indir</button>
+          <div className="row" style={{ gap: 6 }}>
+            <button type="button" className="btn sm" onClick={pngIndir} title={S.transparent ? "Saydam zeminli PNG (alfa kanallı)" : undefined}>PNG indir</button>
+            {S.transparent && <button type="button" className="btn ghost sm" onClick={svgIndir} title="Vektör SVG; yazı yola çevrilmiş">SVG indir</button>}
+          </div>
         </div>
-        <div className="ie-tuval" style={{ aspectRatio: "1080 / 1350", ["--oran" as string]: String(1080 / 1350) }}>
+        <div className={"ie-tuval" + (S.transparent ? " ie-seffaf" : "")} style={{ aspectRatio: "1080 / 1350", ["--oran" as string]: String(1080 / 1350) }}>
           <canvas ref={ana} width={1080} height={1350} role="img" aria-label="Post önizlemesi" />
           <canvas ref={ust} width={1080} height={1350} className="ie-ust" aria-hidden="true" />
         </div>
         <p className="ie-ipucu" role="status">{mesaj || ipucu}</p>
+        </OnizlemeKutu>
       </div>
 
       <div className="ie-yan">

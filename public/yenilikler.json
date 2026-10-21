@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-21-d",
+    "tarih": "21 Ekim 2026",
+    "baslik": "İçerik: önizleme ve şeffaf şablon",
+    "bolumler": [
+      {
+        "ad": "İçerik",
+        "maddeler": [
+          "Telefonda önizleme artık üstte duran bir kart; küçültülebiliyor.",
+          "Yeni şablon: Şeffaf zemin, sadece kategori ve logo; PNG (saydam) ve SVG iner.",
+          "Logo seçiminde yeni marka kitinin logoları da var."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-21-c",
     "tarih": "21 Ekim 2026",
     "baslik": "Yeni marka kiti",
