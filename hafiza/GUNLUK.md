@@ -28,6 +28,8 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Enes'le çalışma biçimi ve geri bildirimleri (birikir, silinmez)
 
+- **EN ÖNEMLİ (21 Ekim, Enes: "en derin hafızana kazı"):** Kolaya kaçma, tembellik yapma, gücünü hafife alma; tam efor göster. Enes'in demediği şeyi yapma. Varsayımda bulunma; emin olmadığında sor ya da açıkça söyle. (Hata örneği: "eskisinin özelliklerini yenisine getir" istenirken eski aracı olduğu gibi geri koymak.)
+
 - Türkçe, kısa, doğrudan. Önce seçenekler ve bedelleri, sonra tek tavsiye. Teknik terim sade anlatılır.
 - Teknik değil: yapması gereken adımda sayfayı aç, linki ver, ne tıklayacağını yaz. Şifre/anahtarı asla Claude girmez.
 - **Engel ya da sorun olunca hemen söyle** (token/limit dahil). Sormadan karar değiştirme; önceki geri bildirimlerini geri alma (13 Ekim'de bu yüzden uyardı).
@@ -58,6 +60,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 21 Ekim 2026
+- (16:25) Enes kızdı: "eskisinin özelliklerini yenisine getirecektin, kafamı karıştırdın"; "tembellik yapıyorsun, kolaya kaçıyorsun". Doğru iş: eski aracın tüm özellikleri **yeni editöre** (`src/modules/icerik/`) taşınacak; eski araç taşıma bitene kadar sekmede açık kalır, sonra kaldırılır. Özellik listesi (13 madde) Enes'e verildi; sıra: önce parçaları ayrı düzenleme (1-4).
 - (15:45) Enes: `studio.updated.com.tr` çalışıyor; Gemini/Groq anahtarlarını boşver ("bir şey olursa o alır"). İçerik editörü için: "çok eksiklik var, bir öncekini tamamen incelememişsin, her şey birbirinden ayrı düzenlenebiliyordu; gerekirse kopyala, birebir tüm özellikler olsun, sonra şablonları arttıracağız". Yapılan: eski post aracı ana editör yapıldı (sekme 1), kayıtlı düzenler buluta bağlandı (taklit istemciyle denendi: yükleme, ekleme, silme; tek başına açılınca yerel çalışıyor). Eski aracın tam özellik listesi ARCHITECTURE bölüm 19'a yazıldı. Ders: bir aracı yeniden yazarken önce eskisinin özellik listesini çıkar ve kullanıcıya göster. `notify-email` v18 (panel linki yeni adres). Bekleyen: Supabase Auth Site URL / izinli adreslere `https://studio.updated.com.tr` eklenmesi (bağlantıda bu ayar yok; panelden). Sıradaki: Enes'in denemesi, sonra yeni şablonlar ve Story/Reels'in eski motora eklenmesi.
 - Enes sordu: diğer Claude not yazdı mı? Hayır; Fatih 18 Ekim'den beri depoda çalışmamış. Panoya "okuduğunda 'okundu' yaz" isteği eklendi. Yedek ve DNS kontrol edildi (yukarıda). Sıradaki işler Enes'e listelendi.
 
