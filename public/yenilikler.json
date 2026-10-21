@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-10-21-c",
+    "tarih": "21 Ekim 2026",
+    "baslik": "Yeni logo",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Sol üstte yeni UPDATED logosu."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-21-b",
     "tarih": "21 Ekim 2026",
     "baslik": "Yeni post editörü",
