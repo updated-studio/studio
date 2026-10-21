@@ -15,8 +15,8 @@ import "./icerik.css";
 // Klasik şablonlar ~700 KB (gömülü logolar ve örnek görseller); sadece açılınca yüklenir
 const KlasikEditor = lazy(() => import("./klasik/KlasikEditor"));
 
-type Bolum = "post" | "editor" | "kayitlar" | "eski";
-const BOLUMLER: [Bolum, string][] = [["post", "Post editörü"], ["editor", "Story / Reels"], ["kayitlar", "Story / Reels kayıtları"], ["eski", "Eski araç (yedek)"]];
+type Bolum = "post" | "editor" | "kayitlar";
+const BOLUMLER: [Bolum, string][] = [["post", "Post editörü"], ["editor", "Story / Reels"], ["kayitlar", "Story / Reels kayıtları"]];
 // Çerçevedeki post aracı Stüdyo'nun oturumunu buradan kullanır (aynı adres, aynı giriş)
 (window as unknown as { __studio?: unknown }).__studio = { sb };
 const TASLAK = "icerik-taslak-v1";
@@ -116,12 +116,6 @@ export default function Icerik() {
       )}
       {bolum === "kayitlar" && <Kayitlar ac={ac} acikId={proje.id} />}
       {bolum === "post" && <Suspense fallback={<div className="muted">Post editörü yükleniyor…</div>}><KlasikEditor /></Suspense>}
-      {bolum === "eski" && (
-        <>
-          <div className="muted">Eski post aracı, yeni Post editörü ekipte onaylanana kadar yedek olarak burada. Kayıtlı düzenler ikisinde de ortak.</div>
-          <iframe src="araclar/post/index.html" title="Eski post aracı" className="arac-cerceve" allow="clipboard-write; web-share" />
-        </>
-      )}
     </>
   );
 }

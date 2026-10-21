@@ -2,16 +2,14 @@
   {
     "id": "2026-10-21-b",
     "tarih": "21 Ekim 2026",
-    "baslik": "Post editörü Stüdyo'nun kendi editörü oldu, eski aracın bütün özellikleriyle",
+    "baslik": "Yeni post editörü",
     "bolumler": [
       {
         "ad": "İçerik",
         "maddeler": [
-          "\"Post editörü\" sekmesi artık Stüdyo'nun kendi ekranı; eski post aracının bütün özellikleri burada: 29 şablon (Cam, Vizör, Fiş, Dergi), her öğe ayrı taşınır, büyütülür, döndürülür; katman sırası, yazı boyutları, fotoğrafın çerçeve içinde kadrajı, logo çeşidi, geri al / ileri al / tümünü geri al, önceki şablonun içeriğini getir, sıfırlama, PNG indir.",
-          "Çizimler eski araçla piksel piksel aynı (29 şablonun hepsi karşılaştırıldı).",
-          "\"Kayıtlı düzenler\" ekipte ortak; eski adresteki kayıtların için \"Dosyaya aktarma\" bölümü var.",
-          "Otomasyondan gelen post (.updated.json ya da UPD1: kodu) aynı şekilde açılıyor.",
-          "Story ve Reels için ikinci sekme duruyor; eski araç son sekmede yedek olarak kaldı."
+          "Post editörü yenilendi: eski aracın tüm şablonları ve özellikleri artık burada.",
+          "Kayıtlı düzenler ekipte ortak.",
+          "E-postalardaki link artık studio.updated.com.tr."
         ]
       }
     ]
