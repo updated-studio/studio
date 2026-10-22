@@ -301,6 +301,13 @@ export default function KlasikEditor() {
               ))}
             </select>
           </label>
+          {modlar.some((m) => m.k === "logo" || m.k === "mast") && (
+            <label className="ie-grup"><span>Logo</span>
+              <select value={s._logo || klasik.defLogo(t)} onChange={(e) => klasik.logoSec(e.target.value)}>
+                {(klasik.LOGOS as [string, string][]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </label>
+          )}
           <div className="row">
             <button type="button" className="btn ghost sm" disabled={!prevT || prevT === t} onClick={() => { const n = klasik.icerikGetir(); setMesaj(n ? 'İçerik ve fotoğraf bu şablona getirildi. "Geri al" ile vazgeçebilirsin.' : "Getirilecek içerik yok."); }}>
               {prevT && prevT !== t ? `İçeriği getir: ${T[prevT].group}, ${T[prevT].name}` : "Önceki şablonun içeriğini getir"}
@@ -364,13 +371,6 @@ export default function KlasikEditor() {
                         <button type="button" aria-pressed={secim.k === m.k && secim.ic} onClick={(e) => { e.stopPropagation(); if (secim.k !== m.k) klasik.sec(m.k); if (!klasik.hasInner(m.k)) { setMesaj("Önce bu karta bir fotoğraf yükle."); return; } klasik.icSec(true); }}>Fotoğraf</button>
                       </div>
                     </div>
-                  )}
-                  {(m.k === "logo" || m.k === "mast") && (
-                    <label className="ie-grup"><span>Logo çeşidi</span>
-                      <select value={s._logo || klasik.defLogo(t)} onChange={(e) => klasik.logoSec(e.target.value)}>
-                        {(klasik.LOGOS as [string, string][]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                    </label>
                   )}
                   {acik && ayar && (
                     <div className="ie-secili">
