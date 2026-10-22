@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-10-23-a",
+    "tarih": "23 Ekim 2026",
+    "baslik": "Taslak etiketleri",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Taslaklara en fazla 3 etiket eklenir.",
+          "Yalnız sitede kullanılan ya da marka/ana konu listesindeki etiketler eklenir; gereksiz yeni etiket açılmaz."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-22-a",
     "tarih": "22 Ekim 2026",
     "baslik": "Sohbet ve logo seçimi",
