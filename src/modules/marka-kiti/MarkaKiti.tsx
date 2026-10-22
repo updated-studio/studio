@@ -115,6 +115,22 @@ export default function MarkaKiti() {
         })}
       </div>
 
+      <h3>Bumper (video logo)</h3>
+      <div className="panel mk-bumper">
+        <video className="mk-video" controls loop muted playsInline preload="metadata" poster={`${K}video/updated-bumper-kapak.png`}>
+          <source src={`${K}video/updated-bumper-saydam.webm`} type='video/webm; codecs="vp9"' />
+          <source src={`${K}video/updated-bumper-siyah.mp4`} type="video/mp4" />
+        </video>
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="muted">1920×1080 · 25 fps · 4,5 sn · sessiz · zemini saydam. Videonun açılışında ya da kapanışında kullanılır.</span>
+          <div className="row" style={{ gap: 6 }}>
+            <a className="btn ghost sm" href={`${K}video/updated-bumper-prores4444.mov`} download>Kurgu için (ProRes 4444, saydam, 36 MB)</a>
+            <a className="btn ghost sm" href={`${K}video/updated-bumper-saydam.webm`} download>Web (WebM, saydam)</a>
+            <a className="btn ghost sm" href={`${K}video/updated-bumper-siyah.mp4`} download>MP4 (siyah zemin)</a>
+          </div>
+        </div>
+      </div>
+
       <h3>Temel kurallar</h3>
       <ul className="panel mk-kurallar">{KURALLAR.map((k) => <li key={k}>{k}</li>)}</ul>
 
