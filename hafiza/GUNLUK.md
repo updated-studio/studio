@@ -60,6 +60,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 22 Ekim 2026
+- (18:40) Enes: editörde eksikler var (liste bekleniyor), "bumper logo" eklenecek (dosyayı Enes verecek), logo seçimi üste → yapıldı. Başka cihazda sohbet okunmamış görünüyordu → son görülme hesapta (0023). Bekleyen: Post/Story/Reels birleştirme önerisine cevap.
+
 ### 21 Ekim 2026
 - (22:55) Enes: (1) telefonda yalnız önizleme görselinin sabit kalması bozuk görünüyordu → önizleme kartı (araçlar + tuval + ipucu) + Küçült; (2) Post / Story-Reels ayrımı neden? → açıklandı (klasik motor sadece post; story/reels yeni motorda), birleştirme önerisi verildi, Enes'in kararı bekleniyor; (3) şeffaf zeminli kategori + logo şablonu, PNG alfa + SVG → yapıldı (PNG ve SVG birebir karşılaştırıldı). Denendi: 390 px telefon, taşma yok.
 - (18:00) Enes: "kit renk + yazı tipi, cam kalsın". Uygulandı: renkler/yazı tipleri kite geçti (koyu mod 12b), cam ve köşeler kaldı; Marka Kiti sayfası baştan yazıldı (renkler, 6 yazı rolü, logo indirme SVG/PNG, temel kurallar, şablon örnekleri, md/json indirme). Kit dosyaları `public/marka/`. Açık: yeşil/kırmızı/mor durum renkleri (Enes soracak), koyu modda mavi yazı tonu.

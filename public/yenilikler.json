@@ -1,5 +1,24 @@
 [
   {
+    "id": "2026-10-22-a",
+    "tarih": "22 Ekim 2026",
+    "baslik": "Sohbet ve logo seçimi",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Sohbette okuduğun mesajlar artık her cihazda okunmuş görünür."
+        ]
+      },
+      {
+        "ad": "İçerik",
+        "maddeler": [
+          "Logo seçimi editörün en üstünde."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-21-d",
     "tarih": "21 Ekim 2026",
     "baslik": "İçerik: önizleme ve şeffaf şablon",

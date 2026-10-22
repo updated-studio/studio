@@ -26,6 +26,14 @@ export default function SohbetDugme() {
   const alt = useRef<HTMLDivElement>(null);
   const kutu = useRef<HTMLDivElement>(null);
 
+  // Son görülme hesapta da tutulur (0023): başka cihazda girince okunanlar okunmamış görünmesin
+  useEffect(() => {
+    if (!profile?.id) return;
+    sb.from("profiles").select("chat_seen_at").eq("id", profile.id).maybeSingle().then(({ data }) => {
+      const t = (data as { chat_seen_at?: string | null } | null)?.chat_seen_at;
+      if (t) setSon((x) => (Date.parse(t) > Date.parse(x || "1970-01-01") ? new Date(t).toISOString() : x));
+    });
+  }, [profile?.id]);
   useEffect(() => {
     sb.from("tr_chat").select("id,user_id,body,created_at").order("created_at", { ascending: false }).limit(100)
       .then(({ data }) => data && setMesajlar((data as Mesaj[]).reverse()));
@@ -37,7 +45,11 @@ export default function SohbetDugme() {
   }, []);
 
   const okunmamis = mesajlar.filter((m) => m.id > 0 && m.user_id !== profile?.id && m.created_at > son).length;
-  const gorundu = () => { const t = new Date().toISOString(); setSon(t); try { localStorage.setItem(SON, t); } catch { /* yok */ } };
+  const gorundu = () => {
+    const t = new Date().toISOString(); setSon(t);
+    try { localStorage.setItem(SON, t); } catch { /* yok */ }
+    sb.rpc("sohbet_goruldu").then(() => undefined, () => undefined);
+  };
   useEffect(() => { if (acik) { gorundu(); alt.current?.scrollIntoView({ block: "end" }); } }, [acik, mesajlar.length]);
   useEffect(() => {
     if (!acik) return;
