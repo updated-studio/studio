@@ -1,7 +1,7 @@
 // WordPress'e taslak gönderimi (REST API + Uygulama Şifresi). MCP kullanılmaz: Stüdyo siteyle doğrudan konuşur.
 // Gizli bilgi (Supabase Secrets): WP_URL (https://updated.com.tr), WP_USER (WordPress'teki "Stüdyo" kullanıcısı), WP_APP_PASSWORD.
 // Kurallar (ARCHITECTURE.md, 15 Ekim 2026): yazı her zaman "draft" gider, yayına editör basar; kategori sadece sitede VAR OLANLARDAN seçilir;
-// etiket önce sitede aranır, yoksa açılır; editör notları/sorular/doğrulama listesi gitmez; WordPress'te editörün değiştirdiği taslağın üzerine yazılmaz.
+// etiket: en fazla 3, yalnız var olan (≥2 yazılık) ya da izinli listedeki etiketler (yeni etiket yığılmasın); editör notları/sorular/doğrulama listesi gitmez; WordPress'te editörün değiştirdiği taslağın üzerine yazılmaz.
 import { yaziHtml } from "./html.ts";
 import { altyazi, type GorselAday } from "./gorsel.ts";
 
@@ -80,19 +80,33 @@ export function kategoriEsle(ad: string, liste: Kategori[]): Kategori | undefine
     ?? uygun.find((x) => anahtar(x.name).length >= 4 && (k.includes(anahtar(x.name)) || anahtar(x.name).includes(k)));
 }
 
-/** Etiketler: önce sitede aynı adla var mı bakılır, yoksa açılır. En fazla 7. */
+/**
+ * Etiketler (Fatih, 23 Ekim): eskiden bulunamayan her etiket açılıyordu; WordPress'te 1.725 etiketin 1.513'ü hiçbir yazıda kullanılmıyordu.
+ * Kural: en fazla 3 etiket. Sitede aynı adla VAR ve en az 2 yazıda kullanılmış etiket eklenir; yeni etiket yalnız ETIKET_IZINLI
+ * listesindeki adlar için açılır (marka ve ana konular). Listede olmayan, yeni ya da tek yazılık etiketler eklenmez.
+ */
+export const ETIKET_IZINLI = [
+  "Apple", "iPhone", "iPad", "Mac", "Apple Watch", "AirPods", "Samsung", "Galaxy", "Google", "Pixel", "Android", "Sony", "PlayStation", "Xbox", "Nintendo",
+  "Microsoft", "Windows", "Xiaomi", "Huawei", "Honor", "Oppo", "OnePlus", "Vivo", "Asus", "Lenovo", "HP", "Dell", "Acer", "MSI", "Nvidia", "AMD", "Intel", "Qualcomm",
+  "Meta", "OpenAI", "ChatGPT", "Gemini", "Yapay Zeka", "DJI", "Insta360", "GoPro", "Canon", "Nikon", "Fujifilm", "Panasonic", "Leica", "Sigma", "Tamron", "Hasselblad",
+  "Tesla", "Togg", "Elektrikli Araç", "Steam", "Oyun", "Akıllı Saat", "Kulaklık", "Dron", "Aksiyon Kamerası", "Vlog", "Mikrofon", "Katlanabilir Telefon", "VR",
+];
+const IZINLI = new Set(ETIKET_IZINLI.map((x) => anahtar(x)));
 export async function etiketIdleri(a: WpAyar, adlar: string[]): Promise<number[]> {
   const idler: number[] = [];
   const gorulen = new Set<string>();
-  for (const ham of adlar.slice(0, 7)) {
+  for (const ham of adlar.slice(0, 8)) {
+    if (idler.length >= 3) break;
     const ad = String(ham ?? "").replace(/^#/, "").trim().slice(0, 60);
     const k = anahtar(ad);
     if (!k || gorulen.has(k)) continue;
     gorulen.add(k);
-    const ara = await wp(a, `/wp/v2/tags?per_page=20&search=${encodeURIComponent(ad)}&_fields=id,name,slug`);
-    const bulunan = Array.isArray(ara.veri) ? (ara.veri as { id: number; name: string; slug: string }[]).find((t) => anahtar(t.name) === k || anahtar(t.slug) === k) : undefined;
-    if (bulunan) { idler.push(bulunan.id); continue; }
-    const ac = await wp(a, "/wp/v2/tags", { method: "POST", body: { name: ad } });
+    const ara = await wp(a, `/wp/v2/tags?per_page=20&search=${encodeURIComponent(ad)}&_fields=id,name,slug,count`);
+    const bulunan = Array.isArray(ara.veri) ? (ara.veri as { id: number; name: string; slug: string; count: number }[]).find((t) => anahtar(t.name) === k || anahtar(t.slug) === k) : undefined;
+    if (bulunan && ((bulunan.count ?? 0) >= 2 || IZINLI.has(k))) { idler.push(bulunan.id); continue; }
+    if (bulunan || !IZINLI.has(k)) continue; // tek yazılık / listede olmayan etiket eklenmez, açılmaz
+    const duzgun = ETIKET_IZINLI.find((x) => anahtar(x) === k) ?? ad;
+    const ac = await wp(a, "/wp/v2/tags", { method: "POST", body: { name: duzgun } });
     const v = ac.veri as { id?: number; code?: string; data?: { term_id?: number } } | null;
     if (ac.ok && v?.id) idler.push(v.id);
     else if (v?.code === "term_exists" && v.data?.term_id) idler.push(v.data.term_id);

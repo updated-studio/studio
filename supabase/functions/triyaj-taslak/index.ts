@@ -171,7 +171,7 @@ KURALLAR:
 - Ters piramit: en önemli bilgi ilk paragrafta. TAM 3 adet H2 ara başlık, kısa paragraflar. Uzunluğu kaynakların zenginliği belirler (üsluptaki UZUNLUK kuralı): özet değil, gerektiği kadar ayrıntı.
 - Birden fazla kaynak verildiyse hepsini oku ve birleştir: her kaynaktaki farklı ayrıntıyı kullan, tekrar etme; kaynaklar çelişiyorsa bunu belirt ve editor_notlari'na yaz. Kaynaklardan biri BAŞKA bir olayı anlatıyorsa (yanlış eşleşmiş) onu tamamen yok say ve editor_notlari'na "Kaynak N bu haberle ilgisiz" yaz.
 - Spot en fazla 210 karakter.
-- Etiketler: önce KAYNAK SİTELERİN ETİKETLERİ'nden habere uyanlar (marka, ürün, teknoloji adı), sonra eksik kalanlar; 5-7 adet. "haber", "teknoloji", "son dakika" gibi genel etiketleri ve kaynak sitenin/ajansın adını etiket yapma.
+- Etiketler: 2-4 adet, en önemliden başlayarak: önce markanın adı (Apple, Samsung, DJI…), sonra ürün ailesi (iPhone, Galaxy, PlayStation…), sonra ana konu (Yapay Zeka, Elektrikli Araç, Katlanabilir Telefon…). Model numarası, tek seferlik terim, özellik adı etiket olmaz (ör. "10000mAh", "M6", "Bokeh" olmaz). "haber", "teknoloji", "son dakika" gibi genel etiketleri ve kaynak sitenin/ajansın adını etiket yapma.
 - Başlık merak uyandırsın ama her iddiasının kaynakta birebir karşılığı olsun; abartı, "şok", tık tuzağı yok.
 - Haber ajansı titizliği: rakamları, özel adları, tarihleri kaynaktaki gibi aktar; tarafsız yaz, reklam dili kullanma.
 - Doğrulanmamış bilgiyi "iddiaya göre" veya "sızıntıya göre" diye açıkça işaretle.
@@ -188,7 +188,7 @@ SİTENİN ÜSLUBU (buna birebir uy):
 ${uslup}
 
 Sadece şu biçimde geçerli JSON döndür:
-{"focus_keyword":"","title_tag":"(en fazla 60 karakter)","slug":"turkce-karaktersiz-tireli","meta_description":"(en fazla 155 karakter)","kategori":"","etiketler":["5-7 adet"],"baslik":"","spot":"1-2 cümle","govde":[{"h2":"","paragraflar":[""]}],"dikkat_edilmesi_gerekenler":[""],"editor_sorulari":[""],"dogrulama":[""],"kaynaklar":["kaynak adı"],"gorsel":{"oneri":"","alt_text":"","aramalar":["","",""],"ai_istem":""},"editor_notlari":[""]}`;
+{"focus_keyword":"","title_tag":"(en fazla 60 karakter)","slug":"turkce-karaktersiz-tireli","meta_description":"(en fazla 155 karakter)","kategori":"","etiketler":["2-4 adet"],"baslik":"","spot":"1-2 cümle","govde":[{"h2":"","paragraflar":[""]}],"dikkat_edilmesi_gerekenler":[""],"editor_sorulari":[""],"dogrulama":[""],"kaynaklar":["kaynak adı"],"gorsel":{"oneri":"","alt_text":"","aramalar":["","",""],"ai_istem":""},"editor_notlari":[""]}`;
 
 const CEVIRI_SISTEM = 'Sen bir çevirmensin. Verilen İngilizce teknoloji haberini paragraf yapısını koruyarak eksiksiz ve sadık biçimde Türkçeye çevir. Yorum, özet veya ekleme yapma. Sadece şu JSON\'u döndür: {"ceviri":"paragraflar arasında \\n\\n olan metin"}';
 

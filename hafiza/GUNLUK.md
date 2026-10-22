@@ -60,6 +60,10 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+
+### 23 Ekim 2026
+- (Fatih'in Claude'u, yeni site oturumu) Etiket yığılması düzeltildi: WordPress'te 1.725 etiketin 1.513'ü boştu (otomatik taslaklar her etiketi açıyordu). `triyaj-taslak/wordpress.ts` etiketIdleri: en fazla 3; yalnız var olan ≥2 yazılık etiket ya da `ETIKET_IZINLI` listesindeki ad; liste dışı yeni etiket açılmaz. İstem: 2-4 etiket, marka → ürün ailesi → ana konu. **Fonksiyonun yeniden yayınlanması gerekiyor (Supabase → Edge Functions → triyaj-taslak).**
+
 ### 22 Ekim 2026
 - (18:55) Enes bumper'ı verdi (ProRes 4444 alfa, 1920×1080, 4,5 sn: UP logosu, turuncu/mavi halka, ikonlar, sosyal hesaplar). Marka Kiti sayfasına eklendi (izle + 3 indirme). Editöre (görsel üretiyor) video giremez; Enes'e nerede kullanmak istediği soruldu.
 - (18:40) Enes: editörde eksikler var (liste bekleniyor), "bumper logo" eklenecek (dosyayı Enes verecek), logo seçimi üste → yapıldı. Başka cihazda sohbet okunmamış görünüyordu → son görülme hesapta (0023). Bekleyen: Post/Story/Reels birleştirme önerisine cevap.
