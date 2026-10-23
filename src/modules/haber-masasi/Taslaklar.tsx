@@ -5,7 +5,7 @@ import { useToast } from "../../shared/toast";
 import { useKisi, zamanOnce } from "./ortak";
 import { useMasa, type Taslak } from "./veri";
 
-// Markdown → HTML ortak dosyada: WordPress'e giden metin ile "HTML kopyala" aynı olsun.
+// Markdown → HTML ortak dosyada: ekrandaki önizleme ve "HTML kopyala" aynı çıktıyı kullanır (panele Markdown gider).
 import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
 import { fluxIstem } from "../../../supabase/functions/triyaj-taslak/gorsel.ts";
 
@@ -38,7 +38,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
             <b>Öne çıkan görsel (otomatik seçildi)</b>
             <div className="muted">Fotoğraf: {sec.yazar} / {sec.kaynak} · {sec.lisans}</div>
             {g.gorsel_neden && <div className="muted">Neden: {g.gorsel_neden}</div>}
-            <div className="muted">{g.wp_media_id ? "WordPress'e yüklendi; altyazıda kaynak ve lisans yazıyor. Değiştirmek istersen WordPress'te öne çıkan görseli değiştir." : "WordPress'e gönderilince öne çıkan görsel olarak eklenecek."}</div>
+            <div className="muted">{t.site_id ? "Panelde haberin kapağı oldu; künyede kaynak ve lisans yazıyor. Değiştirmek istersen paneldeki kapak alanını değiştir." : "Panele gönderilince haberin kapağı olarak eklenecek."}</div>
             {g.yukleme_hata && <div className="msg err">{g.yukleme_hata}</div>}
           </div>
         </div>
@@ -88,8 +88,8 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
             <div className="ana"><b>{x.title || "(başlıksız)"}</b><div className="muted">{kisi(x.author)?.name ?? "?"} · {zamanOnce(x.updated_at)} önce</div></div>
             {x.auto && <span className="pill purple" title="Stüdyo kendisi hazırladı">🤖</span>}
             {x.qc?.ana_sayfa && <span className="pill rose" title={`Önem ${x.qc.onem ?? ""}/10`}>Ana sayfa adayı</span>}
-            {(x.qc_state === "bekliyor" || x.qc_state === "calisiyor") && <span className="pill off" title="Kaynaklara karşı son kontrol, görsel ve WordPress gönderimi">Kontrol ediliyor</span>}
-            {x.wp_error && <span className="pill rose" title={x.wp_error}>WordPress hatası</span>}
+            {(x.qc_state === "bekliyor" || x.qc_state === "calisiyor") && <span className="pill off" title="Kaynaklara karşı son kontrol, görsel ve panele gönderim">Kontrol ediliyor</span>}
+            {x.site_hata && <span className="pill rose" title={x.site_hata}>Panel hatası</span>}
             <span className={"pill " + (x.status === "hazir" ? "ok" : x.status === "gonderildi" ? "blue" : "off")}>{DURUM[x.status]}</span>
           </button>
         ))}
@@ -122,24 +122,24 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
     const html = yaziHtml(d.spot, d.body);
     try {
       await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([d.spot + "\n\n" + d.body], { type: "text/plain" }) })]);
-      toast("Kopyalandı. WordPress düzenleyicisine yapıştırabilirsin.");
+      toast("Kopyalandı.");
     } catch { toast("Kopyalanamadı; tarayıcı izin vermedi."); }
   }
 
-  // WordPress'e taslak olarak gönder (yayına basma kararı WordPress'te editörde). Kaydedilmemiş değişiklik varsa önce kaydedilir.
-  const [wpSuruyor, setWpSuruyor] = useState(false);
-  async function wordpressGonder(zorla = false) {
+  // Panele (updated.com.tr) taslak haber olarak gönder; yayına panelde yayın yönetmeni basar. Kaydedilmemiş değişiklik varsa önce kaydedilir.
+  const [siteSuruyor, setSiteSuruyor] = useState(false);
+  async function siteGonder(zorla = false) {
     if (degisti) await kaydet();
-    setWpSuruyor(true);
-    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { wp: true, draft_id: t.id, zorla } });
-    setWpSuruyor(false);
+    setSiteSuruyor(true);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { site: true, draft_id: t.id, zorla } });
+    setSiteSuruyor(false);
     if (error) {
       let m = error.message;
       try { const j = await (error as { context?: Response }).context?.json(); if (j?.hata) m = j.hata; } catch { /* yok */ }
       return toast(m);
     }
     setD({ ...d, status: "gonderildi" });
-    toast(`WordPress'e taslak olarak gitti${data?.kategori ? " (" + data.kategori + ")" : ""}. Yayına WordPress'te sen basarsın.`);
+    toast(`Panele taslak olarak gitti${data?.kategori ? " (" + data.kategori + ")" : ""}. Yayına panelde yayın yönetmeni basar.`);
   }
 
   const [silOnay, setSilOnay] = useState(false);
@@ -161,10 +161,10 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       </div>
       {haber && <div className="muted">Haber: <a href={haber.link} target="_blank" rel="noreferrer">{haber.event || haber.title}</a></div>}
       {t.auto && <div className="muted">🤖 Bu taslağı Stüdyo en güçlü haberlerden otomatik hazırladı{t.author ? " ve ilgi alanına göre sana verdi" : ""}. Yayından önce doğrulama listesine bak.</div>}
-      {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel{t.auto ? " ve WordPress" : ""}). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
+      {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel{t.auto ? " ve panele gönderim" : ""}). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
       {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
-      {t.wp_link && <div className="msg good">WordPress'te taslak olarak duruyor{t.wp_sent_at ? " (" + zamanOnce(t.wp_sent_at) + " önce gönderildi)" : ""}. <a href={t.wp_link} target="_blank" rel="noreferrer">WordPress'te aç ↗</a></div>}
-      {t.wp_error && <div className="msg err">{t.wp_error}{/düzenlenmiş/.test(t.wp_error) && <> <button className="linkbtn" onClick={() => wordpressGonder(true)}>Üzerine yaz</button></>}</div>}
+      {t.site_id && <div className="msg good">Panelde taslak haber olarak duruyor{t.site_gonderim ? " (" + zamanOnce(t.site_gonderim) + " önce gönderildi)" : ""}. {t.site_onizleme && <a href={t.site_onizleme} target="_blank" rel="noreferrer">Son taslağı aç ↗</a>}{t.site_admin && <> · <a href={t.site_admin} target="_blank" rel="noreferrer">Panelde aç ↗</a></>}</div>}
+      {t.site_hata && <div className="msg err">{t.site_hata}{/düzenlenmiş/.test(t.site_hata) && <> <button className="linkbtn" onClick={() => siteGonder(true)}>Üzerine yaz</button></>}</div>}
       <div className="panel">
         <label>Başlık (H1)<input type="text" value={d.title} onChange={(e) => alan("title", e.target.value)} /></label>
         <label>Spot<textarea className="alan" rows={2} value={d.spot} onChange={(e) => alan("spot", e.target.value)} /></label>
@@ -204,7 +204,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
         <span className="muted" style={{ marginRight: "auto" }}>Durum: {DURUM[d.status]}{t.model ? " · " + t.model : ""}</span>
         {d.status !== "hazir" && <button className="btn ok sm" onClick={() => kaydet("hazir")}>Yayına hazır</button>}
         {d.status === "hazir" && <button className="btn ghost sm" onClick={() => kaydet("taslak")}>Taslağa geri al</button>}
-        <button className="btn sm" onClick={() => wordpressGonder()} disabled={wpSuruyor}>{wpSuruyor ? "Gönderiliyor…" : t.wp_post_id ? "WordPress'i güncelle" : "WordPress'e gönder"}</button>
+        <button className="btn sm" onClick={() => siteGonder()} disabled={siteSuruyor}>{siteSuruyor ? "Gönderiliyor…" : t.site_id ? "Paneldeki taslağı güncelle" : "Panele gönder"}</button>
         <button className="btn ghost sm" onClick={sil}>{silOnay ? "Emin misin? Tekrar bas" : "Sil"}</button>
       </div>
     </>

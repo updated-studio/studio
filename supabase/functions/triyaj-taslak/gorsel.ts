@@ -195,7 +195,7 @@ export async function stokFoto(q: string, adet: number, anahtar: { pexels?: stri
   return out;
 }
 
-/** WordPress altyazısı. Fatih: haberlerde kaynak belirtmek zorunlu değil. Ama CC BY / CC BY-SA lisansı yazar ve lisans adını
+/** Görsel künyesi (panelde kapak künyesi; eskiden WordPress altyazısı). Fatih: haberlerde kaynak belirtmek zorunlu değil. Ama CC BY / CC BY-SA lisansı yazar ve lisans adını
  *  ZORUNLU tutar; bu yüzden sadece onlarda altyazı yazılır. CC0, kamu malı, Pexels, Pixabay: altyazı yok. Resmi basın: "Görsel: Marka". */
 export function altyazi(g: GorselAday): string {
   if (g.kaynak === "Resmi basın") return `Görsel: ${g.yazar.replace(/[<>&]/g, "")}`;

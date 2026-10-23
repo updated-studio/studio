@@ -7,7 +7,7 @@ import { useMasa } from "./veri";
 import { OTO_VARSAYILAN, type OtoAyar } from "../../../supabase/functions/triyaj-taslak/secim.ts";
 import { USLUP_VARSAYILAN } from "../../../supabase/functions/triyaj-taslak/uslup.ts";
 
-// Sadece yöneticiler: otomatik taslak ve WordPress, saklama süresi, gürültü kelimeleri, Türkiye pazarı markaları, basın kiti.
+// Sadece yöneticiler: otomatik taslak ve site paneli bağlantısı, saklama süresi, gürültü kelimeleri, Türkiye pazarı markaları, basın kiti.
 export default function Ayarlar() {
   const { v } = useMasa();
   const toast = useToast();
@@ -37,7 +37,7 @@ export default function Ayarlar() {
     <>
       <OtomatikTaslak ayar={ayar} />
       <YazimUslubu ayar={ayar} />
-      <WordPress ayar={ayar} />
+      <SitePaneli ayar={ayar} />
       <div className="panel">
         <h3>Saklama</h3>
         <div className="muted">Havuzda kimsenin dokunmadığı (alınmamış, oylanmamış, pas geçilmemiş) haberler bu kadar gün sonra silinir. İşlem görmüş haberler kalır.</div>
@@ -92,10 +92,12 @@ export default function Ayarlar() {
 
 type AyarYaz = (key: string, value: unknown, mesaj: string) => Promise<void>;
 
-/** Otomatik taslak (ARCHITECTURE.md, 15 Ekim 2026): en güçlü haberlere taslak + WordPress'e taslak gönderimi. */
+/** Otomatik taslak (ARCHITECTURE.md, 15 Ekim 2026): en güçlü haberlere taslak + panele taslak haber olarak gönderim. */
 function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
   const { v } = useMasa();
-  const [a, setA] = useState<OtoAyar>({ ...OTO_VARSAYILAN, ...((v.ayarlar.oto_taslak ?? {}) as Partial<OtoAyar>) });
+  const kayitli = (v.ayarlar.oto_taslak ?? {}) as Partial<OtoAyar> & { wordpress?: boolean };
+  // Eski kayıtta "wordpress" adıyla durur (23 Ekim 2026'ya kadar)
+  const [a, setA] = useState<OtoAyar>({ ...OTO_VARSAYILAN, ...kayitli, site: kayitli.site ?? kayitli.wordpress ?? OTO_VARSAYILAN.site });
   const son = (v.ayarlar.oto_son ?? {}) as { zaman?: string; durum?: string; haber?: string; editor?: string; puan?: number; bugun?: number };
   const sinir = { gunluk: [1, 200], esik: [40, 150], bekle_dk: [0, 240], tur_basina: [1, 3] } as const;
   const sayi = (k: keyof typeof sinir) => (
@@ -105,10 +107,10 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
   return (
     <div className="panel">
       <h3>Otomatik taslak</h3>
-      <div className="muted">Öncelik puanı eşiği geçen haberlere (en yüksek puandan başlayarak) taslak, düğmeye basılmadan hazırlanır ve (atama açıksa) ilgi alanı en uygun editöre verilir; atama kapalıysa ya da eşleşen editör yoksa haber havuzda sahipsiz kalır. Taslak WordPress'e de <b>taslak</b> olarak gider; yayına basma kararı editörde.</div>
+      <div className="muted">Öncelik puanı eşiği geçen haberlere (en yüksek puandan başlayarak) taslak, düğmeye basılmadan hazırlanır ve (atama açıksa) ilgi alanı en uygun editöre verilir; atama kapalıysa ya da eşleşen editör yoksa haber havuzda sahipsiz kalır. Taslak sitenin paneline de <b>incelemede</b> bir haber olarak gider; yayına panelde yayın yönetmeni basar.</div>
       <label className="row"><input type="checkbox" checked={a.acik} onChange={(e) => setA({ ...a, acik: e.target.checked })} /> Otomatik taslak açık</label>
       <label className="row"><input type="checkbox" checked={a.ata} onChange={(e) => setA({ ...a, ata: e.target.checked })} /> Taslağı ilgi alanı en uygun editöre ata <span className="muted">(kapalıyken taslak havuzda sahipsiz kalır, kimseye bildirim gitmez)</span></label>
-      <label className="row"><input type="checkbox" checked={a.wordpress} onChange={(e) => setA({ ...a, wordpress: e.target.checked })} /> Hazırlanan taslağı WordPress'e taslak olarak gönder</label>
+      <label className="row"><input type="checkbox" checked={a.site} onChange={(e) => setA({ ...a, site: e.target.checked })} /> Hazırlanan taslağı panele (updated.com.tr) taslak olarak gönder</label>
       <div className="row">Günde en fazla {sayi("gunluk")} taslak</div>
       <div className="row">En az {sayi("esik")} puan <span className="muted">(= önem {(a.esik / 10).toLocaleString("tr")}/10 · {YAYIN_ESIK} = Öncelik 2 "yayına değer", {ANA_SAYFA_ESIK} = Öncelik 1 "ana sayfa adayı")</span></div>
       <div className="row">Haber düştükten {sayi("bekle_dk")} dk sonra <span className="muted">(diğer kaynaklar aynı karta birleşsin diye)</span></div>
@@ -123,7 +125,8 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
       <div><button className="btn sm" onClick={() => {
         const temiz = { ...a } as OtoAyar;
         for (const k of Object.keys(sinir) as (keyof typeof sinir)[]) temiz[k] = Math.max(sinir[k][0], Math.min(sinir[k][1], a[k]));
-        setA(temiz); ayar("oto_taslak", temiz, "Otomatik taslak ayarları kaydedildi.");
+        const { wordpress: _eski, ...kayit } = temiz as OtoAyar & { wordpress?: boolean };
+        setA(temiz); ayar("oto_taslak", kayit, "Otomatik taslak ayarları kaydedildi.");
       }}>Kaydet</button></div>
       {son.zaman && (
         <div className="muted">Son çalışma: {zamanOnce(son.zaman)} önce · {son.durum}{son.haber ? ` · "${son.haber}"${son.puan ? ` (${son.puan} puan)` : ""} → ${son.editor || "sahipsiz"}` : ""}{son.bugun !== undefined ? ` · bugün ${son.bugun}/${a.gunluk}` : ""}</div>
@@ -132,31 +135,32 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
   );
 }
 
-/** WordPress bağlantısı: bilgiler Supabase Secrets'ta (WP_URL, WP_USER, WP_APP_PASSWORD); burada sadece denenir. */
-function WordPress({ ayar }: { ayar: AyarYaz }) {
+/** Site paneli (Payload, panel.updated.com.tr) bağlantısı: anahtar Supabase Secrets'ta (STUDIO_IMPORT_KEY); burada sadece denenir.
+ *  WordPress bağlantısı 23 Ekim 2026'da kaldırıldı (ARCHITECTURE.md karar günlüğü). */
+function SitePaneli({ ayar }: { ayar: AyarYaz }) {
   const { v } = useMasa();
-  const [sonuc, setSonuc] = useState<{ ok: boolean; hata?: string; kullanici?: string; roller?: string[]; kategori?: number; site?: string; uyari?: string } | null>(null);
+  const [sonuc, setSonuc] = useState<{ ok: boolean; hata?: string; panel?: string; kategori?: number; yazar?: number; uyari?: string } | null>(null);
   const [suruyor, setSuruyor] = useState(false);
-  const kategoriler = ((v.ayarlar.wp_kategoriler ?? {}) as { liste?: { id: number; name: string; slug: string }[] }).liste ?? [];
+  const kategoriler = ((v.ayarlar.site_kategoriler ?? {}) as { liste?: { id: number | string; name: string; slug: string }[] }).liste ?? [];
   async function dene() {
     setSuruyor(true);
-    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { wp_dene: true } });
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { site_dene: true } });
     setSuruyor(false);
     setSonuc(error ? { ok: false, hata: error.message } : data);
   }
   return (
     <div className="panel">
-      <h3>WordPress bağlantısı</h3>
-      <div className="muted">Stüdyo, WordPress'teki ayrı bir "Stüdyo" kullanıcısıyla (rolü Editör) ve onun uygulama şifresiyle bağlanır. Şifre burada değil, sadece Supabase'in gizli bilgiler bölümünde durur.</div>
+      <h3>Site paneli bağlantısı</h3>
+      <div className="muted">Taslaklar updated.com.tr'nin paneline (panel.updated.com.tr) gider. Bağlantı anahtarı burada değil, Supabase'in gizli bilgiler bölümünde durur.</div>
       <div><button className="btn sm" onClick={dene} disabled={suruyor}>{suruyor ? "Deneniyor…" : "Bağlantıyı dene"}</button></div>
       {sonuc && (sonuc.ok
-        ? <div className="msg good">Bağlandı: {sonuc.site} · kullanıcı {sonuc.kullanici} ({(sonuc.roller ?? []).join(", ")}) · {sonuc.kategori} kategori okundu.{sonuc.uyari ? " " + sonuc.uyari : ""}</div>
+        ? <div className="msg good">Bağlandı: {sonuc.panel} · {sonuc.kategori} kategori okundu · {sonuc.yazar} yazar.{sonuc.uyari ? " " + sonuc.uyari : ""}</div>
         : <div className="msg err">{sonuc.hata}</div>)}
       {kategoriler.length > 0 && (
         <label>Yapay zekâ uygun kategori bulamazsa
-          <select value={String(v.ayarlar.wp_varsayilan_kategori ?? "")} onChange={(e) => ayar("wp_varsayilan_kategori", Number(e.target.value) || 0, "Varsayılan kategori kaydedildi.")}>
-            <option value="">WordPress'in varsayılanı</option>
-            {kategoriler.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+          <select value={String(v.ayarlar.site_varsayilan_kategori ?? "")} onChange={(e) => ayar("site_varsayilan_kategori", e.target.value, "Varsayılan kategori kaydedildi.")}>
+            <option value="">Seçilmedi (taslak gönderilmez, uyarı verir)</option>
+            {kategoriler.map((k) => <option key={k.slug} value={k.slug}>{k.name}</option>)}
           </select>
         </label>
       )}
