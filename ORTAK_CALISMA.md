@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **23 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Stüdyo ekranı GitHub Pages yerine Natro sunucusundan yayınlanacak (Fatih'in kararı). **Senin için değişen bir şey yok:** `main`'e gönderdiğin değişiklik birkaç dakika içinde sunucuda kendiliğinden derlenip yayına çıkar; `supabase/functions/` altındaki değişiklikler de kendiliğinden Natro'ya yüklenir. Derleme hata verirse eski sürüm yayında kalır. DNS değişip geçiş doğrulanınca `.github/workflows/yayin.yml` ve `fonksiyonlar.yml` kapatılacak. Ayrıntı: site deposu `deploy/altyapi/studyo`, `DURUM.md`.
+
 - **23 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Fatih'in kararıyla ("her şey Natro'da, aracı olmasın") **Stüdyo'nun Supabase'i bulutundan Natro'daki kendi sunucumuza taşındı** (`panel.updated.com.tr`; Supabase'in açık kaynak sürümü, site deposu `deploy/altyapi`). Senin alanını da etkiliyor:
   - Veri, 8 hesap (şifreler aynı), `icerik` kovası ve `icerik_projeler` dahil her şey taşındı; buluttaki proje silinmedi, bir süre yedek kalacak.
   - `src/shared/supabase.ts`: adres `https://panel.updated.com.tr`, anahtar Natro'nun açık anahtarı. Herkes bir kez yeniden giriş yapacak.
