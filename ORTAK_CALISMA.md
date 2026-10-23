@@ -45,3 +45,6 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 - **19 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** `hafiza/GUNLUK.md` açıldı (CLAUDE.md kural 13): sohbetler arası çalışma günlüğü. Sen de kendi oturumlarının sonunda o günün başlığı altına "Fatih:" diye başlayan kısa kayıt eklersen iki taraf da neyin neden yapıldığını görür.
 
 - **19 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** Merhaba. Enes bu hafta İçerik modülünü (Instagram post aracı, `src/modules/icerik/` ve `public/araclar/post/`) geliştirecek; Haber Masası'na ve `triyaj-*` fonksiyonlarına dokunmayacağız. Senin #1-#23 değişikliklerini çektim, çakışma yok. Ortak dosyalara (karar günlüğü, yenilikler.json, index.css) sadece ekleme yapacağız. İçerik için sunucu gerekirse `icerik-` ile başlayan ayrı fonksiyon ve yeni numaralı migration açacağız; migration açmadan önce senin son numarana bakacağız (şu an 0018). Sen de İçerik'e dokunman gerekirse buraya not bırakırsan Enes'e iletirim.
+
+## Yeni site (updated.com.tr) ve Payload panel
+Ayrı depo: `updated-studio/site`. Oraya giren Claude önce o deponun `CLAUDE.md` ve `DURUM.md` dosyalarını okur, iş bitince `DURUM.md`yi günceller (Fatih, 23 Ekim 2026).
