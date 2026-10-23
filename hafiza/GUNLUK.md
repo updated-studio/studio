@@ -17,7 +17,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Şu an (her oturumda güncellenir)
 
-- **23 Ekim 16:45 (Fatih'in Claude'u):** Stüdyo ekranı Natro'da derlenip yayınlanıyor; DNS değişikliği bekleniyor, sonra GitHub Pages kapanacak. Ayrıntı günlükte ve site deposu DURUM.md.
+- **23 Ekim 21:55 (Fatih'in Claude'u):** **Stüdyo tamamen Natro'da** (ekran, veri, giriş, fonksiyonlar, zamanlanmış işler). `main`'e gönderim → 2-5 dk'da yayında; göç elle (`sudo updated-studyo-goc`). Ayrıntı günlükte ve site deposu DURUM.md.
 - **23 Ekim 07:50 (Fatih'in Claude'u):** Stüdyo Natro'da (kendi Supabase'imiz, `panel.updated.com.tr`); bulut yedek olarak duruyor. Ayrıntı günlükte.
 - **23 Ekim 04:35 (Fatih'in Claude'u):** Haber Masası taslakları WordPress'ten yeni sitenin paneline taşınıyor (PR #24, site PR #1); `SUPABASE_ACCESS_TOKEN` bekleniyor. Ayrıntı günlükte.
 - **Son güncelleme:** 21 Ekim 2026 17:10, Enes'in Claude'u. İçerik → Post editörü artık Stüdyo'nun kendi editörü, eski aracın bütün özellikleriyle (motor birebir); Enes'in denemesi bekleniyor.
@@ -65,6 +65,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 
 ### 23 Ekim 2026
+- (21:55, Fatih'in Claude'u, Natro sunucusunda) **Stüdyo taşıması bitti.** Kullanıcı: "tamamen bitirmeden diğer işlere geçmiyoruz, her seferinde sorduruyorsun." Denetim: veri, 8 hesap, 4 kova, 8 zamanlanmış iş, fonksiyonlar Natro'da çalışıyor (son 6 saatte 240 haber, 24 saatte 102 taslak). Kapatılan: `yayin.yml` (Pages), `fonksiyonlar.yml` ve `veritabani.yml` (bulut). Veritabanı göçü artık sunucuda elle: `sudo updated-studyo-goc <dosya>` (otomatik değil, bilerek). Site deposundaki tehlikeli "Stüdyo taşıma" iş akışı kaldırıldı (Natro verisini bayat bulut kopyasıyla ezerdi). Kalan elle işler: GitHub Pages ayarından yayını kaldırma, Flux (Fatih'in Mac'i).
 - (18:15, Fatih'in Claude'u, Natro sunucusunda) `studio.updated.com.tr` artık Natro'dan açılıyor (DNS A kaydı, sertifika alındı). GitHub Pages kopyası henüz kapatılmadı; ekip denemesinden sonra.
 - (16:45, Fatih'in Claude'u, Natro sunucusunda) **Stüdyo ekranı Natro'da hazır** (site deposu `deploy/altyapi/studyo`): sunucu 2 dakikada bir bu deponun `main` dalına bakıyor; değişiklik varsa ekranı derliyor (~40 sn) ve değişen `supabase/functions/*` fonksiyonlarını Natro'daki Supabase'e yüklüyor. Derleme hata verirse eski sürüm kalıyor. Çalışma şekli aynı: `main`'e gönder → birkaç dakikada yayında. Bekleyen: Fatih'in DNS değişikliği (`studio` → `panel.updated.com.tr`); geçiş doğrulanınca `yayin.yml` (GitHub Pages) ve `fonksiyonlar.yml` (bulut) kapatılacak. Depo sunucuda kalıcı olarak `/opt/updated/studio`.
 - (16:05, Fatih'in Claude'u) Gün özeti: elle hazırlanan taslaklar da panele kendiliğinden gidiyor (PR #25, Natro'da yayında); Natro giden e-posta portlarını açtı (şifre sıfırlama ve bildirimler çalışıyor, Deniz girdi); WordPress kapatıldı (30 Ekim'de dosyaları silinecek); Natro gece yedeği (şifreli, hosting). **Claude artık Natro sunucusunda da çalışıyor** ("Natro sunucu" oturumu); sunucu işleri oradan yapılır. Sıradaki: Stüdyo ekranı GitHub Pages'ten Natro'ya. Öncelik listesi: site deposu DURUM.md → "Sıradaki işler".
