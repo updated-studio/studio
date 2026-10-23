@@ -17,6 +17,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Şu an (her oturumda güncellenir)
 
+- **23 Ekim 07:50 (Fatih'in Claude'u):** Stüdyo Natro'da (kendi Supabase'imiz, `panel.updated.com.tr`); bulut yedek olarak duruyor. Ayrıntı günlükte.
 - **23 Ekim 04:35 (Fatih'in Claude'u):** Haber Masası taslakları WordPress'ten yeni sitenin paneline taşınıyor (PR #24, site PR #1); `SUPABASE_ACCESS_TOKEN` bekleniyor. Ayrıntı günlükte.
 - **Son güncelleme:** 21 Ekim 2026 17:10, Enes'in Claude'u. İçerik → Post editörü artık Stüdyo'nun kendi editörü, eski aracın bütün özellikleriyle (motor birebir); Enes'in denemesi bekleniyor.
 - **Kim ne yapıyor:** Fatih Haber Masası'nda (otomatik taslak, WordPress, görsel, kümeleme). Enes İçerik modülüne başlıyor (Instagram post aracı). Ayrıntı: ORTAK_CALISMA.md.
@@ -63,6 +64,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 
 ### 23 Ekim 2026
+- (07:50, Fatih'in Claude'u) **Stüdyo Natro'daki kendi Supabase sunucumuza taşındı** (Fatih: "her şey Natro'da, aracı olmasın"). PR #24 birleşti: arayüz `https://panel.updated.com.tr`, Haber Masası taslakları panele. Bulut projesi silinmedi, zamanlanmış işleri durduruldu. Natro'daki ilk tur 07:45 sorunsuz. Herkes bir kez yeniden giriş yapacak. Supabase bağlantısı (connector) ve panel artık Stüdyo'yu göstermez; ayrıntı ORTAK_CALISMA notu ve site deposu DURUM.md. Sırada: WordPress'i kapatmadan önce panele gönderim denemesi, Flux ayarı, yedek, GitHub → Forgejo.
 - (04:35, Fatih'in Claude'u) Fatih: "Stüdyo'nun otomatik ve elle hazırlanan taslaklarını WordPress yerine doğrudan Payload paneline gönderelim; bitince WordPress tamamen devreden çıksın." Yapılan (PR #24): `triyaj-taslak/site.ts` (wordpress.ts kaldırıldı), Ayarlar → "Site paneli bağlantısı", Taslaklar → "Panele gönder" / "Son taslağı aç" / "Panelde aç", göç 0024 (`site_*`), "Veritabanı göçü" (elle) ve PR "Kontrol" iş akışları. Site tarafı: site PR #1 (uç sağlamlaştırma + anahtar eşitleme + WordPress kapatma anahtarı). **Engel:** `SUPABASE_ACCESS_TOKEN` hiçbir depoda yok (fonksiyonlar 23 Ekim'den beri GitHub'dan yayınlanamıyor; etiket düzeltmesi de yayında değil); Fatih organizasyon secret'ı olarak girince sıra: site PR → göç 0024 → bu PR → deneme → `canli.json` wordpress=false.
 - (Fatih'in Claude'u) Otomatik taslak ataması duraklatıldı (Fatih: "uzmanlık alanları ve bölümler henüz belirlenmedi"): ayar `ata` (varsayılan kapalı), Ayarlar'da kutu. Edge Function'lar artık `.github/workflows/fonksiyonlar.yml` ile yayınlanıyor (SUPABASE_ACCESS_TOKEN secret'ı gerekli).
 - (Fatih'in Claude'u, yeni site oturumu) Etiket yığılması düzeltildi: WordPress'te 1.725 etiketin 1.513'ü boştu (otomatik taslaklar her etiketi açıyordu). `triyaj-taslak/wordpress.ts` etiketIdleri: en fazla 3; yalnız var olan ≥2 yazılık etiket ya da `ETIKET_IZINLI` listesindeki ad; liste dışı yeni etiket açılmaz. İstem: 2-4 etiket, marka → ürün ailesi → ana konu. **Fonksiyonun yeniden yayınlanması gerekiyor (Supabase → Edge Functions → triyaj-taslak).**
