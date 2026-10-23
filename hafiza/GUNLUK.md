@@ -62,6 +62,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 
 ### 23 Ekim 2026
+- (Fatih'in Claude'u) Otomatik taslak ataması duraklatıldı (Fatih: "uzmanlık alanları ve bölümler henüz belirlenmedi"): ayar `ata` (varsayılan kapalı), Ayarlar'da kutu. Edge Function'lar artık `.github/workflows/fonksiyonlar.yml` ile yayınlanıyor (SUPABASE_ACCESS_TOKEN secret'ı gerekli).
 - (Fatih'in Claude'u, yeni site oturumu) Etiket yığılması düzeltildi: WordPress'te 1.725 etiketin 1.513'ü boştu (otomatik taslaklar her etiketi açıyordu). `triyaj-taslak/wordpress.ts` etiketIdleri: en fazla 3; yalnız var olan ≥2 yazılık etiket ya da `ETIKET_IZINLI` listesindeki ad; liste dışı yeni etiket açılmaz. İstem: 2-4 etiket, marka → ürün ailesi → ana konu. **Fonksiyonun yeniden yayınlanması gerekiyor (Supabase → Edge Functions → triyaj-taslak).**
 
 ### 22 Ekim 2026

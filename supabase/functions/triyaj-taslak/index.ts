@@ -621,7 +621,7 @@ async function otoCalistir(sb: Sb) {
     const { data: kilit } = await sb.from("tr_items").update({ work_state: "taslak", work_error: "", touched: true, auto_draft_at: new Date().toISOString() })
       .eq("id", secim.h.id).eq("work_state", "").is("taken_by", null).select("id");
     if (!kilit?.length) continue;
-    const editor = editorSec(secim.h, (prof ?? []) as Profil[], musait, yuk);
+    const editor = ayar.ata ? editorSec(secim.h, (prof ?? []) as Profil[], musait, yuk) : null; // atama kapalıysa sahipsiz (bildirim gitmez)
     if (editor) yuk.set(editor.id, (yuk.get(editor.id) ?? 0) + 1);
     baslayan.push({ id: secim.h.id, puan: secim.d.puan, editor: editor?.name ?? null });
     const sure = new Promise<void>((r) => setTimeout(async () => {

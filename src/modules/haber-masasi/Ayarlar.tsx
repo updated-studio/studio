@@ -105,8 +105,9 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
   return (
     <div className="panel">
       <h3>Otomatik taslak</h3>
-      <div className="muted">Öncelik puanı eşiği geçen haberlere (en yüksek puandan başlayarak) taslak, düğmeye basılmadan hazırlanır ve ilgi alanı en uygun editöre verilir. Eşleşen editör yoksa haber havuzda sahipsiz kalır. Taslak WordPress'e de <b>taslak</b> olarak gider; yayına basma kararı editörde.</div>
+      <div className="muted">Öncelik puanı eşiği geçen haberlere (en yüksek puandan başlayarak) taslak, düğmeye basılmadan hazırlanır ve (atama açıksa) ilgi alanı en uygun editöre verilir; atama kapalıysa ya da eşleşen editör yoksa haber havuzda sahipsiz kalır. Taslak WordPress'e de <b>taslak</b> olarak gider; yayına basma kararı editörde.</div>
       <label className="row"><input type="checkbox" checked={a.acik} onChange={(e) => setA({ ...a, acik: e.target.checked })} /> Otomatik taslak açık</label>
+      <label className="row"><input type="checkbox" checked={a.ata} onChange={(e) => setA({ ...a, ata: e.target.checked })} /> Taslağı ilgi alanı en uygun editöre ata <span className="muted">(kapalıyken taslak havuzda sahipsiz kalır, kimseye bildirim gitmez)</span></label>
       <label className="row"><input type="checkbox" checked={a.wordpress} onChange={(e) => setA({ ...a, wordpress: e.target.checked })} /> Hazırlanan taslağı WordPress'e taslak olarak gönder</label>
       <div className="row">Günde en fazla {sayi("gunluk")} taslak</div>
       <div className="row">En az {sayi("esik")} puan <span className="muted">(= önem {(a.esik / 10).toLocaleString("tr")}/10 · {YAYIN_ESIK} = Öncelik 2 "yayına değer", {ANA_SAYFA_ESIK} = Öncelik 1 "ana sayfa adayı")</span></div>
