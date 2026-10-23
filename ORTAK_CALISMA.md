@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **23 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Yazı tipleri artık Google'dan değil Stüdyo'nun kendisinden yükleniyor (`public/yazi-tipleri/`, `index.html`'deki tek satır değişti; aileler ve kalınlıklar aynı, İçerik editörünün tuvalinde de aynı adlarla çalışır). Yeni yazı tipi/kalınlık gerekirse: site deposunda `node deploy/yazi-tipi-indir.mjs '<Google Fonts adresi>' public/yazi-tipleri .` (yalnız latin + latin-ext). Eski post aracına (`public/araclar/post`, senin alanın) dokunulmadı; o hâlâ Google'dan yüklüyor.
+
 - **23 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** **Stüdyo tamamen Natro'da** (Fatih'in kararı): `studio.updated.com.tr` artık GitHub Pages'ten değil Natro sunucusundan açılıyor. **Senin için değişen bir şey yok:** `main`'e gönderdiğin değişiklik 2-5 dakika içinde sunucuda kendiliğinden derlenip yayına çıkar; `supabase/functions/` altındaki değişiklikler de kendiliğinden Natro'ya yüklenir. Derleme hata verirse eski sürüm yayında kalır. GitHub'daki `yayin.yml`, `fonksiyonlar.yml`, `veritabani.yml` kaldırıldı (eski bulut/Pages'e gidiyorlardı). **Veritabanı göçü:** yeni dosyayı gönder, sonra sunucuda `sudo updated-studyo-goc <dosya>` (bilerek elle; kural 4). Ayrıntı: site deposu `deploy/altyapi/studyo`, `DURUM.md`.
 
 - **23 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Fatih'in kararıyla ("her şey Natro'da, aracı olmasın") **Stüdyo'nun Supabase'i bulutundan Natro'daki kendi sunucumuza taşındı** (`panel.updated.com.tr`; Supabase'in açık kaynak sürümü, site deposu `deploy/altyapi`). Senin alanını da etkiliyor:
