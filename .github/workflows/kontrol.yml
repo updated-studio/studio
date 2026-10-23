@@ -24,7 +24,7 @@ jobs:
           # Hatalar Actions özetinde de görünsün diye ::error notu olarak yazılır (ilk 2500 karakter)
           for f in supabase/functions/*/index.ts; do
             echo "== $f"
-            if ! deno check "$f" > /tmp/c.log 2>&1; then
+            if ! deno check --node-modules-dir=none "$f" > /tmp/c.log 2>&1; then
               hata=1; cat /tmp/c.log
               node -e "const t=require('fs').readFileSync('/tmp/c.log','utf8').replace(/\x1b\[[0-9;]*m/g,'').slice(0,2500);console.log('::error title='+process.argv[1]+'::'+t.replace(/%/g,'%25').replace(/\r/g,'').replace(/\n/g,'%0A'))" "$f"
             fi
