@@ -37,7 +37,7 @@ jobs:
           git checkout -q -
           # Tipsiz Supabase istemcisinden gelen 'never' uyarıları bilinen sınıf; sayılmaz
           comm -13 /tmp/ana.txt /tmp/pr.txt | grep -v "'never" > /tmp/yeni.txt || true
-          echo "ana dal: $(wc -l < /tmp/ana.txt) bilinen · PR: $(wc -l < /tmp/pr.txt) · yeni: $(wc -l < /tmp/yeni.txt)"
+          echo "::notice title=Tip denetimi::ana dal: $(wc -l < /tmp/ana.txt) bilinen · PR: $(wc -l < /tmp/pr.txt) · yeni: $(wc -l < /tmp/yeni.txt)"
           if [ -s /tmp/yeni.txt ]; then
             cat /tmp/yeni.txt
             node -e "const t=require('fs').readFileSync('/tmp/yeni.txt','utf8').slice(0,3000);console.log('::error title=Yeni tip hataları::'+t.replace(/%/g,'%25').replace(/\n/g,'%0A'))"
