@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-23-c",
+    "tarih": "23 Ekim 2026",
+    "baslik": "Stüdyo yeni sunucusunda",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Stüdyo artık Updated'ın kendi sunucusunda çalışıyor.",
+          "Herkesin bir kez yeniden giriş yapması gerekiyor; şifreler aynı.",
+          "Üstteki altyapı uyarısı artık kendi sunucumuzu gösteriyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-23-b",
     "tarih": "23 Ekim 2026",
     "baslik": "Taslaklar yeni siteye gidiyor",

@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Açık (paylaşılabilir) anahtar. Veriyi koruyan şey veritabanındaki erişim kurallarıdır (RLS).
-export const SUPABASE_URL = "https://fulmooonidwrqyybbkvu.supabase.co";
-const PUBLISHABLE_KEY = "sb_publishable_MFb3gtgEx4bci2HAmLrUTA_BWCOMGi6";
+// Natro'daki kendi Supabase sunucumuz (23 Ekim 2026'ya kadar Supabase bulutu: fulmooonidwrqyybbkvu.supabase.co).
+// Açık (paylaşılabilir) anahtar: tarayıcıya konur, gizli değildir. Veriyi koruyan şey veritabanındaki erişim kurallarıdır (RLS).
+export const SUPABASE_URL = "https://panel.updated.com.tr";
+export const PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkyNzIxMjQyLCJleHAiOjE5NTA0MDEyNDJ9.E1JwNdTSj6BF2NuOxFtK1_LmAIVeI3Qn3sEvZLd85j8";
 
 export const sb = createClient(SUPABASE_URL, PUBLISHABLE_KEY);
 
