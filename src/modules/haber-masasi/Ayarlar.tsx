@@ -110,7 +110,7 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
       <div className="muted">Öncelik puanı eşiği geçen haberlere (en yüksek puandan başlayarak) taslak, düğmeye basılmadan hazırlanır ve (atama açıksa) ilgi alanı en uygun editöre verilir; atama kapalıysa ya da eşleşen editör yoksa haber havuzda sahipsiz kalır. Taslak sitenin paneline de <b>incelemede</b> bir haber olarak gider; yayına panelde yayın yönetmeni basar.</div>
       <label className="row"><input type="checkbox" checked={a.acik} onChange={(e) => setA({ ...a, acik: e.target.checked })} /> Otomatik taslak açık</label>
       <label className="row"><input type="checkbox" checked={a.ata} onChange={(e) => setA({ ...a, ata: e.target.checked })} /> Taslağı ilgi alanı en uygun editöre ata <span className="muted">(kapalıyken taslak havuzda sahipsiz kalır, kimseye bildirim gitmez)</span></label>
-      <label className="row"><input type="checkbox" checked={a.site} onChange={(e) => setA({ ...a, site: e.target.checked })} /> Hazırlanan taslağı panele (updated.com.tr) taslak olarak gönder</label>
+      <label className="row"><input type="checkbox" checked={a.site} onChange={(e) => setA({ ...a, site: e.target.checked })} /> Hazırlanan taslakları (otomatik ve elle) panele (updated.com.tr) taslak olarak gönder</label>
       <div className="row">Günde en fazla {sayi("gunluk")} taslak</div>
       <div className="row">En az {sayi("esik")} puan <span className="muted">(= önem {(a.esik / 10).toLocaleString("tr")}/10 · {YAYIN_ESIK} = Öncelik 2 "yayına değer", {ANA_SAYFA_ESIK} = Öncelik 1 "ana sayfa adayı")</span></div>
       <div className="row">Haber düştükten {sayi("bekle_dk")} dk sonra <span className="muted">(diğer kaynaklar aynı karta birleşsin diye)</span></div>
