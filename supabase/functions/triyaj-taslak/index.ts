@@ -391,7 +391,7 @@ ${metinler.join("\n\n---\n\n")}`;
 // ---------- Son kalite kontrolü (ARCHITECTURE.md, 18 Ekim 2026) ----------
 // Taslak yazıldıktan hemen sonra ayrı bir çağrıyla çalışır (her çağrının kendi ~150 sn sınırı var):
 // 1) kaynaklara karşı doğrulama + düzeltme + insanlaştırma (uslup.ts KONTROL_SISTEM), 2) öne çıkan görsel (yoksa Flux isteği),
-// 3) otomatik taslaksa panele taslak haber olarak gönderim. Editör bu arada metni değiştirdiyse düzeltme metne uygulanmaz, notlara yazılır.
+// 3) panele taslak haber olarak gönderim (otomatik ve elle hazırlanan taslaklar). Editör bu arada metni değiştirdiyse düzeltme metne uygulanmaz, notlara yazılır.
 
 const spotKisalt = (s: string, n = 210) => {
   const t = s.replace(/\s+/g, " ").trim();
@@ -490,15 +490,16 @@ async function kontrol(sb: Sb, id: number) {
       await sb.from("tr_drafts").update({ image: { ...img, secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: oneCikan.neden, ...(flux ? { flux } : {}) } }).eq("id", id);
     }
 
-    // 3) Otomatik taslak: panele taslak haber olarak (bağlantı kuruluysa, ayar açıksa, kaynağın tam metni okunduysa)
+    // 3) Panele taslak haber olarak: otomatik ve elle hazırlanan bütün taslaklar (Fatih, 23 Ekim 2026: "hazırlayınca panelde görünsün").
+    //    Bağlantı kuruluysa, ayar açıksa, kaynağın tam metni okunduysa. Sonradan Stüdyo'da düzeltilirse "Paneldeki taslağı güncelle".
     let siteDurum = "Sadece Stüdyo'da";
+    const ayar = await otoAyar(sb);
+    if (ayar.site && siteAyar()) {
+      if (!qc.tam_metin) { await sb.from("tr_drafts").update({ site_hata: "Kaynağın tam metni alınamadığı için panele otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", id); siteDurum = "tam metin yok, gönderilmedi"; }
+      else if (bitis - Date.now() < 35_000) { await sb.from("tr_drafts").update({ site_bekliyor: true }).eq("id", id); siteDurum = "panele sonraki turda gidecek"; }
+      else { const r = await siteGonder(sb, id, { kategoriSec }); siteDurum = r.ok ? "panele taslak olarak gitti" : "Panel hatası: " + r.hata; }
+    }
     if (t.auto) {
-      const ayar = await otoAyar(sb);
-      if (ayar.site && siteAyar()) {
-        if (!qc.tam_metin) { await sb.from("tr_drafts").update({ site_hata: "Kaynağın tam metni alınamadığı için panele otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", id); siteDurum = "tam metin yok, gönderilmedi"; }
-        else if (bitis - Date.now() < 35_000) { await sb.from("tr_drafts").update({ site_bekliyor: true }).eq("id", id); siteDurum = "panele sonraki turda gidecek"; }
-        else { const r = await siteGonder(sb, id, { kategoriSec }); siteDurum = r.ok ? "panele taslak olarak gitti" : "Panel hatası: " + r.hata; }
-      }
       const { data: son } = await sb.from("tr_drafts").select("image,site_id").eq("id", id).maybeSingle();
       const im = (son?.image ?? {}) as { secilen?: unknown; flux?: unknown };
       const gDurum = im.secilen ? (son?.site_id ? "görsel kapak oldu" : "görsel seçildi") : im.flux ? "görsel Flux'ta üretilecek" : "görselsiz";

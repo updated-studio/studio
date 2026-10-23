@@ -161,7 +161,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       </div>
       {haber && <div className="muted">Haber: <a href={haber.link} target="_blank" rel="noreferrer">{haber.event || haber.title}</a></div>}
       {t.auto && <div className="muted">🤖 Bu taslağı Stüdyo en güçlü haberlerden otomatik hazırladı{t.author ? " ve ilgi alanına göre sana verdi" : ""}. Yayından önce doğrulama listesine bak.</div>}
-      {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel{t.auto ? " ve panele gönderim" : ""}). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
+      {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel ve panele gönderim). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
       {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
       {t.site_id && <div className="msg good">Panelde taslak haber olarak duruyor{t.site_gonderim ? " (" + zamanOnce(t.site_gonderim) + " önce gönderildi)" : ""}. {t.site_onizleme && <a href={t.site_onizleme} target="_blank" rel="noreferrer">Son taslağı aç ↗</a>}{t.site_admin && <> · <a href={t.site_admin} target="_blank" rel="noreferrer">Panelde aç ↗</a></>}</div>}
       {t.site_hata && <div className="msg err">{t.site_hata}{/düzenlenmiş/.test(t.site_hata) && <> <button className="linkbtn" onClick={() => siteGonder(true)}>Üzerine yaz</button></>}</div>}
