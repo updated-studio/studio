@@ -4,7 +4,7 @@ import { degerlendir, ilgiEslesme } from "./puan.ts";
 // Varsayılanlar; Haber Masası → Ayarlar'dan (tr_settings.oto_taslak) değiştirilir.
 export const OTO_VARSAYILAN = {
   acik: false,              // otomatik taslak çalışsın mı (kapalı başlar; Ayarlar'dan açılır)
-  wordpress: true,          // hazırlanan taslak WordPress'e taslak olarak gitsin mi
+  site: true,               // hazırlanan taslak yeni sitenin paneline taslak haber olarak gitsin mi (23 Ekim 2026'ya kadar "wordpress")
   ata: false,               // taslak ilgi alanına göre editöre atansın mı (Fatih, 23 Ekim: uzmanlık alanları belirlenene kadar kapalı; taslak havuzda sahipsiz kalır)
   gunluk: 100,              // günde en fazla kaç otomatik taslak (İstanbul saatiyle gün)
   esik: 55,                 // en az bu öncelik puanı = önem 5,5/10 (Öncelik 2 "yayına değer"; 80 = Öncelik 1 "ana sayfa adayı")

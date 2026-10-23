@@ -1,17 +1,17 @@
 // Haber Masası: seçilen haberin kaynağını okur; ham Türkçe çeviri ya da Updated standardında haber taslağı üretir.
 // Eski "Updated Triyaj" (Kod.gs: taslakHazirla_, ceviriGetir, gorselYaz_) mantığının karşılığı. Taslak Google Docs yerine Stüdyo'da (tr_drafts) durur.
 // Çağıranlar:
-//   - Stüdyo (giriş yapmış ekip üyesi): {item_id, tur} taslak/çeviri; {wp:true, draft_id} WordPress'e gönder; {wp_dene:true} bağlantı denemesi (yönetici).
-//   - Zamanlanmış görev (10 dk'da bir, tr_oto_kick): {oto:true} en güçlü haberden birine otomatik taslak + WordPress'e taslak.
-// Gizli bilgi (Supabase Secrets): GEMINI_API_KEY; WordPress için WP_URL, WP_USER, WP_APP_PASSWORD;
+//   - Stüdyo (giriş yapmış ekip üyesi): {item_id, tur} taslak/çeviri; {site:true, draft_id} panele (yeni site) gönder; {site_dene:true} bağlantı denemesi (yönetici).
+//   - Zamanlanmış görev (10 dk'da bir, tr_oto_kick): {oto:true} en güçlü haberden birine otomatik taslak + panele taslak haber.
+// Gizli bilgi (Supabase Secrets): GEMINI_API_KEY; panel (yeni site) için STUDIO_IMPORT_KEY (isteğe bağlı PANEL_URL, SITE_URL);
 // isteğe bağlı stok fotoğraf anahtarları UNSPLASH_ACCESS_KEY, PIXABAY_API_KEY, PEXELS_API_KEY.
-// Dosyalar: uslup.ts (yazım üslubu, insanlaştırma), puan.ts (öncelik puanı, ekranla ortak), secim.ts (otomatik taslak: haber ve editör seçimi), gorsel.ts (öne çıkan görsel), html.ts (Markdown → HTML, ekranla ortak), wordpress.ts (WordPress REST).
-// Panelden yayınlarken yedi dosya birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
+// Dosyalar: uslup.ts (yazım üslubu, insanlaştırma), puan.ts (öncelik puanı, ekranla ortak), secim.ts (otomatik taslak: haber ve editör seçimi), gorsel.ts (öne çıkan görsel), html.ts (Markdown → HTML, ekranla ortak), site.ts (yeni sitenin paneline gönderim; WordPress 23 Ekim 2026'da devreden çıktı).
+// Yayın GitHub'dan (.github/workflows/fonksiyonlar.yml); dosyalar birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
-import { wpAyar, wpDene, wpGonder, wpIlgili, wpOneCikanEkle, type Kategori } from "./wordpress.ts";
+import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, type Kategori } from "./site.ts";
 import { adayListesi, commons, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
@@ -198,9 +198,9 @@ type IsSecenek = { oto?: boolean };
 const istanbulGun = () => new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" }).slice(0, 10);
 const istanbulZaman = () => new Date().toLocaleString("sv-SE", { timeZone: "Europe/Istanbul" }).slice(0, 16);
 
-/** Sitedeki kategoriler (WordPress'ten okunmuş ve saklanmış liste); yoksa boş. Yapay zekâ kategoriyi bu listeden seçer. */
+/** Sitedeki kategoriler (panelden okunmuş ve saklanmış liste); yoksa boş. Yapay zekâ kategoriyi bu listeden seçer. */
 async function kayitliKategoriler(sb: Sb): Promise<Kategori[]> {
-  const { data } = await sb.from("tr_settings").select("value").eq("key", "wp_kategoriler").maybeSingle();
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "site_kategoriler").maybeSingle();
   return ((data?.value as { liste?: Kategori[] } | null)?.liste ?? []).filter((k) => k.slug !== "uncategorized");
 }
 
@@ -284,12 +284,12 @@ async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici:
     const [ana, ...ekler] = await Promise.all([kaynakOku(it.link, 14000), ...diger.map((o) => kaynakOku(o.link, 8000))]);
     const metinler = [`KAYNAK 1 (${it.source_name}) ${it.link}\n` + (ana.metin.length >= 300 ? ana.metin : `(Tam metin alınamadı. Başlık: ${it.title})`)];
     ekler.forEach((e, i) => { if (e.metin.length >= 300) metinler.push(`KAYNAK ${metinler.length + 1} (${diger[i].name}) ${diger[i].link}\n` + e.metin); });
-    // Kaynak sitelerin kendi etiketleri (meta: article:tag, news_keywords, keywords): WordPress etiketleri için aday
+    // Kaynak sitelerin kendi etiketleri (meta: article:tag, news_keywords, keywords): etiket (panelde varlık) adayı
     const kaynakEtiket = [...new Set([ana, ...ekler].flatMap((e) => e.etiketler))].slice(0, 25);
     // Sitemizin arşivinden ilgili yazılar (iç link adayı)
-    const ilgili = await wpIlgili([[it.brand, it.product].filter(Boolean).join(" "), it.product, it.brand].filter(Boolean)).catch(() => []);
+    const ilgili = await siteIlgili([[it.brand, it.product].filter(Boolean).join(" "), it.product, it.brand].filter(Boolean)).catch(() => []);
     await nabiz();
-    // Kategori sitedeki listeden seçilsin (liste WordPress'ten okununca saklanır; yoksa serbest yazar)
+    // Kategori sitedeki listeden seçilsin (liste panelden okununca saklanır; yoksa serbest yazar)
     const kategoriler = await kayitliKategoriler(sb);
     const katSatiri = kategoriler.length ? `\nKATEGORİ: "kategori" alanına SADECE şu listeden birini aynen yaz: ${kategoriler.map((k) => k.name).join(" | ")}\n` : "";
     const istem = `UYARI: Aşağıdaki özet ve tür etiketi otomatik üretildi, hatalı olabilir. Haberin resmi mi, sızıntı mı, söylenti mi olduğunu ve ürünün piyasada olup olmadığını SADECE kaynak metne bakarak kendin belirle.
@@ -327,7 +327,7 @@ ${metinler.join("\n\n---\n\n")}`;
     const spot = spotKisalt(String(t.spot ?? ""));
     const govdeMd = linkTemizle(parcalar.join("\n\n"), ilgili.map((x) => x.link));
 
-    // Kaynaklar (Stüdyo'da kalır, WordPress'e gitmez): ilk yazan + diğerleri + asıl kaynak
+    // Kaynaklar (panelde haberin "Kaynaklar" listesine gider; ilk satır birincil): ilk yazan + diğerleri + asıl kaynak
     const kaynaklar = [`${it.source_name} — ${it.link}`, ...((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link !== it.link).map((o) => `${o.name} — ${o.link}`)];
     if (it.origin) kaynaklar.push("Asıl kaynak: " + it.origin);
 
@@ -371,7 +371,7 @@ ${metinler.join("\n\n---\n\n")}`;
       if (kullanici) await sb.from("notifications").insert({ user_id: kullanici, body: `Otomatik taslak sana atandı: ${kartBaslik} (Haber Masası → Taslaklar)` });
       await otoOzet(sb, { durum: "Taslak yazıldı · kalite kontrolü sürüyor", haber: kartBaslik, editor: kullanici ? ad : "" });
     }
-    // Kalite kontrolü + görsel + (otomatikse) WordPress: ayrı çağrı, kendi süre bütçesiyle
+    // Kalite kontrolü + görsel + (otomatikse) panele gönderim: ayrı çağrı, kendi süre bütçesiyle
     if (yeni?.id) await kontrolBaslat(yeni.id);
   } catch (e) {
     const mesaj = String((e as Error).message ?? e);
@@ -391,7 +391,7 @@ ${metinler.join("\n\n---\n\n")}`;
 // ---------- Son kalite kontrolü (ARCHITECTURE.md, 18 Ekim 2026) ----------
 // Taslak yazıldıktan hemen sonra ayrı bir çağrıyla çalışır (her çağrının kendi ~150 sn sınırı var):
 // 1) kaynaklara karşı doğrulama + düzeltme + insanlaştırma (uslup.ts KONTROL_SISTEM), 2) öne çıkan görsel (yoksa Flux isteği),
-// 3) otomatik taslaksa WordPress'e taslak olarak gönderim. Editör bu arada metni değiştirdiyse düzeltme metne uygulanmaz, notlara yazılır.
+// 3) otomatik taslaksa panele taslak haber olarak gönderim. Editör bu arada metni değiştirdiyse düzeltme metne uygulanmaz, notlara yazılır.
 
 const spotKisalt = (s: string, n = 210) => {
   const t = s.replace(/\s+/g, " ").trim();
@@ -490,19 +490,19 @@ async function kontrol(sb: Sb, id: number) {
       await sb.from("tr_drafts").update({ image: { ...img, secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: oneCikan.neden, ...(flux ? { flux } : {}) } }).eq("id", id);
     }
 
-    // 3) Otomatik taslak: WordPress'e taslak olarak (bağlantı kuruluysa, ayar açıksa, kaynağın tam metni okunduysa)
-    let wpDurum = "Sadece Stüdyo'da";
+    // 3) Otomatik taslak: panele taslak haber olarak (bağlantı kuruluysa, ayar açıksa, kaynağın tam metni okunduysa)
+    let siteDurum = "Sadece Stüdyo'da";
     if (t.auto) {
       const ayar = await otoAyar(sb);
-      if (ayar.wordpress && wpAyar()) {
-        if (!qc.tam_metin) { await sb.from("tr_drafts").update({ wp_error: "Kaynağın tam metni alınamadığı için WordPress'e otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", id); wpDurum = "tam metin yok, gönderilmedi"; }
-        else if (bitis - Date.now() < 35_000) { await sb.from("tr_drafts").update({ wp_pending: true }).eq("id", id); wpDurum = "WordPress'e sonraki turda gidecek"; }
-        else { const r = await wpGonder(sb, id, { kategoriSec }); wpDurum = r.ok ? "WordPress'e taslak olarak gitti" : "WordPress hatası: " + r.hata; }
+      if (ayar.site && siteAyar()) {
+        if (!qc.tam_metin) { await sb.from("tr_drafts").update({ site_hata: "Kaynağın tam metni alınamadığı için panele otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", id); siteDurum = "tam metin yok, gönderilmedi"; }
+        else if (bitis - Date.now() < 35_000) { await sb.from("tr_drafts").update({ site_bekliyor: true }).eq("id", id); siteDurum = "panele sonraki turda gidecek"; }
+        else { const r = await siteGonder(sb, id, { kategoriSec }); siteDurum = r.ok ? "panele taslak olarak gitti" : "Panel hatası: " + r.hata; }
       }
-      const { data: son } = await sb.from("tr_drafts").select("image").eq("id", id).maybeSingle();
-      const im = (son?.image ?? {}) as { wp_media_id?: number; secilen?: unknown; flux?: unknown };
-      const gDurum = im.wp_media_id ? "görsel eklendi" : im.secilen ? "görsel seçildi" : im.flux ? "görsel Flux'ta üretilecek" : "görselsiz";
-      await otoOzet(sb, { durum: `Taslak hazır · ${durum || "kontrolsüz"} · ${wpDurum} · ${gDurum}`, haber: baslik });
+      const { data: son } = await sb.from("tr_drafts").select("image,site_id").eq("id", id).maybeSingle();
+      const im = (son?.image ?? {}) as { secilen?: unknown; flux?: unknown };
+      const gDurum = im.secilen ? (son?.site_id ? "görsel kapak oldu" : "görsel seçildi") : im.flux ? "görsel Flux'ta üretilecek" : "görselsiz";
+      await otoOzet(sb, { durum: `Taslak hazır · ${durum || "kontrolsüz"} · ${siteDurum} · ${gDurum}`, haber: baslik });
     }
     await sb.from("tr_drafts").update({ qc_state: "tamam" }).eq("id", id);
     return { ok: true, durum };
@@ -527,13 +527,13 @@ async function fluxYukle(sb: Sb, id: number, b64: string, mime: string) {
   const y = await sb.storage.from("haber-gorsel").upload(yol, veri, { contentType: mime, upsert: true });
   if (y.error) return { hata: "Depolamaya yüklenemedi: " + y.error.message };
   const url = sb.storage.from("haber-gorsel").getPublicUrl(yol).data.publicUrl;
-  const { data: t } = await sb.from("tr_drafts").select("image,wp_post_id").eq("id", id).single();
+  const { data: t } = await sb.from("tr_drafts").select("image,site_id").eq("id", id).single();
   const img = (t?.image ?? {}) as Record<string, unknown> & { secilen?: GorselAday | null; flux?: Record<string, unknown> };
   const secilen: GorselAday = { kaynak: "Yapay zekâ (Flux)", sayfa: url, buyuk: url, thumb: url, yazar: "Updated (Flux)", lisans: "Yapay zekâ üretimi", aciklama: String(img.flux?.istem ?? ""), w: 1344, h: 768 };
   // Elle seçilmiş/yüklenmiş görsel varsa ona dokunulmaz; Flux görseli sadece görselsiz taslağa konur
   const bos = !img.secilen;
   await sb.from("tr_drafts").update({ image: { ...img, ...(bos ? { secilen, gorsel_neden: "Uygun fotoğraf bulunamadı; Flux ile üretildi (yazısız). Yayından önce kontrol et." } : {}), flux: { ...(img.flux ?? {}), durum: "tamam", url, bitti: new Date().toISOString() } } }).eq("id", id);
-  if (bos && t?.wp_post_id) return { ok: true, url, wp: await wpOneCikanEkle(sb, id) };
+  if (bos && t?.site_id) return { ok: true, url, site: await siteKapakEkle(sb, id) };
   return { ok: true, url };
 }
 
@@ -547,7 +547,9 @@ async function otoOzet(sb: Sb, o: Record<string, unknown>) {
 
 async function otoAyar(sb: Sb): Promise<OtoAyar> {
   const { data } = await sb.from("tr_settings").select("value").eq("key", "oto_taslak").maybeSingle();
-  return { ...OTO_VARSAYILAN, ...((data?.value ?? {}) as Partial<OtoAyar>) };
+  const v = (data?.value ?? {}) as Partial<OtoAyar> & { wordpress?: boolean };
+  // Eski kayıtta ayar "wordpress" adıyla duruyor (23 Ekim 2026'ya kadar): yeni ayar yoksa onun değeri geçerli
+  return { ...OTO_VARSAYILAN, ...v, site: v.site ?? v.wordpress ?? OTO_VARSAYILAN.site };
 }
 
 async function otoCalistir(sb: Sb) {
@@ -565,10 +567,10 @@ async function otoCalistir(sb: Sb) {
     .or(`and(qc_state.eq.bekliyor,qc_at.lt.${new Date(Date.now() - 3 * 60_000).toISOString()}),and(qc_state.eq.calisiyor,qc_at.lt.${new Date(Date.now() - 5 * 60_000).toISOString()})`).limit(2);
   const arkaPlan: Promise<unknown>[] = ((kontrolBekleyen ?? []) as { id: number }[]).map((k) => kontrol(sb, k.id).catch(() => null));
 
-  // 1) Önceki turda süre yetmediği için WordPress'e gidemeyen otomatik taslaklar (kontrolü bitmiş olanlar)
-  if (ayar.wordpress && wpAyar()) {
-    const { data: bekleyen } = await sb.from("tr_drafts").select("id").eq("wp_pending", true).is("wp_post_id", null).eq("qc_state", "tamam").limit(3);
-    for (const b of bekleyen ?? []) { await sb.from("tr_drafts").update({ wp_pending: false }).eq("id", b.id); await wpGonder(sb, b.id, { kategoriSec }); }
+  // 1) Önceki turda süre yetmediği için panele gidemeyen otomatik taslaklar (kontrolü bitmiş olanlar)
+  if (ayar.site && siteAyar()) {
+    const { data: bekleyen } = await sb.from("tr_drafts").select("id").eq("site_bekliyor", true).is("site_id", null).eq("qc_state", "tamam").limit(3);
+    for (const b of bekleyen ?? []) { await sb.from("tr_drafts").update({ site_bekliyor: false }).eq("id", b.id); await siteGonder(sb, b.id, { kategoriSec }); }
   }
 
   // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
@@ -677,15 +679,15 @@ Deno.serve(async (req) => {
   const { data: p } = await sb.from("profiles").select("id,name,is_admin").eq("id", u.user.id).maybeSingle();
   if (!p) return Response.json({ hata: "Ekip üyesi değil" }, { status: 403, headers: CORS });
 
-  // WordPress bağlantısını dene (yönetici)
-  if (govde?.wp_dene) {
+  // Panel (yeni site) bağlantısını dene (yönetici)
+  if (govde?.site_dene) {
     if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
-    return Response.json(await wpDene(sb), { headers: CORS });
+    return Response.json(await siteDene(sb), { headers: CORS });
   }
-  // Taslağı WordPress'e gönder (ekip üyesi)
-  if (govde?.wp) {
+  // Taslağı panele gönder (ekip üyesi)
+  if (govde?.site) {
     if (!govde.draft_id) return Response.json({ hata: "draft_id gerekli" }, { status: 400, headers: CORS });
-    const r = await wpGonder(sb, Number(govde.draft_id), { zorla: !!govde.zorla, kategoriSec });
+    const r = await siteGonder(sb, Number(govde.draft_id), { zorla: !!govde.zorla, kategoriSec });
     return Response.json(r, { status: r.ok ? 200 : 422, headers: CORS });
   }
 

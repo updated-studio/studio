@@ -3,7 +3,7 @@
 
 Haber Masası'nda uygun fotoğrafı bulunamayan taslaklar için yazısız, gerçekçi bir görsel üretir ve taslağa yükler.
 Çalışma: dakikada bir Stüdyo'ya "bekleyen iş var mı?" diye sorar → varsa FLUX.1-schnell ile (Apple Silicon, mflux) üretir →
-JPEG olarak yükler. Görsel taslağın öne çıkan görseli olur; WordPress'te taslak açılmışsa oraya da eklenir. Yayın kararı editörde.
+JPEG olarak yükler. Görsel taslağın öne çıkan görseli olur; taslak panele (updated.com.tr) gönderilmişse orada kapak olur. Yayın kararı editörde.
 
 Model: FLUX.1-schnell (Apache 2.0, ticari kullanım serbest). FLUX.1-dev ticari kullanıma kapalı olduğu için kullanılmaz.
 Ayar: ~/updated-flux/ayar.json  {"adres": "...functions/v1/triyaj-taslak", "token": "<Supabase Secrets'taki FLUX_TOKEN>"}
@@ -13,7 +13,7 @@ import base64, io, json, os, subprocess, sys, tempfile, time, urllib.request
 KLASOR = os.path.expanduser("~/updated-flux")
 AYAR = json.load(open(os.path.join(KLASOR, "ayar.json")))
 ADIM = int(AYAR.get("adim", 4))          # schnell için 2-4 adım yeterli
-EN, BOY = 1344, 768                      # 16:9'a yakın, WordPress öne çıkan görsel
+EN, BOY = 1344, 768                      # 16:9'a yakın, haber kapağı
 
 
 def istek(govde: dict, sure: int = 60) -> dict:

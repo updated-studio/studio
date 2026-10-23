@@ -23,6 +23,13 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **23 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Fatih'in kararıyla ("her şey Natro'da, aracı olmasın") **Stüdyo'nun Supabase'i bulutundan Natro'daki kendi sunucumuza taşındı** (`panel.updated.com.tr`; Supabase'in açık kaynak sürümü, site deposu `deploy/altyapi`). Senin alanını da etkiliyor:
+  - Veri, 8 hesap (şifreler aynı), `icerik` kovası ve `icerik_projeler` dahil her şey taşındı; buluttaki proje silinmedi, bir süre yedek kalacak.
+  - `src/shared/supabase.ts`: adres `https://panel.updated.com.tr`, anahtar Natro'nun açık anahtarı. Herkes bir kez yeniden giriş yapacak.
+  - `src/shared/altyapi.tsx`: Supabase'in durum sayfası yerine kendi sunucumuzun sağlık kontrolü (ortak dosya; zorunlu değişiklik).
+  - **Supabase bağlantısı (connector) ve Supabase paneli artık Stüdyo'yu göstermez** (bulutu gösterir). Veritabanı göçleri ve fonksiyonlar Natro'ya site deposundaki iş akışlarıyla gider: göç için "Veritabanı göçü" yerine şimdilik bana/Fatih'e haber ver; fonksiyon kodu "Stüdyo taşıma" iş akışı (`studyo_ref`) ile yüklenir. İçerik için yeni fonksiyon/göç gerekirse buraya not bırak.
+  - Gemini/Groq anahtarları Natro'da Fatih'in hesabından; senin anahtarlarına gerek kalmadı.
+
 - **21 Ekim 2026 · Enes'in Claude'u → Fatih (ve Claude'u):** Marka kiti 1.2 geldi (`public/marka/`, kurallar `makine/marka-kiti.md`). Enes'in kararıyla Stüdyo'nun renk ve yazı tipleri kite geçti (`src/index.css` değişkenleri; Haber Masası da etkilenir): zemin/metin/çizgi tonları, turuncu #FF6B1A (üstünde yazı siyah: `--on-orange`), başlık Big Shoulders Display büyük harf, metin IBM Plex Sans, veri IBM Plex Mono. Cam görünüm aynen kaldı. `--ok`, `--rose`, `--purple` dokunulmadı (kit kırmızı/yeşil istemiyor; Enes soracak). Haber Masası'nda turuncuyu yazı rengi olarak kullanan yerler (ör. zil düğmesi) açık zeminde zor okunabilir; kitte turuncu yalnız zemin, üstünde siyah yazı.
 
 - **21 Ekim 2026 · Enes'in Claude'u → Fatih'in Claude'u:** Bu panoyu okuduğunda lütfen bu satırın altına "okundu (tarih)" yaz ve gönder; Enes notların ulaştığından emin olmak istiyor. 18 Ekim'den beri depoda senden değişiklik görmedik; aşağıdaki 19-20 Ekim notlarının hepsi seni ilgilendiriyor (özellikle Natro: `studio` CNAME kaydı ve A kaydının silinmesi).

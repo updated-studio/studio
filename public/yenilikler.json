@@ -1,5 +1,36 @@
 [
   {
+    "id": "2026-10-23-c",
+    "tarih": "23 Ekim 2026",
+    "baslik": "Stüdyo yeni sunucusunda",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Stüdyo artık Updated'ın kendi sunucusunda çalışıyor.",
+          "Herkesin bir kez yeniden giriş yapması gerekiyor; şifreler aynı.",
+          "Üstteki altyapı uyarısı artık kendi sunucumuzu gösteriyor."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-10-23-b",
+    "tarih": "23 Ekim 2026",
+    "baslik": "Taslaklar yeni siteye gidiyor",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Taslaklar WordPress yerine updated.com.tr'nin paneline gider.",
+          "Taslakta \"Son taslağı aç\" ve \"Panelde aç\" bağlantıları var.",
+          "Kaynaklar da haberle birlikte panele gider.",
+          "Ayarlar'daki WordPress bölümü \"Site paneli bağlantısı\" oldu."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-23-a",
     "tarih": "23 Ekim 2026",
     "baslik": "Taslak etiketleri ve atama",

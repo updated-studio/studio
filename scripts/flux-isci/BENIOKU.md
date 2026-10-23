@@ -5,7 +5,7 @@ Haber Masası'nda uygun fotoğraf bulunamayan taslaklara **yazısız, gerçekçi
 - Model: **FLUX.1-schnell** (Apache 2.0, ticari kullanım serbest). FLUX.1-dev ticari kullanıma kapalı, kullanılmaz.
 - Gereken: Apple Silicon Mac, en az 16 GB bellek (32 GB rahat), ilk indirme için ~30 GB boş alan.
 - Akış: taslağın kalite kontrolü fotoğraf bulamazsa görsel isteği sıraya girer (ya da editör Taslaklar → Görsel → "Flux ile görsel üret"e basar).
-  İşçi dakikada bir sorar, üretir, yükler. Görsel taslağın öne çıkan görseli olur; WordPress'te taslak açılmışsa orada da eklenir.
+  İşçi dakikada bir sorar, üretir, yükler. Görsel taslağın öne çıkan görseli olur; taslak panele gönderilmişse orada kapak olur.
   Altyazı: "Görsel yapay zekâ ile üretilmiştir."
 - Mac kapalıyken istekler bekler; açılınca üretilir.
 
