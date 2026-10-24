@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-24-l",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Daha az ama daha güçlü otomatik taslak",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Otomatik taslak günde en fazla 30, yalnız 65 puan ve üstü haberlere yazılıyor.",
+          "Panelde 2 gün kimsenin dokunmadığı otomatik taslak panelden kaldırılıyor; Stüdyo'daki taslak duruyor.",
+          "Süreyi Ayarlar → Otomatik taslak'tan değiştirebilirsin."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-k",
     "tarih": "24 Ekim 2026",
     "baslik": "Taslaklar panele hazır geliyor",

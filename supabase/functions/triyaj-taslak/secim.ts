@@ -6,9 +6,10 @@ export const OTO_VARSAYILAN = {
   acik: false,              // otomatik taslak çalışsın mı (kapalı başlar; Ayarlar'dan açılır)
   site: true,               // hazırlanan taslak yeni sitenin paneline taslak haber olarak gitsin mi (23 Ekim 2026'ya kadar "wordpress")
   ata: false,               // taslak ilgi alanına göre editöre atansın mı (Fatih, 23 Ekim: uzmanlık alanları belirlenene kadar kapalı; taslak havuzda sahipsiz kalır)
-  gunluk: 100,              // günde en fazla kaç otomatik taslak (İstanbul saatiyle gün)
-  esik: 55,                 // en az bu öncelik puanı = önem 5,5/10 (Öncelik 2 "yayına değer"; 80 = Öncelik 1 "ana sayfa adayı")
+  gunluk: 30,               // günde en fazla kaç otomatik taslak (İstanbul saatiyle gün; 24 Ekim 2026: 100 → 30, taslak birikmesi)
+  esik: 65,                 // en az bu öncelik puanı = önem 6,5/10 (24 Ekim 2026: 55 → 65; 55 = Öncelik 2 "yayına değer", 80 = Öncelik 1 "ana sayfa adayı")
   bekle_dk: 10,             // haber düştükten sonra bekleme (diğer kaynaklar aynı karta birleşsin)
+  panel_sure_gun: 2,        // panelde bu kadar gün kimsenin dokunmadığı otomatik taslak panelden kaldırılır (0 = kapalı; Stüdyo'daki kopyası kalır)
   tur_basina: 2,            // 10 dakikalık her turda en fazla kaç farklı habere aynı anda taslak yazılır
   haric_turler: ["Söylenti"] as string[],
 };

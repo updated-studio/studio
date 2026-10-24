@@ -149,6 +149,21 @@ export async function siteKapakEkle(sb: Sb, taslakId: number): Promise<{ ok: boo
   return r.ok ? { ok: true } : { ok: false, hata: hataMetni(r.status, r.veri) };
 }
 
+/** Panelde `gun` gündür kimsenin dokunmadığı otomatik taslakları panelden kaldırır (Stüdyo'daki taslak kalır, yeniden gönderilebilir). */
+export async function siteTemizle(sb: Sb, gun: number): Promise<number> {
+  const a = siteAyar();
+  if (!a || !(gun >= 1)) return 0;
+  const { data: liste } = await sb.from("tr_drafts").select("id,site_guncel").eq("auto", true).not("site_id", "is", null)
+    .lt("site_gonderim", new Date(Date.now() - gun * 86_400_000).toISOString()).order("site_gonderim").limit(50);
+  if (!liste?.length) return 0;
+  const r = await panel(a, "/triyaj/temizle", { method: "POST", body: { gun, taslaklar: liste.map((t) => ({ studioId: String(t.id), lastSeen: t.site_guncel || "" })) }, ms: 60_000 });
+  const silinen = ((r.veri ?? {}) as { silinen?: string[] }).silinen ?? [];
+  if (!r.ok || !silinen.length) return 0;
+  await sb.from("tr_drafts").update({ site_id: null, site_admin: "", site_onizleme: "", site_guncel: "", site_hata: "",
+    site_eksik: { eksikler: [], duzeltmeler: [], kaldirildi: new Date().toISOString(), gun } }).in("id", silinen.map(Number));
+  return silinen.length;
+}
+
 type Secenek = { zorla?: boolean; kategoriSec?: (baslik: string, oneri: string, liste: Kategori[]) => Promise<string> };
 
 /** Taslağı panele taslak haber olarak gönderir ya da daha önce gönderilmişse günceller. Sonucu tr_drafts'a yazar. */

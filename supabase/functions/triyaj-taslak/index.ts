@@ -11,7 +11,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
-import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, type Kategori } from "./site.ts";
+import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, type Kategori } from "./site.ts";
 import { adayListesi, commons, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
@@ -578,6 +578,9 @@ async function otoCalistir(sb: Sb) {
     const { data: bekleyen } = await sb.from("tr_drafts").select("id").eq("site_bekliyor", true).is("site_id", null).eq("qc_state", "tamam").limit(3);
     for (const b of bekleyen ?? []) { await sb.from("tr_drafts").update({ site_bekliyor: false }).eq("id", b.id); await siteGonder(sb, b.id, { kategoriSec }); }
   }
+
+  // 1b) Panelde birikme: kimsenin dokunmadığı eski otomatik taslaklar panelden kaldırılır (saatte bir, ilk turda)
+  if (ayar.panel_sure_gun > 0 && siteAyar() && new Date().getUTCMinutes() < 10) await siteTemizle(sb, ayar.panel_sure_gun).catch((e) => console.error("siteTemizle", e));
 
   // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
   if (arkaPlan.length) EdgeRuntime.waitUntil(Promise.all(arkaPlan));

@@ -99,7 +99,7 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
   // Eski kayıtta "wordpress" adıyla durur (23 Ekim 2026'ya kadar)
   const [a, setA] = useState<OtoAyar>({ ...OTO_VARSAYILAN, ...kayitli, site: kayitli.site ?? kayitli.wordpress ?? OTO_VARSAYILAN.site });
   const son = (v.ayarlar.oto_son ?? {}) as { zaman?: string; durum?: string; haber?: string; editor?: string; puan?: number; bugun?: number };
-  const sinir = { gunluk: [1, 200], esik: [40, 150], bekle_dk: [0, 240], tur_basina: [1, 3] } as const;
+  const sinir = { gunluk: [1, 200], esik: [40, 150], bekle_dk: [0, 240], tur_basina: [1, 3], panel_sure_gun: [0, 30] } as const;
   const sayi = (k: keyof typeof sinir) => (
     <input type="text" inputMode="numeric" value={String(a[k])} style={{ width: 80 }} aria-label={k}
       onChange={(e) => setA({ ...a, [k]: Number(e.target.value.replace(/\D/g, "")) || 0 } as OtoAyar)} />
@@ -115,6 +115,7 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
       <div className="row">En az {sayi("esik")} puan <span className="muted">(= önem {(a.esik / 10).toLocaleString("tr")}/10 · {YAYIN_ESIK} = Öncelik 2 "yayına değer", {ANA_SAYFA_ESIK} = Öncelik 1 "ana sayfa adayı")</span></div>
       <div className="row">Haber düştükten {sayi("bekle_dk")} dk sonra <span className="muted">(diğer kaynaklar aynı karta birleşsin diye)</span></div>
       <div className="row">Her turda (10 dk) en fazla {sayi("tur_basina")} farklı haber <span className="muted">(aynı haberin diğer kartları yazılmaz)</span></div>
+      <div className="row">Panelde {sayi("panel_sure_gun")} gün kimsenin dokunmadığı otomatik taslak panelden kaldırılır <span className="muted">(0 = kapalı; Stüdyo'daki taslak kalır, yeniden gönderilebilir)</span></div>
       <div className="muted">Bu türler otomatik yazılmaz:</div>
       <div className="row">
         {HABER_TURLERI.map((t) => (
