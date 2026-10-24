@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-24-m",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Sitede üyelik: Uper",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Okurlar sitede Uper olup yorum yapabiliyor, tepki verebiliyor, yazı kaydedebiliyor.",
+          "Onay bekleyen yorumlar Site → Topluluk → Yorumlar'da; yayın yönetmeni ve yöneticilere bildirim gelir.",
+          "Uper'leri aynı yerden susturabilir ya da engelleyebilirsin."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-l",
     "tarih": "24 Ekim 2026",
     "baslik": "Daha az ama daha güçlü otomatik taslak",

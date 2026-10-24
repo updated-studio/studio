@@ -170,7 +170,7 @@ export default function Site() {
   return <Gezinme kullanici={kullanici} />;
 }
 
-const GRUP_SIRASI = ["İçerik", "Künye", "Kanallar", "Gelir", "Kulüp", "Ekip", "Ayarlar"];
+const GRUP_SIRASI = ["İçerik", "Topluluk", "Künye", "Kanallar", "Gelir", "Kulüp", "Ekip", "Ayarlar"];
 const AKIS: Koleksiyon[] = ["news", "reviews", "comparisons"];
 type Bolum = { tur: "k"; s: KoleksiyonSema } | { tur: "g"; s: PanelSema["genel"][number] };
 
