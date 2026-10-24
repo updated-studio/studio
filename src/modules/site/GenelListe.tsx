@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api";
 import type { Medya } from "./api";
 import MedyaSecici from "./MedyaSecici";
+import TopluYukle from "./TopluYukle";
 import { veriAlanlari, type KoleksiyonSema } from "./sema";
 import type { PanelKullanici } from "./api";
 import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
@@ -18,6 +19,7 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
   const [veri, setVeri] = useState<{ docs: Kayit[]; sonraki: boolean; sayfa: number; toplam: number } | null>(null);
   const [hata, setHata] = useState("");
   const [yukleAcik, setYukleAcik] = useState(false);
+  const [topluAcik, setTopluAcik] = useState(false);
   const alanAd = new Map(veriAlanlari(k.fields).map((a) => [a.name!, a.label ?? a.name!]));
   const aracAlan = useMemo(() => aracAlanlari(k.fields), [k]);
   const [arac, setArac] = useAraclar(k.slug, aracAlan, { sirala: "-updatedAt", sutunlar: k.sutunlar.filter((s) => s !== k.baslikAlani && s !== "id").slice(0, 3) });
@@ -48,7 +50,7 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
       <div className="row">
         <div className="filtre" style={{ flex: 1 }}><input type="search" placeholder={`${k.cogul} içinde ara…`} value={ara} onChange={(e) => setAra(e.target.value)} /></div>
         {k.gorsel
-          ? <button className="btn sm" onClick={() => setYukleAcik(true)}>+ Görsel yükle</button>
+          ? <><button className="btn ghost sm" onClick={() => setTopluAcik(true)}>Toplu yükle</button><button className="btn sm" onClick={() => setYukleAcik(true)}>+ Görsel yükle</button></>
           : k.giris
             ? <a className="btn ghost sm" href="#/yonetim">Yeni kişi: Ekip → Yönetim'den davet et</a> /* hesaplar Stüdyo'dan (tek giriş) */
             : <button className="btn sm" onClick={() => ac(null)}>+ Yeni {k.tekil.toLocaleLowerCase("tr-TR")}</button>}
@@ -90,6 +92,7 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
         ))}
         {veri?.sonraki && <button className="btn ghost" onClick={() => yukle(veri.sayfa + 1)}>Daha fazla ({veri.toplam - veri.docs.length})</button>}
       </div>
+      {topluAcik && <TopluYukle altSinir={125} kapat={() => setTopluAcik(false)} bitti={(n) => { toast(`${n} görsel yüklendi.`); yukle(1); }} />}
       {yukleAcik && <MedyaSecici ilk="yukle" altSinir={125} kapat={() => setYukleAcik(false)} sec={(m) => { setYukleAcik(false); ac(m.id); }} />}
     </>
   );

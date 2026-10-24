@@ -147,3 +147,10 @@
 .site-odak-onizleme { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .site-odak-onizleme figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .site-odak-onizleme img { height: 120px; width: auto; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+
+/* Toplu görsel yükleme (TopluYukle.tsx) */
+.site-birak { display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 2px dashed var(--line); border-radius: 10px; align-items: center; }
+.site-toplu-yukle { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow: auto; }
+.site-toplu-yukle-satir { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: start; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.site-toplu-yukle-satir img { width: 120px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; }
+@media (max-width: 560px) { .site-toplu-yukle-satir { grid-template-columns: minmax(0, 1fr); } }

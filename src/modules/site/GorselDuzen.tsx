@@ -45,6 +45,14 @@ export default function GorselDuzen({ yol, m, degisti }: { yol: string; m: Kayit
     } catch (e) { toast((e as Error).message); return null; }
     finally { setMesgul(false); }
   }
+  async function dosyaDegistir(f: File | undefined) {
+    if (!f || !confirm(`Görselin dosyası "${f.name}" ile değişsin mi? Alt metin ve künye aynı kalır; bu görseli kullanan her yerde yeni dosya görünür.`)) return;
+    const fd = new FormData(); fd.append("file", f); fd.append("_payload", "{}");
+    setMesgul(true);
+    try { const r = await api.istekYap<{ doc: Kayit }>(`${yol}?depth=0`, { method: "PATCH", body: fd }); degisti(r.doc); toast("Dosya değişti."); setOdak({ x: 50, y: 50 }); setKutu(null); }
+    catch (e) { toast((e as Error).message); }
+    finally { setMesgul(false); }
+  }
   const odakKaydet = () => yaz("", { focalX: Math.round(odak.x), focalY: Math.round(odak.y) }, "Odak noktası kaydedildi; küçük boyutlar yeniden üretildi.");
   async function kirp() {
     if (!kutu) return;
@@ -68,6 +76,8 @@ export default function GorselDuzen({ yol, m, degisti }: { yol: string; m: Kayit
           <button aria-pressed={mod === "kirp"} onClick={() => setMod("kirp")}>Kırp</button>
         </div>
         <span className="muted">{W}×{H} piksel</span>
+        <span style={{ flex: 1 }} />
+        <label className="btn ghost sm">Dosyayı değiştir<input type="file" accept="image/*" hidden disabled={mesgul} onChange={(e) => { dosyaDegistir(e.target.files?.[0]); e.target.value = ""; }} /></label>
       </div>
       <div ref={alan} className={`site-gorsel-alan site-gorsel-alan--${mod}`}
         onPointerDown={(e) => {
