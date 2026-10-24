@@ -1,14 +1,16 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import * as api from "./api";
 import type { Medya } from "./api";
-import { DESTEKLI, duzenMi, icAlanMi, type Alan, type PanelSema } from "./sema";
+import { DESTEKLI, duzenMi, icAlanMi, type Alan } from "./sema";
+import { SemaCtx } from "./baglam";
+import { CokTurluIliski, TersIliski } from "./CokluIliski";
 import { bilinmeyenTurler } from "./editor/dugumler";
 import MetinEditoru from "./editor/MetinEditoru";
 import MedyaSecici from "./MedyaSecici";
 
 // Genel form: panelin alan yapısından (sema.ts) çizilir. Değerler kimlik düzeyinde (depth=0) tutulur ve öyle gönderilir.
 type Kayit = Record<string, unknown>;
-export const SemaCtx = createContext<PanelSema | null>(null);
+export { SemaCtx };
 
 const etiket = (a: Alan) => a.label ?? a.name ?? "";
 const ALT_SINIR = 125;
@@ -40,23 +42,16 @@ function useSecenekler(rel?: string) {
 }
 
 export function Iliski({ a, deger, set }: { a: Alan; deger: unknown; set: (v: unknown) => void }) {
-  const rel = typeof a.relationTo === "string" ? a.relationTo : undefined;
+  // Çok türlü ya da çoklu ilişki: sıralı seçici (CokluIliski.tsx); tekli ilişki: açılır liste
+  if (typeof a.relationTo !== "string" || a.hasMany) return <CokTurluIliski a={a} deger={deger} set={set} />;
+  return <TekIliski a={a} deger={deger} set={set} />;
+}
+
+function TekIliski({ a, deger, set }: { a: Alan; deger: unknown; set: (v: unknown) => void }) {
+  const rel = a.relationTo as string;
   const liste = useSecenekler(rel);
-  if (!rel) return <span className="muted">Birden çok türe bağlanan alan; panelde düzenlenir.</span>;
   if (!liste) return <span className="muted">Yükleniyor…</span>;
   const kimlik = (x: unknown) => (x && typeof x === "object" ? (x as { id: number }).id : (x as number));
-  if (a.hasMany) {
-    const secili = new Set(((deger as unknown[]) ?? []).map(kimlik));
-    return (
-      <div className="site-coklu">
-        {liste.map((o) => (
-          <label key={o.id} className="site-kutu"><input type="checkbox" disabled={a.admin?.readOnly} checked={secili.has(o.id)}
-            onChange={(e) => { const s = new Set(secili); if (e.target.checked) s.add(o.id); else s.delete(o.id); set([...s]); }} /> {o.ad}</label>
-        ))}
-        {!liste.length && <span className="muted">Seçenek yok.</span>}
-      </div>
-    );
-  }
   return (
     <select value={kimlik(deger) ?? ""} disabled={a.admin?.readOnly} onChange={(e) => set(e.target.value ? Number(e.target.value) : null)}>
       <option value="">Seç…</option>
@@ -136,6 +131,8 @@ export function AlanGirdisi({ a, deger, set }: { a: Alan; deger: unknown; set: (
         : <label className="site-alan"><Etiket a={a} /><input type="datetime-local" disabled={ro} value={yerel(deger)} onChange={(e) => set(e.target.value ? new Date(e.target.value).toISOString() : null)} /><Aciklama a={a} /></label>;
     case "relationship":
       return <div className="site-alan"><Etiket a={a} /><Iliski a={a} deger={deger} set={set} /><Aciklama a={a} /></div>;
+    case "join":
+      return <div className="site-alan"><Etiket a={a} /><TersIliski a={a} /><Aciklama a={a} /></div>;
     case "upload":
       return <div className="site-alan"><Etiket a={a} /><Gorsel a={a} deger={deger} set={set} /><Aciklama a={a} /></div>;
     case "richText": {

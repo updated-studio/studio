@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-24-j",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Manşetler, ilgili içerikler, görsel odağı",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Ana sayfa manşetlerine haber, inceleme ve karşılaştırma arayıp ekleyebilir, sırasını değiştirebilirsin.",
+          "Ürün sayfasında o ürünle ilgili haberler ve incelemeler listeleniyor.",
+          "Görsellerde odak noktası seçilebiliyor; kartlar ve manşetler o noktayı ortalıyor.",
+          "Görseller Stüdyo'dan kırpılabiliyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-i",
     "tarih": "24 Ekim 2026",
     "baslik": "API anahtarı Stüdyo'da",

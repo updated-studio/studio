@@ -1,7 +1,7 @@
 // Panelin alan yapısı (site deposu apps/cms/src/lib/sema.ts → GET /api/studyo/alanlar). Stüdyo formları bundan kurulur.
 import { istekYap } from "./api";
 
-export type AlanTuru = "text" | "textarea" | "email" | "number" | "checkbox" | "select" | "radio" | "date" | "relationship" | "upload" | "richText" | "group" | "row" | "collapsible" | "array" | "tabs" | "blocks" | "json" | "code" | "point";
+export type AlanTuru = "text" | "textarea" | "email" | "number" | "checkbox" | "select" | "radio" | "date" | "relationship" | "upload" | "richText" | "group" | "row" | "collapsible" | "array" | "tabs" | "blocks" | "json" | "code" | "point" | "join";
 export type Alan = {
   type: AlanTuru;
   name?: string;
@@ -10,6 +10,8 @@ export type Alan = {
   hasMany?: boolean;
   unique?: boolean;
   relationTo?: string | string[];
+  /** Ters ilişki (join): hangi koleksiyonun hangi alanı bu kayda bağlanıyor */
+  collection?: string; on?: string;
   options?: { label: string; value: string }[];
   min?: number; max?: number; minRows?: number; maxRows?: number; maxLength?: number;
   defaultValue?: string | number | boolean;
@@ -36,4 +38,4 @@ export const icAlanMi = (a: Alan) => !!a.name?.startsWith("_");
 /** Veri tutan bütün alanlar (düzen alanları açılmış hâlde) */
 export const veriAlanlari = (fs: Alan[]): Alan[] => fs.flatMap((a) => (duzenMi(a) ? veriAlanlari(a.fields ?? []) : a.name && !icAlanMi(a) ? [a] : []));
 /** Panelin Stüdyo'da henüz çizemediğimiz türleri: bunlar varsa form o alanı "panelde düzenle" diye gösterir */
-export const DESTEKLI = new Set<AlanTuru>(["text", "textarea", "email", "number", "checkbox", "select", "radio", "date", "relationship", "upload", "richText", "group", "row", "collapsible", "array"]);
+export const DESTEKLI = new Set<AlanTuru>(["text", "textarea", "email", "number", "checkbox", "select", "radio", "date", "relationship", "upload", "richText", "group", "row", "collapsible", "array", "join"]);

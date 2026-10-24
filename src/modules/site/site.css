@@ -123,3 +123,27 @@
 /* API anahtarı (ApiAnahtari.tsx) */
 .site-anahtar { display: flex; flex-direction: column; gap: 6px; }
 .site-anahtar code { font-family: ui-monospace, monospace; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
+
+/* Çok türlü ilişki ve ters ilişki (CokluIliski.tsx) */
+.site-coklu-iliski, .site-ters-iliski { display: flex; flex-direction: column; gap: 8px; }
+.site-secili-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.site-secili-liste li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.site-secili-liste .ana { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.site-iliski-ekle { display: flex; flex-direction: column; gap: 6px; }
+.site-iliski-ekle .row { flex-wrap: wrap; gap: 6px; }
+.site-iliski-ekle select { width: auto; }
+.site-iliski-ekle input { flex: 1 1 200px; min-width: 0; }
+.site-iliski-sonuc { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-left: 4px; }
+
+/* Görsel odak noktası ve kırpma (GorselDuzen.tsx) */
+.site-gorsel-duzen { display: flex; flex-direction: column; gap: 10px; }
+.site-gorsel-duzen > .row { flex-wrap: wrap; gap: 8px; align-items: center; }
+.site-gorsel-alan { position: relative; align-self: flex-start; max-width: 100%; line-height: 0; touch-action: none; user-select: none; border-radius: 8px; overflow: hidden; }
+.site-gorsel-alan img { display: block; max-width: 100%; max-height: 70vh; width: auto; height: auto; }
+.site-gorsel-alan--odak { cursor: crosshair; }
+.site-gorsel-alan--kirp { cursor: crosshair; }
+.site-odak { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; border: 3px solid #fff; background: var(--blue); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); pointer-events: none; }
+.site-kirp-kutu { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .5); pointer-events: none; }
+.site-odak-onizleme { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.site-odak-onizleme figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.site-odak-onizleme img { height: 120px; width: auto; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }

@@ -9,6 +9,8 @@ import Surumler from "./Surumler";
 import Zamanlama, { useZamanlamalar, ZamanlamaEtiketi } from "./Zamanlama";
 import CanliOnizleme, { useCanliAcik } from "./CanliOnizleme";
 import ApiAnahtari from "./ApiAnahtari";
+import GorselDuzen from "./GorselDuzen";
+import { KayitCtx } from "./baglam";
 
 const ONIZLEMELI = new Set(["news", "reviews", "comparisons"]); // sitenin önizleme sayfası olan bölümler
 
@@ -164,7 +166,10 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
         </div>
       )}
       {hata && <div className="msg err">{hata}</div>}
-      {medya?.url && <img className="site-medya-buyuk" src={api.medyaAdres(medya.sizes?.card?.url || medya.url)} alt={medya.alt ?? ""} />}
+      {medya?.url && (id
+        ? <GorselDuzen yol={yol} m={kayit} degisti={(d) => { setKayit(d); setSurum((x) => x + 1); kilit.tazele(); }} />
+        : <img className="site-medya-buyuk" src={api.medyaAdres(medya.sizes?.card?.url || medya.url)} alt={medya.alt ?? ""} />)}
+      <KayitCtx.Provider value={{ id }}>
       <div className={canli ? "site-canli-duzen" : "site-canli-yok"}>
       <div className={yan.length ? "site-izgara" : ""} key={surum}>
         <div className="site-form"><Alanlar fs={ana} deger={kayit} set={set} /></div>
@@ -172,6 +177,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
       </div>
       {canli && <CanliOnizleme adres={canliAdres} surum={String(kayit?.updatedAt ?? "")} kapat={() => setCanli(false)} />}
       </div>
+      </KayitCtx.Provider>
       {k?.giris && k.apiAnahtari && id && yonetici && <ApiAnahtari yol={yol} kayit={kayit} degisti={(d) => setKayit((o) => ({ ...o, enableAPIKey: d.enableAPIKey, hasAPIKey: d.hasAPIKey, updatedAt: d.updatedAt }))} />}
       {zamanAcik && zamanHedef && <Zamanlama hedef={zamanHedef} isler={zam.isler} yayinda={yayinda} hazirlik={zamanlamaHazirlik} kapat={() => setZamanAcik(false)} degisti={() => { zam.yenile(); if (!degisti) yukle().then(() => kilit.tazele()); toast("Zamanlama güncellendi."); }} />}
       {surumAcik && <Surumler yol={yol} alanlar={sema.fields} simdiki={kayit} kapat={() => setSurumAcik(false)} geriYuklendi={() => { setSurumAcik(false); yukle().then(() => { toast("Sürüm geri yüklendi (taslak)."); kilit.tazele(); }); }} />}
