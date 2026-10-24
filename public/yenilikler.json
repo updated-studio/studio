@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-25-a",
+    "tarih": "25 Ekim 2026",
+    "baslik": "Tek editör ve siteden gelenler",
+    "bolumler": [
+      {
+        "ad": "İçerik",
+        "maddeler": [
+          "İki editör birleşti: 29 şablonun hepsi artık Post, Story ve Reels kapağında çalışıyor.",
+          "Sitede yayınlanan yazılar \"Siteden gelenler\"e düşüyor; \"Aç\" ile başlık, spot ve görsel şablona yerleşiyor.",
+          "Son dakika ve sızıntı Story, diğerleri Post olarak geliyor; hazırlayana İşler'de iş açılıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-n",
     "tarih": "24 Ekim 2026",
     "baslik": "Bildirimler tıklanabiliyor",

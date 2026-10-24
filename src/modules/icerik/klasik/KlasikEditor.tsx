@@ -1,5 +1,6 @@
-// Klasik şablonlar: eski Updated Post Aracı'nın bütün özellikleri, Stüdyo'nun içinde (21 Ekim 2026, Enes:
-// "eskisinin özelliklerini yenisine getir, birebir tüm özellikler olsun").
+// İçerik editörü (tek editör, 24 Ekim 2026; Enes: "iki editör birleşsin, en iyisini yap"): eski Updated Post Aracı'nın
+// bütün özellikleri ve 29 şablon; her şablon Post (4:5), Story (9:16) ve Reels kapağında (9:16, ızgarada 3:4) çalışır.
+// (21 Ekim 2026, Enes: "eskisinin özelliklerini yenisine getir, birebir tüm özellikler olsun").
 // Çizim motoru eski araçtan birebir (motor.js). Bu dosya eski aracın arayüzünü kurar: şablon seçimi, öğe kartları
 // (yazılar, yazı boyutu, görsel, çerçeve/fotoğraf, logo, katman sırası, boyut/konum/açı ayarları), önizlemede sürükleme,
 // geri al / ileri al / tümünü geri al, önceki şablonun içeriğini getir, şablonu / tüm şablonları sıfırla,
@@ -15,9 +16,12 @@ type Sablon = { group: string; name: string; transparent?: boolean; fields: Alan
 type Ayar = Record<string, number>;
 type Durum = Record<string, unknown> & { _adj: Record<string, Ayar>; _order: string[]; _logo: string };
 type Kayit = { n: string; s: Durum; _id?: string };
-type Paket = { slides: { t: string; v: Record<string, string>; img?: boolean }[]; img: string };
+export type Paket = { slides: { t: string; v: Record<string, string>; img?: boolean; imgs?: Record<string, string> }[]; img: string };
+/** Siteden gelen yazı (İçerik → Siteden gelenler): açılınca format seçilir, slaytlar ve görseller yerleşir */
+export type GelenAc = { id: number; format: string; paket: Paket; ad: string };
 
 const T = klasik.T as Record<string, Sablon>;
+const FORMAT = klasik.FORMATLAR as Record<string, { ad: string; aciklama: string; h: number }>;
 const SAKLA = "updated-post-araci-v4"; // eski araçla aynı anahtar: yazdıkların bu tarayıcıda kalır
 
 const pct = (v: number) => Math.round(v * 100) + "%", pxf = (v: number) => (v > 0 ? "+" : "") + Math.round(v), deg = (v: number) => Math.round(v) + "°", oto = (v: number) => (v > 0 ? String(Math.round(v)) : "otomatik");
@@ -63,7 +67,7 @@ function Kaydirac({ ad, c, deger, degistir }: { ad: string; c: (typeof SL)[strin
   );
 }
 
-export default function KlasikEditor() {
+export default function KlasikEditor({ gelen, indirildi }: { gelen?: GelenAc | null; indirildi?: () => void }) {
   const [hazir, setHazir] = useState(false);
   const [, yenile] = useReducer((x: number) => x + 1, 0);
   const [secim, setSecim] = useState<{ k: string | null; ic: boolean }>({ k: null, ic: false });
@@ -108,6 +112,18 @@ export default function KlasikEditor() {
   }, []);
   useEffect(() => { kayitlariYenile(); }, [kayitlariYenile]);
 
+  // Siteden gelen yazı: format, slaytlar, görseller (slaytAc aşağıda tanımlı; ref ile çağrılır)
+  const gelenId = gelen?.id;
+  const slaytAcRef = useRef<(p: Paket, i: number) => void>(() => {});
+  useEffect(() => {
+    if (!hazir || !gelen) return;
+    // Şablonun doldurulmayan alanları boş kalsın (örnek yazılar karışmasın)
+    const paket: Paket = { ...gelen.paket, slides: gelen.paket.slides.filter((sl) => T[sl.t]).map((sl) => ({ ...sl, v: { ...Object.fromEntries(T[sl.t].fields.map((f) => [f.k, ""])), ...sl.v } })) };
+    klasik.formatSec(gelen.format); setPaket(paket); slaytAcRef.current(paket, 0);
+    setMesaj(`"${gelen.ad}" açıldı (${FORMAT[gelen.format]?.ad ?? gelen.format}). Yazıları ve görseli kontrol et, sonra PNG indir.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hazir, gelenId]);
+
   // Seçili öğenin kartını görünür yap
   useEffect(() => {
     if (!secim.k || !kartlar.current) return;
@@ -116,7 +132,7 @@ export default function KlasikEditor() {
   }, [secim.k]);
 
   const sablonlar = useMemo(() => Object.keys(T).sort((a, b) => sira(a) - sira(b)), []);
-  if (!hazir) return <div className="muted">Post editörü yükleniyor…</div>;
+  if (!hazir) return <div className="muted">Editör yükleniyor…</div>;
 
   const t: string = klasik.cur, S = T[t], s = klasik.state[t] as Durum, im = klasik.images[t] as Record<string, unknown>;
   const prevT: string | null = klasik.prevT;
@@ -190,7 +206,8 @@ export default function KlasikEditor() {
     setMesaj("Hazırlanıyor…");
     klasik.hemenCiz(); // seçim çerçevesi ayrı tuvalde; ana tuval temiz
     const cv: HTMLCanvasElement = klasik.kanvas();
-    cv.toBlob(async (b) => { if (!b) { setMesaj("Görsel oluşturulamadı."); return; } setMesaj(await dosyaVer(b, "updated-" + t + "-post.png", "image/png")); }, "image/png");
+    try { cv.toBlob(async (b) => { if (!b) { setMesaj("Görsel oluşturulamadı."); return; } setMesaj(await dosyaVer(b, "updated-" + t + "-" + klasik.fmt + ".png", "image/png")); indirildi?.(); }, "image/png"); }
+    catch { setMesaj("Bu görsel başka bir adresten geldiği için PNG'ye çevrilemedi; görseli bilgisayarına indirip karttan yeniden yükle."); }
   }
 
   // ---- Kayıtlı düzenler ----
@@ -244,9 +261,12 @@ export default function KlasikEditor() {
   // ---- Otomasyondan gelen post ----
   function slaytAc(p: Paket, i: number) {
     const sl = p.slides[i]; klasik.doldur(sl); setPaketSlayt(i);
-    const resimli = sl.img && p.img && (T[klasik.cur].images || []).some((g) => g.k === "img");
-    setAktarMesaj(`${i + 1}. slayt açıldı: ${T[klasik.cur].group}, ${T[klasik.cur].name}.` + (resimli ? " Haber fotoğrafı yüklendi." : ""));
-    if (resimli) { const hedef = klasik.cur; klasik.loadImg(p.img).then((g: HTMLImageElement) => { if (klasik.cur === hedef) klasik.gorsel("img", g); }).catch(() => setAktarMesaj((x) => x + " Fotoğraf açılamadı; karttan ayrıca yükle.")); }
+    const resimler: Record<string, string> = { ...(sl.img && p.img ? { img: p.img } : {}), ...(sl.imgs || {}) };
+    const yuklenecek = Object.entries(resimler).filter(([k, u]) => u && (T[klasik.cur].images || []).some((g) => g.k === k));
+    setAktarMesaj(`${i + 1}. slayt açıldı: ${T[klasik.cur].group}, ${T[klasik.cur].name}.` + (yuklenecek.length ? " Görseller yükleniyor…" : ""));
+    const hedef = klasik.cur;
+    yuklenecek.forEach(([k, u]) => klasik.loadImg(u).then((g: HTMLImageElement) => { if (klasik.cur === hedef) klasik.gorsel(k, g); setAktarMesaj((x) => x.replace(" Görseller yükleniyor…", " Görseller yüklendi.")); })
+      .catch(() => setAktarMesaj((x) => x.replace(" Görseller yükleniyor…", "") + " Bir görsel açılamadı; karttan ayrıca yükle.")));
   }
   function paketAc(fl: File) {
     const rd = new FileReader();
@@ -268,6 +288,7 @@ export default function KlasikEditor() {
     setAktarMesaj(`Açıldı: ${T[klasik.cur].group}, ${T[klasik.cur].name}.` + ((T[klasik.cur].images || []).length ? " Fotoğrafı ilgili karttan ayrıca yükle." : ""));
   }
 
+  slaytAcRef.current = slaytAc;
   const gruplar = klasik.GORDER as string[];
   return (
     <div className="ie">
@@ -284,9 +305,9 @@ export default function KlasikEditor() {
             {S.transparent && <button type="button" className="btn ghost sm" onClick={svgIndir} title="Vektör SVG; yazı yola çevrilmiş">SVG indir</button>}
           </div>
         </div>
-        <div className={"ie-tuval" + (S.transparent ? " ie-seffaf" : "")} style={{ aspectRatio: "1080 / 1350", ["--oran" as string]: String(1080 / 1350) }}>
-          <canvas ref={ana} width={1080} height={1350} role="img" aria-label="Post önizlemesi" />
-          <canvas ref={ust} width={1080} height={1350} className="ie-ust" aria-hidden="true" />
+        <div className={"ie-tuval" + (S.transparent ? " ie-seffaf" : "")} style={{ aspectRatio: `1080 / ${klasik.CH}`, ["--oran" as string]: String(1080 / klasik.CH) }}>
+          <canvas ref={ana} width={1080} height={klasik.CH} role="img" aria-label={FORMAT[klasik.fmt].ad + " önizlemesi"} />
+          <canvas ref={ust} width={1080} height={klasik.CH} className="ie-ust" aria-hidden="true" />
         </div>
         <p className="ie-ipucu" role="status">{mesaj || ipucu}</p>
         </OnizlemeKutu>
@@ -294,6 +315,17 @@ export default function KlasikEditor() {
 
       <div className="ie-yan">
         <section className="panel" aria-label="Şablon">
+          <div className="ie-grup"><span>Format</span>
+            <div className="segment" role="group" aria-label="Format">
+              {Object.entries(FORMAT).map(([k, f]) => <button key={k} type="button" aria-pressed={klasik.fmt === k} title={f.aciklama} onClick={() => { klasik.formatSec(k); setMesaj(k === "post" ? "" : `${f.ad}: turuncu kesik çizgiler güvenli alanı gösterir${k === "reels" ? ", beyaz çerçeve profil ızgarasında görünen kısımdır" : ""}. Çizgiler indirilen görsele girmez.`); }}>{f.ad}</button>)}
+            </div>
+          </div>
+          {paket && paket.slides.length > 1 && (
+            <div className="ie-grup"><span>Slaytlar</span>
+              <div className="row">{paket.slides.map((sl, i) => <button key={i} type="button" className="chip" aria-pressed={paketSlayt === i} onClick={() => slaytAc(paket, i)}>{i + 1}. {T[sl.t]?.name ?? sl.t}</button>)}</div>
+              <div className="muted">Her slaytı ayrı ayrı PNG olarak indir.</div>
+            </div>
+          )}
           <label className="ie-grup"><span>Şablon</span>
             <select value={t} onChange={(e) => { klasik.sablonSec(e.target.value); setMesaj(""); }}>
               {gruplar.map((g) => (

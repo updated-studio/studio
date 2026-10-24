@@ -98,3 +98,13 @@
 @media (max-width: 899px) { .ie-oge { scroll-margin-top: calc(42vh + 80px); } }
 .ie-duzenler { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
 .ie-duzenler .ie-katman { gap: 6px; }
+
+/* Siteden gelenler (Gelenler.tsx) */
+.ie-gelen { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ie-gelen-l { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ie-gelen-l li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.ie-gelen-l li.on { background: color-mix(in srgb, var(--accent, #2563EB) 8%, transparent); border-radius: 10px; padding-inline: 8px; }
+.ie-gelen-l .ana { flex: 1; min-width: 0; }
+.ie-gelen-l .ana a { color: var(--ink); text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ie-gelen-l .ana a:hover { text-decoration: underline; }
+@media (max-width: 560px) { .ie-gelen-l li { flex-wrap: wrap; } .ie-gelen-l .ana { flex-basis: 100%; } .ie-gelen-l .ana a { white-space: normal; } }
