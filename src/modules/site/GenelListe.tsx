@@ -45,7 +45,9 @@ export default function GenelListe({ k, ac }: { k: KoleksiyonSema; ac: (id: numb
         <div className="filtre" style={{ flex: 1 }}><input type="search" placeholder={`${k.cogul} içinde ara…`} value={ara} onChange={(e) => setAra(e.target.value)} /></div>
         {k.gorsel
           ? <button className="btn sm" onClick={() => setYukleAcik(true)}>+ Görsel yükle</button>
-          : <button className="btn sm" onClick={() => ac(null)}>+ Yeni {k.tekil.toLocaleLowerCase("tr-TR")}</button>}
+          : k.giris
+            ? <a className="btn ghost sm" href="#/yonetim">Yeni kişi: Ekip → Yönetim'den davet et</a> /* hesaplar Stüdyo'dan (tek giriş) */
+            : <button className="btn sm" onClick={() => ac(null)}>+ Yeni {k.tekil.toLocaleLowerCase("tr-TR")}</button>}
       </div>
       <div className="panel">
         {hata && <div className="msg err">{hata}</div>}

@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-24-e",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Otomatik kayıt, kilit ve sürüm geçmişi",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Haber ve incelemeler yazarken birkaç saniyede bir kendiliğinden kaydediliyor.",
+          "Bir kaydı başkası düzenliyorsa uyarı çıkıyor; istersen düzenlemeyi devralabilirsin.",
+          "\"Sürümler\" düğmesiyle önceki hâlleri görüp karşılaştırabilir, geri dönebilirsin.",
+          "Yayındaki bir içerikte yayınlanmamış değişiklik varsa listede \"Değişiklik var\" yazıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-d",
     "tarih": "24 Ekim 2026",
     "baslik": "Tek giriş: ekip tek yerden",

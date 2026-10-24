@@ -25,15 +25,17 @@ const zaman = (s?: string) => {
   return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
-function DurumEtiket({ x }: { x: Icerik }) {
-  const d: Durum = x._status === "published" ? "yayinda" : x.workflow?.state ?? "taslak";
-  return <span className={`site-durum site-durum--${d}`}>{api.DURUMLAR[d]}</span>;
+function DurumEtiket({ x, yayinda }: { x: Icerik; yayinda: boolean }) {
+  const d: Durum = yayinda ? "yayinda" : x.workflow?.state ?? "taslak";
+  return <>
+    <span className={`site-durum site-durum--${d}`}>{api.DURUMLAR[d]}</span>
+    {yayinda && x._status !== "published" && <span className="site-durum site-durum--incelemede" title="Kaydedilmiş ama sitede henüz görünmeyen değişiklik var">Değişiklik var</span>}
+  </>;
 }
 
-function Satir({ k, x, kullanici, yenile, ac }: { k: Koleksiyon; x: Icerik; kullanici: PanelKullanici; yenile: () => void; ac: (id: number) => void }) {
+function Satir({ k, x, yayinda, kullanici, yenile, ac }: { k: Koleksiyon; x: Icerik; yayinda: boolean; kullanici: PanelKullanici; yenile: () => void; ac: (id: number) => void }) {
   const toast = useToast();
   const [mesgul, setMesgul] = useState(false);
-  const yayinda = x._status === "published";
   const durum = x.workflow?.state ?? "taslak";
   const yayinci = YAYINCI.includes(kullanici.role);
   const site = yayinda ? api.siteAdresi(k, x) : null;
@@ -53,7 +55,7 @@ function Satir({ k, x, kullanici, yenile, ac }: { k: Koleksiyon; x: Icerik; kull
           {[api.ad(x.category), api.ad(x.author), zaman(x.updatedAt)].filter(Boolean).join(" · ")}
         </div>
       </div>
-      <DurumEtiket x={x} />
+      <DurumEtiket x={x} yayinda={yayinda} />
       <div className="row site-eylem">
         {!yayinda && durum === "taslak" && <button className="btn ghost sm" disabled={mesgul} onClick={() => yap(() => api.durumYap(k, x.id, "incelemede"), "İncelemeye gönderildi.")}>İncelemeye gönder</button>}
         {!yayinda && durum === "incelemede" && <button className="btn ghost sm" disabled={mesgul} onClick={() => yap(() => api.durumYap(k, x.id, "taslak"), "Taslağa geri alındı.")}>Taslağa al</button>}
@@ -70,7 +72,7 @@ function Satir({ k, x, kullanici, yenile, ac }: { k: Koleksiyon; x: Icerik; kull
 function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon; ks: KoleksiyonSema }) {
   const [sekme, setSekme] = useState<Sekme>("incelemede");
   const [ara, setAra] = useState("");
-  const [veri, setVeri] = useState<{ docs: Icerik[]; toplam: number; sonraki: boolean; sayfa: number } | null>(null);
+  const [veri, setVeri] = useState<{ docs: Icerik[]; yayinda: Set<number>; toplam: number; sonraki: boolean; sayfa: number } | null>(null);
   const [sayilar, setSayilar] = useState<Partial<Record<Sekme, number>>>({});
   const [hata, setHata] = useState("");
   const [acik, setAcik] = useState<number | null | "yeni">(null);
@@ -83,8 +85,11 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
     const no = ++istekNo.current;
     try {
       const r = await api.liste(k, sekme, ara, sayfa);
+      const y = sekme === "yayinda" ? new Set(r.docs.map((d) => d.id)) : await api.yayindakiler(k, r.docs.map((d) => d.id));
       if (no !== istekNo.current) return;
-      setVeri((o) => ({ docs: sayfa > 1 && o ? [...o.docs, ...r.docs] : r.docs, toplam: r.totalDocs, sonraki: r.hasNextPage, sayfa }));
+      setVeri((o) => sayfa > 1 && o
+        ? { docs: [...o.docs, ...r.docs], yayinda: new Set([...o.yayinda, ...y]), toplam: r.totalDocs, sonraki: r.hasNextPage, sayfa }
+        : { docs: r.docs, yayinda: y, toplam: r.totalDocs, sonraki: r.hasNextPage, sayfa });
     } catch (e) { setHata((e as Error).message); }
   }, [k, sekme, ara]);
 
@@ -109,7 +114,7 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
     <>
       <div className="row" style={{ alignItems: "flex-start" }}>
         <div className="segment" role="group" aria-label="Durum">
-        {SEKMELER.map(([s, l]) => <button key={s} aria-pressed={sekme === s} onClick={() => { setSekme(s); setVeri(null); }}>{l}{sayilar[s] !== undefined ? ` ${sayilar[s]}` : ""}</button>)}
+        {SEKMELER.map(([s, l]) => <button key={s} aria-pressed={sekme === s} onClick={() => { if (s !== sekme) { setSekme(s); setVeri(null); } }}>{l}{sayilar[s] !== undefined ? ` ${sayilar[s]}` : ""}</button>)}
         </div>
         <button className="btn sm" style={{ marginLeft: "auto" }} onClick={yeni}>+ Yeni {ks.tekil.toLocaleLowerCase("tr-TR")}</button>
       </div>
@@ -120,7 +125,7 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
         {veri && !veri.docs.length && <div className="empty">Bu bölümde içerik yok.</div>}
         {veri && veri.docs.length > 0 && (
           <div className="liste">
-            {veri.docs.map((x) => <Satir key={x.id} k={k} x={x} kullanici={kullanici} yenile={yenile} ac={setAcik} />)}
+            {veri.docs.map((x) => <Satir key={x.id} k={k} x={x} yayinda={veri.yayinda.has(x.id)} kullanici={kullanici} yenile={yenile} ac={setAcik} />)}
           </div>
         )}
         {veri?.sonraki && <button className="btn ghost" onClick={() => yukle(veri.sayfa + 1)}>Daha fazla ({veri.toplam - veri.docs.length})</button>}

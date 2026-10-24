@@ -65,11 +65,18 @@ export function filtre(sekme: string, ara: string): string {
   return p.toString();
 }
 
+// "Yayında" sekmesi sitedeki hâli okur (taslaksız); diğerleri son kaydedilen hâli (taslak dahil)
 export const liste = (k: Koleksiyon, sekme: string, ara: string, sayfa = 1) =>
-  istek<Sayfa>(`/${k}?${filtre(sekme, ara)}&draft=true&depth=1&limit=25&page=${sayfa}&sort=-updatedAt`);
+  istek<Sayfa>(`/${k}?${filtre(sekme, ara)}${sekme === "yayinda" ? "" : "&draft=true"}&depth=1&limit=25&page=${sayfa}&sort=-updatedAt`);
+/** Listedeki kayıtlardan sitede yayında olanlar (son hâli taslak olsa bile) */
+export const yayindakiler = async (k: Koleksiyon, idler: number[]) => {
+  if (!idler.length) return new Set<number>();
+  const r = await istek<Sayfa>(`/${k}?where[id][in]=${idler.join(",")}&where[_status][equals]=published&depth=0&limit=${idler.length}&select[_status]=true`);
+  return new Set(r.docs.map((d) => d.id));
+};
 
 export const sayi = (k: Koleksiyon, sekme: string) =>
-  istek<Sayfa>(`/${k}?${filtre(sekme, "")}&draft=true&depth=0&limit=1`).then((x) => x.totalDocs);
+  istek<Sayfa>(`/${k}?${filtre(sekme, "")}${sekme === "yayinda" ? "" : "&draft=true"}&depth=0&limit=1`).then((x) => x.totalDocs);
 
 export const getir = (k: Koleksiyon, id: number) => istek<Icerik>(`/${k}/${id}?draft=true&depth=0`);
 
@@ -121,6 +128,13 @@ export const getirTam = (k: Koleksiyon, id: number) => istek<TamIcerik>(`/${k}/$
 /** Kaydet: taslak olarak (yayındaki sayfa değişmez; değişiklik "Yayınla" ile sitede görünür) */
 export const kaydet = (k: Koleksiyon, id: number, veri: Record<string, unknown>) =>
   istek<{ doc: TamIcerik }>(`/${k}/${id}?draft=true&depth=0`, { method: "PATCH", body: JSON.stringify(veri) }).then((x) => x.doc);
+/** Otomatik kayıt (panelin "autosave"i): taslak; son otomatik sürümün üzerine yazar, geçmişi şişirmez */
+export const otoKaydet = (yol: string, veri: Record<string, unknown>) => {
+  const genel = yol.startsWith("/globals/"); // ayar sayfaları POST ile kaydedilir ve kaydın kendisini döndürür
+  return istek<{ doc?: TamIcerik } & TamIcerik>(`${yol}?draft=true&autosave=true&depth=0`, { method: genel ? "POST" : "PATCH", body: JSON.stringify(veri) }).then((x) => (genel ? x : x.doc!));
+};
+/** Sitede yayında mı: taslaksız okuma yayındaki hâli verir (taslak kaydı yayındaki hâli değiştirmez) */
+export const yayindaMi = (yol: string) => istek<{ _status?: string }>(`${yol}?depth=0&select[_status]=true`).then((x) => x._status === "published");
 /** Değişikliklerle birlikte yayınla (panelin yayın kuralları geçerli) */
 export const kaydetVeYayinla = (k: Koleksiyon, id: number, veri: Record<string, unknown>) =>
   istek<{ doc: TamIcerik }>(`/${k}/${id}?depth=0`, { method: "PATCH", body: JSON.stringify({ ...veri, _status: "published" }) }).then((x) => x.doc);

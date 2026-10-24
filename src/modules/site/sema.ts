@@ -18,9 +18,11 @@ export type Alan = {
 };
 export type KoleksiyonSema = {
   slug: string; tekil: string; cogul: string; grup: string; baslikAlani: string; sutunlar: string[];
-  gorsel: boolean; taslak: boolean; giris: boolean; fields: Alan[];
-};
-export type GenelSema = { slug: string; ad: string; grup: string; taslak: boolean; fields: Alan[] };
+  gorsel: boolean; giris: boolean; fields: Alan[];
+} & SurumOzellik;
+/** Panelin sürüm ayarları: taslak, sürüm geçmişi, otomatik kayıt aralığı (ms, 0 = yok), zamanlanmış yayın, düzenleme kilidi */
+export type SurumOzellik = { taslak: boolean; surumler?: boolean; otoKayit?: number; zamanlama?: boolean; kilit?: boolean };
+export type GenelSema = { slug: string; ad: string; grup: string; fields: Alan[] } & SurumOzellik;
 export type PanelSema = { koleksiyonlar: KoleksiyonSema[]; genel: GenelSema[] };
 
 let onbellek: Promise<PanelSema> | null = null;

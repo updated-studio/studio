@@ -74,3 +74,16 @@
 .site-sayi, .site-alan input[type=email], .site-alan input[type=date] { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; color: inherit; font: inherit; }
 .site-baslik-ust { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
 .site-medya-buyuk { max-width: 480px; width: 100%; border-radius: 12px; }
+
+/* Sürüm geçmişi, kilit ve otomatik kayıt (Surumler.tsx, kayit.ts) */
+.pencere.site-surumler { max-width: 1100px; max-height: 84vh; overflow: auto; }
+.site-surum-izgara { display: grid; grid-template-columns: minmax(200px, 260px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 720px) { .site-surum-izgara { grid-template-columns: 1fr; } }
+.site-surum { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 8px 6px; cursor: pointer; color: var(--ink); width: 100%; }
+.site-surum.secili { background: var(--sunk); }
+.site-fark-alan { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.site-fark p { margin: 0; padding: 2px 6px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.site-fark-yeni { background: var(--ok-soft); color: var(--ok); }
+.site-fark-eski { background: var(--rose-soft); color: var(--rose); text-decoration: line-through; }
+.site-kilit { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.site-oto { font-size: 13px; }
