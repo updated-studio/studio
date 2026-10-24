@@ -81,6 +81,8 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
   const veri = (): Kayit => Object.fromEntries(alanlar.filter((a) => !a.admin?.readOnly && a.name! in kayit).map((a) => [a.name!, kayit[a.name!]]));
   veriRef.current = veri;
 
+  /** Ayar sayfası (global) kaydı: panel kaydı { message, result } içinde döndürür */
+  const genelKaydet = (url: string, govde: string) => api.istekYap<{ result?: Kayit } & Kayit>(url, { method: "POST", body: govde }).then((x) => x.result ?? x);
   async function gonder(is: () => Promise<Kayit>, mesaj: string, yayin?: boolean) {
     setMesgul(true); setHata("");
     try {
@@ -92,7 +94,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
     finally { setMesgul(false); }
   }
   const kaydet = () => gonder(async () => {
-    if (g) return api.istekYap<Kayit>(`${yol}?depth=0${taslak}`, { method: "POST", body: JSON.stringify(veri()) });
+    if (g) return genelKaydet(`${yol}?depth=0${taslak}`, JSON.stringify(veri()));
     if (!id) {
       const ek = k!.giris ? { password: rastgeleSifre() } : {}; // giriş Stüdyo'dan; panel şifresi kimseye verilmez
       const r = await api.istekYap<{ doc: Kayit }>(`/${k!.slug}?depth=0${taslak}`, { method: "POST", body: JSON.stringify({ ...veri(), ...ek }) });
@@ -101,7 +103,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
     return (await api.istekYap<{ doc: Kayit }>(`${yol}?depth=0${taslak}`, { method: "PATCH", body: JSON.stringify(veri()) })).doc;
   }, sema.taslak ? "Kaydedildi (taslak)." : "Kaydedildi.");
   const yayinla = () => confirm(yayinda ? "Değişiklikler sitede yayınlansın mı?" : "Yayınlansın mı?") && gonder(async () => {
-    if (g) return api.istekYap<Kayit>(`${yol}?depth=0`, { method: "POST", body: JSON.stringify({ ...veri(), _status: "published" }) });
+    if (g) return genelKaydet(`${yol}?depth=0`, JSON.stringify({ ...veri(), _status: "published" }));
     return (await api.istekYap<{ doc: Kayit }>(`${yol}?depth=0`, { method: "PATCH", body: JSON.stringify({ ...veri(), _status: "published" }) })).doc;
   }, "Yayınlandı; site birkaç dakikada güncellenir.", true);
   const kaldir = () => confirm("Yayından kaldırılsın mı? İçerik taslak olarak kalır.") && gonder(async () =>
@@ -118,7 +120,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
     const planla = tur === "publish" && akis && !yayinda ? { workflow: { ...akis, state: "planlandi" } } : null;
     if (degisti || planla) {
       const govde = JSON.stringify({ ...veri(), ...planla });
-      const d = g ? await api.istekYap<Kayit>(`${yol}?depth=0${taslak}`, { method: "POST", body: govde })
+      const d = g ? await genelKaydet(`${yol}?depth=0${taslak}`, govde)
         : (await api.istekYap<{ doc: Kayit }>(`${yol}?depth=0${taslak}`, { method: "PATCH", body: govde })).doc;
       setKayit(d); setDegisti(false); setSurum((x) => x + 1); kilit.tazele();
     }

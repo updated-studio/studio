@@ -134,8 +134,8 @@ export const kaydet = (k: Koleksiyon, id: number, veri: Record<string, unknown>)
   istek<{ doc: TamIcerik }>(`/${k}/${id}?draft=true&depth=0`, { method: "PATCH", body: JSON.stringify(veri) }).then((x) => x.doc);
 /** Otomatik kayıt (panelin "autosave"i): taslak; son otomatik sürümün üzerine yazar, geçmişi şişirmez */
 export const otoKaydet = (yol: string, veri: Record<string, unknown>) => {
-  const genel = yol.startsWith("/globals/"); // ayar sayfaları POST ile kaydedilir ve kaydın kendisini döndürür
-  return istek<{ doc?: TamIcerik } & TamIcerik>(`${yol}?draft=true&autosave=true&depth=0`, { method: genel ? "POST" : "PATCH", body: JSON.stringify(veri) }).then((x) => (genel ? x : x.doc!));
+  const genel = yol.startsWith("/globals/"); // ayar sayfaları POST ile kaydedilir, kayıt { result } içinde döner
+  return istek<{ doc?: TamIcerik; result?: TamIcerik } & TamIcerik>(`${yol}?draft=true&autosave=true&depth=0`, { method: genel ? "POST" : "PATCH", body: JSON.stringify(veri) }).then((x) => (genel ? x.result ?? x : x.doc!));
 };
 /** Sitede yayında mı: taslaksız okuma yayındaki hâli verir (taslak kaydı yayındaki hâli değiştirmez) */
 export const yayindaMi = (yol: string) => istek<{ _status?: string }>(`${yol}?depth=0&select[_status]=true`).then((x) => x._status === "published");
