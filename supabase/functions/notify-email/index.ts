@@ -55,6 +55,7 @@ Deno.serve(async () => {
     auth: { user, pass: host === "smtp.gmail.com" ? pass.replace(/\s/g, "") : pass },
   });
   const davet = await davetleriGonder(sb, tx);
+  if (davet.gonderilen || davet.errs?.length || davet.hata) console.log(JSON.stringify({ davet }));
 
   const { data: rows, error } = await sb.from("notifications")
     .update({ emailed: true }).eq("emailed", false)
