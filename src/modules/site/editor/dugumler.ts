@@ -19,19 +19,19 @@ export type SerializedBaglanti = Spread<{ type: "link"; id?: string; fields: Bag
 
 export class BaglantiDugumu extends ElementNode {
   __alanlar: BaglantiAlanlari;
-  __kimlik: string;
+  __kimlik: string | null;
   static getType() { return "link"; }
   static clone(n: BaglantiDugumu) { return new BaglantiDugumu(n.__alanlar, n.__kimlik, n.__key); }
-  constructor(alanlar: BaglantiAlanlari, kimlik?: string, key?: NodeKey) {
+  constructor(alanlar: BaglantiAlanlari, kimlik?: string | null, key?: NodeKey) {
     super(key);
     this.__alanlar = alanlar;
-    this.__kimlik = kimlik ?? yeniKimlik();
+    this.__kimlik = kimlik === undefined ? yeniKimlik() : kimlik;
   }
   static importJSON(j: SerializedBaglanti) {
-    return $baglantiOlustur(j.fields, j.id).setFormat(j.format).setIndent(j.indent).setDirection(j.direction);
+    return $baglantiOlustur(j.fields, j.id ?? null).setFormat(j.format).setIndent(j.indent).setDirection(j.direction);
   }
   exportJSON(): SerializedBaglanti {
-    return { ...super.exportJSON(), type: "link", id: this.__kimlik, fields: this.getLatest().__alanlar, version: 3 };
+    return { ...super.exportJSON(), type: "link", ...(this.getLatest().__kimlik !== null ? { id: this.getLatest().__kimlik! } : {}), fields: this.getLatest().__alanlar, version: 3 };
   }
   createDOM(_c: EditorConfig) {
     const a = document.createElement("a");
@@ -53,33 +53,33 @@ export class BaglantiDugumu extends ElementNode {
   canBeEmpty() { return false; }
   insertNewAfter(_s: RangeSelection, _r = true) { return null; }
 }
-export const $baglantiOlustur = (alanlar: BaglantiAlanlari, kimlik?: string) => $applyNodeReplacement(new BaglantiDugumu(alanlar, kimlik));
+export const $baglantiOlustur = (alanlar: BaglantiAlanlari, kimlik?: string | null) => $applyNodeReplacement(new BaglantiDugumu(alanlar, kimlik));
 export const $baglantiMi = (n: LexicalNode | null | undefined): n is BaglantiDugumu => n instanceof BaglantiDugumu;
 
 // ── Metin içi görsel ────────────────────────────────────────────────────────
-export type SerializedGorsel = Spread<{ type: "upload"; id?: string; value: number | { id: number }; relationTo: string; fields: Record<string, unknown>; format: string; version: 3 }, SerializedLexicalNode>;
+export type SerializedGorsel = Spread<{ type: "upload"; id?: string; value: number | { id: number }; relationTo: string; fields: Record<string, unknown> | null; format: string; version: 3 }, SerializedLexicalNode>;
 /** Görseli ekranda çizen bileşen editör tarafında atanır (dugumler.ts tarayıcı dışında da çalışsın diye React'e bağlı değil) */
 export const gorselCizici: { bilesen: ((p: { id: number; dugum: NodeKey }) => ReactNode) | null } = { bilesen: null };
 
 export class GorselDugumu extends DecoratorNode<ReactNode> {
   __deger: number;
   __iliski: string;
-  __alanlar: Record<string, unknown>;
+  __alanlar: Record<string, unknown> | null; // eski kayıtlarda null; olduğu gibi korunur
   __bicim: string;
-  __kimlik: string;
+  __kimlik: string | null; // null: eski kayıtta kimlik yok, eklenmez
   static getType() { return "upload"; }
   static clone(n: GorselDugumu) { return new GorselDugumu(n.__deger, n.__iliski, n.__alanlar, n.__bicim, n.__kimlik, n.__key); }
-  constructor(deger: number, iliski = "media", alanlar: Record<string, unknown> = {}, bicim = "", kimlik?: string, key?: NodeKey) {
+  constructor(deger: number, iliski = "media", alanlar: Record<string, unknown> | null = {}, bicim = "", kimlik?: string | null, key?: NodeKey) {
     super(key);
-    this.__deger = deger; this.__iliski = iliski; this.__alanlar = alanlar; this.__bicim = bicim; this.__kimlik = kimlik ?? yeniKimlik();
+    this.__deger = deger; this.__iliski = iliski; this.__alanlar = alanlar; this.__bicim = bicim; this.__kimlik = kimlik === undefined ? yeniKimlik() : kimlik;
   }
   static importJSON(j: SerializedGorsel) {
     const deger = typeof j.value === "object" && j.value ? j.value.id : (j.value as number);
-    return $applyNodeReplacement(new GorselDugumu(deger, j.relationTo, j.fields ?? {}, j.format ?? "", j.id));
+    return $applyNodeReplacement(new GorselDugumu(deger, j.relationTo, j.fields === undefined ? {} : j.fields, j.format ?? "", j.id ?? null));
   }
   exportJSON(): SerializedGorsel {
     const s = this.getLatest();
-    return { id: s.__kimlik, type: "upload", value: s.__deger, fields: s.__alanlar, format: s.__bicim, version: 3, relationTo: s.__iliski };
+    return { ...(s.__kimlik !== null ? { id: s.__kimlik } : {}), type: "upload", value: s.__deger, fields: s.__alanlar, format: s.__bicim, version: 3, relationTo: s.__iliski };
   }
   createDOM() { const d = document.createElement("div"); d.className = "site-ed-gorsel"; return d; }
   updateDOM() { return false; }

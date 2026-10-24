@@ -5,9 +5,13 @@ import type { Koleksiyon, Medya, PanelKullanici, Secenek, Sema, TamIcerik } from
 import { bilinmeyenTurler } from "./editor/dugumler";
 import MetinEditoru from "./editor/MetinEditoru";
 import MedyaSecici from "./MedyaSecici";
+import { Alanlar } from "./Form";
+import { alanlar, veriAlanlari, type Alan } from "./sema";
 
 // Haber düzenleme (2. aşama). Kaydet = taslak (sitedeki sayfa değişmez); Yayınla = panelin kurallarıyla yayına alır.
-// Grup alanları (seo, workflow) bütün olarak gönderilir ki ekranda olmayan alt alanlar (GEO, sahip, onaylayan…) silinmesin.
+// Grup alanları (seo, workflow) bütün olarak gönderilir ki alt alanlar silinmesin. Bu ekranda özel çizilmeyen bütün alanlar
+// (kaynaklar, ürün künyesi, sızıntı, düzeltmeler, SEO/GEO'nun kalanı, hazırlayan…) panelin alan yapısından genel formla çizilir.
+const OZEL = new Set(["title", "spot", "category", "label", "cover", "shortAnswer", "body", "author", "publishedAt", "seo", "workflow"]);
 const YAYINCI = ["admin", "yayin-yonetmeni"];
 type Form = {
   title: string; spot: string; category: number | null; label: string; cover: number | null; shortAnswer: string;
@@ -39,10 +43,12 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
   const [mesgul, setMesgul] = useState(false);
   const [hata, setHata] = useState("");
   const [metinSurum, setMetinSurum] = useState(0); // kayıttan sonra editörü sunucudaki metinle yeniden kurar
+  const [ek, setEk] = useState<Record<string, unknown> | null>(null); // genel formla düzenlenen alanlar
+  const [alanYapisi, setAlanYapisi] = useState<Alan[]>([]);
 
   useEffect(() => {
-    Promise.all([api.getirTam(k, id), api.sema(), api.kategoriler(), api.yazarlar()])
-      .then(([d, s, kt, yz]) => { setDoc(d); setF(formYap(d)); setSema(s); setKategoriler(kt); setYazarlar(yz); })
+    Promise.all([api.getirTam(k, id), api.sema(), api.kategoriler(), api.yazarlar(), alanlar()])
+      .then(([d, s, kt, yz, ps]) => { setDoc(d); setF(formYap(d)); setEk(d); setSema(s); setKategoriler(kt); setYazarlar(yz); setAlanYapisi(ps.koleksiyonlar.find((c) => c.slug === k)?.fields ?? []); })
       .catch((e) => setHata((e as Error).message));
   }, [k, id]);
   useEffect(() => { if (f?.cover) api.medyaGetir(f.cover).then(setKapak).catch(() => setKapak(null)); else setKapak(null); }, [f?.cover]);
@@ -55,7 +61,7 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
 
   const bilinmeyen = useMemo(() => (doc ? bilinmeyenTurler(doc.body) : []), [doc]);
   if (hata && !f) return <div className="empty">Açılamadı: {hata} <button className="linkbtn" onClick={kapat}>Listeye dön</button></div>;
-  if (!doc || !f || !sema) return <div className="muted">Yükleniyor…</div>;
+  if (!doc || !f || !sema || !ek) return <div className="muted">Yükleniyor…</div>;
 
   const yayinda = doc._status === "published";
   const yayinci = YAYINCI.includes(kullanici.role);
@@ -64,19 +70,21 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
   const set = <K extends keyof Form>(a: K, v: Form[K]) => { setF({ ...f, [a]: v }); setDegisti(true); };
 
   /** Sunucuya gidecek veri: değişen alanlar + grup alanları bütün hâlde */
+  const genelVeri = Object.fromEntries(veriAlanlari(alanYapisi).filter((a) => !OZEL.has(a.name!) && !a.admin?.readOnly && a.name! in ek).map((a) => [a.name!, ek[a.name!]]));
   const veri = (durum?: string): Record<string, unknown> => ({
+    ...genelVeri,
     title: f.title, spot: f.spot, category: f.category, label: f.label, cover: f.cover, shortAnswer: f.shortAnswer,
     author: f.author, publishedAt: f.publishedAt || null,
     ...(bilinmeyen.length ? {} : { body: f.body }),
-    seo: { ...doc.seo, title: f.seoTitle, description: f.seoDescription },
-    workflow: { ...doc.workflow, checklist: f.checklist, ...(durum ? { state: durum } : {}) },
+    seo: { ...(ek.seo as object), title: f.seoTitle, description: f.seoDescription },
+    workflow: { ...(ek.workflow as object), checklist: f.checklist, ...(durum ? { state: durum } : {}) },
   });
 
   async function calistir(is: () => Promise<TamIcerik>, tamam: string) {
     setMesgul(true); setHata("");
     try {
       const d = await is();
-      setDoc(d); setF(formYap(d)); setDegisti(false); setMetinSurum((x) => x + 1); toast(tamam);
+      setDoc(d); setF(formYap(d)); setEk(d); setDegisti(false); setMetinSurum((x) => x + 1); toast(tamam);
     } catch (e) { setHata((e as Error).message); }
     finally { setMesgul(false); }
   }
@@ -132,6 +140,7 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
               <MetinEditoru key={metinSurum} baslangic={doc.body} altSinir={sema.limit.alt} degisti={(j) => { setF((o) => (o ? { ...o, body: j } : o)); setDegisti(true); }} />
             )}
           </div>
+          <Alanlar fs={alanYapisi.filter((x) => x.admin?.position !== "sidebar")} deger={ek} set={(v) => { setEk(v); setDegisti(true); }} haric={OZEL} />
         </div>
 
         <div className="site-form site-yan">
@@ -159,6 +168,7 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
             <summary>SEO <span className="muted">(boş bırakılırsa otomatik)</span></summary>
             <label>SEO başlığı <Sayac deger={f.seoTitle} sinir={sema.limit.seoTitle} /><input type="text" value={f.seoTitle} onChange={(e) => set("seoTitle", e.target.value)} /></label>
             <label>Açıklama <Sayac deger={f.seoDescription} sinir={sema.limit.spot} /><textarea rows={3} value={f.seoDescription} onChange={(e) => set("seoDescription", e.target.value)} /></label>
+            {(() => { const a = alanYapisi.find((x) => x.name === "seo"); return a ? <Alanlar fs={a.fields ?? []} deger={(ek.seo as Record<string, unknown>) ?? {}} set={(v) => { setEk({ ...ek, seo: v }); setDegisti(true); }} haric={new Set(["title", "description"])} /> : null; })()}
           </details>
           <div className="site-kontrol">
             <span className="site-etiket">Yayın öncesi kontrol {eksik ? <span className="muted">· {eksik} eksik</span> : <span className="muted">· tamam</span>}</span>
@@ -166,7 +176,14 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
               <label key={a} className="site-kutu"><input type="checkbox" checked={!!f.checklist[a]} onChange={(e) => set("checklist", { ...f.checklist, [a]: e.target.checked })} /> {metin}</label>
             ))}
           </div>
-          <span className="muted">Kaynaklar, ürün künyesi ve sızıntı alanları şimdilik panelde: <a href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a></span>
+          {(() => {
+            const grup = (ad: string, cikar: string[]) => { const a = alanYapisi.find((x) => x.name === ad); return a ? [{ ...a, fields: (a.fields ?? []).filter((x) => !cikar.includes(x.name ?? "")) }] : []; };
+            const setEk_ = (v: Record<string, unknown>) => { setEk(v); setDegisti(true); };
+            return <>
+              <Alanlar fs={grup("workflow", ["state", "checklist", "approvedBy"])} deger={ek} set={setEk_} />
+              <Alanlar fs={alanYapisi.filter((a) => a.admin?.position === "sidebar")} deger={ek} set={setEk_} haric={OZEL} />
+            </>;
+          })()}
         </div>
       </div>
       {kapakSec && <MedyaSecici altSinir={sema.limit.alt} kapat={() => setKapakSec(false)} sec={(m) => { set("cover", m.id); setKapak(m); setKapakSec(false); }} />}

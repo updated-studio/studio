@@ -37,7 +37,7 @@ export class PanelHatasi extends Error {
   constructor(message: string, kod: number) { super(message); this.kod = kod; }
 }
 
-async function istek<T>(yol: string, init: RequestInit = {}): Promise<T> {
+export async function istekYap<T>(yol: string, init: RequestInit = {}): Promise<T> {
   const { data } = await sb.auth.getSession();
   const anahtar = data.session?.access_token;
   if (!anahtar) throw new PanelHatasi("Oturum bulunamadı, yeniden giriş yap.", 401);
@@ -49,6 +49,8 @@ async function istek<T>(yol: string, init: RequestInit = {}): Promise<T> {
   if (!r.ok) throw new PanelHatasi(govde?.errors?.[0]?.message || govde?.message || `Panel yanıt vermedi (${r.status})`, r.status);
   return govde as T;
 }
+
+const istek = istekYap;
 
 export const ben = () => istek<{ user: PanelKullanici | null }>("/users/me").then((x) => x.user);
 

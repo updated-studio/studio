@@ -3,8 +3,8 @@ import * as api from "./api";
 import type { Medya } from "./api";
 
 /** Görsel seç: sitenin görsel arşivinden ya da yeni yükleyerek. Yüklemede alt metin ve künye zorunlu (kit §2, §11). */
-export default function MedyaSecici({ sec, kapat, altSinir }: { sec: (m: Medya) => void; kapat: () => void; altSinir: number }) {
-  const [sekme, setSekme] = useState<"arsiv" | "yukle">("arsiv");
+export default function MedyaSecici({ sec, kapat, altSinir, ilk = "arsiv" }: { sec: (m: Medya) => void; kapat: () => void; altSinir: number; ilk?: "arsiv" | "yukle" }) {
+  const [sekme, setSekme] = useState<"arsiv" | "yukle">(ilk);
   const [ara, setAra] = useState("");
   const [liste, setListe] = useState<Medya[] | null>(null);
   const [sayfa, setSayfa] = useState(1);

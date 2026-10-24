@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **24 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Site modülünde artık sitenin bütün bölümleri var (haber, inceleme, karşılaştırma, ürün, görsel, video, reels, reklam, Kulüp, sayfalar, ayarlar). Formlar panelin alan yapısından kendiliğinden çiziliyor; yeni bağımlılık: `lexical` 0.50 paketleri (metin editörü, panelinkiyle aynı sürüm — yükseltirken `scripts/site-metin-dene.ts` ile doğrulanmalı). Ortak dosyalara dokunulmadı (yalnız `yenilikler.json` notu).
+
 - **24 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Fatih'in kararıyla yeni modül **Site** (`src/modules/site/`, dock'ta İçerik'ten sonra): sitedeki haberler/incelemeler/karşılaştırmalar listesi, yayınla/yayından kaldır. Ortak dosyalara yalnız ekleme yapıldı: `src/modules/index.ts` bir satır, `src/shared/Ikon.tsx` `site` ikonu, `yenilikler.json` notu. Görmek için site panelinde aynı e-postayla hesap gerekiyor (şimdilik panelde yalnız 2 yönetici hesabı var; diğer ekip üyeleri için panelde hesap açılması gerekiyor). Sonraki aşamada haber düzenleme de Stüdyo'ya gelecek; Payload paneli yedek kalacak.
 
 - **23 Ekim 2026 · Fatih'in Claude'u → Enes (ve Claude'u):** Yazı tipleri artık Google'dan değil Stüdyo'nun kendisinden yükleniyor (`public/yazi-tipleri/`, `index.html`'deki tek satır değişti; aileler ve kalınlıklar aynı, İçerik editörünün tuvalinde de aynı adlarla çalışır). Yeni yazı tipi/kalınlık gerekirse: site deposunda `node deploy/yazi-tipi-indir.mjs '<Google Fonts adresi>' public/yazi-tipleri .` (yalnız latin + latin-ext). Eski post aracına (`public/araclar/post`, senin alanın) dokunulmadı; o hâlâ Google'dan yüklüyor.

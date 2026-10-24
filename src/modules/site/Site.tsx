@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "../../shared/toast";
 import * as api from "./api";
 import type { Durum, Icerik, Koleksiyon, PanelKullanici } from "./api";
 import Duzenle from "./Duzenle";
+import GenelDuzenle from "./GenelDuzenle";
+import GenelListe from "./GenelListe";
+import { alanlar, type KoleksiyonSema, type PanelSema } from "./sema";
+import { SemaCtx } from "./Form";
 import "./site.css";
 
 // Site: updated.com.tr'deki haberler, incelemeler ve karşılaştırmalar (yayın paneli Payload'a Stüdyo girişiyle bağlanır).
-// Listeler, arama, yayınla / yayından kaldır / incelemeye gönder; haberler Stüdyo'da düzenlenir (Duzenle.tsx),
-// incelemeler ve karşılaştırmalar şimdilik panelde (kendilerine özgü alanları 3. aşamada gelecek).
+// Panelin bütün bölümleri Stüdyo'da: haberler özel ekranda (Duzenle.tsx), diğer her bölüm panelin alan yapısından çizilen
+// genel ekranda (GenelListe/GenelDuzenle). Payload'un kendi paneli yedek olarak açık kalır.
 type Sekme = "taslak" | "incelemede" | "planlandi" | "yayinda" | "hepsi";
 const SEKMELER: [Sekme, string][] = [["taslak", "Taslaklar"], ["incelemede", "İncelemede"], ["planlandi", "Planlandı"], ["yayinda", "Yayında"], ["hepsi", "Tümü"]];
 const YAYINCI = ["admin", "yayin-yonetmeni"];
@@ -44,7 +48,7 @@ function Satir({ k, x, kullanici, yenile, ac }: { k: Koleksiyon; x: Icerik; kull
   return (
     <div className="satir site-satir">
       <div className="ana">
-        <div className="site-baslik">{k === "news" ? <button className="linkbtn" onClick={() => ac(x.id)}>{x.title || "(başlıksız)"}</button> : x.title || <span className="muted">(başlıksız)</span>}</div>
+        <div className="site-baslik"><button className="linkbtn" onClick={() => ac(x.id)}>{x.title || "(başlıksız)"}</button></div>
         <div className="muted">
           {[api.ad(x.category), api.ad(x.author), zaman(x.updatedAt)].filter(Boolean).join(" · ")}
         </div>
@@ -56,27 +60,30 @@ function Satir({ k, x, kullanici, yenile, ac }: { k: Koleksiyon; x: Icerik; kull
         {!yayinda && yayinci && <button className="btn sm" disabled={mesgul} onClick={() => yap(() => api.yayinla(k, x.id), "Yayınlandı; site birkaç dakikada güncellenir.")}>Yayınla</button>}
         {yayinda && yayinci && <button className="btn ghost sm" disabled={mesgul} onClick={() => { if (confirm("Sitedeki sayfa kaldırılsın mı? İçerik taslak olarak kalır.")) yap(() => api.yayindanKaldir(k, x.id), "Yayından kaldırıldı."); }}>Yayından kaldır</button>}
         {site && <a className="btn ghost sm" href={site} target="_blank" rel="noreferrer">Sitede gör ↗</a>}
-        {k === "news" ? <button className="btn ghost sm" onClick={() => ac(x.id)}>Düzenle</button>
-          : <a className="btn ghost sm" href={api.panelAdresi(k, x.id)} target="_blank" rel="noreferrer">Düzenle ↗</a>}
+        <button className="btn ghost sm" onClick={() => ac(x.id)}>Düzenle</button>
       </div>
     </div>
   );
 }
 
-function Liste({ kullanici }: { kullanici: PanelKullanici }) {
-  const [k, setK] = useState<Koleksiyon>("news");
+/** Yayın akışı olan bölümler (haber, inceleme, karşılaştırma): durum sekmeleriyle */
+function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon; ks: KoleksiyonSema }) {
   const [sekme, setSekme] = useState<Sekme>("incelemede");
   const [ara, setAra] = useState("");
   const [veri, setVeri] = useState<{ docs: Icerik[]; toplam: number; sonraki: boolean; sayfa: number } | null>(null);
   const [sayilar, setSayilar] = useState<Partial<Record<Sekme, number>>>({});
   const [hata, setHata] = useState("");
-  const [acik, setAcik] = useState<number | null>(null);
+  const [acik, setAcik] = useState<number | null | "yeni">(null);
   const toast = useToast();
 
+  // Sekmeler arasında hızlı geçişte geç gelen eski yanıt yeni listenin üstüne yazmasın
+  const istekNo = useRef(0);
   const yukle = useCallback(async (sayfa = 1) => {
     setHata("");
+    const no = ++istekNo.current;
     try {
       const r = await api.liste(k, sekme, ara, sayfa);
+      if (no !== istekNo.current) return;
       setVeri((o) => ({ docs: sayfa > 1 && o ? [...o.docs, ...r.docs] : r.docs, toplam: r.totalDocs, sonraki: r.hasNextPage, sayfa }));
     } catch (e) { setHata((e as Error).message); }
   }, [k, sekme, ara]);
@@ -90,22 +97,21 @@ function Liste({ kullanici }: { kullanici: PanelKullanici }) {
   useEffect(() => { say(); }, [say]);
   const yenile = () => { yukle(1); say(); };
   async function yeni() {
+    if (k !== "news") { setAcik("yeni"); return; }
     try { setAcik((await api.yeniTaslak(k)).id); } catch (e) { toast((e as Error).message); }
   }
+  const kapat = () => { setAcik(null); yenile(); };
 
-  if (acik) return <Duzenle k={k} id={acik} kullanici={kullanici} kapat={() => { setAcik(null); yenile(); }} />;
+  if (acik !== null && k === "news" && acik !== "yeni") return <Duzenle k={k} id={acik} kullanici={kullanici} kapat={kapat} />;
+  if (acik !== null) return <GenelDuzenle hedef={{ koleksiyon: ks, id: acik === "yeni" ? null : acik }} kullanici={kullanici} kapat={kapat} />;
 
   return (
     <>
       <div className="row" style={{ alignItems: "flex-start" }}>
-        <div className="segment" role="group" aria-label="İçerik türü">
-          {api.KOLEKSIYONLAR.map((c) => <button key={c.id} aria-pressed={k === c.id} onClick={() => { setK(c.id); setVeri(null); }}>{c.ad}</button>)}
-        </div>
-        {k === "news" ? <button className="btn sm" style={{ marginLeft: "auto" }} onClick={yeni}>+ Yeni haber</button>
-          : <a className="btn sm" style={{ marginLeft: "auto" }} href={api.panelAdresi(k)} target="_blank" rel="noreferrer">+ Yeni ↗</a>}
-      </div>
-      <div className="segment" role="group" aria-label="Durum">
+        <div className="segment" role="group" aria-label="Durum">
         {SEKMELER.map(([s, l]) => <button key={s} aria-pressed={sekme === s} onClick={() => { setSekme(s); setVeri(null); }}>{l}{sayilar[s] !== undefined ? ` ${sayilar[s]}` : ""}</button>)}
+        </div>
+        <button className="btn sm" style={{ marginLeft: "auto" }} onClick={yeni}>+ Yeni {ks.tekil.toLocaleLowerCase("tr-TR")}</button>
       </div>
       <div className="filtre"><input type="search" placeholder="Başlıkta ara…" value={ara} onChange={(e) => setAra(e.target.value)} aria-label="Başlıkta ara" /></div>
       <div className="panel">
@@ -136,5 +142,52 @@ export default function Site() {
       eklenince bu sayfa kendiliğinden açılır.
     </div>
   );
-  return <Liste kullanici={kullanici} />;
+  return <Gezinme kullanici={kullanici} />;
+}
+
+const GRUP_SIRASI = ["İçerik", "Künye", "Kanallar", "Gelir", "Kulüp", "Ekip", "Ayarlar"];
+const AKIS: Koleksiyon[] = ["news", "reviews", "comparisons"];
+type Bolum = { tur: "k"; s: KoleksiyonSema } | { tur: "g"; s: PanelSema["genel"][number] };
+
+/** Panelin bölümleri gruplar hâlinde (gruplar ve sıra panelin kendi menüsüyle aynı) */
+function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
+  const [sema, setSema] = useState<PanelSema | null>(null);
+  const [hata, setHata] = useState("");
+  const [grup, setGrup] = useState("İçerik");
+  const [secili, setSecili] = useState("news");
+  const [genelAcik, setGenelAcik] = useState(false);
+  useEffect(() => { alanlar().then(setSema).catch((e) => setHata((e as Error).message)); }, []);
+  if (hata) return <div className="empty">Bölümler alınamadı: {hata}</div>;
+  if (!sema) return <div className="muted">Yükleniyor…</div>;
+
+  const bolumler: Bolum[] = [...sema.koleksiyonlar.map((s) => ({ tur: "k" as const, s })), ...sema.genel.map((s) => ({ tur: "g" as const, s }))];
+  const gruplar = [...new Set(bolumler.map((b) => b.s.grup))].sort((a, b) => (GRUP_SIRASI.indexOf(a) + 99) % 99 - (GRUP_SIRASI.indexOf(b) + 99) % 99);
+  const gruptakiler = bolumler.filter((b) => b.s.grup === grup);
+  const b = bolumler.find((x) => x.s.slug === secili) ?? gruptakiler[0];
+  const ad = (x: Bolum) => (x.tur === "k" ? x.s.cogul : x.s.ad);
+
+  return (
+    <SemaCtx.Provider value={sema}>
+      <div className="segment" role="group" aria-label="Bölüm grubu">
+        {gruplar.map((g) => <button key={g} aria-pressed={grup === g} onClick={() => { setGrup(g); setSecili(bolumler.find((x) => x.s.grup === g)!.s.slug); setGenelAcik(false); }}>{g}</button>)}
+      </div>
+      {gruptakiler.length > 1 && (
+        <div className="segment" role="group" aria-label="Bölüm">
+          {gruptakiler.map((x) => <button key={x.s.slug} aria-pressed={b.s.slug === x.s.slug} onClick={() => { setSecili(x.s.slug); setGenelAcik(false); }}>{ad(x)}</button>)}
+        </div>
+      )}
+      {b.tur === "g" ? (
+        genelAcik ? <GenelDuzenle key={b.s.slug} hedef={{ genel: b.s }} kullanici={kullanici} kapat={() => setGenelAcik(false)} />
+          : <div className="panel"><b>{b.s.ad}</b><span className="muted">Sitenin genel ayarları.</span><button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => setGenelAcik(true)}>Düzenle</button></div>
+      ) : AKIS.includes(b.s.slug as Koleksiyon)
+        ? <Liste key={b.s.slug} kullanici={kullanici} k={b.s.slug as Koleksiyon} ks={b.s} />
+        : <GenelBolum key={b.s.slug} k={b.s} kullanici={kullanici} />}
+    </SemaCtx.Provider>
+  );
+}
+
+function GenelBolum({ k, kullanici }: { k: KoleksiyonSema; kullanici: PanelKullanici }) {
+  const [acik, setAcik] = useState<number | null | undefined>(undefined);
+  if (acik !== undefined) return <GenelDuzenle hedef={{ koleksiyon: k, id: acik }} kullanici={kullanici} kapat={() => setAcik(undefined)} />;
+  return <GenelListe k={k} ac={setAcik} />;
 }
