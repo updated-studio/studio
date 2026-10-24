@@ -158,6 +158,9 @@ export async function medyaYukle(dosya: File, alt: string, credit: string, repre
 }
 export const medyaKucuk = (m?: Medya | null) => (m && (m.sizes?.thumb?.url || m.sizes?.card?.url || m.url)) || "";
 export const medyaAdres = (yol: string) => (yol.startsWith("http") ? yol : PANEL + yol);
+/** Kopyala: panelin kendi kopyalaması; kopya taslak olarak, yeni adresle ve tarihsiz başlar */
+export const kopyala = (slug: string, id: number) =>
+  istek<{ doc: { id: number } }>(`/${slug}/${id}/duplicate?draft=true&depth=0`, { method: "POST" }).then((x) => x.doc.id);
 /** Yeni boş taslak (taslakta zorunlu alanlar aranmaz; yayınlarken panel denetler) */
 export const yeniTaslak = (k: Koleksiyon) =>
   istek<{ doc: TamIcerik }>(`/${k}?draft=true&depth=0`, { method: "POST", body: JSON.stringify({ title: "", _status: "draft" }) }).then((x) => x.doc);

@@ -87,3 +87,10 @@
 .site-fark-eski { background: var(--rose-soft); color: var(--rose); text-decoration: line-through; }
 .site-kilit { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .site-oto { font-size: 13px; }
+
+/* Toplu işlemler (Toplu.tsx) */
+.site-toplu { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--blue); border-radius: 10px; background: var(--surface); position: sticky; top: 8px; z-index: 5; }
+.site-sec { width: 18px; height: 18px; flex: none; accent-color: var(--blue); }
+.site-medya-kutu { position: relative; }
+.site-medya-kutu .site-sec { position: absolute; top: 6px; left: 6px; z-index: 1; }
+.site-medya-kutu .site-medya-oge { width: 100%; }

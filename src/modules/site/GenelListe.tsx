@@ -3,6 +3,9 @@ import * as api from "./api";
 import type { Medya } from "./api";
 import MedyaSecici from "./MedyaSecici";
 import { veriAlanlari, type KoleksiyonSema } from "./sema";
+import type { PanelKullanici } from "./api";
+import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
+import { useToast } from "../../shared/toast";
 
 // Panelin herhangi bir bölümünün listesi: sütunlar panelin varsayılan sütunlarından, arama başlık alanında.
 type Kayit = Record<string, unknown>;
@@ -16,7 +19,9 @@ const goster = (v: unknown): string => {
   return String(v);
 };
 
-export default function GenelListe({ k, ac }: { k: KoleksiyonSema; ac: (id: number | null) => void }) {
+export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac: (id: number | null) => void; kullanici: PanelKullanici }) {
+  const toast = useToast();
+  const [secili, setSecili] = useState<Set<number>>(new Set());
   const [ara, setAra] = useState("");
   const [veri, setVeri] = useState<{ docs: Kayit[]; sonraki: boolean; sayfa: number; toplam: number } | null>(null);
   const [hata, setHata] = useState("");
@@ -53,19 +58,27 @@ export default function GenelListe({ k, ac }: { k: KoleksiyonSema; ac: (id: numb
         {hata && <div className="msg err">{hata}</div>}
         {!veri && !hata && <div className="muted">Yükleniyor…</div>}
         {veri && !veri.docs.length && <div className="empty">Henüz {k.cogul.toLocaleLowerCase("tr-TR")} yok.</div>}
+        {veri && veri.docs.length > 0 && !k.giris && <>
+          <div className="row"><TumunuSec secili={secili} idler={veri.docs.map((d) => d.id as number)} degis={setSecili} /></div>
+          <TopluCubuk k={k} secili={secili} kullanici={kullanici} bitti={(m) => { toast(m); setSecili(new Set()); yukle(1); }} />
+        </>}
         {veri && veri.docs.length > 0 && (k.gorsel ? (
           <div className="site-medya-izgara">
             {veri.docs.map((m) => (
-              <button key={m.id as number} className="site-medya-oge" onClick={() => ac(m.id as number)} title={String(m.alt ?? "")}>
-                <img src={api.medyaAdres(api.medyaKucuk(m as Medya))} alt={String(m.alt ?? "")} loading="lazy" />
-                <span>{String(m.alt || m.filename || "")}</span>
-              </button>
+              <div key={m.id as number} className="site-medya-kutu">
+                <Secim secili={secili} id={m.id as number} degis={setSecili} />
+                <button className="site-medya-oge" onClick={() => ac(m.id as number)} title={String(m.alt ?? "")}>
+                  <img src={api.medyaAdres(api.medyaKucuk(m as Medya))} alt={String(m.alt ?? "")} loading="lazy" />
+                  <span>{String(m.alt || m.filename || "")}</span>
+                </button>
+              </div>
             ))}
           </div>
         ) : (
           <div className="liste">
             {veri.docs.map((d) => (
               <div key={d.id as number} className="satir">
+                {!k.giris && <Secim secili={secili} id={d.id as number} degis={setSecili} />}
                 <div className="ana">
                   <button className="linkbtn site-baslik" onClick={() => ac(d.id as number)}>{goster(d[k.baslikAlani]) === "—" ? `#${d.id}` : goster(d[k.baslikAlani])}</button>
                   <div className="muted">{sutunlar.map((s) => `${alanAd.get(s) ?? s}: ${goster(d[s])}`).join(" · ")}</div>

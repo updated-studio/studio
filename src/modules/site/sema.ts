@@ -8,6 +8,7 @@ export type Alan = {
   label?: string;
   required?: boolean;
   hasMany?: boolean;
+  unique?: boolean;
   relationTo?: string | string[];
   options?: { label: string; value: string }[];
   min?: number; max?: number; minRows?: number; maxRows?: number; maxLength?: number;

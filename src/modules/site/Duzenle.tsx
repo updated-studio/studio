@@ -9,6 +9,7 @@ import { Alanlar } from "./Form";
 import { alanlar, veriAlanlari, type Alan, type SurumOzellik } from "./sema";
 import { kilitHatasi, otoMetni, useKilit, useOtoKayit } from "./kayit";
 import Surumler from "./Surumler";
+import Zamanlama, { useZamanlamalar, ZamanlamaEtiketi } from "./Zamanlama";
 
 // Haber düzenleme (2. aşama). Kaydet = taslak (sitedeki sayfa değişmez); Yayınla = panelin kurallarıyla yayına alır.
 // Grup alanları (seo, workflow) bütün olarak gönderilir ki alt alanlar silinmesin. Bu ekranda özel çizilmeyen bütün alanlar
@@ -32,7 +33,7 @@ function Sayac({ deger, sinir }: { deger: string; sinir: number }) {
   return <span className={deger.length > sinir ? "site-sayac asti" : "site-sayac"}>{deger.length} / {sinir}</span>;
 }
 
-export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id: number; kullanici: PanelKullanici; kapat: () => void }) {
+export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon; id: number; kullanici: PanelKullanici; kapat: () => void; ac: (id: number) => void }) {
   const toast = useToast();
   const [doc, setDoc] = useState<TamIcerik | null>(null);
   const [sema, setSema] = useState<Sema | null>(null);
@@ -53,7 +54,9 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
   const noRef = useRef(0);
   const veriRef = useRef<() => Record<string, unknown>>(() => ({}));
   const [surumAcik, setSurumAcik] = useState(false);
+  const [zamanAcik, setZamanAcik] = useState(false);
   const yol = `/${k}/${id}`;
+  const zam = useZamanlamalar({ koleksiyon: k, id }, YAYINCI.includes(kullanici.role) && !!ozellik.zamanlama);
   const kilit = useKilit({ koleksiyon: k, id }, kullanici, ozellik.kilit !== false);
   const kilitli = kilit.durum.tur === "baskasi";
   const oto = useOtoKayit(kilit.durum.tur === "bende" ? ozellik.otoKayit ?? 0 : 0, no, async () => {
@@ -120,6 +123,22 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
     try { const url = await api.onizlemeAdresi(k, id); if (pencere) pencere.location.href = url; }
     catch (e) { pencere?.close(); toast((e as Error).message); }
   }
+  /** Zamanlamadan önce: yayın kuralları şimdiden denetlenir (saatinde reddedilmesin), değişiklikler kaydedilir, durum "Planlandı" olur */
+  async function zamanlamaHazirlik(tur: "publish" | "unpublish") {
+    if (tur === "publish") {
+      if (yasak) return `Başlıkta "${yasak}" kullanılmaz.`;
+      if (eksik && f!.label !== "son-dakika") return `Yayın öncesi kontrol listesinde ${eksik} madde eksik.`;
+      const d = await api.kaydet(k, id, veri(yayinda ? undefined : "planlandi"));
+      setDoc(d); setF(formYap(d)); setEk(d); setDegisti(false); setMetinSurum((x) => x + 1); kilit.tazele();
+    } else if (degisti) await kaydet();
+    return null;
+  }
+  async function kopyala() {
+    if (degisti && !confirm("Kaydedilmemiş değişiklikler kopyaya girmez (son kaydedilen hâl kopyalanır). Devam edilsin mi?")) return;
+    setMesgul(true);
+    try { const yeni = await api.kopyala(k, id); toast("Kopyası oluşturuldu (taslak)."); ac(yeni); }
+    catch (e) { setHata((e as Error).message); setMesgul(false); }
+  }
   const geri = () => { if (!degisti || confirm("Kaydedilmemiş değişiklikler var. Çıkılsın mı?")) kapat(); };
 
   return (
@@ -131,7 +150,10 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
         {yayinda && <span className="muted">Kaydettiğin değişiklikler, yayınlayana kadar sitede görünmez.</span>}
         <span style={{ flex: 1 }} />
         {oto.tur && <span className={oto.tur === "hata" ? "site-oto site-uyari" : "site-oto muted"}>{otoMetni(oto)}</span>}
+        <ZamanlamaEtiketi isler={zam.isler} ac={() => setZamanAcik(true)} />
         {ozellik.surumler && <button className="btn ghost sm" onClick={() => setSurumAcik(true)}>Sürümler</button>}
+        {yayinci && ozellik.zamanlama && <button className="btn ghost sm" disabled={mesgul || kilitli} onClick={() => setZamanAcik(true)}>Zamanla</button>}
+        <button className="btn ghost sm" disabled={mesgul} onClick={kopyala}>Kopyala</button>
         <button className="btn ghost sm" disabled={mesgul} onClick={onizle}>Önizle ↗</button>
         {kullanici.role === "admin" && <a className="btn ghost sm" href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
         <button className="btn ghost sm" disabled={mesgul || kilitli || !degisti} onClick={() => kaydet()}>{degisti ? "Kaydet" : "Kaydedildi"}</button>
@@ -220,6 +242,7 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
         </div>
       </div>
       {surumAcik && <Surumler yol={yol} alanlar={alanYapisi} simdiki={{ ...doc, ...veri() }} kapat={() => setSurumAcik(false)} geriYuklendi={() => { setSurumAcik(false); yukle().then(() => { toast("Sürüm geri yüklendi (taslak)."); kilit.tazele(); }); }} />}
+      {zamanAcik && <Zamanlama hedef={{ koleksiyon: k, id }} isler={zam.isler} yayinda={yayinda} hazirlik={zamanlamaHazirlik} kapat={() => setZamanAcik(false)} degisti={() => { zam.yenile(); if (!degisti) yukle().then(() => kilit.tazele()); toast("Zamanlama güncellendi."); }} />}
       {kapakSec && <MedyaSecici altSinir={sema.limit.alt} kapat={() => setKapakSec(false)} sec={(m) => { set("cover", m.id); setKapak(m); setKapakSec(false); }} />}
     </div>
   );

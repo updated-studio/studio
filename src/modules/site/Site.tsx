@@ -7,6 +7,7 @@ import GenelDuzenle from "./GenelDuzenle";
 import GenelListe from "./GenelListe";
 import { alanlar, type KoleksiyonSema, type PanelSema } from "./sema";
 import { SemaCtx } from "./Form";
+import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
 import "./site.css";
 
 // Site: updated.com.tr'deki haberler, incelemeler ve karşılaştırmalar (yayın paneli Payload'a Stüdyo girişiyle bağlanır).
@@ -33,7 +34,7 @@ function DurumEtiket({ x, yayinda }: { x: Icerik; yayinda: boolean }) {
   </>;
 }
 
-function Satir({ k, x, yayinda, kullanici, yenile, ac }: { k: Koleksiyon; x: Icerik; yayinda: boolean; kullanici: PanelKullanici; yenile: () => void; ac: (id: number) => void }) {
+function Satir({ k, x, yayinda, kullanici, yenile, ac, secim }: { k: Koleksiyon; x: Icerik; yayinda: boolean; kullanici: PanelKullanici; yenile: () => void; ac: (id: number) => void; secim: React.ReactNode }) {
   const toast = useToast();
   const [mesgul, setMesgul] = useState(false);
   const durum = x.workflow?.state ?? "taslak";
@@ -49,6 +50,7 @@ function Satir({ k, x, yayinda, kullanici, yenile, ac }: { k: Koleksiyon; x: Ice
 
   return (
     <div className="satir site-satir">
+      {secim}
       <div className="ana">
         <div className="site-baslik"><button className="linkbtn" onClick={() => ac(x.id)}>{x.title || "(başlıksız)"}</button></div>
         <div className="muted">
@@ -76,6 +78,7 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
   const [sayilar, setSayilar] = useState<Partial<Record<Sekme, number>>>({});
   const [hata, setHata] = useState("");
   const [acik, setAcik] = useState<number | null | "yeni">(null);
+  const [secili, setSecili] = useState<Set<number>>(new Set());
   const toast = useToast();
 
   // Sekmeler arasında hızlı geçişte geç gelen eski yanıt yeni listenin üstüne yazmasın
@@ -107,14 +110,14 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
   }
   const kapat = () => { setAcik(null); yenile(); };
 
-  if (acik !== null && k === "news" && acik !== "yeni") return <Duzenle k={k} id={acik} kullanici={kullanici} kapat={kapat} />;
-  if (acik !== null) return <GenelDuzenle hedef={{ koleksiyon: ks, id: acik === "yeni" ? null : acik }} kullanici={kullanici} kapat={kapat} />;
+  if (acik !== null && k === "news" && acik !== "yeni") return <Duzenle key={acik} k={k} id={acik} kullanici={kullanici} kapat={kapat} ac={setAcik} />;
+  if (acik !== null) return <GenelDuzenle key={acik} hedef={{ koleksiyon: ks, id: acik === "yeni" ? null : acik }} kullanici={kullanici} kapat={kapat} ac={setAcik} />;
 
   return (
     <>
       <div className="row" style={{ alignItems: "flex-start" }}>
         <div className="segment" role="group" aria-label="Durum">
-        {SEKMELER.map(([s, l]) => <button key={s} aria-pressed={sekme === s} onClick={() => { if (s !== sekme) { setSekme(s); setVeri(null); } }}>{l}{sayilar[s] !== undefined ? ` ${sayilar[s]}` : ""}</button>)}
+        {SEKMELER.map(([s, l]) => <button key={s} aria-pressed={sekme === s} onClick={() => { if (s !== sekme) { setSekme(s); setVeri(null); setSecili(new Set()); } }}>{l}{sayilar[s] !== undefined ? ` ${sayilar[s]}` : ""}</button>)}
         </div>
         <button className="btn sm" style={{ marginLeft: "auto" }} onClick={yeni}>+ Yeni {ks.tekil.toLocaleLowerCase("tr-TR")}</button>
       </div>
@@ -123,11 +126,13 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
         {hata && <div className="msg err">{hata}</div>}
         {!veri && !hata && <div className="muted">Yükleniyor…</div>}
         {veri && !veri.docs.length && <div className="empty">Bu bölümde içerik yok.</div>}
-        {veri && veri.docs.length > 0 && (
+        {veri && veri.docs.length > 0 && <>
+          <div className="row"><TumunuSec secili={secili} idler={veri.docs.map((x) => x.id)} degis={setSecili} /></div>
+          <TopluCubuk k={ks} secili={secili} kullanici={kullanici} bitti={(m) => { toast(m); setSecili(new Set()); yenile(); }} />
           <div className="liste">
-            {veri.docs.map((x) => <Satir key={x.id} k={k} x={x} yayinda={veri.yayinda.has(x.id)} kullanici={kullanici} yenile={yenile} ac={setAcik} />)}
+            {veri.docs.map((x) => <Satir key={x.id} k={k} x={x} yayinda={veri.yayinda.has(x.id)} kullanici={kullanici} yenile={yenile} ac={setAcik} secim={<Secim secili={secili} id={x.id} degis={setSecili} />} />)}
           </div>
-        )}
+        </>}
         {veri?.sonraki && <button className="btn ghost" onClick={() => yukle(veri.sayfa + 1)}>Daha fazla ({veri.toplam - veri.docs.length})</button>}
       </div>
     </>
@@ -194,6 +199,6 @@ function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
 
 function GenelBolum({ k, kullanici }: { k: KoleksiyonSema; kullanici: PanelKullanici }) {
   const [acik, setAcik] = useState<number | null | undefined>(undefined);
-  if (acik !== undefined) return <GenelDuzenle hedef={{ koleksiyon: k, id: acik }} kullanici={kullanici} kapat={() => setAcik(undefined)} />;
-  return <GenelListe k={k} ac={setAcik} />;
+  if (acik !== undefined) return <GenelDuzenle key={acik ?? "yeni"} hedef={{ koleksiyon: k, id: acik }} kullanici={kullanici} kapat={() => setAcik(undefined)} ac={setAcik} />;
+  return <GenelListe k={k} ac={setAcik} kullanici={kullanici} />;
 }

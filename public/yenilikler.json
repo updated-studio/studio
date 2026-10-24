@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-24-f",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Zamanlanmış yayın, toplu işlem, kopyalama",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "\"Zamanla\" ile bir içerik istediğin saatte kendiliğinden yayınlanıyor ya da yayından kalkıyor.",
+          "Listede birden çok kayıt seçip toplu yayınlayabilir, incelemeye gönderebilir ya da bir alanını değiştirebilirsin.",
+          "\"Kopyala\" bir içeriğin taslak kopyasını açıyor.",
+          "Aynı başlıklı içerikler artık otomatik farklı adres alıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-e",
     "tarih": "24 Ekim 2026",
     "baslik": "Otomatik kayıt, kilit ve sürüm geçmişi",
