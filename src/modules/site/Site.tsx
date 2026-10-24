@@ -138,8 +138,8 @@ export default function Site() {
   if (kullanici === undefined) return <div className="muted">Yükleniyor…</div>;
   if (!kullanici) return (
     <div className="empty">
-      Site panelinde hesabın yok. Yöneticiden panelin <b>Kullanıcılar</b> bölümüne seni Stüdyo'daki e-postanla eklemesini iste;
-      eklenince bu sayfa kendiliğinden açılır.
+      Sitede yetkin yok. Yöneticiden Stüdyo'da <b>Ekip → Yönetim</b> bölümünde sana bir site rolü vermesini iste;
+      verilince bu sayfa kendiliğinden açılır.
     </div>
   );
   return <Gezinme kullanici={kullanici} />;
@@ -176,6 +176,7 @@ function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
           {gruptakiler.map((x) => <button key={x.s.slug} aria-pressed={b.s.slug === x.s.slug} onClick={() => { setSecili(x.s.slug); setGenelAcik(false); }}>{ad(x)}</button>)}
         </div>
       )}
+      {kullanici.role === "admin" && <a className="linkbtn muted" style={{ alignSelf: "flex-end" }} href="#/panel-giris" target="_blank" rel="noreferrer">Site panelinin kendisini aç (yedek) ↗</a>}
       {b.tur === "g" ? (
         genelAcik ? <GenelDuzenle key={b.s.slug} hedef={{ genel: b.s }} kullanici={kullanici} kapat={() => setGenelAcik(false)} />
           : <div className="panel"><b>{b.s.ad}</b><span className="muted">Sitenin genel ayarları.</span><button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => setGenelAcik(true)}>Düzenle</button></div>

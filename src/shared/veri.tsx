@@ -14,7 +14,7 @@ export type Is = {
 };
 export type Ekipman = { id: number; name: string; category: string; status: "elimizde" | "yolda"; holder: string | null; day: string | null };
 export type Etkinlik = { id: number; title: string; brand: string; start_day: string; end_day: string | null; certainty: "kesin" | "tahmini"; note: string };
-export type Davet = { email: string; name: string; org: string; is_admin: boolean };
+export type Davet = { email: string; name: string; org: string; is_admin: boolean; site_rol: string; davet_gonderildi: string | null };
 export type Bildirim = { id: number; body: string; read: boolean; created_at: string };
 
 export type Veri = {

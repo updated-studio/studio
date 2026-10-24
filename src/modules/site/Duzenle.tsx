@@ -106,7 +106,7 @@ export default function Duzenle({ k, id, kullanici, kapat }: { k: Koleksiyon; id
         {yayinda && <span className="muted">Kaydettiğin değişiklikler, yayınlayana kadar sitede görünmez.</span>}
         <span style={{ flex: 1 }} />
         <button className="btn ghost sm" disabled={mesgul} onClick={onizle}>Önizle ↗</button>
-        <a className="btn ghost sm" href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>
+        {kullanici.role === "admin" && <a className="btn ghost sm" href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
         <button className="btn ghost sm" disabled={mesgul || !degisti} onClick={() => kaydet()}>{degisti ? "Kaydet" : "Kaydedildi"}</button>
         {!yayinda && !yayinci && doc.workflow?.state !== "incelemede" && <button className="btn sm" disabled={mesgul} onClick={() => kaydet("incelemede", "İncelemeye gönderildi.")}>İncelemeye gönder</button>}
         {yayinci && <button className="btn sm" disabled={mesgul} onClick={yayinla}>{yayinda ? "Değişiklikleri yayınla" : "Yayınla"}</button>}

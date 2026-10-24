@@ -3,6 +3,7 @@ import Ekip from "./ekip/Ekip";
 import HaberMasasi from "./haber-masasi/HaberMasasi";
 import Icerik from "./icerik/Icerik";
 import Site from "./site/Site";
+import PanelGiris from "./site/PanelGiris";
 import YonetimSayfa from "./ekip/Yonetim";
 import Profil from "./hesap/Profil";
 import MarkaKiti from "./marka-kiti/MarkaKiti";
@@ -16,7 +17,7 @@ export type Modul = {
   ikon: string;        // shared/Ikon.tsx içindeki ad
   bilesen: ComponentType;
   sadeceYonetici?: boolean;
-  yer?: "dock" | "profil"; // nerede görünür: alttaki dock (varsayılan) veya sağ üstteki profil menüsü
+  yer?: "dock" | "profil" | "gizli"; // nerede görünür: alttaki dock (varsayılan), sağ üstteki profil menüsü ya da hiçbir menüde (yalnız adresle)
   renk?: string;           // dock simgesinin rengi (index.css değişkeni adı, ör. "blue")
 };
 
@@ -28,5 +29,6 @@ export const MODULLER: Modul[] = [
   { id: "takvim", ad: "Takvim", ikon: "takvim", bilesen: Takvim, renk: "orange" },
   { id: "marka-kiti", ad: "Marka Kiti", ikon: "marka", bilesen: MarkaKiti, renk: "purple" },
   { id: "profil", ad: "Profilim", ikon: "profil", bilesen: Profil, yer: "profil" },
+  { id: "panel-giris", ad: "Site paneli (yedek)", ikon: "site", bilesen: PanelGiris, yer: "gizli" },
   { id: "yonetim", ad: "Yönetim", ikon: "yonetim", bilesen: YonetimSayfa, yer: "profil", sadeceYonetici: true },
 ];

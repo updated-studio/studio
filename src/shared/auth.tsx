@@ -26,9 +26,12 @@ const LABELS: Record<Mode, [string, string]> = {
   newpass: ["Yeni şifreni belirle", "Şifreyi kaydet"],
 };
 
+// Davet e-postasındaki bağlantı (?davet=<e-posta>): kayıt ekranı e-posta doldurulmuş açılır
+const davetEdilen = () => new URLSearchParams(window.location.search).get("davet") ?? "";
+
 function AuthScreen({ initial }: { initial: Mode }) {
-  const [mode, setMode] = useState<Mode>(initial);
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<Mode>(initial === "login" && davetEdilen() ? "signup" : initial);
+  const [email, setEmail] = useState(davetEdilen);
   const [pass, setPass] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ t: string; good?: boolean } | null>(null);

@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-24-d",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Tek giriş: ekip tek yerden",
+    "bolumler": [
+      {
+        "ad": "Yönetim",
+        "maddeler": [
+          "Davet ettiğin kişiye davet e-postası kendiliğinden gidiyor; şifresini kendisi belirliyor.",
+          "Her üyenin site rolü (editör, yayın yönetmeni…) artık Stüdyo'dan seçiliyor; site hesabı kendiliğinden açılıyor.",
+          "Site panelinin kendisi yalnız yöneticilere açık; ekip her şeyi Site modülünden yapıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-c",
     "tarih": "24 Ekim 2026",
     "baslik": "Site panelinin tamamı Stüdyo'da",

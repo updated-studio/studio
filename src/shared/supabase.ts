@@ -14,6 +14,7 @@ export type Profile = {
   role: string;
   org: string;
   is_admin: boolean;
+  site_rol: string; // sitedeki rol (shared/siteRolleri.ts); "yok" = sitede yetkisi yok
   notify_email: boolean;
   avatar_url: string | null;
   emoji: string | null;

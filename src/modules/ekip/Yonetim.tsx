@@ -7,6 +7,7 @@ import { BU_HAFTA, GUN, iso, kalan, kisaY } from "../../shared/tarih";
 import { hataMetni, useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
 import { adOf, bosGunler, KATEGORILER } from "./ortak";
+import { SITE_ROLLERI, siteRolAdi } from "../../shared/siteRolleri";
 
 type Sonuc = PromiseLike<{ error: { message: string } | null }>;
 
@@ -37,18 +38,21 @@ function Yonetim({ bitti }: { bitti: (isler?: boolean) => void }) {
 
   async function ekipmanEkle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget), st = al(f, "durum");
-    if (await yap(sb.from("gear").insert({ name: al(f, "urun"), category: al(f, "kat"), status: st, holder: st === "elimizde" && al(f, "kimde") ? al(f, "kimde") : null, day: al(f, "tarih") || null }), "Ekipman eklendi.")) e.currentTarget.reset();
+    const form = e.currentTarget; // await'ten sonra e.currentTarget boşalır
+    const f = new FormData(form), st = al(f, "durum");
+    if (await yap(sb.from("gear").insert({ name: al(f, "urun"), category: al(f, "kat"), status: st, holder: st === "elimizde" && al(f, "kimde") ? al(f, "kimde") : null, day: al(f, "tarih") || null }), "Ekipman eklendi.")) form.reset();
   }
   async function etkinlikEkle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    if (await yap(sb.from("events").insert({ title: al(f, "ad"), brand: al(f, "marka"), start_day: al(f, "bas"), end_day: al(f, "bit") || null, certainty: al(f, "kesinlik"), note: al(f, "not") }), "Etkinlik takvime eklendi.")) e.currentTarget.reset();
+    const form = e.currentTarget; // await'ten sonra e.currentTarget boşalır
+    const f = new FormData(form);
+    if (await yap(sb.from("events").insert({ title: al(f, "ad"), brand: al(f, "marka"), start_day: al(f, "bas"), end_day: al(f, "bit") || null, certainty: al(f, "kesinlik"), note: al(f, "not") }), "Etkinlik takvime eklendi.")) form.reset();
   }
   async function davetEt(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    if (await yap(sb.from("invites").insert({ email: al(f, "eposta").toLowerCase(), name: al(f, "ad"), org: al(f, "yer"), is_admin: al(f, "yetki") === "1" }), "Davet listesine eklendi.")) e.currentTarget.reset();
+    const form = e.currentTarget; // await'ten sonra e.currentTarget boşalır
+    const f = new FormData(form);
+    if (await yap(sb.from("invites").insert({ email: al(f, "eposta").toLowerCase(), name: al(f, "ad"), org: al(f, "yer"), is_admin: al(f, "yetki") === "1", site_rol: al(f, "siterol") || "editor" }), "Davet gönderildi.")) form.reset();
   }
   async function hatirlat() {
     const r = await sb.rpc("send_reminder");
@@ -120,6 +124,13 @@ function Yonetim({ bitti }: { bitti: (isler?: boolean) => void }) {
             <div className="satir" key={m.id}>
               <div className="ana"><strong>{m.name}</strong> <span className="muted">{m.email}</span></div>
               {m.is_admin && <span className="pill wait">Yönetici</span>}
+              <label style={{ display: "flex", gap: 6, alignItems: "center" }} title="Sitedeki rolü (site paneli hesabı bu rolle açılır)">
+                <span className="muted">Site:</span>
+                <select aria-label={`${m.name} site rolü`} value={m.site_rol} disabled={m.id === uid}
+                  onChange={(e) => yap(sb.from("profiles").update({ site_rol: e.target.value }).eq("id", m.id), "Site rolü değişti.")}>
+                  {SITE_ROLLERI.map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}
+                </select>
+              </label>
               {m.id !== uid && <button className="btn ghost sm" onClick={() => yap(sb.from("profiles").update({ is_admin: !m.is_admin }).eq("id", m.id))}>{m.is_admin ? "Yöneticiliği kaldır" : "Yönetici yap"}</button>}
             </div>
           ))}
@@ -127,7 +138,9 @@ function Yonetim({ bitti }: { bitti: (isler?: boolean) => void }) {
             <div className="satir" key={i.email}>
               <div className="ana"><strong>{i.name}</strong> <span className="muted">{i.email}</span></div>
               {i.is_admin && <span className="pill wait">Yönetici olacak</span>}
-              <span className="pill off">Davet edildi, henüz kaydolmadı</span>
+              <span className="muted">Site: {siteRolAdi(i.site_rol)}</span>
+              <span className="pill off">{i.davet_gonderildi ? "Davet e-postası gitti, henüz kaydolmadı" : "Davet e-postası gönderiliyor…"}</span>
+              <button className="btn ghost sm" onClick={() => yap(sb.from("invites").update({ davet_gonderildi: null }).eq("email", i.email), "Davet e-postası yeniden gönderildi.")}>Yeniden gönder</button>
               <button className="btn ghost sm" aria-label="Daveti sil" onClick={() => yap(sb.from("invites").delete().eq("email", i.email))}><Ikon ad="sil" /></button>
             </div>
           ))}
@@ -136,10 +149,11 @@ function Yonetim({ bitti }: { bitti: (isler?: boolean) => void }) {
           <label htmlFor="d-eposta">E-posta<input id="d-eposta" name="eposta" type="email" required placeholder="uye@ornek.com" /></label>
           <label htmlFor="d-ad">Ad<input id="d-ad" name="ad" type="text" required maxLength={40} /></label>
           <label htmlFor="d-yer">Çalıştığı yer<input id="d-yer" name="yer" type="text" maxLength={40} placeholder="GZT, Sigma…" /></label>
-          <label htmlFor="d-yetki">Yetki<select id="d-yetki" name="yetki"><option value="">Üye</option><option value="1">Yönetici</option></select></label>
-          <button className="btn"><Ikon ad="plus" />Davet listesine ekle</button>
+          <label htmlFor="d-yetki">Stüdyo yetkisi<select id="d-yetki" name="yetki"><option value="">Üye</option><option value="1">Yönetici</option></select></label>
+          <label htmlFor="d-siterol">Site rolü<select id="d-siterol" name="siterol" defaultValue="editor">{SITE_ROLLERI.map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}</select></label>
+          <button className="btn"><Ikon ad="plus" />Davet et</button>
         </form>
-        <div className="muted">Eklediğin kişiye Stüdyo'nun adresini gönder. Bu e-postayla "Hesabını oluştur" diyerek kendi şifresini belirler.</div>
+        <div className="muted">Kişiye davet e-postası kendiliğinden gider; bağlantıdan kendi şifresini belirleyip hesabını açar. Site hesabı da seçtiğin rolle kendiliğinden açılır.</div>
       </div>
 
       <h3>Hatırlatma</h3>

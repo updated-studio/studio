@@ -88,7 +88,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat }: { hedef: Hedef
         <b className="site-baslik-ust">{baslik}</b>
         {sema.taslak && <span className={`site-durum site-durum--${yayinda ? "yayinda" : "taslak"}`}>{yayinda ? api.DURUMLAR.yayinda : api.DURUMLAR.taslak}</span>}
         <span style={{ flex: 1 }} />
-        {k && id && <a className="btn ghost sm" href={api.panelAdresi(k.slug as api.Koleksiyon, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
+        {k && id && yonetici && <a className="btn ghost sm" href={api.panelAdresi(k.slug as api.Koleksiyon, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
         {k && id && yonetici && <button className="btn ghost sm" disabled={mesgul} onClick={sil}>Sil</button>}
         {yayinda && <button className="btn ghost sm" disabled={mesgul} onClick={kaldir}>Yayından kaldır</button>}
         <button className={sema.taslak ? "btn ghost sm" : "btn sm"} disabled={mesgul || !degisti} onClick={kaydet}>{degisti ? "Kaydet" : "Kaydedildi"}</button>

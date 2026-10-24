@@ -1,4 +1,5 @@
-// Yeni bildirimleri e-posta olarak gönderir. Tetikleyici: notifications tablosuna ekleme (0003).
+// Yeni bildirimleri ve davetleri e-posta olarak gönderir. Tetikleyici: notifications tablosuna ekleme (0003),
+// invites tablosuna ekleme ya da davet_gonderildi'nin boşaltılması (0025, "Daveti yeniden gönder").
 // Gizli bilgi (Supabase > Edge Functions > Secrets; koda yazılmaz):
 //   MAIL_FROM: gönderen adres. SMTP_PASSWORD: o adresin şifresi (yoksa eski GMAIL_APP_PASSWORD kullanılır).
 //   SMTP_HOST / SMTP_PORT: posta sunucusu (yoksa Gmail: smtp.gmail.com / 465). Kurumsal adres (Natro) için
@@ -18,6 +19,30 @@ function serviceKey(): string {
   return (dict.default ?? Object.values(dict)[0]) as string;
 }
 
+/** Gönderilmemiş davetler: kişiye Stüdyo'nun kayıt bağlantısı gider (e-posta önceden doldurulmuş). Önce işaretlenir, iki kez gitmez. */
+// deno-lint-ignore no-explicit-any
+async function davetleriGonder(sb: any, tx: any) {
+  const { data: rows, error } = await sb.from("invites")
+    .update({ davet_gonderildi: new Date().toISOString() }).is("davet_gonderildi", null)
+    .select("email,name");
+  if (error) return { gonderilen: 0, hata: error.message };
+  let gonderilen = 0;
+  const errs: string[] = [];
+  for (const d of rows ?? []) {
+    const link = PANEL + "?davet=" + encodeURIComponent(d.email);
+    const text = "Merhaba " + d.name + ",\n\nUpdated ekibine davet edildin. Stüdyo, ekibin haber masası, içerik ve site yönetimi ekranı.\n\n" +
+      "Hesabını açmak için bu bağlantıya tıkla ve kendi şifreni belirle:\n" + link +
+      "\n\nArdından e-postana gelecek onay bağlantısına tıklaman yeterli.";
+    try {
+      await tx.sendMail({ from: '"Updated Stüdyo" <' + FROM + ">", to: d.email, subject: "Updated Stüdyo'ya davet edildin", text });
+      gonderilen++;
+    } catch (e) {
+      errs.push(d.email + ": " + String(e)); // yeniden denemek: Ekip → Yönetim'de "Daveti yeniden gönder" (burada boşaltmak tetikleyiciyle döngü olur)
+    }
+  }
+  return { gonderilen, errs };
+}
+
 Deno.serve(async () => {
   const pass = Deno.env.get("SMTP_PASSWORD") ?? Deno.env.get("GMAIL_APP_PASSWORD");
   if (!pass || !FROM) return new Response("SMTP_PASSWORD (ya da GMAIL_APP_PASSWORD) veya MAIL_FROM yok", { status: 500 });
@@ -25,6 +50,11 @@ Deno.serve(async () => {
   const port = Number(Deno.env.get("SMTP_PORT") || 465);
   const user = Deno.env.get("SMTP_USER") || FROM;
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
+  const tx = nodemailer.createTransport({
+    host, port, secure: port === 465,
+    auth: { user, pass: host === "smtp.gmail.com" ? pass.replace(/\s/g, "") : pass },
+  });
+  const davet = await davetleriGonder(sb, tx);
 
   const { data: rows, error } = await sb.from("notifications")
     .update({ emailed: true }).eq("emailed", false)
@@ -33,16 +63,11 @@ Deno.serve(async () => {
 
   const hourAgo = Date.now() - 60 * 60 * 1000;
   const fresh = (rows ?? []).filter((r) => new Date(r.created_at).getTime() >= hourAgo);
-  if (!fresh.length) return Response.json({ sent: 0 });
+  if (!fresh.length) return Response.json({ sent: 0, davet });
 
   const ids = [...new Set(fresh.map((r) => r.user_id))];
   const { data: people } = await sb.from("profiles")
     .select("id,email,name,notify_email").in("id", ids);
-
-  const tx = nodemailer.createTransport({
-    host, port, secure: port === 465,
-    auth: { user, pass: host === "smtp.gmail.com" ? pass.replace(/\s/g, "") : pass },
-  });
 
   let sent = 0;
   const errs: string[] = [];
@@ -59,6 +84,6 @@ Deno.serve(async () => {
       errs.push(String(e));
     }
   }
-  console.log(JSON.stringify({ sent, errs }));
-  return Response.json({ sent, errs });
+  console.log(JSON.stringify({ sent, errs, davet }));
+  return Response.json({ sent, errs, davet });
 });
