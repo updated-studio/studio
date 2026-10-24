@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-24-g",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Listelerde filtre, sıralama, sütun",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Her listede istediğin alana göre filtre kurabilirsin; koşullar \"hepsi\" ya da \"herhangi biri\" diye birleşir.",
+          "Liste istediğin alana göre artan ya da azalan sıralanıyor.",
+          "\"Sütunlar\" ile satırlarda görmek istediğin alanları seçebilirsin; seçimlerin hatırlanır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-f",
     "tarih": "24 Ekim 2026",
     "baslik": "Zamanlanmış yayın, toplu işlem, kopyalama",

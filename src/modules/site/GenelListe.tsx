@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api";
 import type { Medya } from "./api";
 import MedyaSecici from "./MedyaSecici";
@@ -6,18 +6,10 @@ import { veriAlanlari, type KoleksiyonSema } from "./sema";
 import type { PanelKullanici } from "./api";
 import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
 import { useToast } from "../../shared/toast";
+import ListeAraclari, { aracAlanlari, goster, hucre, kosullariEkle, sorguAnahtari, useAraclar } from "./ListeAraclari";
 
-// Panelin herhangi bir bölümünün listesi: sütunlar panelin varsayılan sütunlarından, arama başlık alanında.
+// Panelin herhangi bir bölümünün listesi: sütunlar panelin varsayılan sütunlarından (kişi değiştirebilir), arama başlık alanında, filtre ve sıralama ListeAraclari'ndan.
 type Kayit = Record<string, unknown>;
-
-const goster = (v: unknown): string => {
-  if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "boolean") return v ? "✓" : "—";
-  if (Array.isArray(v)) return v.length ? `${v.length} öğe` : "—";
-  if (typeof v === "object") { const o = v as Kayit; return String(o.name ?? o.title ?? o.alt ?? o.filename ?? `#${o.id}`); }
-  if (typeof v === "string" && /^\d{4}-\d\d-\d\dT/.test(v)) return new Date(v).toLocaleString("tr-TR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  return String(v);
-};
 
 export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac: (id: number | null) => void; kullanici: PanelKullanici }) {
   const toast = useToast();
@@ -27,22 +19,29 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
   const [hata, setHata] = useState("");
   const [yukleAcik, setYukleAcik] = useState(false);
   const alanAd = new Map(veriAlanlari(k.fields).map((a) => [a.name!, a.label ?? a.name!]));
-  const sutunlar = k.sutunlar.filter((s) => s !== k.baslikAlani && s !== "id").slice(0, 3);
+  const aracAlan = useMemo(() => aracAlanlari(k.fields), [k]);
+  const [arac, setArac] = useAraclar(k.slug, aracAlan, { sirala: "-updatedAt", sutunlar: k.sutunlar.filter((s) => s !== k.baslikAlani && s !== "id").slice(0, 3) });
+  const anahtar = sorguAnahtari(arac);
+  const aracRef = useRef(arac); aracRef.current = arac;
+  const sutunAd = (s: string) => aracAlan.find((a) => a.yol === s)?.ad ?? alanAd.get(s) ?? s;
 
   const istekNo = useRef(0); // geç gelen eski yanıt yok sayılır
   const yukle = useCallback(async (sayfa = 1) => {
     setHata("");
     const no = ++istekNo.current;
-    const p = new URLSearchParams({ depth: "1", limit: k.gorsel ? "48" : "25", page: String(sayfa), sort: "-updatedAt" });
+    const p = new URLSearchParams({ depth: "1", limit: k.gorsel ? "48" : "25", page: String(sayfa), sort: aracRef.current.sirala || "-updatedAt" });
     if (k.taslak) p.set("draft", "true");
-    if (ara.trim()) p.set(`where[${k.baslikAlani}][like]`, ara.trim());
+    if (ara.trim()) p.set(`where[and][0][${k.baslikAlani}][like]`, ara.trim());
+    kosullariEkle(p, "where[and][1]", aracRef.current);
     try {
       const r = await api.istekYap<{ docs: Kayit[]; hasNextPage: boolean; totalDocs: number }>(`/${k.slug}?${p}`);
       if (no !== istekNo.current) return;
       setVeri((o) => ({ docs: sayfa > 1 && o ? [...o.docs, ...r.docs] : r.docs, sonraki: r.hasNextPage, sayfa, toplam: r.totalDocs }));
     } catch (e) { setHata((e as Error).message); }
-  }, [k, ara]);
-  useEffect(() => { setVeri(null); const t = setTimeout(() => yukle(1), ara ? 300 : 0); return () => clearTimeout(t); }, [yukle, ara]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [k, ara, anahtar]);
+  const ilk = useRef(true); // açılışta hemen, yazarken 300 ms bekleyerek
+  useEffect(() => { const t = setTimeout(() => yukle(1), ilk.current ? 0 : 300); ilk.current = false; return () => clearTimeout(t); }, [yukle]);
 
   return (
     <>
@@ -54,6 +53,7 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
             ? <a className="btn ghost sm" href="#/yonetim">Yeni kişi: Ekip → Yönetim'den davet et</a> /* hesaplar Stüdyo'dan (tek giriş) */
             : <button className="btn sm" onClick={() => ac(null)}>+ Yeni {k.tekil.toLocaleLowerCase("tr-TR")}</button>}
       </div>
+      <ListeAraclari alanlar={aracAlan} d={arac} setD={(d) => { setArac(d); setSecili(new Set()); }} sutunlu={!k.gorsel} sabitSirala={[["updatedAt", "Güncellenme"], ["createdAt", "Oluşturulma"]]} />
       <div className="panel">
         {hata && <div className="msg err">{hata}</div>}
         {!veri && !hata && <div className="muted">Yükleniyor…</div>}
@@ -81,7 +81,7 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
                 {!k.giris && <Secim secili={secili} id={d.id as number} degis={setSecili} />}
                 <div className="ana">
                   <button className="linkbtn site-baslik" onClick={() => ac(d.id as number)}>{goster(d[k.baslikAlani]) === "—" ? `#${d.id}` : goster(d[k.baslikAlani])}</button>
-                  <div className="muted">{sutunlar.map((s) => `${alanAd.get(s) ?? s}: ${goster(d[s])}`).join(" · ")}</div>
+                  <div className="muted">{arac.sutunlar.map((s) => `${sutunAd(s)}: ${hucre(d, aracAlan.find((a) => a.yol === s), s)}`).join(" · ")}</div>
                 </div>
                 {k.taslak && <span className={`site-durum site-durum--${d._status === "published" ? "yayinda" : "taslak"}`}>{d._status === "published" ? api.DURUMLAR.yayinda : api.DURUMLAR.taslak}</span>}
               </div>

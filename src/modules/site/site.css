@@ -94,3 +94,13 @@
 .site-medya-kutu { position: relative; }
 .site-medya-kutu .site-sec { position: absolute; top: 6px; left: 6px; z-index: 1; }
 .site-medya-kutu .site-medya-oge { width: 100%; }
+
+/* Liste araçları: filtre, sıralama, sütunlar (ListeAraclari.tsx) */
+.site-araclar { display: flex; flex-direction: column; gap: 8px; }
+.site-araclar > .row { flex-wrap: wrap; gap: 8px; align-items: center; }
+.site-sirala { display: flex; flex-direction: row; align-items: center; align-self: flex-start; gap: 6px; font-size: 13px; color: var(--muted); }
+.site-sirala select { width: auto; max-width: 220px; }
+.site-filtre-kutu { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.site-kosul { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.site-kosul > select, .site-kosul > input { width: auto; flex: 1 1 160px; min-width: 0; }
+.site-sutunlar { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; }

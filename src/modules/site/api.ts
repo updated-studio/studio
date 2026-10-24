@@ -54,20 +54,24 @@ const istek = istekYap;
 
 export const ben = () => istek<{ user: PanelKullanici | null }>("/users/me").then((x) => x.user);
 
+/** Liste araçlarından gelen ek koşullar (ListeAraclari.kosullariEkle) ve sıralama */
+export type ListeEki = { ekle?: (p: URLSearchParams, onek: string) => void; sirala?: string };
+
 /** Sekmenin filtresi: Payload "where" sorgusu adres biçiminde */
-export function filtre(sekme: string, ara: string): string {
+export function filtre(sekme: string, ara: string, ek?: ListeEki): string {
   const p = new URLSearchParams();
   let i = 0;
   const ekle = (alan: string, op: string, deger: string) => { p.set(`where[and][${i}][${alan}][${op}]`, deger); i++; };
   if (sekme === "yayinda") ekle("_status", "equals", "published");
   else if (sekme !== "hepsi") { ekle("workflow.state", "equals", sekme); ekle("_status", "not_equals", "published"); }
   if (ara.trim()) ekle("title", "like", ara.trim());
+  ek?.ekle?.(p, `where[and][${i}]`);
   return p.toString();
 }
 
 // "Yayında" sekmesi sitedeki hâli okur (taslaksız); diğerleri son kaydedilen hâli (taslak dahil)
-export const liste = (k: Koleksiyon, sekme: string, ara: string, sayfa = 1) =>
-  istek<Sayfa>(`/${k}?${filtre(sekme, ara)}${sekme === "yayinda" ? "" : "&draft=true"}&depth=1&limit=25&page=${sayfa}&sort=-updatedAt`);
+export const liste = (k: Koleksiyon, sekme: string, ara: string, sayfa = 1, ek?: ListeEki) =>
+  istek<Sayfa>(`/${k}?${filtre(sekme, ara, ek)}${sekme === "yayinda" ? "" : "&draft=true"}&depth=1&limit=25&page=${sayfa}&sort=${encodeURIComponent(ek?.sirala || "-updatedAt")}`);
 /** Listedeki kayıtlardan sitede yayında olanlar (son hâli taslak olsa bile) */
 export const yayindakiler = async (k: Koleksiyon, idler: number[]) => {
   if (!idler.length) return new Set<number>();
@@ -75,8 +79,8 @@ export const yayindakiler = async (k: Koleksiyon, idler: number[]) => {
   return new Set(r.docs.map((d) => d.id));
 };
 
-export const sayi = (k: Koleksiyon, sekme: string) =>
-  istek<Sayfa>(`/${k}?${filtre(sekme, "")}${sekme === "yayinda" ? "" : "&draft=true"}&depth=0&limit=1`).then((x) => x.totalDocs);
+export const sayi = (k: Koleksiyon, sekme: string, ek?: ListeEki) =>
+  istek<Sayfa>(`/${k}?${filtre(sekme, "", ek)}${sekme === "yayinda" ? "" : "&draft=true"}&depth=0&limit=1`).then((x) => x.totalDocs);
 
 export const getir = (k: Koleksiyon, id: number) => istek<Icerik>(`/${k}/${id}?draft=true&depth=0`);
 

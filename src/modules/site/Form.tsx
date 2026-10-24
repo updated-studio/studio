@@ -39,7 +39,7 @@ function useSecenekler(rel?: string) {
   return liste;
 }
 
-function Iliski({ a, deger, set }: { a: Alan; deger: unknown; set: (v: unknown) => void }) {
+export function Iliski({ a, deger, set }: { a: Alan; deger: unknown; set: (v: unknown) => void }) {
   const rel = typeof a.relationTo === "string" ? a.relationTo : undefined;
   const liste = useSecenekler(rel);
   if (!rel) return <span className="muted">Birden çok türe bağlanan alan; panelde düzenlenir.</span>;

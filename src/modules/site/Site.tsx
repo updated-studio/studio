@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "../../shared/toast";
 import * as api from "./api";
 import type { Durum, Icerik, Koleksiyon, PanelKullanici } from "./api";
@@ -8,6 +8,7 @@ import GenelListe from "./GenelListe";
 import { alanlar, type KoleksiyonSema, type PanelSema } from "./sema";
 import { SemaCtx } from "./Form";
 import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
+import ListeAraclari, { aracAlanlari, hucre, kosullariEkle, sorguAnahtari, useAraclar, type AracAlan } from "./ListeAraclari";
 import "./site.css";
 
 // Site: updated.com.tr'deki haberler, incelemeler ve karşılaştırmalar (yayın paneli Payload'a Stüdyo girişiyle bağlanır).
@@ -34,7 +35,7 @@ function DurumEtiket({ x, yayinda }: { x: Icerik; yayinda: boolean }) {
   </>;
 }
 
-function Satir({ k, x, yayinda, kullanici, yenile, ac, secim }: { k: Koleksiyon; x: Icerik; yayinda: boolean; kullanici: PanelKullanici; yenile: () => void; ac: (id: number) => void; secim: React.ReactNode }) {
+function Satir({ k, x, yayinda, kullanici, yenile, ac, secim, sutunlar }: { k: Koleksiyon; x: Icerik; yayinda: boolean; kullanici: PanelKullanici; yenile: () => void; ac: (id: number) => void; secim: React.ReactNode; sutunlar: AracAlan[] }) {
   const toast = useToast();
   const [mesgul, setMesgul] = useState(false);
   const durum = x.workflow?.state ?? "taslak";
@@ -54,7 +55,7 @@ function Satir({ k, x, yayinda, kullanici, yenile, ac, secim }: { k: Koleksiyon;
       <div className="ana">
         <div className="site-baslik"><button className="linkbtn" onClick={() => ac(x.id)}>{x.title || "(başlıksız)"}</button></div>
         <div className="muted">
-          {[api.ad(x.category), api.ad(x.author), zaman(x.updatedAt)].filter(Boolean).join(" · ")}
+          {[api.ad(x.category), api.ad(x.author), zaman(x.updatedAt), ...sutunlar.map((s) => `${s.ad}: ${hucre(x as unknown as Record<string, unknown>, s, s.yol)}`)].filter(Boolean).join(" · ")}
         </div>
       </div>
       <DurumEtiket x={x} yayinda={yayinda} />
@@ -80,6 +81,12 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
   const [acik, setAcik] = useState<number | null | "yeni">(null);
   const [secili, setSecili] = useState<Set<number>>(new Set());
   const toast = useToast();
+  const aracAlan = useMemo(() => aracAlanlari(ks.fields), [ks]);
+  const [arac, setArac] = useAraclar(k, aracAlan, { sirala: "-updatedAt", sutunlar: [] });
+  const anahtar = sorguAnahtari(arac);
+  const aracRef = useRef(arac); aracRef.current = arac;
+  const ek = useCallback((): api.ListeEki => ({ ekle: (p, o) => kosullariEkle(p, o, aracRef.current), sirala: aracRef.current.sirala }), []);
+  const sutunlar = arac.sutunlar.map((y) => aracAlan.find((a) => a.yol === y)).filter((a): a is AracAlan => !!a);
 
   // Sekmeler arasında hızlı geçişte geç gelen eski yanıt yeni listenin üstüne yazmasın
   const istekNo = useRef(0);
@@ -87,21 +94,28 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
     setHata("");
     const no = ++istekNo.current;
     try {
-      const r = await api.liste(k, sekme, ara, sayfa);
+      const r = await api.liste(k, sekme, ara, sayfa, ek());
       const y = sekme === "yayinda" ? new Set(r.docs.map((d) => d.id)) : await api.yayindakiler(k, r.docs.map((d) => d.id));
       if (no !== istekNo.current) return;
       setVeri((o) => sayfa > 1 && o
         ? { docs: [...o.docs, ...r.docs], yayinda: new Set([...o.yayinda, ...y]), toplam: r.totalDocs, sonraki: r.hasNextPage, sayfa }
         : { docs: r.docs, yayinda: y, toplam: r.totalDocs, sonraki: r.hasNextPage, sayfa });
     } catch (e) { setHata((e as Error).message); }
-  }, [k, sekme, ara]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [k, sekme, ara, anahtar]);
 
   const say = useCallback(async () => {
-    const s = await Promise.all(SEKMELER.filter(([x]) => x !== "hepsi").map(([x]) => api.sayi(k, x).then((n) => [x, n] as const).catch(() => [x, 0] as const)));
+    const s = await Promise.all(SEKMELER.filter(([x]) => x !== "hepsi").map(([x]) => api.sayi(k, x, ek()).then((n) => [x, n] as const).catch(() => [x, 0] as const)));
     setSayilar(Object.fromEntries(s));
-  }, [k]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [k, anahtar]);
 
-  useEffect(() => { const t = setTimeout(() => yukle(1), ara ? 300 : 0); return () => clearTimeout(t); }, [yukle, ara]);
+  // Arama ya da filtre yazılırken 300 ms beklenir; sekme değişince hemen
+  const sonYazi = useRef(ara + anahtar);
+  useEffect(() => {
+    const yazildi = sonYazi.current !== ara + anahtar; sonYazi.current = ara + anahtar;
+    const t = setTimeout(() => yukle(1), yazildi ? 300 : 0); return () => clearTimeout(t);
+  }, [yukle, ara, anahtar]);
   useEffect(() => { say(); }, [say]);
   const yenile = () => { yukle(1); say(); };
   async function yeni() {
@@ -122,6 +136,7 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
         <button className="btn sm" style={{ marginLeft: "auto" }} onClick={yeni}>+ Yeni {ks.tekil.toLocaleLowerCase("tr-TR")}</button>
       </div>
       <div className="filtre"><input type="search" placeholder="Başlıkta ara…" value={ara} onChange={(e) => setAra(e.target.value)} aria-label="Başlıkta ara" /></div>
+      <ListeAraclari alanlar={aracAlan} d={arac} setD={(d) => { setArac(d); setSecili(new Set()); }} sabitSirala={[["updatedAt", "Güncellenme"], ["createdAt", "Oluşturulma"]]} />
       <div className="panel">
         {hata && <div className="msg err">{hata}</div>}
         {!veri && !hata && <div className="muted">Yükleniyor…</div>}
@@ -130,7 +145,7 @@ function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon;
           <div className="row"><TumunuSec secili={secili} idler={veri.docs.map((x) => x.id)} degis={setSecili} /></div>
           <TopluCubuk k={ks} secili={secili} kullanici={kullanici} bitti={(m) => { toast(m); setSecili(new Set()); yenile(); }} />
           <div className="liste">
-            {veri.docs.map((x) => <Satir key={x.id} k={k} x={x} yayinda={veri.yayinda.has(x.id)} kullanici={kullanici} yenile={yenile} ac={setAcik} secim={<Secim secili={secili} id={x.id} degis={setSecili} />} />)}
+            {veri.docs.map((x) => <Satir key={x.id} k={k} x={x} yayinda={veri.yayinda.has(x.id)} kullanici={kullanici} yenile={yenile} ac={setAcik} secim={<Secim secili={secili} id={x.id} degis={setSecili} />} sutunlar={sutunlar} />)}
           </div>
         </>}
         {veri?.sonraki && <button className="btn ghost" onClick={() => yukle(veri.sayfa + 1)}>Daha fazla ({veri.toplam - veri.docs.length})</button>}
