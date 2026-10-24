@@ -59,7 +59,7 @@ Deno.serve(async () => {
 
   const { data: rows, error } = await sb.from("notifications")
     .update({ emailed: true }).eq("emailed", false)
-    .select("id,user_id,body,created_at");
+    .select("id,user_id,body,created_at,link");
   if (error) return new Response(error.message, { status: 500 });
 
   const hourAgo = Date.now() - 60 * 60 * 1000;
@@ -76,7 +76,7 @@ Deno.serve(async () => {
     if (!p.notify_email) continue;
     const mine = fresh.filter((r) => r.user_id === p.id);
     const subject = mine.length === 1 ? mine[0].body.slice(0, 90) : mine.length + " yeni bildirim";
-    const text = "Merhaba " + p.name + ",\n\n" + mine.map((r) => "- " + r.body).join("\n") +
+    const text = "Merhaba " + p.name + ",\n\n" + mine.map((r) => "- " + r.body + (r.link ? "\n  Aç: " + PANEL + r.link : "")).join("\n") +
       "\n\nPanel: " + PANEL + "\n\nBu e-postalari Studyo'da Ekip > Profilim bolumunden kapatabilirsin.";
     try {
       await tx.sendMail({ from: '"Updated Stüdyo" <' + FROM + ">", to: p.email, subject: "Updated: " + subject, text });

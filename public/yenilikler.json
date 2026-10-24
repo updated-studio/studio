@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-10-24-n",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Bildirimler tıklanabiliyor",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Onay bekleyen yorum bildirimine basınca Site → Topluluk → Yorumlar açılıyor; e-postada da bağlantı var."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-m",
     "tarih": "24 Ekim 2026",
     "baslik": "Sitede üyelik: Uper",

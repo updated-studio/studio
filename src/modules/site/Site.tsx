@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useToast } from "../../shared/toast";
 import * as api from "./api";
 import type { Durum, Icerik, Koleksiyon, PanelKullanici } from "./api";
@@ -181,7 +182,16 @@ function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
   const [grup, setGrup] = useState("İçerik");
   const [secili, setSecili] = useState("news");
   const [genelAcik, setGenelAcik] = useState(false);
+  // Bildirimden gelince (#/site?bolum=yorumlar) o bölüm açılır
+  const [sp, setSp] = useSearchParams();
   useEffect(() => { alanlar().then(setSema).catch((e) => setHata((e as Error).message)); }, []);
+  useEffect(() => {
+    const istenen = sp.get("bolum");
+    if (!sema || !istenen) return;
+    const x = [...sema.koleksiyonlar, ...sema.genel].find((s) => s.slug === istenen);
+    if (x) { setGrup(x.grup); setSecili(x.slug); setGenelAcik(false); }
+    setSp({}, { replace: true });
+  }, [sema, sp, setSp]);
   if (hata) return <div className="empty">Bölümler alınamadı: {hata}</div>;
   if (!sema) return <div className="muted">Yükleniyor…</div>;
 

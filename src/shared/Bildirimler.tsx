@@ -30,7 +30,7 @@ export default function Bildirimler() {
           <div className="liste">
             {veri.notifs.length ? veri.notifs.map((n) => (
               <div className="satir" key={n.id}><div className="ana">
-                {!n.read && <span className="pill wait">Yeni</span>} {n.body}
+                {!n.read && <span className="pill wait">Yeni</span>} {n.link ? <a href={n.link} onClick={() => setAcik(false)}>{n.body}</a> : n.body}
                 <div className="muted">{new Date(n.created_at).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
               </div></div>
             )) : <div className="muted">Bildirim yok.</div>}
