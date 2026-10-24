@@ -90,6 +90,9 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
             {x.qc?.ana_sayfa && <span className="pill rose" title={`Önem ${x.qc.onem ?? ""}/10`}>Ana sayfa adayı</span>}
             {(x.qc_state === "bekliyor" || x.qc_state === "calisiyor") && <span className="pill off" title="Kaynaklara karşı son kontrol, görsel ve panele gönderim">Kontrol ediliyor</span>}
             {x.site_hata && <span className="pill rose" title={x.site_hata}>Panel hatası</span>}
+            {x.site_id && !x.site_hata && x.site_eksik && (x.site_eksik.eksikler?.length
+              ? <span className="pill wait" title={x.site_eksik.eksikler.join(" · ")}>Eksik: {x.site_eksik.eksikler.length}</span>
+              : <span className="pill ok" title="Panelde ölçülebilen kurallar tamam; editör okuyup onaylar">Panelde hazır</span>)}
             <span className={"pill " + (x.status === "hazir" ? "ok" : x.status === "gonderildi" ? "blue" : "off")}>{DURUM[x.status]}</span>
           </button>
         ))}
@@ -164,6 +167,8 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel ve panele gönderim). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
       {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
       {t.site_id && <div className="msg good">Panelde taslak haber olarak duruyor{t.site_gonderim ? " (" + zamanOnce(t.site_gonderim) + " önce gönderildi)" : ""}. {t.site_onizleme && <a href={t.site_onizleme} target="_blank" rel="noreferrer">Son taslağı aç ↗</a>}{t.site_admin && <> · <a href={t.site_admin} target="_blank" rel="noreferrer">Panelde aç ↗</a></>}</div>}
+      {t.site_id && t.site_eksik?.eksikler?.length ? <div className="msg">Panelde tamamlanacaklar: {t.site_eksik.eksikler.join(" · ")}.</div> : null}
+      {t.site_id && t.site_eksik?.duzeltmeler?.length ? <div className="muted">Panel yayın kuralı için düzeltti: {t.site_eksik.duzeltmeler.join(" ")}</div> : null}
       {t.site_hata && <div className="msg err">{t.site_hata}{/düzenlenmiş/.test(t.site_hata) && <> <button className="linkbtn" onClick={() => siteGonder(true)}>Üzerine yaz</button></>}</div>}
       <div className="panel">
         <label>Başlık (H1)<input type="text" value={d.title} onChange={(e) => alan("title", e.target.value)} /></label>

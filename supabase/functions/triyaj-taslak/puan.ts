@@ -5,7 +5,7 @@
 // Kural değişince: değerleri güncelle, ONCELIK_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz (CLAUDE.md kural 10).
 // Enes'in kararları: puan markadan bağımsız; Öncelikli marka listesi puanı etkilemez (sadece elemede kullanılır).
 
-export const ONCELIK_SURUMU = "18 Ekim 2026 (2)";
+export const ONCELIK_SURUMU = "24 Ekim 2026";
 
 // 1) Haberin türü: markadan bağımsız temel değer. Yapay zekâ her haberi bu listeden birine koyar ("tip" etiketi).
 export const HABER_TURLERI: { ad: string; puan: number; aciklama: string }[] = [

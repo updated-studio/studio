@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-24-k",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Taslaklar panele hazır geliyor",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Taslaklara kısa cevap ve sızıntı haberlerinde bilinenler/bilinmeyenler ekleniyor.",
+          "Başlık ve spot sitenin yayın kurallarına göre yazılıyor; spot en fazla 160 karakter.",
+          "Panele giden taslakta kapak 16:9'a kırpılıyor, ölçülebilen kontroller kendiliğinden işaretleniyor.",
+          "Taslak kartında \"Panelde hazır\" ya da eksik sayısı görünüyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-j",
     "tarih": "24 Ekim 2026",
     "baslik": "Manşetler, ilgili içerikler, görsel odağı",

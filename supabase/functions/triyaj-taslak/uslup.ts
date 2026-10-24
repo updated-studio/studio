@@ -1,4 +1,4 @@
-// UPDATED / NERDESİN FATİH YAZIM ÜSLUBU (ARCHITECTURE.md, 16 Ekim 2026 (4); 18 Ekim 2026: ajans/haber sitesi dili, uzunluk, spot 210, 3 ara başlık, iç link).
+// UPDATED / NERDESİN FATİH YAZIM ÜSLUBU (ARCHITECTURE.md, 16 Ekim 2026 (4); 18 Ekim 2026: ajans/haber sitesi dili, uzunluk, spot 210 (24 Ekim: 160, panel sınırı), 3 ara başlık, iç link).
 // Kaynak: updated.com.tr'de yayınlanan haberler (özellikle Fatih'in yazıları), Nerdesin Fatih YouTube kanalının başlık ve açıklamaları,
 // @nerdesinfatih Instagram gönderileri. Haber Masası → Ayarlar → "Yazım üslubu"ndan değiştirilebilir (tr_settings.yazim_uslubu);
 // orada bir şey yazılı değilse bu varsayılan kullanılır. Saf TypeScript: ekran da içe aktarıyor.
@@ -15,7 +15,7 @@ SES
 
 YAPI
 - Başlık: iki parçalı, "Ne oldu: en dikkat çeken somut detay" (ör. "Vaonis Atlas Tanıtıldı: Dünyanın İlk Modüler Akıllı Teleskobu"). Tercih/karşılaştırma haberlerinde soru olabilir ("Değiştirmeye Değer mi?"). Sonda en fazla bir ünlem. Kelimelerin baş harfleri büyük.
-- Spot: en fazla 210 karakter, 1-2 cümle; haberin özü ve neden önemli olduğu. Başlığı tekrar etme.
+- Spot: en fazla 160 karakter, 1-2 cümle; haberin özü ve neden önemli olduğu. Başlığı tekrar etme.
 - TAM 3 ara başlık (H2), somut ve bilgi taşıyan: "Fiyatı 3.990 Dolardan Başlıyor", "Öne Çıkan Teknik Özellikler", "Teslimatlar Mart 2027'de". "Giriş", "Sonuç", "Özet" gibi başlık yok.
 - En kritik rakamları ve ürün adlarını **kalın** yaz (paragraf başına en fazla bir-iki).
 - Kaynak/referans haber adı verme ("X sitesinin haberine göre" diye başlama). Sadece bilginin değerini kaynağı belirliyorsa yaz: şirketin resmi açıklaması, bir sızıntının kaynağı (ör. Mark Gurman / Bloomberg), bir araştırma ya da kurum. Ayrı kaynak listesi yazma.
@@ -70,7 +70,7 @@ KONTROL ET:
 3. Kaynakta olmayan iddia: taslakta kaynaklarda dayanağı olmayan bilgi varsa çıkar. Yeni bilgi EKLEME.
 4. Tutarsızlık: metnin içinde ya da kaynaklar arasında çelişen bilgi varsa metinde tarafsız biçimde belirt ("şirket X derken Y'ye göre ...") ya da emin olunanla yetin; sorunlar listesine yaz.
 5. Taraflılık: reklam/övgü dili, tek tarafın iddiasını gerçek gibi sunma, gereksiz yorum varsa tarafsızlaştır. Sızıntı ve söylenti "iddiaya göre" diye işaretli kalsın.
-6. Biçim: başlık iki parçalı kalıpta; spot en fazla 210 karakter; TAM 3 ara başlık (## ile); "[bağlantı](adres)" biçimindeki iç linkleri ve "**[EDİTÖR YORUMU: ...]**" satırını aynen koru.
+6. Biçim: başlık iki parçalı kalıpta, en fazla 70 karakter, ünlem ve "şok/flaş/inanılmaz" yok, sızıntı/söylenti başlığında "sızıntı", "sızdı" ya da "iddia" geçer; spot en fazla 160 karakter; TAM 3 ara başlık (## ile); "[bağlantı](adres)" biçimindeki iç linkleri ve "**[EDİTÖR YORUMU: ...]**" satırını aynen koru.
 7. Dil: aşağıdaki üsluba uy; yapay zekâ kokan ifadeleri temizle (özellikle: ${IZ_LISTESI}). Özetleme, kısaltma: bilgi miktarı aynı kalsın.
 
 ÜSLUP:

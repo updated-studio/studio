@@ -140,8 +140,12 @@ export async function siteKapakEkle(sb: Sb, taslakId: number): Promise<{ ok: boo
   const img = (t?.image ?? {}) as { secilen?: GorselAday | null; alt_text?: string };
   if (!t?.site_id || !img.secilen?.buyuk) return { ok: false, hata: "Haber ya da görsel yok" };
   const r = await panel(a, "/triyaj/kapak", { method: "POST", body: { studioId: String(taslakId), image: gorselGovde(img.secilen, img.alt_text || t.title) }, ms: 45_000 });
-  const v = r.veri as { updatedAt?: string; error?: string } | null;
-  if (r.ok && v?.updatedAt) await sb.from("tr_drafts").update({ site_guncel: v.updatedAt }).eq("id", taslakId);
+  const v = r.veri as { updatedAt?: string; error?: string; eksikler?: string[] } | null;
+  if (r.ok && v?.updatedAt) {
+    const { data: o } = await sb.from("tr_drafts").select("site_eksik").eq("id", taslakId).single();
+    const eski = (o?.site_eksik ?? {}) as { duzeltmeler?: string[] };
+    await sb.from("tr_drafts").update({ site_guncel: v.updatedAt, site_eksik: { eksikler: v.eksikler ?? [], duzeltmeler: eski.duzeltmeler ?? [] } }).eq("id", taslakId);
+  }
   return r.ok ? { ok: true } : { ok: false, hata: hataMetni(r.status, r.veri) };
 }
 
@@ -159,7 +163,7 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
   };
   try {
     // Kategori: paneldeki listeden. Önce yapay zekânın yazdığı adla eşleştir, olmazsa listeden seçtir, o da olmazsa varsayılan.
-    const seo = (t.seo ?? {}) as { kategori?: string; etiketler?: string[]; slug?: string; meta?: string; title_tag?: string };
+    const seo = (t.seo ?? {}) as { kategori?: string; etiketler?: string[]; slug?: string; meta?: string; title_tag?: string; kisa_cevap?: string; sizinti?: { bilinenler?: string[]; bilinmeyenler?: string[]; kesinlik?: string } };
     const liste = await siteKategoriler(sb, a);
     let kat = kategoriEsle(seo.kategori ?? "", liste);
     if (!kat && s.kategoriSec && liste.length) {
@@ -190,12 +194,14 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
       sources: kaynakListesi(t.sources ?? ""),
       ...(img.secilen?.buyuk ? { image: gorselGovde(img.secilen, img.alt_text || t.title) } : {}),
       seo: { title: seo.title_tag ?? "", description: seo.meta ?? "", slug: seo.slug ?? "" },
+      shortAnswer: seo.kisa_cevap || undefined,
+      ...(seo.sizinti ? { leak: { knowns: seo.sizinti.bilinenler ?? [], unknowns: seo.sizinti.bilinmeyenler ?? [], certainty: seo.sizinti.kesinlik || undefined } } : {}),
       tags: (seo.etiketler ?? []).slice(0, 4),
       priority: qc.onem ?? undefined, cluster: kume || undefined, editorEmail: eposta || undefined,
       lastSeen: t.site_guncel || undefined, force: !!s.zorla,
     };
     const r = await panel(a, "/triyaj/import", { method: "POST", body: govde, ms: 60_000 });
-    const v = (r.veri ?? {}) as { id?: number; admin?: string; preview?: string; updatedAt?: string; updated?: boolean; kategori?: string; code?: string; gorselHata?: string };
+    const v = (r.veri ?? {}) as { id?: number; admin?: string; preview?: string; updatedAt?: string; updated?: boolean; kategori?: string; code?: string; gorselHata?: string; eksikler?: string[]; duzeltmeler?: string[] };
     if (!r.ok || !v.id) {
       if (v.code === "duzenlendi") return kaydetHata("Bu taslak panelde düzenlenmiş; üzerine yazmadım. Yine de göndermek için \"Üzerine yaz\"a bas.", "duzenlendi");
       if (v.code === "yayinda") return kaydetHata("Bu haber panelde yayınlanmış ya da planlanmış; Stüdyo üzerine yazmaz.", "yayinda");
@@ -204,6 +210,7 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
     await sb.from("tr_drafts").update({
       site_id: v.id, site_admin: v.admin ?? "", site_onizleme: v.preview ?? "", site_guncel: v.updatedAt ?? "",
       site_gonderim: new Date().toISOString(), site_hata: v.gorselHata ? "Haber gitti ama görsel yüklenemedi: " + v.gorselHata : "", site_bekliyor: false, status: "gonderildi",
+      site_eksik: { eksikler: v.eksikler ?? [], duzeltmeler: v.duzeltmeler ?? [] },
     }).eq("id", taslakId);
     return { ok: true, id: v.id, admin: v.admin ?? "", onizleme: v.preview ?? "", kategori: v.kategori ?? kat.name, guncellendi: !!v.updated };
   } catch (e) {

@@ -32,6 +32,7 @@ export type Taslak = {
   qc_state?: "" | "bekliyor" | "calisiyor" | "tamam" | "hata"; qc?: { sorunlar?: string[]; durum?: string; onem?: number | null; ana_sayfa?: boolean; bitti?: string }; // son kalite kontrolü
   auto: boolean; wp_post_id: number | null; wp_link: string; wp_error: string; wp_sent_at: string | null; wp_pending: boolean; // otomatik mi, eski WordPress karşılığı (23 Ekim 2026'ya kadar; yalnız geçmiş)
   site_id?: number | null; site_admin?: string; site_onizleme?: string; site_hata?: string; site_gonderim?: string | null; site_bekliyor?: boolean; // panel (updated.com.tr) karşılığı (0024)
+  site_eksik?: { eksikler?: string[]; duzeltmeler?: string[] } | null; // panelin bildirdiği eksikler ve kural düzeltmeleri (0028)
 };
 export type Mesaj = { id: number; user_id: string; body: string; item_id: number | null; created_at: string };
 export type Kaynak = { id: number; category: string; name: string; url: string; active: boolean; last_check: string | null; item_count: number | null; last_item_at: string | null; status: string; error: string };
