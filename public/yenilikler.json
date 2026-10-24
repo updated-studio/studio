@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-10-24-i",
+    "tarih": "24 Ekim 2026",
+    "baslik": "API anahtarı Stüdyo'da",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Yöneticiler Ekip → Kullanıcılar'da bir kişiye panel API anahtarı üretip kapatabiliyor.",
+          "Site rolü \"yok\" yapılan kişinin anahtarı kendiliğinden siliniyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-h",
     "tarih": "24 Ekim 2026",
     "baslik": "Canlı önizleme",

@@ -119,3 +119,7 @@
   .site-canli-duzen { grid-template-columns: minmax(0, 1fr); }
   .site-canli { position: static; height: 75vh; }
 }
+
+/* API anahtarı (ApiAnahtari.tsx) */
+.site-anahtar { display: flex; flex-direction: column; gap: 6px; }
+.site-anahtar code { font-family: ui-monospace, monospace; font-size: 14px; overflow-wrap: anywhere; user-select: all; }

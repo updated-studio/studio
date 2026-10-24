@@ -19,7 +19,7 @@ export type Alan = {
 };
 export type KoleksiyonSema = {
   slug: string; tekil: string; cogul: string; grup: string; baslikAlani: string; sutunlar: string[];
-  gorsel: boolean; giris: boolean; fields: Alan[];
+  gorsel: boolean; giris: boolean; apiAnahtari?: boolean; fields: Alan[];
 } & SurumOzellik;
 /** Panelin sürüm ayarları: taslak, sürüm geçmişi, otomatik kayıt aralığı (ms, 0 = yok), zamanlanmış yayın, düzenleme kilidi */
 export type SurumOzellik = { taslak: boolean; surumler?: boolean; otoKayit?: number; zamanlama?: boolean; kilit?: boolean };

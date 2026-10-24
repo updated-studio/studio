@@ -8,6 +8,7 @@ import { kilitHatasi, otoMetni, useKilit, useOtoKayit } from "./kayit";
 import Surumler from "./Surumler";
 import Zamanlama, { useZamanlamalar, ZamanlamaEtiketi } from "./Zamanlama";
 import CanliOnizleme, { useCanliAcik } from "./CanliOnizleme";
+import ApiAnahtari from "./ApiAnahtari";
 
 const ONIZLEMELI = new Set(["news", "reviews", "comparisons"]); // sitenin önizleme sayfası olan bölümler
 
@@ -171,6 +172,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
       </div>
       {canli && <CanliOnizleme adres={canliAdres} surum={String(kayit?.updatedAt ?? "")} kapat={() => setCanli(false)} />}
       </div>
+      {k?.giris && k.apiAnahtari && id && yonetici && <ApiAnahtari yol={yol} kayit={kayit} degisti={(d) => setKayit((o) => ({ ...o, enableAPIKey: d.enableAPIKey, hasAPIKey: d.hasAPIKey, updatedAt: d.updatedAt }))} />}
       {zamanAcik && zamanHedef && <Zamanlama hedef={zamanHedef} isler={zam.isler} yayinda={yayinda} hazirlik={zamanlamaHazirlik} kapat={() => setZamanAcik(false)} degisti={() => { zam.yenile(); if (!degisti) yukle().then(() => kilit.tazele()); toast("Zamanlama güncellendi."); }} />}
       {surumAcik && <Surumler yol={yol} alanlar={sema.fields} simdiki={kayit} kapat={() => setSurumAcik(false)} geriYuklendi={() => { setSurumAcik(false); yukle().then(() => { toast("Sürüm geri yüklendi (taslak)."); kilit.tazele(); }); }} />}
     </div>
