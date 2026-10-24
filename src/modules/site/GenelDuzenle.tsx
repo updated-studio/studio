@@ -7,6 +7,9 @@ import { veriAlanlari, type GenelSema, type KoleksiyonSema } from "./sema";
 import { kilitHatasi, otoMetni, useKilit, useOtoKayit } from "./kayit";
 import Surumler from "./Surumler";
 import Zamanlama, { useZamanlamalar, ZamanlamaEtiketi } from "./Zamanlama";
+import CanliOnizleme, { useCanliAcik } from "./CanliOnizleme";
+
+const ONIZLEMELI = new Set(["news", "reviews", "comparisons"]); // sitenin önizleme sayfası olan bölümler
 
 // Panelin herhangi bir bölümü (koleksiyon kaydı ya da ayar sayfası) için düzenleme ekranı; alanlar panelin yapısından çizilir.
 type Kayit = Record<string, unknown>;
@@ -58,6 +61,11 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
     window.addEventListener("beforeunload", uyar);
     return () => window.removeEventListener("beforeunload", uyar);
   }, [degisti]);
+  const onizlemeli = !!k && !!id && ONIZLEMELI.has(k.slug);
+  const [canliAcik, setCanli] = useCanliAcik();
+  const canli = onizlemeli && canliAcik;
+  const [canliAdres, setCanliAdres] = useState<string | null>(null);
+  useEffect(() => { if (canli && !canliAdres) api.onizlemeAdresi(k!.slug as api.Koleksiyon, id!).then(setCanliAdres).catch((e) => toast((e as Error).message)); }, [canli, canliAdres, k, id, toast]);
 
   const alanlar = useMemo(() => veriAlanlari(sema.fields), [sema]);
   if (hata && !kayit) return <div className="empty">Açılamadı: {hata} <button className="linkbtn" onClick={kapat}>Geri dön</button></div>;
@@ -128,7 +136,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
   const medya = k?.gorsel ? (kayit as Medya) : null;
 
   return (
-    <div className="site-duzen">
+    <div className={`site-duzen${canli ? " canli" : ""}`}>
       <div className="row site-ust">
         <button className="btn ghost sm" onClick={geri}>← Geri</button>
         <b className="site-baslik-ust">{baslik}</b>
@@ -140,6 +148,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
         {sema.surumler && (g || id) && <button className="btn ghost sm" onClick={() => setSurumAcik(true)}>Sürümler</button>}
         {zamanHedef && sema.zamanlama && ["admin", "yayin-yonetmeni"].includes(kullanici.role) && <button className="btn ghost sm" disabled={mesgul || kilitli} onClick={() => setZamanAcik(true)}>Zamanla</button>}
         {k && id && ac && !k.gorsel && !k.giris && <button className="btn ghost sm" disabled={mesgul} onClick={kopyala}>Kopyala</button>}
+        {onizlemeli && <button className="btn ghost sm" aria-pressed={canli} onClick={() => setCanli(!canli)}>{canli ? "Önizlemeyi kapat" : "Canlı önizleme"}</button>}
         {k && id && yonetici && <a className="btn ghost sm" href={api.panelAdresi(k.slug as api.Koleksiyon, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
         {k && id && yonetici && <button className="btn ghost sm" disabled={mesgul || kilitli} onClick={sil}>Sil</button>}
         {yayinda && <button className="btn ghost sm" disabled={mesgul || kilitli} onClick={kaldir}>Yayından kaldır</button>}
@@ -155,9 +164,12 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
       )}
       {hata && <div className="msg err">{hata}</div>}
       {medya?.url && <img className="site-medya-buyuk" src={api.medyaAdres(medya.sizes?.card?.url || medya.url)} alt={medya.alt ?? ""} />}
+      <div className={canli ? "site-canli-duzen" : "site-canli-yok"}>
       <div className={yan.length ? "site-izgara" : ""} key={surum}>
         <div className="site-form"><Alanlar fs={ana} deger={kayit} set={set} /></div>
         {yan.length > 0 && <div className="site-form site-yan"><Alanlar fs={yan} deger={kayit} set={set} /></div>}
+      </div>
+      {canli && <CanliOnizleme adres={canliAdres} surum={String(kayit?.updatedAt ?? "")} kapat={() => setCanli(false)} />}
       </div>
       {zamanAcik && zamanHedef && <Zamanlama hedef={zamanHedef} isler={zam.isler} yayinda={yayinda} hazirlik={zamanlamaHazirlik} kapat={() => setZamanAcik(false)} degisti={() => { zam.yenile(); if (!degisti) yukle().then(() => kilit.tazele()); toast("Zamanlama güncellendi."); }} />}
       {surumAcik && <Surumler yol={yol} alanlar={sema.fields} simdiki={kayit} kapat={() => setSurumAcik(false)} geriYuklendi={() => { setSurumAcik(false); yukle().then(() => { toast("Sürüm geri yüklendi (taslak)."); kilit.tazele(); }); }} />}

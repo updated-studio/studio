@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-10-24-h",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Canlı önizleme",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Haber, inceleme ve karşılaştırma düzenlerken \"Canlı önizleme\" sitedeki görünüşü yanda gösteriyor.",
+          "Önizleme her kayıtta kendiliğinden yenileniyor; masaüstü ve telefon görünümü arasında geçebilirsin."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-g",
     "tarih": "24 Ekim 2026",
     "baslik": "Listelerde filtre, sıralama, sütun",

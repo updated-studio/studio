@@ -10,6 +10,7 @@ import { alanlar, veriAlanlari, type Alan, type SurumOzellik } from "./sema";
 import { kilitHatasi, otoMetni, useKilit, useOtoKayit } from "./kayit";
 import Surumler from "./Surumler";
 import Zamanlama, { useZamanlamalar, ZamanlamaEtiketi } from "./Zamanlama";
+import CanliOnizleme, { useCanliAcik } from "./CanliOnizleme";
 
 // Haber düzenleme (2. aşama). Kaydet = taslak (sitedeki sayfa değişmez); Yayınla = panelin kurallarıyla yayına alır.
 // Grup alanları (seo, workflow) bütün olarak gönderilir ki alt alanlar silinmesin. Bu ekranda özel çizilmeyen bütün alanlar
@@ -82,6 +83,10 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
     return () => window.removeEventListener("beforeunload", uyar);
   }, [degisti]);
 
+  const [canli, setCanli] = useCanliAcik();
+  const [canliAdres, setCanliAdres] = useState<string | null>(null);
+  useEffect(() => { if (canli && !canliAdres) api.onizlemeAdresi(k, id).then(setCanliAdres).catch((e) => toast((e as Error).message)); }, [canli, canliAdres, k, id, toast]);
+
   const bilinmeyen = useMemo(() => (doc ? bilinmeyenTurler(doc.body) : []), [doc]);
   if (hata && !f) return <div className="empty">Açılamadı: {hata} <button className="linkbtn" onClick={kapat}>Listeye dön</button></div>;
   if (!doc || !f || !sema || !ek) return <div className="muted">Yükleniyor…</div>;
@@ -142,7 +147,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
   const geri = () => { if (!degisti || confirm("Kaydedilmemiş değişiklikler var. Çıkılsın mı?")) kapat(); };
 
   return (
-    <div className="site-duzen">
+    <div className={`site-duzen${canli ? " canli" : ""}`}>
       <div className="row site-ust">
         <button className="btn ghost sm" onClick={geri}>← Liste</button>
         <span className={`site-durum site-durum--${yayinda ? "yayinda" : doc.workflow?.state ?? "taslak"}`}>{api.DURUMLAR[yayinda ? "yayinda" : doc.workflow?.state ?? "taslak"]}</span>
@@ -154,7 +159,8 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
         {ozellik.surumler && <button className="btn ghost sm" onClick={() => setSurumAcik(true)}>Sürümler</button>}
         {yayinci && ozellik.zamanlama && <button className="btn ghost sm" disabled={mesgul || kilitli} onClick={() => setZamanAcik(true)}>Zamanla</button>}
         <button className="btn ghost sm" disabled={mesgul} onClick={kopyala}>Kopyala</button>
-        <button className="btn ghost sm" disabled={mesgul} onClick={onizle}>Önizle ↗</button>
+        <button className="btn ghost sm" aria-pressed={canli} onClick={() => setCanli(!canli)}>{canli ? "Önizlemeyi kapat" : "Canlı önizleme"}</button>
+        {!canli && <button className="btn ghost sm" disabled={mesgul} onClick={onizle}>Önizle ↗</button>}
         {kullanici.role === "admin" && <a className="btn ghost sm" href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
         <button className="btn ghost sm" disabled={mesgul || kilitli || !degisti} onClick={() => kaydet()}>{degisti ? "Kaydet" : "Kaydedildi"}</button>
         {!yayinda && !yayinci && doc.workflow?.state !== "incelemede" && <button className="btn sm" disabled={mesgul || kilitli} onClick={() => kaydet("incelemede", "İncelemeye gönderildi.")}>İncelemeye gönder</button>}
@@ -168,6 +174,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
       )}
       {hata && <div className="msg err">{hata}</div>}
 
+      <div className={canli ? "site-canli-duzen" : "site-canli-yok"}>
       <div className="site-izgara">
         <div className="site-form">
           <label>Başlık <Sayac deger={f.title} sinir={sema.limit.title} />
@@ -240,6 +247,8 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
             </>;
           })()}
         </div>
+      </div>
+      {canli && <CanliOnizleme adres={canliAdres} surum={doc.updatedAt} kapat={() => setCanli(false)} />}
       </div>
       {surumAcik && <Surumler yol={yol} alanlar={alanYapisi} simdiki={{ ...doc, ...veri() }} kapat={() => setSurumAcik(false)} geriYuklendi={() => { setSurumAcik(false); yukle().then(() => { toast("Sürüm geri yüklendi (taslak)."); kilit.tazele(); }); }} />}
       {zamanAcik && <Zamanlama hedef={{ koleksiyon: k, id }} isler={zam.isler} yayinda={yayinda} hazirlik={zamanlamaHazirlik} kapat={() => setZamanAcik(false)} degisti={() => { zam.yenile(); if (!degisti) yukle().then(() => kilit.tazele()); toast("Zamanlama güncellendi."); }} />}
