@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-24-a",
+    "tarih": "24 Ekim 2026",
+    "baslik": "Yeni modül: Site",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Sitedeki haber, inceleme ve karşılaştırmalar artık Stüdyo'da listeleniyor.",
+          "Taslak, incelemede ve yayında olanlar ayrı bölümlerde.",
+          "Yetkisi olan, buradan yayınlayıp yayından kaldırabilir.",
+          "Görmek için site panelinde hesabın olmalı."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-23-d",
     "tarih": "23 Ekim 2026",
     "baslik": "Taslaklar panele kendiliğinden gidiyor",

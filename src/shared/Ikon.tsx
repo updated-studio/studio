@@ -24,6 +24,7 @@ const P: Record<string, string> = {
   sil: "M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13",
   cikis: "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10",
   sohbet: "M4 5h16v11H9l-5 4z",
+  site: "M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z",
 };
 
 export function Ikon({ ad }: { ad: string }) {

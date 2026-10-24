@@ -1,0 +1,10 @@
+/* Site modülü: durum etiketleri kit §12'deki sabit beş durum (renk + ikon + metin); renkler index.css değişkenlerinden */
+.site-satir { align-items: center; }
+.site-baslik { font-weight: 600; }
+.site-eylem { justify-content: flex-end; }
+.site-durum { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 99px; font-size: 13px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.site-durum--taslak { background: var(--sunk); color: var(--ink); }
+.site-durum--incelemede { background: var(--orange); color: var(--on-orange); }
+.site-durum--planlandi { background: transparent; color: var(--ink); border-color: var(--blue); }
+.site-durum--yayinda { background: var(--blue); color: var(--on-accent); }
+.site-durum--arsiv { background: var(--ink); color: var(--surface); }

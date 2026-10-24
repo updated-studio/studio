@@ -63,6 +63,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 24 Ekim 2026
+- (Fatih'in Claude'u, Natro sunucusunda) Kullanıcı: "Payload panelimizi Stüdyo gibi işlevsel yapacaktık; Stüdyo'ya modül olarak ekle" → üç yol sunuldu (A: paneli modül içinde aç, B: paneli özelleştir, C: yönetimi Stüdyo'da yeniden yaz). Kullanıcı C'yi seçti ("A ve B zaten C'nin içinde" — doğru; "birkaç dakika" değil, aşamalı dendi). 1. aşama: `site` modülü + panelde Stüdyo girişi tanıma. Önce: site ve panel kite göre doğrulandı/düzeltildi (site deposu DURUM.md).
+
 
 ### 23 Ekim 2026
 - (23:30, Fatih'in Claude'u) Yazı tipleri Stüdyo'nun kendisinden yükleniyor (`public/yazi-tipleri`, Google'a bağlantı yok). Kullanıcı marka kitinin her yere tam uygulanmasını istedi; Stüdyo'daki cam görünüm ve yuvarlak köşeler kitle çelişiyor (Enes 21 Ekim: "cam kalsın") → karar soruldu.
