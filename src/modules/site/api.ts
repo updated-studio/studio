@@ -43,7 +43,7 @@ async function istek<T>(yol: string, init: RequestInit = {}): Promise<T> {
   if (!anahtar) throw new PanelHatasi("Oturum bulunamadı, yeniden giriş yap.", 401);
   const r = await fetch(`${PANEL}/api${yol}`, {
     ...init,
-    headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), Authorization: `Studyo ${anahtar}`, ...init.headers },
+    headers: { ...(typeof init.body === "string" ? { "Content-Type": "application/json" } : {}), Authorization: `Studyo ${anahtar}`, ...init.headers },
   });
   const govde = await r.json().catch(() => ({}));
   if (!r.ok) throw new PanelHatasi(govde?.errors?.[0]?.message || govde?.message || `Panel yanıt vermedi (${r.status})`, r.status);
@@ -89,3 +89,62 @@ export const durumYap = async (k: Koleksiyon, id: number, durum: Durum) => {
 export const panelAdresi = (k: Koleksiyon, id?: number) => `${PANEL}/admin/collections/${k}${id ? `/${id}` : "/create"}`;
 export const siteAdresi = (k: Koleksiyon, x: Icerik) => x.path ? SITE + x.path : x.slug ? `${SITE}${KOLEKSIYONLAR.find((c) => c.id === k)!.onek}/${x.slug}` : null;
 export const ad = (x: { name?: string; title?: string } | number | null | undefined) => (x && typeof x === "object" ? x.name || x.title : "") || "";
+
+// ── Düzenleme (2. aşama) ────────────────────────────────────────────────────
+export type Sema = {
+  checklist: [string, string][];
+  labels: { label: string; value: string }[];
+  limit: { title: number; seoTitle: number; spot: number; alt: number };
+  states: { label: string; value: Durum }[];
+  yasakKelimeler: string[];
+};
+export type Medya = { id: number; alt?: string; credit?: string; filename?: string; url?: string; width?: number; height?: number; sizes?: Record<string, { url?: string | null }> };
+export type Secenek = { id: number; ad: string };
+export type TamIcerik = Icerik & {
+  label?: string;
+  cover?: number | null;
+  author?: number | null;
+  category?: number | null;
+  shortAnswer?: string;
+  body?: unknown;
+  seo?: { title?: string; description?: string; [k: string]: unknown };
+  workflow?: { state?: Durum; checklist?: Record<string, boolean>; [k: string]: unknown };
+};
+
+export const sema = () => istek<Sema>("/studyo/sema");
+export const onizlemeAdresi = (k: Koleksiyon, id: number) => istek<{ url: string }>(`/studyo/onizleme/${k}/${id}`).then((x) => x.url);
+/** Düzenleme için: ilişkiler kimlik olarak gelir (geri gönderirken grup alanları bozulmasın) */
+export const getirTam = (k: Koleksiyon, id: number) => istek<TamIcerik>(`/${k}/${id}?draft=true&depth=0`);
+
+/** Kaydet: taslak olarak (yayındaki sayfa değişmez; değişiklik "Yayınla" ile sitede görünür) */
+export const kaydet = (k: Koleksiyon, id: number, veri: Record<string, unknown>) =>
+  istek<{ doc: TamIcerik }>(`/${k}/${id}?draft=true&depth=0`, { method: "PATCH", body: JSON.stringify(veri) }).then((x) => x.doc);
+/** Değişikliklerle birlikte yayınla (panelin yayın kuralları geçerli) */
+export const kaydetVeYayinla = (k: Koleksiyon, id: number, veri: Record<string, unknown>) =>
+  istek<{ doc: TamIcerik }>(`/${k}/${id}?depth=0`, { method: "PATCH", body: JSON.stringify({ ...veri, _status: "published" }) }).then((x) => x.doc);
+
+const secenekler = (yol: string) => istek<{ docs: { id: number; name?: string; title?: string }[] }>(yol).then((x) => x.docs.map((d) => ({ id: d.id, ad: d.name || d.title || `#${d.id}` })));
+export const kategoriler = () => secenekler("/categories?limit=200&depth=0&sort=name");
+export const yazarlar = () => secenekler("/authors?limit=200&depth=0&sort=name");
+
+export const medyaListe = (ara: string, sayfa = 1) => {
+  const p = new URLSearchParams({ limit: "24", page: String(sayfa), sort: "-createdAt", depth: "0" });
+  if (ara.trim()) { p.set("where[or][0][alt][like]", ara.trim()); p.set("where[or][1][filename][like]", ara.trim()); }
+  return istek<{ docs: Medya[]; hasNextPage: boolean }>(`/media?${p}`);
+};
+export const medyaGetir = (id: number) => istek<Medya>(`/media/${id}?depth=0`);
+/** Görsel yükle: alt metin ve künye zorunlu (kit §11, §2) */
+export async function medyaYukle(dosya: File, alt: string, credit: string, representative: boolean): Promise<Medya> {
+  const f = new FormData();
+  f.append("file", dosya);
+  f.append("_payload", JSON.stringify({ alt, credit, representative }));
+  return istek<{ doc: Medya }>("/media", { method: "POST", body: f }).then((x) => x.doc);
+}
+export const medyaKucuk = (m?: Medya | null) => (m && (m.sizes?.thumb?.url || m.sizes?.card?.url || m.url)) || "";
+export const medyaAdres = (yol: string) => (yol.startsWith("http") ? yol : PANEL + yol);
+/** Yeni boş taslak (taslakta zorunlu alanlar aranmaz; yayınlarken panel denetler) */
+export const yeniTaslak = (k: Koleksiyon) =>
+  istek<{ doc: TamIcerik }>(`/${k}?draft=true&depth=0`, { method: "POST", body: JSON.stringify({ title: "", _status: "draft" }) }).then((x) => x.doc);
+
+/** Eski sistemden gelen künyelerde HTML var (ör. <a href=…>): ekranda düz yazı */
+export const duzMetin = (s?: string) => (s ?? "").replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
