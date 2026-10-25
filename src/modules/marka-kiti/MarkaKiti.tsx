@@ -12,7 +12,8 @@ const RENKLER = [
 ];
 const NOTRLER = [["Metin", "#171717"], ["İkincil metin", "#55585C"], ["Yardımcı", "#6B6F74"], ["Çizgi", "#E2E2E2"]];
 const YAZILAR = [
-  { rol: "Başlık", ad: "Big Shoulders Display 900", stil: { fontFamily: "var(--display)", fontWeight: 900, textTransform: "uppercase" as const, fontSize: 30, lineHeight: 1.2 }, ornek: "iPhone 18 Pro tanıtıldı", not: "Daima büyük harf; 20 px altında kullanılmaz" },
+  { rol: "Başlık", ad: "IBM Plex Sans Condensed 700", stil: { fontFamily: "var(--baslik)", fontWeight: 700, fontSize: 30, lineHeight: 1.15, letterSpacing: "-.01em" }, ornek: "iPhone 18 Pro tanıtıldı", not: "Site ve Stüdyo: normal yazım. Grafiklerde (Instagram, YouTube) Big Shoulders büyük harf" },
+  { rol: "Menü", ad: "Big Shoulders Display 900", stil: { fontFamily: "var(--display)", fontWeight: 900, textTransform: "uppercase" as const, fontSize: 24, lineHeight: 1.2 }, ornek: "Haberler · İncelemeler · Kulüp", not: "Sitede üst menü ve logo yanı; 18 px altında kullanılmaz" },
   { rol: "Metin", ad: "IBM Plex Sans 400 / 600", stil: { fontFamily: "var(--body)", fontSize: 17 }, ornek: "Apple, yeni modelini bugün düzenlediği etkinlikte duyurdu.", not: "Gövde, spot, açıklama" },
   { rol: "Veri", ad: "IBM Plex Mono 400 / 600", stil: { fontFamily: "var(--mono)", fontSize: 17 }, ornek: "49.999 TL · 19.10 · 14.30", not: "Rakam, fiyat, tarih, etiket" },
   { rol: "Vurgu", ad: "Big Shoulders Display 900", stil: { fontFamily: "var(--display)", fontWeight: 900, textTransform: "uppercase" as const, fontSize: 24, lineHeight: 1, background: "#FF6B1A", color: "#000", padding: "4px 10px", alignSelf: "flex-start" }, ornek: "Son dakika", not: "Rozet, şerit; en fazla 3 kelime" },

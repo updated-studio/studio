@@ -55,7 +55,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 | Vurgu | Big Shoulders Display | 900 | Rozet, şerit; en fazla 3 kelime |
 | Alıntı | Newsreader İtalik | 400 | Yalnızca alıntı |
 | Arayüz | IBM Plex Sans | 500 / 600 | Menü, buton, form, tablo, panel |
-- **Web sitesi (25 Ekim 2026, Fatih):** başlıklar (H1–H4, manşet, kart, bölüm başlığı) IBM Plex Sans Condensed 700, normal yazım (büyük harf değil), satır 1,1–1,22. Big Shoulders Display sitede yalnız üst menü, mobil menü, KULÜP, içerik etiketleri (SON DAKİKA…) ve logoda. Grafiklerde (Instagram, YouTube, bülten) tablo aynen geçerli.
+- **Web sitesi ve Stüdyo (25 Ekim 2026, Fatih):** başlıklar (H1–H4, manşet, kart, bölüm başlığı) IBM Plex Sans Condensed 700, normal yazım (büyük harf değil), satır 1,1–1,22. Big Shoulders Display sitede yalnız üst menü, mobil menü, KULÜP, içerik etiketleri (SON DAKİKA…) ve logoda. Grafiklerde (Instagram, YouTube, bülten) tablo aynen geçerli.
 - Ölçek (masaüstü/mobil, px): display 96/56 · h1 64/40 · h2 40/30 · h3 30/24 · lead 21/18 · body 18/17 (satır 1.65) · small 14 · quote 30/24 · data 30/24 · label 12 (büyük harf, 0.04em) · ui 14/15 · tag 28/22.
 - Kanal minimum metin: web 14 px · Instagram 32 px · YouTube thumbnail 48 px, video içi (1920×1080) 28 px · panel 12 px.
 - Satır yüksekliği (Başlık ve Vurgu): tüm başlıklarda 1,2 (çok satırlı her başlık, Instagram, story, thumbnail dahil). Yalnızca tek satırlık Vurgu rozeti 1,0 olabilir. Test: 1,05 ve 1,1 değerlerinde Ç/Ş çengeli alt satırdaki Ü/İ/Ğ işaretine değiyor. Neden: Türkçe aksanlar (Ü, İ, Ğ üstte; Ç, Ş altta) satırlar arasında üst üste biner.
