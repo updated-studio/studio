@@ -42,6 +42,11 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
     } catch (e) { setHata((e as Error).message); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [k, ara, anahtar]);
+  // Onay bekleyen yorum: listeden tek tıkla yayına al ya da gizle
+  const yorumDurum = async (id: number, durum: "yayinda" | "gizli") => {
+    try { await api.istekYap(`/yorumlar/${id}?depth=0`, { method: "PATCH", body: JSON.stringify({ durum }) }); toast(durum === "yayinda" ? "Yorum yayında." : "Yorum gizlendi."); yukle(1); }
+    catch (e) { toast((e as Error).message); }
+  };
   const ilk = useRef(true); // açılışta hemen, yazarken 300 ms bekleyerek
   useEffect(() => { const t = setTimeout(() => yukle(1), ilk.current ? 0 : 300); ilk.current = false; return () => clearTimeout(t); }, [yukle]);
 
@@ -85,6 +90,10 @@ export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac
                   <button className="linkbtn site-baslik" onClick={() => ac(d.id as number)}>{goster(d[k.baslikAlani]) === "—" ? `#${d.id}` : goster(d[k.baslikAlani])}</button>
                   <div className="muted">{arac.sutunlar.map((s) => `${sutunAd(s)}: ${hucre(d, aracAlan.find((a) => a.yol === s), s)}`).join(" · ")}</div>
                 </div>
+                {k.slug === "yorumlar" && d.durum === "onay-bekliyor" && <>
+                  <button className="btn sm" onClick={() => yorumDurum(d.id as number, "yayinda")}>Onayla</button>
+                  <button className="btn ghost sm" onClick={() => yorumDurum(d.id as number, "gizli")}>Gizle</button>
+                </>}
                 {k.taslak && <span className={`site-durum site-durum--${d._status === "published" ? "yayinda" : "taslak"}`}>{d._status === "published" ? api.DURUMLAR.yayinda : api.DURUMLAR.taslak}</span>}
               </div>
             ))}
