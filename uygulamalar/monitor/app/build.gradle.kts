@@ -7,6 +7,8 @@ plugins {
 
 // İmza bilgisi (android {} içinde "java" başka anlama geldiği için burada okunur)
 val imza = Properties().apply { val f = file("/opt/updated/monitor-imza/imza.properties"); if (f.exists()) f.inputStream().use { load(it) } }
+// Güncelleme adresi: indirme klasörünün adı yalnız sunucuda (depoya girmez)
+val indirKlasoru = file("/opt/updated/monitor-imza/indir-klasoru").takeIf { it.exists() }?.readText()?.trim().orEmpty()
 
 android {
     namespace = "tr.com.updated.monitor"
@@ -15,8 +17,9 @@ android {
         applicationId = "tr.com.updated.monitor"
         minSdk = 29            // Android 10: GLES 3, MediaStore klasörleri; Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.5.0"
+        versionCode = 9
+        versionName = "0.5.1"
+        buildConfigField("String", "GUNCELLEME_ADRESI", "\"" + (if (indirKlasoru.isEmpty()) "" else "https://studio.updated.com.tr/indir/$indirKlasoru/") + "\"")
         ndk { abiFilters += listOf("arm64-v8a") } // güncel Android telefonların hepsi; ML Kit kitaplıkları diğer işlemciler için APK'yı 3 kat büyütüyordu
     }
     // İmza anahtarı yalnız sunucuda (/opt/updated/monitor-imza, depoya girmez). Aynı anahtar = sonraki sürümler güncelleme olarak kurulur.
@@ -34,6 +37,7 @@ android {
             signingConfig = if (imza.isNotEmpty()) signingConfigs.getByName("updated") else signingConfigs.getByName("debug")
         }
     }
+    buildFeatures { buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }

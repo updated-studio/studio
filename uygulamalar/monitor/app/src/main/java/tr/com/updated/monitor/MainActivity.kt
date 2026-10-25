@@ -113,6 +113,7 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         HataKaydi.kur(this)
+        if (b == null) dongu.postDelayed({ Guncelleme.denetle(this, sessiz = true) }, 3000)
         ayarlariOku()
         kip = runCatching { Kip.valueOf(tercih.getString("kip", "TEK")!!) }.getOrDefault(Kip.TEK)
         koseHisto = tercih.getBoolean("koseHisto", true); parlaklikTam = tercih.getBoolean("parlaklik", false); sesGosterge = tercih.getBoolean("sesGosterge", true)
@@ -605,7 +606,8 @@ class MainActivity : Activity() {
                 anahtar(ic, "EKRAN PARLAKLIĞI EN YÜKSEK", parlaklikTam) { parlaklikTam = it; tercih.edit().putBoolean("parlaklik", it).apply(); parlaklik() }
                 satir(ic, "Yardım", false) { yardim() }
                 aciklama(ic, "Çökme ve donmalar kendiliğinden UPDATED'a bildirilir (yalnız hata ayrıntısı ve cihaz modeli).")
-                aciklama(ic, "UPDATED Monitör ${packageManager.getPackageInfo(packageName, 0).versionName}")
+                satir(ic, "Güncellemeleri denetle", false) { Guncelleme.denetle(this, sessiz = false) }
+                aciklama(ic, "UPDATED Kamera ${packageManager.getPackageInfo(packageName, 0).versionName} · açılışta yeni sürüm kendiliğinden denetlenir.")
             }
         }
     }
