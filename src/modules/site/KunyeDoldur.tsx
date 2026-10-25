@@ -9,6 +9,7 @@ type Oneri = { key: string; value: string; num: number | null; kanit: string };
 export default function KunyeDoldur({ kayit, uygula }: { kayit: Record<string, unknown>; uygula: (specs: Ozellik[]) => void }) {
   const specs = (kayit.specs as Ozellik[] | undefined) ?? [];
   const [url, setUrl] = useState("");
+  const [metin, setMetin] = useState("");
   const [mesgul, setMesgul] = useState(false);
   const [hata, setHata] = useState("");
   const [oneri, setOneri] = useState<{ liste: Oneri[]; kaynak: string } | null>(null);
@@ -21,7 +22,7 @@ export default function KunyeDoldur({ kayit, uygula }: { kayit: Record<string, u
       const { data: o } = await sb.auth.getSession();
       const r = await fetch(`${SUPABASE_URL}/functions/v1/kunye-doldur`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${o.session?.access_token ?? ""}` },
-        body: JSON.stringify({ url: url.trim(), urun: `${kayit.brand ?? ""} ${kayit.name ?? ""}`.trim(), ozellikler: specs.map((s) => ({ key: s.key, unit: s.unit })) }),
+        body: JSON.stringify({ url: url.trim(), urun: `${kayit.brand ?? ""} ${kayit.name ?? ""}`.trim(), ozellikler: specs.map((s) => ({ key: s.key, unit: s.unit })), metin }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `Hata ${r.status}`);
@@ -39,7 +40,7 @@ export default function KunyeDoldur({ kayit, uygula }: { kayit: Record<string, u
       return x && secili.has(s.key) ? { ...s, value: x.value, num: x.num, source: "uretici", sourceUrl: oneri.kaynak, at: bugun } : s;
     });
     uygula(yeni);
-    setOneri(null); setUrl("");
+    setOneri(null); setUrl(""); setMetin("");
   }
 
   return (
@@ -53,6 +54,9 @@ export default function KunyeDoldur({ kayit, uygula }: { kayit: Record<string, u
         <input type="url" placeholder="https://… (ör. üreticinin teknik özellikler sayfası)" value={url} onChange={(e) => setUrl(e.target.value)} style={{ flex: 1, minWidth: 220 }} aria-label="Kaynak bağlantısı" />
         <button className="btn" disabled={mesgul || !url.trim() || !specs.length} onClick={oku}>{mesgul ? "Okunuyor… (≈30 sn)" : "Oku ve öner"}</button>
       </div>
+      <details><summary className="muted" style={{ cursor: "pointer", fontSize: 14 }}>Site otomatik okunmuyorsa: özellik tablosunu kopyalayıp yapıştır</summary>
+        <textarea rows={6} value={metin} onChange={(e) => setMetin(e.target.value)} placeholder="Üreticinin sayfasındaki teknik özellik tablosunu seçip buraya yapıştır (kaynak bağlantısını yukarıya yine yaz)." style={{ width: "100%", marginTop: 8 }} aria-label="Yapıştırılan özellik metni" />
+      </details>
       {hata && <div className="msg err">{hata}</div>}
       {oneri && oneri.liste.length > 0 && (
         <>

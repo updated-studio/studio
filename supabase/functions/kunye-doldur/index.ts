@@ -74,12 +74,14 @@ Deno.serve(async (req) => {
   const b = await req.json().catch(() => ({}));
   const url = String(b.url ?? "").trim(), urun = String(b.urun ?? "").slice(0, 120);
   const ozellikler = (Array.isArray(b.ozellikler) ? b.ozellikler : []).slice(0, 60).map((o: { key?: string; unit?: string }) => ({ key: String(o.key ?? "").slice(0, 80), unit: String(o.unit ?? "").slice(0, 20) })).filter((o: { key: string }) => o.key);
-  if (!/^https?:\/\/[^\s]+$/.test(url)) return yanit({ error: "Geçerli bir bağlantı yaz (https://…)" }, 400);
+  const yapistirilan = String(b.metin ?? "").slice(0, 45_000);
+  if (!/^https?:\/\/[^\s]+$/.test(url)) return yanit({ error: "Kaynağın bağlantısını yaz (https://…); metni yapıştırsan da kaynak olarak bağlantı gerekir." }, 400);
   if (!ozellikler.length) return yanit({ error: "Önce ürünün türünü seçip kaydet; özellik şablonu dolsun." }, 400);
   let html = "";
-  try {
+  if (yapistirilan.trim().length >= 200) html = "<pre>" + yapistirilan.replace(/</g, " ") + "</pre>"; // editör sayfadan kopyaladı (site botları engelliyorsa)
+  else try {
     const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8", Accept: "text/html,application/xhtml+xml" }, redirect: "follow", signal: AbortSignal.timeout(20_000) });
-    if (!r.ok) return yanit({ error: `Sayfa açılmadı (${r.status}). Site botları engelliyor olabilir; üreticinin "teknik özellikler" sayfasını ya da başka bir kaynağı dene.` }, 422);
+    if (!r.ok) return yanit({ error: `Sayfa otomatik okunamadı (${r.status}): site botları engelliyor. Sayfadaki özellik tablosunu seçip kopyala, aşağıdaki kutuya yapıştır ve tekrar "Oku ve öner"e bas.` }, 422);
     html = await r.text();
   } catch { return yanit({ error: "Sayfaya ulaşılamadı (zaman aşımı). Başka bir kaynak dene." }, 422); }
   const m = metin(html);
