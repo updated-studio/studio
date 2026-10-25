@@ -73,8 +73,8 @@ function Satir({ k, x, yayinda, kullanici, yenile, ac, secim, sutunlar }: { k: K
 }
 
 /** Yayın akışı olan bölümler (haber, inceleme, karşılaştırma): durum sekmeleriyle */
-function Liste({ kullanici, k, ks }: { kullanici: PanelKullanici; k: Koleksiyon; ks: KoleksiyonSema }) {
-  const [sekme, setSekme] = useState<Sekme>("incelemede");
+function Liste({ kullanici, k, ks, ilkSekme }: { kullanici: PanelKullanici; k: Koleksiyon; ks: KoleksiyonSema; ilkSekme?: Sekme }) {
+  const [sekme, setSekme] = useState<Sekme>(ilkSekme ?? "incelemede");
   const [ara, setAra] = useState("");
   const [veri, setVeri] = useState<{ docs: Icerik[]; yayinda: Set<number>; toplam: number; sonraki: boolean; sayfa: number } | null>(null);
   const [sayilar, setSayilar] = useState<Partial<Record<Sekme, number>>>({});
@@ -182,7 +182,8 @@ function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
   const [grup, setGrup] = useState("İçerik");
   const [secili, setSecili] = useState("news");
   const [genelAcik, setGenelAcik] = useState(false);
-  // Bildirimden gelince (#/site?bolum=yorumlar) o bölüm açılır
+  const [ilkSekme, setIlkSekme] = useState<{ s: Sekme; n: number } | null>(null);
+  // Bildirimden gelince (#/site?bolum=yorumlar) o bölüm açılır; yayın kuyruğundan gelince (&sekme=incelemede) o sekme
   const [sp, setSp] = useSearchParams();
   useEffect(() => { alanlar().then(setSema).catch((e) => setHata((e as Error).message)); }, []);
   useEffect(() => {
@@ -190,6 +191,8 @@ function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
     if (!sema || !istenen) return;
     const x = [...sema.koleksiyonlar, ...sema.genel].find((s) => s.slug === istenen);
     if (x) { setGrup(x.grup); setSecili(x.slug); setGenelAcik(false); }
+    const sk = sp.get("sekme") as Sekme | null;
+    if (sk && SEKMELER.some(([a]) => a === sk)) setIlkSekme((o) => ({ s: sk, n: (o?.n ?? 0) + 1 }));
     setSp({}, { replace: true });
   }, [sema, sp, setSp]);
   if (hata) return <div className="empty">Bölümler alınamadı: {hata}</div>;
@@ -216,7 +219,7 @@ function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
         genelAcik ? <GenelDuzenle key={b.s.slug} hedef={{ genel: b.s }} kullanici={kullanici} kapat={() => setGenelAcik(false)} />
           : <div className="panel"><b>{b.s.ad}</b><span className="muted">Sitenin genel ayarları.</span><button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => setGenelAcik(true)}>Düzenle</button></div>
       ) : AKIS.includes(b.s.slug as Koleksiyon)
-        ? <Liste key={b.s.slug} kullanici={kullanici} k={b.s.slug as Koleksiyon} ks={b.s} />
+        ? <Liste key={`${b.s.slug}-${ilkSekme?.n ?? 0}`} kullanici={kullanici} k={b.s.slug as Koleksiyon} ks={b.s} ilkSekme={ilkSekme?.s} />
         : <GenelBolum key={b.s.slug} k={b.s} kullanici={kullanici} />}
     </SemaCtx.Provider>
   );

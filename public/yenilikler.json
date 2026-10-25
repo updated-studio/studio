@@ -2,6 +2,22 @@
   {
     "id": "2026-10-25-a",
     "tarih": "25 Ekim 2026",
+    "baslik": "Yayın kuyruğu",
+    "bolumler": [
+      {
+        "ad": "Stüdyo",
+        "maddeler": [
+          "Yöneticiler ve yayın yönetmeni her ekranın üstünde bugün yayınlanan haber sayısını (hedef 5) ve onay bekleyenleri görüyor.",
+          "\"Kuyruğu aç\" incelemede bekleyen haberlere götürüyor.",
+          "Bekleyen varsa saat 10.00 ve 15.00'te hatırlatma bildirimi geliyor.",
+          "Başlıklar sitedeki gibi yeni yazı tipinde."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-10-25-a",
+    "tarih": "25 Ekim 2026",
     "baslik": "Tek editör ve siteden gelenler",
     "bolumler": [
       {

@@ -180,3 +180,12 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .sohbet-panel { width: min(380px, calc(100vw - 32px)); max-height: none; overflow: visible; }
 .sohbet-panel .sohbet { max-height: min(55vh, 460px); }
 @media (max-width: 560px) { .sohbet-panel { position: fixed; left: 16px; right: 16px; top: calc(64px + env(safe-area-inset-top, 0px)); width: auto; } }
+/* Yayın kuyruğu şeridi (yönetici + yayın yönetmeni) */
+.yayin-kuyrugu { flex-direction: row; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 14px; }
+.yk-sayac { display: flex; align-items: baseline; gap: 6px; }
+.yk-sayac b { font: 700 22px var(--baslik); }
+.yk-sayac b.ok { color: var(--green, var(--blue)); }
+.yk-cubuk { width: 90px; height: 6px; border-radius: 99px; background: var(--sunk); overflow: hidden; }
+.yk-cubuk i { display: block; height: 100%; background: var(--orange); border-radius: 99px; }
+.yk-metin { flex: 1; min-width: 180px; font-size: 14px; }
+@media (max-width: 560px) { .yk-cubuk { display: none; } .yayin-kuyrugu .btn { width: 100%; } }
