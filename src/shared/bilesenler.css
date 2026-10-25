@@ -189,3 +189,9 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .yk-cubuk i { display: block; height: 100%; background: var(--orange); border-radius: 99px; }
 .yk-metin { flex: 1; min-width: 180px; font-size: 14px; }
 @media (max-width: 560px) { .yk-cubuk { display: none; } .yayin-kuyrugu .btn { width: 100%; } }
+/* Sistem durumu */
+.sistem-l { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.sistem-l li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); }
+.sistem-l .pill { flex: none; min-width: 82px; justify-content: center; margin-top: 2px; }
+.sistem-l .ana { min-width: 0; }
+.sistem-l .muted { font-size: 14px; line-height: 1.45; }

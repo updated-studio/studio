@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-10-25-b",
+    "tarih": "25 Ekim 2026",
+    "baslik": "Sistem durumu",
+    "bolumler": [
+      {
+        "ad": "Yöneticiler",
+        "maddeler": [
+          "Profil menüsünde yeni \"Sistem durumu\" sayfası: site, panel, yedek, sunucu ve Haber Masası tek ekranda.",
+          "Her satır Çalışıyor, Dikkat ya da Sorun olarak görünür, dakikada bir yenilenir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-25-a",
     "tarih": "25 Ekim 2026",
     "baslik": "Yayın kuyruğu",

@@ -8,6 +8,7 @@ import YonetimSayfa from "./ekip/Yonetim";
 import Profil from "./hesap/Profil";
 import MarkaKiti from "./marka-kiti/MarkaKiti";
 import Takvim from "./takvim/Takvim";
+import SistemDurumu from "./sistem/SistemDurumu";
 
 // Stüdyo'nun modül listesi. Yeni araç = buraya bir satır + src/modules/<ad>/ klasörü.
 // (ARCHITECTURE.md, kural 1: ayrı araç açılmaz, modül eklenir.)
@@ -30,5 +31,6 @@ export const MODULLER: Modul[] = [
   { id: "marka-kiti", ad: "Marka Kiti", ikon: "marka", bilesen: MarkaKiti, renk: "purple" },
   { id: "profil", ad: "Profilim", ikon: "profil", bilesen: Profil, yer: "profil" },
   { id: "panel-giris", ad: "Site paneli (yedek)", ikon: "site", bilesen: PanelGiris, yer: "gizli" },
+  { id: "sistem", ad: "Sistem durumu", ikon: "yonetim", bilesen: SistemDurumu, yer: "profil", sadeceYonetici: true },
   { id: "yonetim", ad: "Yönetim", ikon: "yonetim", bilesen: YonetimSayfa, yer: "profil", sadeceYonetici: true },
 ];
