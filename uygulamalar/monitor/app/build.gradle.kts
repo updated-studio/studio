@@ -15,8 +15,8 @@ android {
         applicationId = "tr.com.updated.monitor"
         minSdk = 28            // Android 9: GLES 3, Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
     // İmza anahtarı yalnız sunucuda (/opt/updated/monitor-imza, depoya girmez). Aynı anahtar = sonraki sürümler güncelleme olarak kurulur.
     signingConfigs {

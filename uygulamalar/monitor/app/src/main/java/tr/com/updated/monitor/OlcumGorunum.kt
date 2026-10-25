@@ -23,6 +23,8 @@ class OlcumGorunum(context: Context) : View(context) {
     var gorunen = linkedSetOf(Tur.DALGA, Tur.PARADE, Tur.VEKTOR, Tur.HISTOGRAM)
         set(v) { field = v; invalidate() }
 
+    /** Görüntünün üstünde küçük pencere olarak (köşe histogramı): yarı saydam zemin, başlıksız */
+    var bindirme = false
     private val is_ = Executors.newSingleThreadExecutor()
     private val mesgul = AtomicBoolean(false)
     @Volatile private var bitmapler: Map<Tur, Bitmap> = emptyMap()
@@ -94,6 +96,7 @@ class OlcumGorunum(context: Context) : View(context) {
     }
 
     override fun onDraw(c: Canvas) {
+        if (bindirme) { val b = bitmapler[Tur.HISTOGRAM] ?: return; c.drawColor(Color.argb(110, 0, 0, 0)); c.drawBitmap(b, Rect(0, 0, b.width, b.height), RectF(4f, 4f, width - 4f, height - 4f), Paint(bmpBoya).apply { alpha = 220 }); return }
         c.drawColor(Color.rgb(12, 13, 16))
         val turler = gorunen.toList(); if (turler.isEmpty()) return
         val sutun = if (turler.size > 1 && width > height * 0.9f) 2 else 1
