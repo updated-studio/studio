@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { HashRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthGate, useAuth } from "./shared/auth";
 import { Ikon } from "./shared/Ikon";
@@ -39,10 +40,12 @@ function Kabuk() {
         ))}
       </nav>
       <main style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Routes>
-          {gorunen.map((m) => <Route key={m.id} path={"/" + m.id} element={<m.bilesen />} />)}
-          <Route path="*" element={<Navigate to={"/" + dock[0].id} replace />} />
-        </Routes>
+        <Suspense fallback={<div className="muted" style={{ padding: 16 }}>Yükleniyor…</div>}>
+          <Routes>
+            {gorunen.map((m) => <Route key={m.id} path={"/" + m.id} element={<m.bilesen />} />)}
+            <Route path="*" element={<Navigate to={"/" + dock[0].id} replace />} />
+          </Routes>
+        </Suspense>
       </main>
     </div>
   );

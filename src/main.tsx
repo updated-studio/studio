@@ -17,3 +17,5 @@ if (acilis) {
   const kalan = 650;
   window.setTimeout(() => { acilis.classList.add("git"); window.setTimeout(() => acilis.remove(), 400); }, kalan);
 }
+// Parça yenilemesi başarılı açılıştan sonra sıfırlanır (modules/index.ts)
+window.setTimeout(() => { try { sessionStorage.removeItem("parca-yenilendi"); } catch { /* depolama kapalı */ } }, 10_000);

@@ -1,14 +1,21 @@
-import type { ComponentType } from "react";
-import Ekip from "./ekip/Ekip";
-import HaberMasasi from "./haber-masasi/HaberMasasi";
-import Icerik from "./icerik/Icerik";
-import Site from "./site/Site";
-import PanelGiris from "./site/PanelGiris";
-import YonetimSayfa from "./ekip/Yonetim";
-import Profil from "./hesap/Profil";
-import MarkaKiti from "./marka-kiti/MarkaKiti";
-import Takvim from "./takvim/Takvim";
-import SistemDurumu from "./sistem/SistemDurumu";
+import { lazy, type ComponentType } from "react";
+
+// Modüller açıldıklarında yüklenir (25 Ekim 2026: ilk açılış 966 KB → 491 KB + o anki modül).
+// Yeni sürüm yayınlanınca eski parça dosyaları kalkar; açık sekme eski parçayı isterse sayfa bir kez yenilenir.
+const yukle = <T,>(f: () => Promise<T>) => () => f().catch((e) => {
+  try { if (!sessionStorage.getItem("parca-yenilendi")) { sessionStorage.setItem("parca-yenilendi", "1"); location.reload(); } } catch { /* depolama kapalı */ }
+  throw e;
+});
+const Ekip = lazy(yukle(() => import("./ekip/Ekip")));
+const HaberMasasi = lazy(yukle(() => import("./haber-masasi/HaberMasasi")));
+const Icerik = lazy(yukle(() => import("./icerik/Icerik")));
+const Site = lazy(yukle(() => import("./site/Site")));
+const PanelGiris = lazy(yukle(() => import("./site/PanelGiris")));
+const YonetimSayfa = lazy(yukle(() => import("./ekip/Yonetim")));
+const Profil = lazy(yukle(() => import("./hesap/Profil")));
+const MarkaKiti = lazy(yukle(() => import("./marka-kiti/MarkaKiti")));
+const Takvim = lazy(yukle(() => import("./takvim/Takvim")));
+const SistemDurumu = lazy(yukle(() => import("./sistem/SistemDurumu")));
 
 // Stüdyo'nun modül listesi. Yeni araç = buraya bir satır + src/modules/<ad>/ klasörü.
 // (ARCHITECTURE.md, kural 1: ayrı araç açılmaz, modül eklenir.)
