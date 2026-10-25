@@ -160,10 +160,13 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                     c.close(); cihaz = null
                     if (e in 1..3 && deneme < 4) { h.postDelayed({ ac(deneme + 1) }, 400L * (deneme + 1)); return }
                     val neden = when (e) { 1 -> "kamera başka uygulamada açık"; 2 -> "aynı anda açılabilecek kamera sınırı"; 3 -> "kamera devre dışı (telefonun kamera erişimi kapalı olabilir: Ayarlar → Gizlilik → Kamera erişimi)"; 4 -> "kamera aygıt hatası"; else -> "kamera servisi hatası" }
-                    hataGeri("Kamera açılamadı: $neden."); HataKaydi.not("kamera", "openCamera onError $e (deneme $deneme) · $ad")
+                    hataGeri(if (e == 3) "POLITIKA" else "Kamera açılamadı: $neden."); HataKaydi.not("kamera", "openCamera onError $e (deneme $deneme) · $ad")
                 }
             }, h)
         } catch (e: Exception) {
+            // "disabled by policy": telefonun kendisi bu uygulamaya kamerayı kapatmış; yeniden denemek işe yaramaz
+            if (e is android.hardware.camera2.CameraAccessException && e.reason == android.hardware.camera2.CameraAccessException.CAMERA_DISABLED) {
+                hataGeri("POLITIKA"); HataKaydi.not("kamera", e.stackTraceToString()); return }
             if (deneme < 4) { h.postDelayed({ ac(deneme + 1) }, 400L * (deneme + 1)); return }
             hataGeri(e.message ?: "Kamera açılamadı."); HataKaydi.not("kamera", e.stackTraceToString())
         }

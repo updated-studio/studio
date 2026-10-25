@@ -581,6 +581,20 @@ class MainActivity : Activity() {
         } catch (e: Exception) { runCatching { contentResolver.delete(uri, null, null) }; HataKaydi.not("foto", e.stackTraceToString()); null }
     }
 
+    private var engelUyarisi = false
+    /** Telefon kamerayı bu uygulamaya kapatmış (CAMERA_DISABLED): ne yapılacağını bir kez anlat */
+    private fun kameraEngelli() {
+        if (engelUyarisi || isFinishing) return; engelUyarisi = true
+        AlertDialog.Builder(this).setTitle("Telefon kamerayı engelliyor").setMessage(
+            "Android bu uygulamanın kamerayı açmasına izin vermiyor (\"disabled by policy\"). Genelde şunlardan biri:\n\n" +
+            "• Bildirim panelindeki kamera erişimi düğmesi kapalı (hızlı ayarlarda \"Kamera erişimi\").\n" +
+            "• Ayarlar → Gizlilik → İzin yöneticisi → Kamera → UPDATED Kamera: \"Yalnız kullanırken izin ver\" seçili olmalı.\n" +
+            "• Uygulama klonlandı, Gizli alan / Çocuk alanı içinde ya da telefon bir kurum tarafından yönetiliyor.\n\n" +
+            "Telefonun kendi kamera uygulaması açılıyor mu, bir bak. Düzelttikten sonra uygulamayı kapatıp aç.")
+            .setPositiveButton("Uygulama ayarları") { _, _ -> runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) } }
+            .setNegativeButton("Tamam", null).show()
+    }
+
     private fun sesOlcerBaslat() { if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED && kamera()?.kayitta != true) sesOlcer.baslat() }
 
     /* ================= ayarlar paneli ================= */
@@ -753,7 +767,7 @@ class MainActivity : Activity() {
                     m.tampon(w, h)
                     runOnUiThread { yonuAyarla() }
                     runOnUiThread { ustCiz() }
-                }, { hata -> runOnUiThread { tost(hata) } })
+                }, { hata -> runOnUiThread { if (hata == "POLITIKA") kameraEngelli() else tost(hata) } })
             }
         }
         if (sonYuzey[i] != null) acici[i]?.invoke()

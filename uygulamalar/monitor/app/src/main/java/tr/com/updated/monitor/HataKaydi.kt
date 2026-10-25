@@ -30,7 +30,9 @@ object HataKaydi {
     }
 
     /** Uygulama içinden yakalanan ama bilinmesi gereken hatalar (kamera açılamadı vb.) */
-    fun not(tur: String, metin: String) = runCatching { yaz(tur, metin); Thread { gonder() }.start() }
+    private val gonderilenler = java.util.Collections.synchronizedSet(HashSet<String>())
+    /** Aynı hata bir oturumda bir kez bildirilir (yeniden denemeler kayıtları şişirmesin) */
+    fun not(tur: String, metin: String) = runCatching { if (!gonderilenler.add(tur + metin.take(200).replace(Regex("deneme \\d+"), ""))) return@runCatching; yaz(tur, metin); Thread { gonder() }.start() }
 
     private fun yaz(tur: String, metin: String) {
         runCatching { File(klasor, "${System.currentTimeMillis()}-$tur.txt").writeText(metin.take(18000)) }
