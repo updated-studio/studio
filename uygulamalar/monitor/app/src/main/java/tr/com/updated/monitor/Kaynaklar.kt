@@ -98,13 +98,27 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     override fun baslat(yuzey: Surface, boyut: (Int, Int) -> Unit, hata: (String) -> Unit) {
         onizleme = yuzey; hataGeri = hata
         val b = secilenBoyut(); boyut(b.width, b.height)
+        h.post { ac(0) }
+    }
+
+    /** Kamerayı açar; "devre dışı/kullanımda" (1, 2, 3) yanıtında önceki kamera kapanırken çakışmış olabilir: 4 kez yeniden dener */
+    @SuppressLint("MissingPermission")
+    private fun ac(deneme: Int) {
         try {
             cm.openCamera(id, object : CameraDevice.StateCallback() {
                 override fun onOpened(c: CameraDevice) { cihaz = c; oturumKur() }
-                override fun onDisconnected(c: CameraDevice) { c.close(); cihaz = null; hata("Kaynak çıkarıldı ya da başka uygulama kullanıyor.") }
-                override fun onError(c: CameraDevice, e: Int) { c.close(); cihaz = null; hata("Kamera hatası ($e)."); HataKaydi.not("kamera", "openCamera onError $e · $ad") }
+                override fun onDisconnected(c: CameraDevice) { c.close(); cihaz = null; hataGeri("Kaynak çıkarıldı ya da başka uygulama kullanıyor.") }
+                override fun onError(c: CameraDevice, e: Int) {
+                    c.close(); cihaz = null
+                    if (e in 1..3 && deneme < 4) { h.postDelayed({ ac(deneme + 1) }, 400L * (deneme + 1)); return }
+                    val neden = when (e) { 1 -> "kamera başka uygulamada açık"; 2 -> "aynı anda açılabilecek kamera sınırı"; 3 -> "kamera devre dışı (telefonun kamera erişimi kapalı olabilir: Ayarlar → Gizlilik → Kamera erişimi)"; 4 -> "kamera aygıt hatası"; else -> "kamera servisi hatası" }
+                    hataGeri("Kamera açılamadı: $neden."); HataKaydi.not("kamera", "openCamera onError $e (deneme $deneme) · $ad")
+                }
             }, h)
-        } catch (e: Exception) { hata(e.message ?: "Kamera açılamadı."); HataKaydi.not("kamera", e.stackTraceToString()) }
+        } catch (e: Exception) {
+            if (deneme < 4) { h.postDelayed({ ac(deneme + 1) }, 400L * (deneme + 1)); return }
+            hataGeri(e.message ?: "Kamera açılamadı."); HataKaydi.not("kamera", e.stackTraceToString())
+        }
     }
 
     private fun oturumKur() {
@@ -185,11 +199,14 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     fun sesDuzeyi(): Int = runCatching { kaydedici?.maxAmplitude ?: 0 }.getOrDefault(0)
 
     /** Kapatma kamera iş parçacığında: ana iş parçacığı beklemez (donma olmasın) */
-    override fun durdur() {
+    override fun durdur() = durdurVe {}
+
+    /** Kapatma kamera iş parçacığında (ana ekran beklemez); kamera tamamen kapanınca `bitti` çağrılır */
+    fun durdurVe(bitti: () -> Unit) {
         h.post {
             runCatching { kaydedici?.stop() }; kayitBirak()
             runCatching { oturum?.close() }; runCatching { cihaz?.close() }; oturum = null; cihaz = null
-            is_.quitSafely()
+            is_.quitSafely(); bitti()
         }
     }
 }

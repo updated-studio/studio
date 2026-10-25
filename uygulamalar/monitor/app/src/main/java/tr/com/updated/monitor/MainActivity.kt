@@ -78,6 +78,8 @@ class MainActivity : Activity() {
     private var hevc = true; private var mbps = 50; private var sesKayit = true
     private var kayitBas = 0L; private var kayitUri: Uri? = null; private var sonUri: Uri? = null
     private var acikParam: Param? = null
+    private var onde = false
+    private val bekleyenAcma = booleanArrayOf(false, false)
     private var bekleyenKamera: Pair<Int, Pair<String, String>>? = null
     private val tercih by lazy { getSharedPreferences("monitor", MODE_PRIVATE) }
     private val dongu = Handler(Looper.getMainLooper())
@@ -501,8 +503,11 @@ class MainActivity : Activity() {
         tercih.edit().putString("kaynak$i", "kamera").putString("kamera$i", k.first).apply()
         kaynakAdi[i] = k.second
         kamAyar[i] = kameraAyarOku(k.first)
-        acici[i] = {
-            kaynaklar[i]?.durdur()
+        acici[i] = acici@{
+            // Uygulama tam öndeyken açılır (arka plandayken Android kamerayı "devre dışı" der); önceki kamera kapanınca yenisi
+            if (!onde) { bekleyenAcma[i] = true; return@acici }
+            val onceki = kaynaklar[i]; kaynaklar[i] = null
+            if (onceki is KameraKaynak) { onceki.durdurVe { runOnUiThread { acici[i]?.invoke() } }; return@acici } else onceki?.durdur()
             val kaynak = runCatching { KameraKaynak(this, k.first, k.second, kamAyar[i]) }.getOrElse { e -> tost("Kamera açılamadı: ${e.message}"); HataKaydi.not("kamera", e.stackTraceToString()); null }
             if (kaynak != null) {
                 kaynaklar[i] = kaynak
@@ -637,9 +642,12 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when { panel.visibility == View.VISIBLE -> panelKapat(); serit.visibility == View.VISIBLE -> seritKapat(); else -> @Suppress("DEPRECATION") super.onBackPressed() }
     }
-    override fun onResume() { super.onResume(); tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat() }
+    override fun onResume() {
+        super.onResume(); onde = true; tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat()
+        for (i in 0..1) if (bekleyenAcma[i]) { bekleyenAcma[i] = false; if (sonYuzey[i] != null) acici[i]?.invoke() }
+    }
     override fun onPause() {
-        super.onPause()
+        super.onPause(); onde = false
         if (kamera()?.kayitta == true) kayitDugmesi() // arka plana geçerken kayıt güvenle kapanır
         sesOlcer.durdur(); monitorler.forEach { it?.onPause() }
     }
