@@ -71,6 +71,8 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
     var konu: RectF? = null; set(v) { field = v; postInvalidate() }      // 0–1, görüntüye göre
     var konuAdi = ""
     var egim: Float? = null; set(v) { field = v; postInvalidate() }     // derece; null = terazi kapalı
+    /** Dikey kilitli kamerada telefon yan tutulunca: çizginin ekrandaki açısı = taban + eğim (taban 0/±90/180) */
+    var egimTaban = 0f
     var asistan = false
     var hizalama = 0f; private set
     fun goruntuOrani(): Float { val r = alan(); return if (r.height() > 0f) r.width() / r.height() else 16f / 9f }
@@ -151,7 +153,7 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
         // Terazi: ufuk çizgisi, düzse yeşil
         egim?.let { e ->
             val duz = abs(e) < 1f; val uz = min(r.width(), r.height()) * 0.28f
-            val cx = r.centerX(); val cy = r.centerY(); val a = Math.toRadians(-e.toDouble())
+            val cx = r.centerX(); val cy = r.centerY(); val a = Math.toRadians(-(e + egimTaban).toDouble())
             val p = Paint(cizgi).apply { strokeWidth = 4f; color = if (duz) yesil else Color.WHITE }
             c.drawLine((cx - uz * cos(a)).toFloat(), (cy - uz * sin(a)).toFloat(), (cx + uz * cos(a)).toFloat(), (cy + uz * sin(a)).toFloat(), p)
             c.drawLine(cx - uz - 30f, cy, cx - uz - 10f, cy, Paint(p).apply { color = if (duz) yesil else Color.argb(150, 255, 255, 255) })

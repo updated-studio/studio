@@ -64,6 +64,9 @@ data class KameraAyari(
     var iso: Int? = null, var pozlamaNs: Long? = null, var ev: Int = 0,
     var awb: Int = CameraMetadata.CONTROL_AWB_MODE_AUTO, var odakMesafe: Float? = null, var sabitleme: Boolean = true,
     var fotoBoyut: Size? = null, var raw: Boolean = false,
+    var zoomOrani: Float = 1f,
+    /** Flaş: 0 kapalı, 1 otomatik, 2 açık, 3 fener (sürekli ışık) */
+    var flas: Int = 0,
 )
 
 /** Kameranın yetenekleri (ayar listeleri buradan çizilir) */
@@ -94,8 +97,15 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     /** Otomatik pozlamanın son ölçümü (sahne önerisi için): ISO ve pozlama süresi */
     @Volatile var sonIso = 0; private set
     @Volatile var sonPozNs = 0L; private set
+    /** Dokunarak odak: görüntü üzerindeki nokta, kamera sensörünün koordinatına çevrilmiş (0–1); null = sürekli otomatik odak */
+    @Volatile var odakNoktasi: android.graphics.PointF? = null; private set
+    /** Flaşlı çekimden önce pozlama ölçümü bitince çağrılır */
+    private var olcumBekleyen: ((Int?) -> Unit)? = null
+    val zoomAralik: Range<Float>? by lazy { if (android.os.Build.VERSION.SDK_INT >= 30) oz.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE) else null }
+    val flasVar: Boolean by lazy { oz.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true }
     private val olcumGeri = object : CameraCaptureSession.CaptureCallback() {
         override fun onCaptureCompleted(ss: CameraCaptureSession, q: CaptureRequest, t: TotalCaptureResult) {
+            olcumBekleyen?.invoke(t.get(android.hardware.camera2.CaptureResult.CONTROL_AE_STATE))
             t.get(android.hardware.camera2.CaptureResult.SENSOR_SENSITIVITY)?.let { sonIso = it }
             t.get(android.hardware.camera2.CaptureResult.SENSOR_EXPOSURE_TIME)?.let { sonPozNs = it }
         }
@@ -204,6 +214,35 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     /** Telefonun o anki tutuluşuna göre fotoğrafın/videonun dik görünmesi için gereken açı */
     fun cikisYonu(): Int = if (haricimi) 0 else if (onKamera) (sensorYonu + ekranYonu) % 360 else (sensorYonu - ekranYonu + 360) % 360
 
+    /**
+     * Görüntüye dokununca odak ve pozlama o noktaya: (u, v) ekranda görünen görüntüye göre 0–1.
+     * Görüntü sensöre göre döndürülmüş gösterildiği için önce sensör koordinatına çevrilir; ön kamera aynalıdır.
+     */
+    fun odakla(u: Float, v: Float, ekranDonusu: Int) {
+        // Ekrandaki dönüş = sensör yönü + ekranın kendi dönüşü (dikey kilitli ekranda 0)
+        val d = ((if (onKamera) sensorYonu + ekranDonusu else sensorYonu - ekranDonusu) % 360 + 360) % 360
+        val uu = if (onKamera) 1f - u else u
+        val p = when (d) { 90 -> android.graphics.PointF(v, 1f - uu); 180 -> android.graphics.PointF(1f - uu, 1f - v); 270 -> android.graphics.PointF(1f - v, uu); else -> android.graphics.PointF(uu, v) }
+        odakNoktasi = p
+        h.post {
+            val c = cihaz ?: return@post; val s = oturum ?: return@post
+            runCatching {
+                val r = c.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW); onizleme?.let { r.addTarget(it) }
+                ayarUygula(r, foto = false); r.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
+                s.capture(r.build(), null, h)
+            }
+            istekGonder()
+        }
+    }
+    fun odakSerbest() { odakNoktasi = null; ayarDegisti() }
+
+    private fun bolge(p: android.graphics.PointF): Array<android.hardware.camera2.params.MeteringRectangle> {
+        val a = oz.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE) ?: return emptyArray()
+        val w = a.width(); val hh = a.height(); val yari = (minOf(w, hh) * 0.08f).toInt()
+        val x = (p.x * w).toInt().coerceIn(yari, w - yari); val y = (p.y * hh).toInt().coerceIn(yari, hh - yari)
+        return arrayOf(android.hardware.camera2.params.MeteringRectangle(x - yari, y - yari, yari * 2, yari * 2, 900))
+    }
+
     /** Ayarları (pozlama, ISO, beyaz dengesi, odak, sabitleme) bir isteğe uygular */
     private fun ayarUygula(r: CaptureRequest.Builder, foto: Boolean) {
         ayar.fps?.let { if (!foto) r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
@@ -221,7 +260,22 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         }
         r.set(CaptureRequest.CONTROL_AWB_MODE, ayar.awb)
         if (ayar.odakMesafe != null && yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, ayar.odakMesafe!!) }
+        else if (odakNoktasi != null) {
+            val b = bolge(odakNoktasi!!)
+            r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_AUTO)
+            if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AF_REGIONS, b)
+            if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AE_REGIONS, b)
+        }
         else r.set(CaptureRequest.CONTROL_AF_MODE, if (fotoModu) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+        // Yakınlaştırma (Android 11+: lensler arası geçiş dahil; .5 geniş açı telefon destekliyorsa)
+        if (android.os.Build.VERSION.SDK_INT >= 30) zoomAralik?.let { z -> r.set(CaptureRequest.CONTROL_ZOOM_RATIO, ayar.zoomOrani.coerceIn(z.lower, z.upper)) }
+        // Flaş: yalnız otomatik pozlamada
+        if (flasVar && !(elle && yetenek.elleKontrol)) when (ayar.flas) {
+            1 -> r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON_AUTO_FLASH)
+            2 -> r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON_ALWAYS_FLASH)
+            3 -> { r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON); r.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_TORCH) }
+            else -> r.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_OFF)
+        }
         r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (ayar.sabitleme && !foto) CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON else CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
         sahneUygula(r, foto)
     }
@@ -287,7 +341,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                 } catch (e: Exception) { bitti("RAW: ${e.message}"); HataKaydi.not("foto", e.stackTraceToString()) } finally { im.close() }
             }
             rr?.setOnImageAvailableListener({ r -> rawImg = runCatching { r.acquireNextImage() }.getOrNull(); dng() }, h)
-            try {
+            fun cek() = try {
                 val r = c.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
                 r.addTarget(jr.surface); rr?.let { r.addTarget(it.surface) }; onizleme?.let { r.addTarget(it) }
                 ayarUygula(r, foto = true)
@@ -297,6 +351,22 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                     override fun onCaptureFailed(ss: CameraCaptureSession, q: CaptureRequest, f: android.hardware.camera2.CaptureFailure) { bekleyen = 1; bitti("Çekim başarısız oldu.") }
                 }, h)
             } catch (e: Exception) { cekiliyor = false; sonuc(e.message ?: "Çekim başarısız."); HataKaydi.not("foto", e.stackTraceToString()) }
+            // Flaş açık/otomatik: önce pozlama ölçümü (ön flaş), ölçüm bitince ya da 1,5 sn sonra çekim
+            val flasli = flasVar && ayar.flas in 1..2 && ayar.iso == null && ayar.pozlamaNs == null
+            if (!flasli) cek()
+            else runCatching {
+                var bitti = false
+                fun devam() { if (bitti) return; bitti = true; olcumBekleyen = null; cek() }
+                val r = c.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW); onizleme?.let { r.addTarget(it) }
+                ayarUygula(r, foto = false); r.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER, CameraMetadata.CONTROL_AE_PRECAPTURE_TRIGGER_START)
+                var basladi = false
+                olcumBekleyen = { durum ->
+                    if (durum == CameraMetadata.CONTROL_AE_STATE_PRECAPTURE) basladi = true
+                    else if (basladi && (durum == CameraMetadata.CONTROL_AE_STATE_CONVERGED || durum == CameraMetadata.CONTROL_AE_STATE_FLASH_REQUIRED)) devam()
+                }
+                s.capture(r.build(), olcumGeri, h)
+                h.postDelayed({ devam() }, 1500)
+            }.onFailure { cek() }
         }
     }
 
