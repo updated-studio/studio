@@ -3,6 +3,7 @@
 // Her satır: ne olduğu, durumu (Çalışıyor / Dikkat / Sorun) ve sade Türkçe açıklama. Ne yapılacağı KURTARMA.md'de.
 import { useCallback, useEffect, useState } from "react";
 import { istekYap } from "../site/api";
+import { Ikon } from "../../shared/Ikon";
 
 type Durum = {
   zaman: string;
@@ -18,6 +19,13 @@ type Durum = {
 };
 type Seviye = "ok" | "dikkat" | "sorun";
 type Satir = { ad: string; seviye: Seviye; metin: string; zaman?: string | null };
+// Konu grupları ve simgeleri (25 Ekim 2026, kullanıcı: "simgelerle ayıralım")
+const GRUP: [string, string, string[]][] = [
+  ["Yayın ve içerik", "icerik", ["Site (updated.com.tr)", "Haber yayını", "Haber Masası (haber toplama)"]],
+  ["Uygulamalar", "site", ["Panel (yayın sistemi)", "Stüdyo ekranı", "Veritabanı ve giriş servisleri", "Zamanlanmış işler"]],
+  ["Sunucu ve yedek", "bilgisayar", ["Sunucu", "Gece yedeği", "Durum özeti"]],
+];
+const SIMGE: Record<string, string> = { "Site (updated.com.tr)": "site", "Haber yayını": "icerik", "Haber Masası (haber toplama)": "triyaj", "Panel (yayın sistemi)": "yonetim", "Stüdyo ekranı": "marka", "Veritabanı ve giriş servisleri": "ekip", "Zamanlanmış işler": "saat", "Sunucu": "bilgisayar", "Gece yedeği": "check", "Durum özeti": "saat" };
 
 const SEVIYE: Record<Seviye, [string, string]> = { ok: ["Çalışıyor", "ok"], dikkat: ["Dikkat", "wait"], sorun: ["Sorun", "rose"] };
 const saat = (s?: string | null) => (s ? (Date.now() - new Date(s).getTime()) / 36e5 : Infinity);
@@ -88,14 +96,24 @@ export default function SistemDurumu() {
         {sorun ? `${sorun} konuda sorun var.` : dikkat ? `Her şey çalışıyor; ${dikkat} konu dikkat istiyor.` : "Her şey çalışıyor."}
         {" "}Ne yapılacağı: site deposundaki KURTARMA.md (Claude'a "Sistem durumunda sorun var" demen yeterli).
       </div>
-      <ul className="sistem-l">
-        {l.map((x) => (
-          <li key={x.ad}>
-            <span className={"pill " + SEVIYE[x.seviye][1]}>{SEVIYE[x.seviye][0]}</span>
-            <div className="ana"><b>{x.ad}</b><div className="muted">{x.metin}</div></div>
-          </li>
-        ))}
-      </ul>
+      {GRUP.map(([gad, gikon, adlar]) => {
+        const gl = l.filter((x) => adlar.includes(x.ad));
+        if (!gl.length) return null;
+        return (
+          <div key={gad} className="sistem-g">
+            <h3 className="sistem-gb"><Ikon ad={gikon} /> {gad}</h3>
+            <ul className="sistem-l">
+              {gl.map((x) => (
+                <li key={x.ad}>
+                  <span className="sistem-ik" aria-hidden="true"><Ikon ad={SIMGE[x.ad] ?? "check"} /></span>
+                  <div className="ana"><b>{x.ad}</b><div className="muted">{x.metin}</div></div>
+                  <span className={"pill " + SEVIYE[x.seviye][1]}>{SEVIYE[x.seviye][0]}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
     </section>
   );
 }

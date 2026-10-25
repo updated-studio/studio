@@ -192,6 +192,10 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 /* Sistem durumu */
 .sistem-l { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .sistem-l li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); }
-.sistem-l .pill { flex: none; min-width: 82px; justify-content: center; margin-top: 2px; }
+.sistem-l .pill { flex: none; min-width: 82px; justify-content: center; margin-top: 2px; margin-left: auto; }
+.sistem-g { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.sistem-gb { display: flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; font-weight: 600; }
+.sistem-ik { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--sunk); color: var(--ink); }
+.sistem-l .ana { flex: 1; }
 .sistem-l .ana { min-width: 0; }
 .sistem-l .muted { font-size: 14px; line-height: 1.45; }
