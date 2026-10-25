@@ -1,0 +1,95 @@
+// Künye otomasyonu (25 Ekim 2026, kullanıcı: "kaynaklarından çekeceğimiz bir otomasyon"): her ürün için yapay zekâ Google aramasıyla
+// resmî üretici sayfasını (yoksa güvenilir kaynağı) bulur, ürünün özellik şablonundaki değerleri kaynak bağlantısı ve kanıtıyla önerir.
+// Öneriler public.kunye_oneriler'e yazılır (göç 0036); editör Stüdyo → Site → Künye onayı'ndan onaylayınca panele yazılır.
+// POST { adet?: 1-3, urun_id?: number } · Giriş: Stüdyo oturumu. Ürünler panelin herkese açık API'sinden okunur.
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
+const PANEL = Deno.env.get("PANEL_URL") || "https://panel.updated.com.tr";
+function serviceKey(): string {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (legacy) return legacy;
+  const dict = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
+  return (dict.default ?? Object.values(dict)[0]) as string;
+}
+function jsonOku(s: string) { try { return JSON.parse(s); } catch { const m = s.match(/\{[\s\S]*\}/); try { return m ? JSON.parse(m[0]) : null; } catch { return null; } } }
+
+type Spec = { key: string; unit?: string | null; value?: string | null };
+type Urun = { id: number; name: string; brand: string; type: string; specs?: Spec[] };
+
+const SISTEM = `Sen bir teknoloji sitesinin ürün veritabanı editörüsün. Görevin bir ürünün teknik özelliklerini İNTERNETTE ARAYARAK bulmak.
+KURALLAR:
+- Önce üreticinin resmî ürün/teknik özellik sayfasını ara ve kullan. Orada yoksa güvenilir bir kaynak (DPReview, GSMArena, B&H, üreticinin basın bülteni) kullan.
+- Yalnız kaynakta açıkça yazan bilgiyi ver. Tahmin etme; emin değilsen o özelliği listeye koyma. Söylenti/sızıntı kullanma.
+- "value": kısa Türkçe değer, birimiyle; ondalıkta virgül (ör. "24,2 MP", "658 g (pil ve kartla)", "4K 60p (10-bit)").
+- "num": karşılaştırma için tek sayı, özelliğin birimi cinsinden (ör. 658), sayısal değilse null.
+- "kaynak": değeri aldığın sayfanın TAM adresi (https://…). "kanit": o sayfadan kısa alıntı (en fazla 120 karakter).
+- Fiyatı yalnız Türkiye fiyatı (TL) resmî kaynakta yazıyorsa doldur.
+Yanıtı YALNIZ şu JSON olarak ver, başka metin yazma:
+{"ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
+
+async function ara(urun: Urun) {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) throw new Error("GEMINI_API_KEY yok");
+  const ozellikler = (urun.specs ?? []).map((s) => `- ${s.key}${s.unit ? " · " + s.unit : ""}`).join("\n");
+  const istem = `ÜRÜN: ${urun.brand} ${urun.name}\nDOLDURULACAK ÖZELLİKLER (ad · birim):\n${ozellikler}`;
+  let son = "";
+  for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: SISTEM }] }, contents: [{ role: "user", parts: [{ text: istem }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1 } }),
+      });
+      const g = await r.text();
+      if (!r.ok) { son = `${model} ${r.status} ${g.slice(0, 120)}`; continue; }
+      const j = JSON.parse(g), c = j?.candidates?.[0];
+      const metin = (c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
+      const v = jsonOku(metin);
+      if (!v) { son = `${model} geçersiz yanıt`; continue; }
+      const kaynaklar = (c?.groundingMetadata?.groundingChunks ?? []).map((x: { web?: { uri?: string; title?: string } }) => ({ baslik: x.web?.title ?? "", url: x.web?.uri ?? "" })).filter((x: { url: string }) => x.url).slice(0, 12);
+      return { v, kaynaklar };
+    } catch { son = `${model} yanıt vermedi`; }
+  }
+  throw new Error("Yapay zekâ yanıt vermedi (" + son + ")");
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+  if (req.method !== "POST") return yanit({ error: "POST gerekli" }, 405);
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
+  const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const { data: k } = await sb.auth.getUser(jwt);
+  if (!k?.user) return yanit({ error: "Stüdyo girişi gerekli" }, 401);
+  const b = await req.json().catch(() => ({}));
+  const adet = Math.min(3, Math.max(1, Number(b.adet) || 2));
+
+  // Aday ürünler: tek ürün istendiyse o; yoksa değerlerinin yarısından azı dolu ve bekleyen önerisi olmayanlar
+  let urunler: Urun[] = [];
+  if (Number.isInteger(b.urun_id)) {
+    const r = await fetch(`${PANEL}/api/products/${b.urun_id}?depth=0`); if (r.ok) urunler = [await r.json()];
+  } else {
+    const r = await fetch(`${PANEL}/api/products?limit=500&depth=0&sort=updatedAt&select[name]=true&select[brand]=true&select[type]=true&select[specs]=true`);
+    const tum: Urun[] = r.ok ? (await r.json()).docs : [];
+    const { data: bekleyen } = await sb.from("kunye_oneriler").select("urun_id").in("durum", ["bekliyor"]);
+    const { data: denenen } = await sb.from("kunye_oneriler").select("urun_id").gte("created_at", new Date(Date.now() - 7 * 864e5).toISOString());
+    const atla = new Set([...(bekleyen ?? []), ...(denenen ?? [])].map((x) => x.urun_id));
+    urunler = tum.filter((u) => !atla.has(u.id) && (u.specs?.length ?? 0) > 0 && (u.specs ?? []).filter((s) => s.value).length < (u.specs ?? []).length / 2);
+  }
+  const kalan = Math.max(0, urunler.length - adet);
+  const sonuc: { urun: string; durum: string; sayi?: number }[] = [];
+  for (const u of urunler.slice(0, adet)) {
+    try {
+      const { v, kaynaklar } = await ara(u);
+      const adlar = new Set((u.specs ?? []).map((s) => s.key));
+      const oz = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).filter((o: { key?: string; value?: string }) => o?.key && adlar.has(o.key) && o.value)
+        .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string }) => ({ key: o.key, value: String(o.value).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160) }));
+      await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length ? "bekliyor" : "hata", hata: oz.length ? null : "Kaynaklarda değer bulunamadı" });
+      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length });
+    } catch (e) {
+      await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, durum: "hata", hata: String((e as Error).message).slice(0, 300) });
+      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "hata" });
+    }
+  }
+  return yanit({ islenen: sonuc, kalan });
+});

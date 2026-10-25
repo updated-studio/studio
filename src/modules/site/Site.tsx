@@ -11,6 +11,7 @@ import { SemaCtx } from "./Form";
 import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
 import ListeAraclari, { aracAlanlari, hucre, kosullariEkle, sorguAnahtari, useAraclar, type AracAlan } from "./ListeAraclari";
 import "./site.css";
+import KunyeOnay from "./KunyeOnay";
 
 // Site: updated.com.tr'deki haberler, incelemeler ve karşılaştırmalar (yayın paneli Payload'a Stüdyo girişiyle bağlanır).
 // Panelin bütün bölümleri Stüdyo'da: haberler özel ekranda (Duzenle.tsx), diğer her bölüm panelin alan yapısından çizilen
@@ -214,6 +215,7 @@ function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
           {gruptakiler.map((x) => <button key={x.s.slug} aria-pressed={b.s.slug === x.s.slug} onClick={() => { setSecili(x.s.slug); setGenelAcik(false); }}>{ad(x)}</button>)}
         </div>
       )}
+      {grup === "Künye" && <KunyeOnay />}
       {kullanici.role === "admin" && <a className="linkbtn muted" style={{ alignSelf: "flex-end" }} href="#/panel-giris" target="_blank" rel="noreferrer">Site panelinin kendisini aç (yedek) ↗</a>}
       {b.tur === "g" ? (
         genelAcik ? <GenelDuzenle key={b.s.slug} hedef={{ genel: b.s }} kullanici={kullanici} kapat={() => setGenelAcik(false)} />
