@@ -5,6 +5,7 @@ import { Ikon } from "../../shared/Ikon";
 import { sb } from "../../shared/supabase";
 import { hataMetni, useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
+import TelefonBildirimi from "../../shared/TelefonBildirimi";
 
 // Fotoğrafı tarayıcıda 512 px kare WebP'ye küçültür: yükleme hızlı, depolama az (50+ kişide de ucuz).
 async function kucult(dosya: File): Promise<Blob> {
@@ -122,6 +123,7 @@ export default function Profil() {
           <button className="btn">Kaydet</button>
         </form>
       </div>
+      <TelefonBildirimi />
     </>
   );
 }
