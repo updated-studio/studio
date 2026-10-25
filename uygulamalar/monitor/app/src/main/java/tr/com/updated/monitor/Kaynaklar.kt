@@ -75,6 +75,9 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     private val oz = cm.getCameraCharacteristics(id)
     var sensorYonu = oz.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0; private set
     val haricimi: Boolean get() = ad.startsWith("USB")
+    val onKamera: Boolean get() = oz.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+    /** Ekranın o anki dönüşü (0/90/180/270); kaydın yön bilgisi bundan hesaplanır */
+    @Volatile var ekranYonu = 0
     val kayitta: Boolean get() = kaydedici != null
     private var hataGeri: (String) -> Unit = {}
 
@@ -177,7 +180,8 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                 m.setVideoEncoder(if (hevc) MediaRecorder.VideoEncoder.HEVC else MediaRecorder.VideoEncoder.H264)
                 m.setVideoSize(b.width, b.height); m.setVideoFrameRate(fps); m.setVideoEncodingBitRate(mbps * 1_000_000)
                 if (ses) { m.setAudioEncoder(MediaRecorder.AudioEncoder.AAC); m.setAudioSamplingRate(48000); m.setAudioEncodingBitRate(192_000); m.setAudioChannels(2) }
-                m.setOrientationHint(0)
+                // Oynatıcı videoyu, telefon kayıt anında nasıl tutulduysa öyle dik göstersin
+                if (!haricimi) m.setOrientationHint(if (onKamera) (sensorYonu + ekranYonu) % 360 else (sensorYonu - ekranYonu + 360) % 360)
                 m.prepare()
                 kaydedici = m; kayitDosyasi = dosya
                 oturumKur() // kayıt yüzeyiyle; başlat onConfigured'da

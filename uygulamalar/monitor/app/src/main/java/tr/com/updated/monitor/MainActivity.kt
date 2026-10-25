@@ -579,7 +579,7 @@ class MainActivity : Activity() {
                 kaynaklar[i] = kaynak
                 kaynak.baslat(sonYuzey[i]!!, { w, h ->
                     m.tampon(w, h)
-                    if (!kaynak.haricimi) { @Suppress("DEPRECATION") val ekran = windowManager.defaultDisplay.rotation * 90; m.ayarlar.dondur = ((kaynak.sensorYonu - ekran + 360) % 360) }
+                    runOnUiThread { yonuAyarla() }
                     runOnUiThread { ustCiz() }
                 }, { hata -> runOnUiThread { tost(hata) } })
             }
@@ -597,7 +597,7 @@ class MainActivity : Activity() {
     private fun agAc(i: Int, adres: String) {
         val m = monitorler[i] ?: return
         tercih.edit().putString("kaynak$i", "ag").putString("ag$i", adres).apply()
-        kaynakAdi[i] = adres; m.ayarlar.dondur = 0
+        kaynakAdi[i] = adres; m.ayarlar.dondur = 0; m.otoDondur = 0
         acici[i] = {
             kaynaklar[i]?.durdur()
             val k = AgKaynak(this, adres); kaynaklar[i] = k
@@ -704,16 +704,35 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Telefon kamerası Android'den dik (telefonun kendi dik yönüne göre) gelir; ekran yan döndükçe görüntüyü ve kayıt yönünü ona göre ayarlar */
+    private fun yonuAyarla() {
+        @Suppress("DEPRECATION") val ekran = windowManager.defaultDisplay.rotation * 90
+        for (i in 0..1) {
+            val m = monitorler[i] ?: continue; val k = kaynaklar[i] as? KameraKaynak
+            m.otoDondur = if (k != null && !k.haricimi) ekran else 0
+            k?.ekranYonu = ekran
+            m.tampon(m.kaynakBoyut[0], m.kaynakBoyut[1])
+        }
+        kompler.forEach { it?.invalidate() }
+    }
+    private val ekranDinle = object : android.hardware.display.DisplayManager.DisplayListener {
+        override fun onDisplayAdded(id: Int) {}
+        override fun onDisplayRemoved(id: Int) {}
+        override fun onDisplayChanged(id: Int) { if (id == android.view.Display.DEFAULT_DISPLAY) yonuAyarla() }
+    }
+
     @Deprecated("Geri tuşu: önce panel/şerit kapanır")
     override fun onBackPressed() {
         when { panel.visibility == View.VISIBLE -> panelKapat(); serit.visibility == View.VISIBLE -> seritKapat(); else -> @Suppress("DEPRECATION") super.onBackPressed() }
     }
     override fun onResume() {
-        super.onResume(); onde = true; teraziKaydi(); tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat()
+        super.onResume(); onde = true; teraziKaydi(); yonuAyarla()
+        (getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).registerDisplayListener(ekranDinle, null); tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat()
         for (i in 0..1) if (bekleyenAcma[i]) { bekleyenAcma[i] = false; if (sonYuzey[i] != null) acici[i]?.invoke() }
     }
     override fun onPause() {
         super.onPause(); onde = false; sensorler.unregisterListener(teraziDinle)
+        (getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).unregisterDisplayListener(ekranDinle)
         if (kamera()?.kayitta == true) kayitDugmesi() // arka plana geçerken kayıt güvenle kapanır
         sesOlcer.durdur(); monitorler.forEach { it?.onPause() }
     }

@@ -43,7 +43,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     fun yenile() = requestRender()
     /** Görüntünün bölme içindeki alanı (kenar boşlukları hariç; kompozisyon kılavuzu bunun üstüne çizilir) */
     fun goruntuAlani(): android.graphics.RectF {
-        val a = ayarlar; val donuk = a.dondur % 180 != 0
+        val a = ayarlar; val donuk = yanDurur()
         val kw = (if (donuk) kaynakBoyut[1] else kaynakBoyut[0]).toFloat() * a.desqueeze
         val kh = (if (donuk) kaynakBoyut[0] else kaynakBoyut[1]).toFloat()
         val w = width.toFloat(); val h = height.toFloat(); val oran = kw / kh
@@ -53,6 +53,14 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     /** Kaynağın boyutu belli olunca: oran ve tampon boyutu (kamera bu boyutta yazar) */
     fun tampon(w: Int, h: Int) { kaynakBoyut = intArrayOf(w, h); yuzeyDokusu?.setDefaultBufferSize(w, h); requestRender() }
     @Volatile private var yuzeyDokusu: SurfaceTexture? = null
+    /** Telefon kamerasında ekranın dönüşünü dengeleyen otomatik açı; kullanıcının DÖNDÜR ayarı bunun üstüne eklenir */
+    @Volatile var otoDondur = 0
+        set(v) { field = v; requestRender() }
+    /** Android, telefon kamerasının karesini dokuya zaten 90° çevirerek veriyor mu (getTransformMatrix'ten okunur) */
+    @Volatile private var dokuDonuk = false
+    private fun toplamDondur() = (otoDondur + ayarlar.dondur) % 360
+    /** Ekrandaki görüntünün en/boyu kaynağın tersi mi */
+    private fun yanDurur() = (toplamDondur() % 180 != 0) != dokuDonuk
 
     private inner class Isleyici : Renderer, SurfaceTexture.OnFrameAvailableListener {
         private var program = 0
@@ -116,13 +124,14 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
 
         override fun onDrawFrame(gl: GL10?) {
             bekleyenLut?.let { lutYaz(it); bekleyenLut = null }
-            st?.let { it.updateTexImage(); it.getTransformMatrix(texMat) }
+            st?.let { it.updateTexImage(); it.getTransformMatrix(texMat)
+                val d = kotlin.math.abs(texMat[0]) < 0.5f; if (d != dokuDonuk) { dokuDonuk = d; post { requestLayout(); invalidate() } } }
             GLES30.glClearColor(0f, 0f, 0f, 1f)
             GLES30.glViewport(0, 0, gw, gh)
             GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
             GLES30.glUseProgram(program)
             val a = ayarlar
-            val donuk = a.dondur % 180 != 0
+            val donuk = yanDurur()
             val kw = (if (donuk) kaynakBoyut[1] else kaynakBoyut[0]).toFloat() * a.desqueeze
             val kh = (if (donuk) kaynakBoyut[0] else kaynakBoyut[1]).toFloat()
             if (karsilastir) {
@@ -177,13 +186,13 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             GLES30.glUniform1f(u("uZoom"), if (olcum) 1f else a.zoom)
             GLES30.glUniform1i(u("uAyna"), if (a.ayna) 1 else 0)
             GLES30.glUniform1i(u("uCevir"), if (a.cevir) 1 else 0)
-            GLES30.glUniform1i(u("uDondur"), a.dondur / 90)
+            GLES30.glUniform1i(u("uDondur"), toplamDondur() / 90)
             GLES30.glUniform1f(u("uKilavuz"), if (sade) 0f else a.kilavuz)
             GLES30.glUniform1i(u("uIzgara"), if (!sade && a.izgara) 1 else 0)
             GLES30.glUniform1i(u("uMerkez"), if (!sade && a.merkez) 1 else 0)
             GLES30.glUniform1f(u("uGuvenli"), if (sade) 0f else a.guvenli)
             GLES30.glUniform1f(u("uOran"), vw.toFloat() / vh)
-            GLES30.glUniform2f(u("uPiksel"), 1f / (if (a.dondur % 180 != 0) kaynakBoyut[1] else kaynakBoyut[0]), 1f / (if (a.dondur % 180 != 0) kaynakBoyut[0] else kaynakBoyut[1]))
+            GLES30.glUniform2f(u("uPiksel"), 1f / (if (yanDurur()) kaynakBoyut[1] else kaynakBoyut[0]), 1f / (if (yanDurur()) kaynakBoyut[0] else kaynakBoyut[1]))
             GLES30.glUniform2f(u("uCikis"), vw.toFloat(), vh.toFloat())
             val k = GLES30.glGetAttribLocation(program, "aKonum")
             GLES30.glEnableVertexAttribArray(k)
