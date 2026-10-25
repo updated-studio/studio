@@ -53,7 +53,7 @@ import kotlin.math.max
 class MainActivity : Activity() {
     enum class Kip(val ad: String) { TEK("Tek ekran"), OLCUM("Görüntü + ölçümler"), KARSILASTIR("LUT karşılaştırma"), IKI("İki kaynak") }
     enum class Sekme(val ad: String) { KAYIT("KAYIT"), MONITOR("MONİTÖR"), KOMPOZISYON("KOMPOZİSYON"), KILAVUZ("KILAVUZ"), LUT("LUT"), OLCUM("ÖLÇÜM"), SES("SES"), KAYNAK("KAYNAK"), KURULUM("KURULUM") }
-    enum class Param { FPS, ENSTANTANE, DIYAFRAM, ISO, WB, EV, ODAK }
+    enum class Param { FPS, ENSTANTANE, DIYAFRAM, ISO, WB, EV, ODAK, SAHNE }
 
     // Renkler (Blackmagic düzeni: siyah şeritler, gri etiket, beyaz değer, kırmızı kayıt)
     private val SIYAH = Color.BLACK; private val GRI = Color.rgb(140, 140, 140); private val KOYU = Color.rgb(30, 30, 30); private val KOYU2 = Color.rgb(44, 44, 44)
@@ -78,6 +78,11 @@ class MainActivity : Activity() {
     private var hevc = true; private var mbps = 50; private var sesKayit = true
     private var fotoMod = false; private var zamanlayici = 0; private var deklansorSesi = true; private var sonMime = "video/mp4"
     private var geriSayiliyor = false
+    // Sahneler: seçili sahne, otomatik öneri, ışık izi süresi
+    private var sahne = Sahne.KAPALI; private var sahneOto = false; private var izSure = 10
+    @Volatile private var yercekimZ = 0f; @Volatile private var renkOrt = floatArrayOf(0f, 0f, 0f)
+    private var sahneOnerisi: Sahne? = null
+    private lateinit var sahneCip: TextView
     private lateinit var geriSayimYazi: TextView
     private val deklansor by lazy { android.media.MediaActionSound().also { it.load(android.media.MediaActionSound.SHUTTER_CLICK) } }
     private var kayitBas = 0L; private var kayitUri: Uri? = null; private var sonUri: Uri? = null
@@ -97,6 +102,7 @@ class MainActivity : Activity() {
             val (x, y) = e.values[0] to e.values[1]
             val aci = Math.toDegrees(if (don == android.view.Surface.ROTATION_270) kotlin.math.atan2(-y.toDouble(), -x.toDouble()) else kotlin.math.atan2(y.toDouble(), x.toDouble())).toFloat()
             kompler[etkin]?.egim = if (teraziAcik) aci else null
+            yercekimZ = e.values[2]
         }
         override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
     }
@@ -118,6 +124,7 @@ class MainActivity : Activity() {
         kip = runCatching { Kip.valueOf(tercih.getString("kip", "TEK")!!) }.getOrDefault(Kip.TEK)
         koseHisto = tercih.getBoolean("koseHisto", true); parlaklikTam = tercih.getBoolean("parlaklik", false); sesGosterge = tercih.getBoolean("sesGosterge", true)
         hevc = tercih.getBoolean("hevc", true); mbps = tercih.getInt("mbps", 50); sesKayit = tercih.getBoolean("sesKayit", true)
+        sahne = runCatching { Sahne.valueOf(tercih.getString("sahne", "KAPALI")!!) }.getOrDefault(Sahne.KAPALI); sahneOto = tercih.getBoolean("sahneOto", false); izSure = tercih.getInt("izSure", 10)
         fotoMod = tercih.getBoolean("fotoMod", false); zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansorSesi", true)
         kompTur = runCatching { KompTur.valueOf(tercih.getString("komp", "KAPALI")!!) }.getOrDefault(KompTur.KAPALI); kompYon = tercih.getInt("kompYon", 0)
         sonKomp = runCatching { KompTur.valueOf(tercih.getString("sonKomp", "SPIRAL")!!) }.getOrDefault(KompTur.SPIRAL)
@@ -139,6 +146,9 @@ class MainActivity : Activity() {
         orta.addView(serit, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         geriSayimYazi = TextView(this).apply { textSize = 96f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD); setShadowLayer(12f, 0f, 0f, Color.BLACK); visibility = View.GONE }
         orta.addView(geriSayimYazi, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        sahneCip = TextView(this).apply { visibility = View.GONE; textSize = 13f; typeface = dar; setTextColor(Color.BLACK); setPadding(dp(14f), dp(8f), dp(14f), dp(8f)); background = Tema.kapsul(Color.rgb(120, 200, 255), dp(16f).toFloat())
+            setOnClickListener { sahneOnerisi?.let { sahneSec(it) }; visibility = View.GONE } }
+        orta.addView(sahneCip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { topMargin = dp(10f); marginStart = dp(10f) })
         yatay.addView(orta, LinearLayout.LayoutParams(0, -1, 1f))
         sag = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setBackgroundColor(SIYAH); setPadding(0, dp(10f), 0, dp(10f)) }
         yatay.addView(sag, LinearLayout.LayoutParams(dp(96f), -1))
@@ -202,15 +212,43 @@ class MainActivity : Activity() {
 
     private fun teraziKaydi() {
         sensorler.unregisterListener(teraziDinle)
-        if (teraziAcik && onde) sensorler.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY)?.let { sensorler.registerListener(teraziDinle, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
+        if ((teraziAcik || sahneOto) && onde) sensorler.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY)?.let { sensorler.registerListener(teraziDinle, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
         if (!teraziAcik) kompler.forEach { it?.egim = null }
     }
 
     private fun olcumBagla() {
         if (asistanAcik && asistan == null) asistan = Asistan { r, ad -> runOnUiThread { asistanSonuc(r, ad) } }
         if (!asistanAcik) { asistan?.kapat(); asistan = null; kompler.forEach { it?.konu = null }; oneriCip.forEach { it?.visibility = View.GONE } }
-        monitorler.forEachIndexed { i, m -> m?.olcumKaresi = if (i == etkin && (olcum != null || koseHisto || asistanAcik)) { buf, w, h -> olcum?.kare(buf, w, h); if (koseHisto) kose.kare(buf, w, h); if (ayarlar[i].zoom == 1f) asistan?.kare(buf, w, h) } else null }
+        monitorler.forEachIndexed { i, m -> m?.olcumKaresi = if (i == etkin && (olcum != null || koseHisto || asistanAcik || sahneOto)) { buf, w, h -> olcum?.kare(buf, w, h); if (koseHisto) kose.kare(buf, w, h); if (ayarlar[i].zoom == 1f) asistan?.kare(buf, w, h); if (sahneOto) renkOlc(buf, w, h) } else null }
         if (this::kose.isInitialized) kose.visibility = if (koseHisto) View.VISIBLE else View.INVISIBLE
+    }
+
+    /** Kabaca ortalama renk (her 8. piksel): gün batımı önerisi için */
+    private fun renkOlc(b: java.nio.ByteBuffer, w: Int, h: Int) {
+        var r = 0L; var g = 0L; var bl = 0L; var n = 0
+        var i = 0; val son = w * h * 4
+        while (i < son) { r += b.get(i).toInt() and 255; g += b.get(i + 1).toInt() and 255; bl += b.get(i + 2).toInt() and 255; n++; i += 32 }
+        if (n > 0) renkOrt = floatArrayOf(r / (255f * n), g / (255f * n), bl / (255f * n))
+    }
+
+    private fun sahneSec(s: Sahne) {
+        sahne = s; tercih.edit().putString("sahne", s.name).apply()
+        for (i in 0..1) (kaynaklar[i] as? KameraKaynak)?.let { it.sahne = s; it.ayarDegisti() }
+        sahneCip.visibility = View.GONE
+        if (s != Sahne.KAPALI && !fotoMod && s in setOf(Sahne.ISIK_IZI, Sahne.SAMANYOLU, Sahne.GECE)) tost("${s.ad}: en iyi sonuç FOTO modunda.")
+        solCiz(); if (acikParam == Param.SAHNE) seritAc(Param.SAHNE)
+    }
+
+    /** Saniyede bir: otomatik sahne önerisi (yalnız otomatik pozlamada anlamlı) */
+    private fun sahneDenetle() {
+        if (!sahneOto) { if (this::sahneCip.isInitialized) sahneCip.visibility = View.GONE; return }
+        val k = kamera() ?: return; val a = kamAyar[etkin]
+        val otoPoz = a.iso == null && a.pozlamaNs == null && k.sonIso > 0 && k.sonPozNs > 0
+        val r = renkOrt; val konu = kompler[etkin]
+        val yuz = asistanAcik && konu?.konuAdi == "Yüz" && (konu.konu?.let { it.width() * it.height() } ?: 0f) > 0.05f
+        val o = sahneOner(SahneOlcum(if (otoPoz) k.sonIso * k.sonPozNs / 1e9f else null, yercekimZ < -5f, 0.2126f * r[0] + 0.7152f * r[1] + 0.0722f * r[2], if (r[2] > 0.01f) r[0] / r[2] else 1f, yuz))
+        sahneOnerisi = o
+        if (o == null || o == sahne) sahneCip.visibility = View.GONE else { sahneCip.text = "SAHNE: ${o.ad}  ›  UYGULA"; sahneCip.visibility = View.VISIBLE }
     }
 
     private fun bolmeYap(i: Int): View {
@@ -278,7 +316,7 @@ class MainActivity : Activity() {
     private fun seritAc(p: Param) {
         acikParam = p; serit.removeAllViews(); serit.visibility = View.VISIBLE; ustCiz(); solCiz()
         val k = kamera()
-        val baslik = mapOf(Param.FPS to "KARE HIZI", Param.ENSTANTANE to "ENSTANTANE", Param.DIYAFRAM to "DİYAFRAM", Param.ISO to "ISO", Param.WB to "BEYAZ DENGESİ", Param.EV to "POZLAMA TELAFİSİ", Param.ODAK to "ODAK")[p]!!
+        val baslik = mapOf(Param.FPS to "KARE HIZI", Param.ENSTANTANE to "ENSTANTANE", Param.DIYAFRAM to "DİYAFRAM", Param.ISO to "ISO", Param.WB to "BEYAZ DENGESİ", Param.EV to "POZLAMA TELAFİSİ", Param.ODAK to "ODAK", Param.SAHNE to "SAHNE")[p]!!
         serit.addView(TextView(this).apply { text = baslik; textSize = 11f; setTextColor(GRI); typeface = dar; letterSpacing = 0.1f; setPadding(0, 0, 0, dp(6f)) })
         if (k == null) { serit.addView(TextView(this).apply { text = "Bu ayar yalnız kamera ve USB kaynaklarında var."; setTextColor(Color.WHITE) }); return }
         val y = k.yetenek; val a = kamAyar[etkin]
@@ -287,6 +325,25 @@ class MainActivity : Activity() {
             background = Tema.kapsul(if (secili) Color.WHITE else KOYU2, dp(6f).toFloat()); setTextColor(if (secili) Color.BLACK else Color.WHITE); typeface = dar
             setOnClickListener { is_(); kameraAyarKaydet(); seritAc(p) } }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6f) })
         when (p) {
+            Param.SAHNE -> {
+                c(if (sahneOto) "OTOMATİK ÖNERİ ✓" else "OTOMATİK ÖNERİ", sahneOto) { sahneOto = !sahneOto; tercih.edit().putBoolean("sahneOto", sahneOto).apply(); teraziKaydi(); olcumBagla() }
+                Sahne.values().forEach { sh -> c(sh.ad, sahne == sh) { sahneSec(sh) } }
+                serit.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(satir) })
+                if (sahne == Sahne.ISIK_IZI) {
+                    val sr = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6f), 0, 0) }
+                    intArrayOf(5, 10, 20, 30, 60).forEach { sn -> sr.addView(Tema.dugme(this, "$sn sn", izSure == sn, kucuk = true).apply {
+                        background = Tema.kapsul(if (izSure == sn) Color.WHITE else KOYU2, dp(6f).toFloat()); setTextColor(if (izSure == sn) Color.BLACK else Color.WHITE); typeface = dar
+                        setOnClickListener { izSure = sn; tercih.edit().putInt("izSure", sn).apply(); seritAc(p) } }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6f) }) }
+                    serit.addView(sr)
+                }
+                val ek = when (sahne) {
+                    Sahne.SAMANYOLU -> if (k.uzunPozlamaVar) " Bu telefon uzun pozlama veriyor: tek çekim, en çok 15 sn." else " Bu telefon uzun pozlama vermiyor: 16 kare birleştirilir."
+                    Sahne.GECE -> if (k.sahneModuVar(CameraMetadata.CONTROL_SCENE_MODE_NIGHT)) " Telefonun kendi gece modu kullanılıyor." else " 8 kare birleştirilir; telefonu sabit tut."
+                    else -> ""
+                }
+                serit.addView(TextView(this).apply { text = sahne.aciklama + ek + if (sahneOto) " Otomatik öneri açık: uygun sahne üstte mavi etiketle önerilir." else ""; textSize = 12f; setTextColor(GRI); setPadding(0, dp(6f), 0, 0) })
+                return
+            }
             Param.FPS -> { c("OTO", a.fps == null) { a.fps = null; k.oturumYenile { w, h -> monitorler[etkin]?.tampon(w, h) } }
                 y.fpsler.forEach { r -> c(if (r.lower == r.upper) "${r.upper}" else "${r.lower}–${r.upper}", a.fps == r) { a.fps = r; k.oturumYenile { w, h -> monitorler[etkin]?.tampon(w, h) } } } }
             Param.ENSTANTANE -> {
@@ -347,6 +404,7 @@ class MainActivity : Activity() {
         kare("⇄", "KAYNAK") { kaynakSec() }
         kare(if (a.zoom > 1f) "${a.zoom.toInt()}x" else "1x", "BÜYÜT", a.zoom > 1f) { a.zoom = when (a.zoom) { 1f -> 2f; 2f -> 4f; else -> 1f }; kaydet(); solCiz(); ustCiz(); yenile() }
         kare(if (ka.odakMesafe == null) "AF" else "MF", "ODAK", acikParam == Param.ODAK) { if (acikParam == Param.ODAK) seritKapat() else seritAc(Param.ODAK) }
+        kare(if (sahne == Sahne.KAPALI) (if (sahneOto) "OTO" else "—") else sahne.ad.uppercase(Locale("tr")).take(6), "SAHNE", acikParam == Param.SAHNE || sahne != Sahne.KAPALI) { if (acikParam == Param.SAHNE) seritKapat() else seritAc(Param.SAHNE) }
         kare("◐", "TEMİZ", a.temiz) { a.temiz = !a.temiz; kaydet(); solCiz(); yenile() }
         kare("▦", "DÜZEN") { panelAc(Sekme.MONITOR) }
     }
@@ -411,7 +469,7 @@ class MainActivity : Activity() {
         }
         val sn = System.currentTimeMillis() / 1000
         if (sn != sonSaniye) {
-            sonSaniye = sn
+            sonSaniye = sn; sahneDenetle()
             if (k?.kayitta != true && this::tcYazi.isInitialized) tcYazi.text = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()) + ":00"
             val bos = runCatching { StatFs(Environment.getExternalStorageDirectory().path).availableBytes }.getOrDefault(0L)
             val saniye = bos / max(1L, mbps * 1_000_000L / 8)
@@ -456,6 +514,7 @@ class MainActivity : Activity() {
 
     private fun fotoDugmesi() {
         val k = kamera() ?: return tost(if (kaynaklar[etkin] is AgKaynak) "Ağ yayınında fotoğraf yok; kamera ya da USB kaynağı seç." else "Kaynak yok.")
+        monitorler[etkin]?.takeIf { it.birlestiriyor }?.let { it.birlestirmeIptal(); return }
         if (geriSayiliyor) { geriSayiliyor = false; geriSayimYazi.visibility = View.GONE; return } // ikinci dokunuş zamanlayıcıyı iptal eder
         if (zamanlayici == 0) return cek(k)
         geriSayiliyor = true; var kalan = zamanlayici
@@ -468,7 +527,39 @@ class MainActivity : Activity() {
         adim()
     }
 
+    /** Sahne kare birleştirme istiyorsa türü (telefon kendisi yapabiliyorsa null) */
+    private fun birlestirmeTuru(k: KameraKaynak): Sahne.Birlestir? = when (sahne) {
+        Sahne.ISIK_IZI -> Sahne.Birlestir.MAX
+        Sahne.SAMANYOLU -> if (k.uzunPozlamaVar) null else Sahne.Birlestir.ORT
+        Sahne.GECE -> if (k.sahneModuVar(CameraMetadata.CONTROL_SCENE_MODE_NIGHT)) null else Sahne.Birlestir.ORT
+        else -> null
+    }
+
+    private fun birlestirCek(m: MonitorGorunum, tur: Sahne.Birlestir) {
+        kayitDugme.basili = true
+        if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.START_VIDEO_RECORDING) }
+        geriSayimYazi.textSize = 40f; geriSayimYazi.text = "0%"; geriSayimYazi.visibility = View.VISIBLE
+        val n = if (sahne == Sahne.SAMANYOLU) 16 else 8
+        m.birlestir(MonitorGorunum.BirlestirmeIstegi(tur, n, izSure * 1000L, 1f, { o -> geriSayimYazi.text = "${sahne.ad.uppercase(Locale("tr"))}  ${(o * 100).toInt()}%" }) { bmp ->
+            geriSayimYazi.visibility = View.GONE; geriSayimYazi.textSize = 96f; kayitDugme.basili = false
+            if (bmp == null) return@BirlestirmeIstegi tost("Birleştirme durdu.")
+            if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.SHUTTER_CLICK) }
+            Thread {
+                val ad = "UPDATED_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + "_" + sahne.name.lowercase(Locale.US) + ".jpg"
+                val u = galeriyeYaz(ad, "image/jpeg") { bmp.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                runOnUiThread {
+                    if (u == null) return@runOnUiThread tost("Fotoğraf kaydedilemedi.")
+                    sonUri = u; sonMime = "image/jpeg"; runCatching { sonCekim.setImageBitmap(contentResolver.loadThumbnail(u, Size(160, 100), null)) }
+                    tost("${sahne.ad}: ${bmp.width}×${bmp.height} kaydedildi.")
+                }
+            }.start()
+        })
+    }
+
     private fun cek(k: KameraKaynak) {
+        val m = monitorler[etkin]
+        if (m != null && m.birlestiriyor) { m.birlestirmeIptal(); return } // ikinci dokunuş birleştirmeyi durdurur
+        birlestirmeTuru(k)?.let { t -> if (m != null) return birlestirCek(m, t) }
         kayitDugme.basili = true
         if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.SHUTTER_CLICK) }
         monitorler[etkin]?.animate()?.alpha(0.2f)?.setDuration(60)?.withEndAction { monitorler[etkin]?.animate()?.alpha(1f)?.setDuration(160) }
@@ -657,7 +748,7 @@ class MainActivity : Activity() {
             if (onceki is KameraKaynak) { onceki.durdurVe { runOnUiThread { acici[i]?.invoke() } }; return@acici } else onceki?.durdur()
             val kaynak = runCatching { KameraKaynak(this, k.first, k.second, kamAyar[i]) }.getOrElse { e -> tost("Kamera açılamadı: ${e.message}"); HataKaydi.not("kamera", e.stackTraceToString()); null }
             if (kaynak != null) {
-                kaynaklar[i] = kaynak; kaynak.fotoModu = fotoMod
+                kaynaklar[i] = kaynak; kaynak.fotoModu = fotoMod; kaynak.sahne = sahne
                 kaynak.baslat(sonYuzey[i]!!, { w, h ->
                     m.tampon(w, h)
                     runOnUiThread { yonuAyarla() }

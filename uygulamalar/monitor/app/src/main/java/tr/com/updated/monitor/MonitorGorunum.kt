@@ -41,6 +41,13 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     fun lutYukle(lut: Lut) { bekleyenLut = lut; ayarlar.lutAcik = true; requestRender() }
     fun ekranGoruntusu(geri: (Bitmap) -> Unit) { ekranGoruntusuIste = geri; requestRender() }
     fun yenile() = requestRender()
+
+    /** Kare birleştirme isteği: `n` kare (ORT) ya da `sureMs` boyunca (MAX); sonuç ekrandaki gibi dik, araçsız ve LUT'suz */
+    class BirlestirmeIstegi(val tur: Sahne.Birlestir, val n: Int, val sureMs: Long, val kazanc: Float, val ilerleme: (Float) -> Unit, val bitti: (Bitmap?) -> Unit)
+    @Volatile private var birlestirme: BirlestirmeIstegi? = null
+    fun birlestir(b: BirlestirmeIstegi) { birlestirme = b; requestRender() }
+    fun birlestirmeIptal() { birlestirme?.let { birlestirme = null; it.bitti(null) } }
+    val birlestiriyor: Boolean get() = birlestirme != null
     /** Görüntünün bölme içindeki alanı (kenar boşlukları hariç; kompozisyon kılavuzu bunun üstüne çizilir) */
     fun goruntuAlani(): android.graphics.RectF {
         val a = ayarlar; val donuk = yanDurur()
@@ -110,7 +117,82 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
 
         override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) { gw = w; gh = h }
 
-        override fun onFrameAvailable(s: SurfaceTexture?) = requestRender()
+        @Volatile private var yeniKare = false
+        override fun onFrameAvailable(s: SurfaceTexture?) { yeniKare = true; requestRender() }
+
+        // Birleştirme tamponu (mümkünse 16 bit kayan nokta: ortalamada renk kademelenmesi olmasın)
+        private var bFbo = 0; private var bTex = 0; private var bW = 0; private var bH = 0; private var bKare = 0; private var bBas = 0L
+        private var kopyaProgram = 0
+
+        private fun dokuYap(w: Int, h: Int, yuksek: Boolean): Int {
+            val t = IntArray(1); GLES30.glGenTextures(1, t, 0)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, t[0])
+            if (yuksek) GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA16F, w, h, 0, GLES30.GL_RGBA, GLES30.GL_HALF_FLOAT, null)
+            else GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, w, h, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_NEAREST)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_NEAREST)
+            return t[0]
+        }
+
+        private fun birlestirSil() {
+            if (bFbo != 0) GLES30.glDeleteFramebuffers(1, intArrayOf(bFbo), 0)
+            if (bTex != 0) GLES30.glDeleteTextures(1, intArrayOf(bTex), 0)
+            bFbo = 0; bTex = 0; bKare = 0
+        }
+
+        private fun birlestirAdim(b: BirlestirmeIstegi) {
+            val donuk = yanDurur()
+            val w = if (donuk) kaynakBoyut[1] else kaynakBoyut[0]; val h = if (donuk) kaynakBoyut[0] else kaynakBoyut[1]
+            if (bFbo == 0 || bW != w || bH != h) {
+                birlestirSil(); bW = w; bH = h; bBas = System.currentTimeMillis()
+                val f = IntArray(1); GLES30.glGenFramebuffers(1, f, 0); bFbo = f[0]
+                val uzanti = GLES30.glGetString(GLES30.GL_EXTENSIONS) ?: ""
+                var yuksek = "GL_EXT_color_buffer_half_float" in uzanti || "GL_EXT_color_buffer_float" in uzanti
+                bTex = dokuYap(w, h, yuksek)
+                GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, bFbo)
+                GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, bTex, 0)
+                if (yuksek && GLES30.glCheckFramebufferStatus(GLES30.GL_FRAMEBUFFER) != GLES30.GL_FRAMEBUFFER_COMPLETE) {
+                    GLES30.glDeleteTextures(1, intArrayOf(bTex), 0); yuksek = false; bTex = dokuYap(w, h, false)
+                    GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, bTex, 0)
+                }
+                GLES30.glViewport(0, 0, w, h); GLES30.glClearColor(0f, 0f, 0f, 0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+            }
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, bFbo)
+            GLES30.glUseProgram(program)
+            GLES30.glEnable(GLES30.GL_BLEND)
+            if (b.tur == Sahne.Birlestir.MAX) { GLES30.glBlendEquation(GLES30.GL_MAX); GLES30.glBlendFunc(GLES30.GL_ONE, GLES30.GL_ONE) }
+            else { GLES30.glBlendEquation(GLES30.GL_FUNC_ADD); GLES30.glBlendColor(0f, 0f, 0f, 1f / b.n); GLES30.glBlendFunc(GLES30.GL_CONSTANT_ALPHA, GLES30.GL_ONE) }
+            ciz(0, 0, w, h, w.toFloat(), h.toFloat(), ham = true, olcum = true, tam = true)
+            GLES30.glDisable(GLES30.GL_BLEND); GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
+            bKare++
+            val gecen = System.currentTimeMillis() - bBas
+            val bitti = if (b.tur == Sahne.Birlestir.ORT) bKare >= b.n else gecen >= b.sureMs
+            val oran = if (b.tur == Sahne.Birlestir.ORT) bKare.toFloat() / b.n else gecen.toFloat() / b.sureMs
+            post { b.ilerleme(oran.coerceIn(0f, 1f)) }
+            if (!bitti) { GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); return }
+            // Sonuç: 8 bitlik tampona kopya (kazanç uygulanır), oku, alt-üst çevir
+            if (kopyaProgram == 0) kopyaProgram = programYap(KOSE, KOPYA)
+            val cTex = dokuYap(w, h, false); val cf = IntArray(1); GLES30.glGenFramebuffers(1, cf, 0)
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, cf[0])
+            GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, cTex, 0)
+            GLES30.glViewport(0, 0, w, h)
+            GLES30.glUseProgram(kopyaProgram)
+            GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, bTex)
+            GLES30.glUniform1i(GLES30.glGetUniformLocation(kopyaProgram, "uDoku"), 0)
+            GLES30.glUniform1f(GLES30.glGetUniformLocation(kopyaProgram, "uKazanc"), b.kazanc)
+            val k = GLES30.glGetAttribLocation(kopyaProgram, "aKonum")
+            GLES30.glEnableVertexAttribArray(k); GLES30.glVertexAttribPointer(k, 2, GLES30.GL_FLOAT, false, 0, dortgen)
+            GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+            val tampon = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
+            GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, tampon)
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+            GLES30.glDeleteFramebuffers(1, cf, 0); GLES30.glDeleteTextures(1, intArrayOf(cTex), 0)
+            birlestirSil(); birlestirme = null
+            GLES30.glUseProgram(program)
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply { copyPixelsFromBuffer(tampon.position(0)) }
+            val dik = Bitmap.createBitmap(bmp, 0, 0, w, h, android.graphics.Matrix().apply { preScale(1f, -1f) }, false)
+            post { b.bitti(dik) }
+        }
 
         private fun lutYaz(l: Lut) {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_3D, lutTex)
@@ -124,6 +206,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
 
         override fun onDrawFrame(gl: GL10?) {
             bekleyenLut?.let { lutYaz(it); bekleyenLut = null }
+            val kareGeldi = yeniKare; yeniKare = false
             st?.let { it.updateTexImage(); it.getTransformMatrix(texMat)
                 val d = kotlin.math.abs(texMat[0]) < 0.5f; if (d != dokuDonuk) { dokuDonuk = d; post { requestLayout(); invalidate() } } }
             GLES30.glClearColor(0f, 0f, 0f, 1f)
@@ -149,6 +232,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
                 GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
                 olcumKaresi?.invoke(olcumTampon, OW, OH)
             }
+            if (kareGeldi) birlestirme?.let { runCatching { birlestirAdim(it) }.onFailure { e -> birlestirSil(); birlestirme = null; GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); HataKaydi.not("birlestir", e.stackTraceToString()); post { it.bitti(null) } } }
             ekranGoruntusuIste?.let { geri ->
                 ekranGoruntusuIste = null
                 val b = ByteBuffer.allocateDirect(gw * gh * 4).order(ByteOrder.nativeOrder())
@@ -220,6 +304,12 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
 in vec2 aKonum;
 out vec2 vUv;
 void main() { vUv = aKonum * 0.5 + 0.5; gl_Position = vec4(aKonum, 0.0, 1.0); }"""
+
+        const val KOPYA = """#version 300 es
+precision highp float;
+uniform sampler2D uDoku; uniform float uKazanc;
+in vec2 vUv; out vec4 renk;
+void main() { renk = vec4(clamp(texture(uDoku, vUv).rgb * uKazanc, 0.0, 1.0), 1.0); }"""
 
         // Araçlar sırası: dönüş/ayna/büyütme → kaynak → LUT → mono → false color | zebra | peaking → kılavuzlar
         const val PARCA = """#version 300 es

@@ -89,6 +89,22 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     val kayitta: Boolean get() = kaydedici != null
     private var hataGeri: (String) -> Unit = {}
 
+    /** Seçili sahne (Sahne.kt); ayarların üstüne uygulanır */
+    @Volatile var sahne = Sahne.KAPALI
+    /** Otomatik pozlamanın son ölçümü (sahne önerisi için): ISO ve pozlama süresi */
+    @Volatile var sonIso = 0; private set
+    @Volatile var sonPozNs = 0L; private set
+    private val olcumGeri = object : CameraCaptureSession.CaptureCallback() {
+        override fun onCaptureCompleted(ss: CameraCaptureSession, q: CaptureRequest, t: TotalCaptureResult) {
+            t.get(android.hardware.camera2.CaptureResult.SENSOR_SENSITIVITY)?.let { sonIso = it }
+            t.get(android.hardware.camera2.CaptureResult.SENSOR_EXPOSURE_TIME)?.let { sonPozNs = it }
+        }
+    }
+    private val sahneModlari: IntArray by lazy { oz.get(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES) ?: IntArray(0) }
+    fun sahneModuVar(m: Int) = m in sahneModlari
+    /** Telefon tek çekimde en az 4 sn pozlama verebiliyor mu (Samanyolu için) */
+    val uzunPozlamaVar: Boolean get() = yetenek.elleKontrol && (yetenek.pozlamaAralik?.upper ?: 0L) >= 4_000_000_000L
+
     /** Fotoğraf modu: oturuma JPEG (ve istenirse RAW/DNG) okuyucusu eklenir, önizleme fotoğrafın en/boy oranına geçer */
     @Volatile var fotoModu = false
     private var jpegOkuyucu: ImageReader? = null
@@ -204,6 +220,40 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         if (ayar.odakMesafe != null && yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, ayar.odakMesafe!!) }
         else r.set(CaptureRequest.CONTROL_AF_MODE, if (fotoModu) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
         r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (ayar.sabitleme && !foto) CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON else CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
+        sahneUygula(r, foto)
+    }
+
+    private fun evAdimi(ev: Float): Int { val adim = yetenek.evAdim.takeIf { it > 0f } ?: return 0; val a = yetenek.evAralik ?: return 0; return Math.round(ev / adim).coerceIn(a.lower, a.upper) }
+
+    /** Sahnenin ayarları: telefonun kendi sahne modu varsa o, yoksa karşılığı el ile */
+    private fun sahneUygula(r: CaptureRequest.Builder, foto: Boolean) {
+        fun mod(m: Int): Boolean { if (!sahneModuVar(m)) return false; r.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_USE_SCENE_MODE); r.set(CaptureRequest.CONTROL_SCENE_MODE, m); return true }
+        fun awb(m: Int) { if (m in yetenek.awbModlari) r.set(CaptureRequest.CONTROL_AWB_MODE, m) }
+        fun sonsuz() { if (yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0f) } }
+        when (sahne) {
+            Sahne.KAPALI -> {}
+            Sahne.GUN_BATIMI -> if (!mod(CameraMetadata.CONTROL_SCENE_MODE_SUNSET)) { awb(CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT); r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, evAdimi(-0.7f)) }
+            Sahne.SPOR -> if (!mod(CameraMetadata.CONTROL_SCENE_MODE_SPORTS)) {
+                // Sabit yüksek kare hızı: otomatik pozlama enstantaneyi kısa tutmak zorunda kalır
+                yetenek.fpsler.filter { it.lower == it.upper }.maxByOrNull { it.upper }?.let { if (!foto) r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) } }
+            Sahne.PORTRE -> { if (!mod(CameraMetadata.CONTROL_SCENE_MODE_PORTRAIT)) mod(CameraMetadata.CONTROL_SCENE_MODE_FACE_PRIORITY) }
+            Sahne.MANZARA -> mod(CameraMetadata.CONTROL_SCENE_MODE_LANDSCAPE)
+            Sahne.GECE -> mod(CameraMetadata.CONTROL_SCENE_MODE_NIGHT)
+            Sahne.ISIK_IZI -> r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, evAdimi(-0.3f))
+            Sahne.SAMANYOLU -> {
+                sonsuz(); awb(CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT) // ≈ 4000 K: gece göğü
+                if (foto && uzunPozlamaVar) {
+                    val poz = minOf(yetenek.pozlamaAralik!!.upper, 15_000_000_000L)
+                    r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
+                    r.set(CaptureRequest.SENSOR_SENSITIVITY, yetenek.isoAralik?.let { minOf(3200, it.upper) } ?: 1600)
+                    r.set(CaptureRequest.SENSOR_EXPOSURE_TIME, poz); r.set(CaptureRequest.SENSOR_FRAME_DURATION, poz)
+                } else {
+                    r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
+                    yetenek.evAralik?.let { r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, it.upper) }
+                    yetenek.fpsler.minByOrNull { it.lower }?.let { r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) } // karede en uzun pozlama
+                }
+            }
+        }
     }
 
     /**
@@ -254,7 +304,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             val r = c.createCaptureRequest(if (kaydedici != null) CameraDevice.TEMPLATE_RECORD else CameraDevice.TEMPLATE_PREVIEW)
             onizleme?.let { r.addTarget(it) }; kaydedici?.surface?.let { r.addTarget(it) }
             ayarUygula(r, foto = false)
-            s.setRepeatingRequest(r.build(), null, h)
+            s.setRepeatingRequest(r.build(), olcumGeri, h)
         } catch (e: Exception) { HataKaydi.not("kamera", "istek: " + e.stackTraceToString()) }
     }
 
