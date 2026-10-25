@@ -1,5 +1,5 @@
 # UPDATED Marka Kiti — Makine Sürümü
-Sürüm: 1.2 · Tarih: 2026-10-21 · Dil: tr
+Sürüm: 1.3 · Tarih: 2026-10-25 · Dil: tr
 Marka: UPDATED (updated.com.tr) — teknoloji haber ve içerik markası. Kanallar: web sitesi, Instagram, YouTube, bülten, stüdyo/yönetim paneli.
 
 Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel sayfalar ile çelişirse bu dosya ve `tokens.json` geçerlidir. Değerler `tokens.json` içinde makine okunur halde de vardır.
@@ -41,7 +41,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 | Açık Gri | #F2F2F2 | 242 242 242 | 0 0 0 5 | Cool Gray 1 C | Yüzey, ayırıcı |
 - Turuncu zeminde yazı daima siyah. Mavi zeminde yazı daima beyaz.
 - Arayüz nötrleri (yalnızca metin/çizgi): #171717 metin, #55585c ikincil metin, #6b6f74 yardımcı, #e2e2e2 çizgi.
-- Palet dışı renk eklenmez. Saydamlık ve gradyan yok.
+- Palet dışı renk eklenmez. Basılı ve sosyal medya grafiklerinde (Instagram, YouTube, bülten, logo) saydamlık ve gradyan yok; web sitesi ve Stüdyo arayüzünde 12c'deki cam görünüm serbest.
 - Kullanım oranı: beyaz + açık gri %60 · siyah %25 · mavi %12 · turuncu %3. Turuncu bir yüzeyde tek öğede.
 - Kontrast (WCAG): siyah/beyaz 21 · siyah/gri 18,8 · siyah/turuncu 7,4 · beyaz/mavi 5,2 · mavi/gri 4,6 → her yazı. Mavi/siyah 4,1 → yalnızca ≥24 px başlık. Beyaz/turuncu 2,9 · turuncu/mavi 1,8 · turuncu/beyaz 2,9 → yasak.
 - Mavi zemine turuncu etiket konmaz; beyaz etiket kullanılır.
@@ -65,7 +65,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 - Boşluk ölçeği (4 px taban): 4, 8, 12, 16, 24, 32, 48, 64, 96, 128. Ara değer yok.
 - Ekran gridi: masaüstü ≥1200 px 12 kolon, kenar 80, gutter 24, maks. içerik 1280 · tablet 768–1199 px 8 kolon, kenar 32, gutter 16 · mobil <768 px 4 kolon, kenar 16, gutter 16.
 - Haber metni en fazla 680 px (60–72 karakter).
-- Köşe yarıçapı 0 (istisna: mağazanın yuvarladığı app ikonu). Gölge yok. Çizgi 1 px ayırıcı, 3 px siyah vurgu.
+- Grafiklerde köşe yarıçapı 0 (istisna: mağazanın yuvarladığı app ikonu), gölge yok. Web sitesi ve Stüdyo arayüzü 12c'ye uyar. Çizgi 1 px ayırıcı, 3 px siyah vurgu.
 - Dokunma alanı en az 44 × 44 px. Görsel oranı: web ve YouTube 16:9 · Instagram gönderisi 4:5 · story ve reels 9:16 · profil 1:1. Başka oran yok.
 
 ## 6. Kanal güvenli alanları
@@ -143,6 +143,13 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 - Bildirim: başarı siyah zemin, mavi ✓, sol alt, 5 sn, "Geri al" · uyarı beyaz zemin 2 px turuncu çerçeve, kapatılana kadar kalır.
 - Boş durum: ne olduğu + ne yapılacağı + tek eylem.
 - Kırmızı/yeşil durum rengi eklenmez. Teknik hata kodu kullanıcıya gösterilmez. Geri alınamaz işlemde onay, geri alınabilirde "Geri al".
+
+## 12c. Arayüz görünümü: cam (web sitesi ve Stüdyo, 25 Ekim 2026)
+- Fatih ve Enes'in kararı: "köşe 0, gölge yok, saydamlık ve gradyan yok" kuralı web sitesi ve Stüdyo arayüzü için kaldırıldı. Grafikler (Instagram, YouTube, bülten, logo) için geçerliliği sürer.
+- Zemin: palet renklerinden yumuşak, bulanık renk geçişi (mavi ve turuncu lekeler, koyuda #121212 üstünde). Yüzeyler yarı saydam (yüzey rengi %86–88), arkası bulanık (blur 24–28 px), 1 px ince çizgi, üstte ince ışık çizgisi, yumuşak gölge.
+- Köşe: kart 14 px, büyük panel 26 px, buton ve sekme 9–12 px, rozet ve etiket tam yuvarlak.
+- Performans: bulanıklık yalnız sabit/üst katmanlarda (üst menü, alt çubuk, açılır pencere); uzun listelerdeki kartlarda bulanıklık yerine yarı saydam düz renk.
+- Renk, tipografi, kontrast ve erişilebilirlik kuralları aynen geçerli.
 
 ## 12b. Panel koyu mod
 - Seçim: Ayarlar › Görünüm: Sistem (varsayılan) / Açık / Koyu; kullanıcı hesabına kaydedilir. Yeni renk yok; katmanlar gölgeyle değil ton farkıyla ayrılır.
