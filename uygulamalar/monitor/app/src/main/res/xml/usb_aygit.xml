@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UVC (görüntü sınıfı) aygıt takılınca uygulama önerilir: HDMI→USB çeviriciler -->
+<resources><usb-device class="14" /><usb-device class="239" subclass="2" protocol="1" /></resources>
