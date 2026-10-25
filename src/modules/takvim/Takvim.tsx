@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BUGUN, GUN, D, ekle, iso, kalan, kisaY, saatMetni, uzun } from "../../shared/tarih";
 import { useVeri } from "../../shared/veri";
+import Abonelik from "./Abonelik";
 import { adOf } from "../ekip/ortak";
 import "./takvim.css";
 
@@ -82,6 +83,7 @@ export default function Takvim() {
           </div>
         )) : <div className="muted">Etkinlik eklenmedi.</div>}
       </div></div>
+      <Abonelik />
     </>
   );
 }
