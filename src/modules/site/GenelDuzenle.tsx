@@ -11,6 +11,7 @@ import CanliOnizleme, { useCanliAcik } from "./CanliOnizleme";
 import ApiAnahtari from "./ApiAnahtari";
 import GorselDuzen from "./GorselDuzen";
 import { KayitCtx } from "./baglam";
+import KunyeDoldur from "./KunyeDoldur";
 
 const ONIZLEMELI = new Set(["news", "reviews", "comparisons"]); // sitenin önizleme sayfası olan bölümler
 
@@ -171,6 +172,7 @@ export default function GenelDuzenle({ hedef, kullanici, kapat, ac }: { hedef: H
       {medya?.url && (id
         ? <GorselDuzen yol={yol} m={kayit} degisti={(d) => { setKayit(d); setSurum((x) => x + 1); kilit.tazele(); }} />
         : <img className="site-medya-buyuk" src={api.medyaAdres(medya.sizes?.card?.url || medya.url)} alt={medya.alt ?? ""} />)}
+      {k?.slug === "products" && !kilitli && <KunyeDoldur kayit={kayit} uygula={(specs) => { set({ ...kayit, specs }); setSurum((x) => x + 1); }} />}
       <KayitCtx.Provider value={{ id }}>
       <div className={canli ? "site-canli-duzen" : "site-canli-yok"}>
       <div className={yan.length ? "site-izgara" : ""} key={surum}>

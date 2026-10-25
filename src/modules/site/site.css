@@ -154,3 +154,8 @@
 .site-toplu-yukle-satir { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: start; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .site-toplu-yukle-satir img { width: 120px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; }
 @media (max-width: 560px) { .site-toplu-yukle-satir { grid-template-columns: minmax(0, 1fr); } }
+/* Künye: kaynaktan doldur */
+.kd-tablo { overflow-x: auto; }
+.kd-tablo table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.kd-tablo th, .kd-tablo td { text-align: left; padding: 8px; border-top: 1px solid var(--line); vertical-align: top; }
+.kd-kanit { font-size: 12px; max-width: 320px; }
