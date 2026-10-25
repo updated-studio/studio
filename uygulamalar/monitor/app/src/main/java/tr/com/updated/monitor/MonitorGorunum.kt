@@ -41,6 +41,15 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     fun lutYukle(lut: Lut) { bekleyenLut = lut; ayarlar.lutAcik = true; requestRender() }
     fun ekranGoruntusu(geri: (Bitmap) -> Unit) { ekranGoruntusuIste = geri; requestRender() }
     fun yenile() = requestRender()
+    /** Görüntünün bölme içindeki alanı (kenar boşlukları hariç; kompozisyon kılavuzu bunun üstüne çizilir) */
+    fun goruntuAlani(): android.graphics.RectF {
+        val a = ayarlar; val donuk = a.dondur % 180 != 0
+        val kw = (if (donuk) kaynakBoyut[1] else kaynakBoyut[0]).toFloat() * a.desqueeze
+        val kh = (if (donuk) kaynakBoyut[0] else kaynakBoyut[1]).toFloat()
+        val w = width.toFloat(); val h = height.toFloat(); val oran = kw / kh
+        return if (w / h > oran) { val vw = h * oran; android.graphics.RectF((w - vw) / 2, 0f, (w + vw) / 2, h) } else { val vh = w / oran; android.graphics.RectF(0f, (h - vh) / 2, w, (h + vh) / 2) }
+    }
+
     /** Kaynağın boyutu belli olunca: oran ve tampon boyutu (kamera bu boyutta yazar) */
     fun tampon(w: Int, h: Int) { kaynakBoyut = intArrayOf(w, h); yuzeyDokusu?.setDefaultBufferSize(w, h); requestRender() }
     @Volatile private var yuzeyDokusu: SurfaceTexture? = null

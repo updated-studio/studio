@@ -52,7 +52,7 @@ import kotlin.math.max
  */
 class MainActivity : Activity() {
     enum class Kip(val ad: String) { TEK("Tek ekran"), OLCUM("Görüntü + ölçümler"), KARSILASTIR("LUT karşılaştırma"), IKI("İki kaynak") }
-    enum class Sekme(val ad: String) { KAYIT("KAYIT"), MONITOR("MONİTÖR"), KILAVUZ("KILAVUZ"), LUT("LUT"), OLCUM("ÖLÇÜM"), SES("SES"), KAYNAK("KAYNAK"), KURULUM("KURULUM") }
+    enum class Sekme(val ad: String) { KAYIT("KAYIT"), MONITOR("MONİTÖR"), KOMPOZISYON("KOMPOZİSYON"), KILAVUZ("KILAVUZ"), LUT("LUT"), OLCUM("ÖLÇÜM"), SES("SES"), KAYNAK("KAYNAK"), KURULUM("KURULUM") }
     enum class Param { FPS, ENSTANTANE, DIYAFRAM, ISO, WB, EV, ODAK }
 
     // Renkler (Blackmagic düzeni: siyah şeritler, gri etiket, beyaz değer, kırmızı kayıt)
@@ -79,6 +79,23 @@ class MainActivity : Activity() {
     private var kayitBas = 0L; private var kayitUri: Uri? = null; private var sonUri: Uri? = null
     private var acikParam: Param? = null
     private var onde = false
+    // Kompozisyon (Fatih'in fikri): kılavuz, akıllı yardımcı (konu algılama + ibre), terazi, öneri
+    private val kompler = arrayOfNulls<KompozisyonGorunum>(2)
+    private val oneriCip = arrayOfNulls<TextView>(2)
+    private var kompTur = KompTur.KAPALI; private var kompYon = 0; private var sonKomp = KompTur.SPIRAL
+    private var asistanAcik = false; private var teraziAcik = false; private var oneriAcik = true
+    private var asistan: Asistan? = null
+    private var sonOneri: Pair<KompTur, Int>? = null
+    private val sensorler by lazy { getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager }
+    private val teraziDinle = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(e: android.hardware.SensorEvent) {
+            @Suppress("DEPRECATION") val don = windowManager.defaultDisplay.rotation
+            val (x, y) = e.values[0] to e.values[1]
+            val aci = Math.toDegrees(if (don == android.view.Surface.ROTATION_270) kotlin.math.atan2(-y.toDouble(), -x.toDouble()) else kotlin.math.atan2(y.toDouble(), x.toDouble())).toFloat()
+            kompler[etkin]?.egim = if (teraziAcik) aci else null
+        }
+        override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
+    }
     private val bekleyenAcma = booleanArrayOf(false, false)
     private var bekleyenKamera: Pair<Int, Pair<String, String>>? = null
     private val tercih by lazy { getSharedPreferences("monitor", MODE_PRIVATE) }
@@ -96,6 +113,9 @@ class MainActivity : Activity() {
         kip = runCatching { Kip.valueOf(tercih.getString("kip", "TEK")!!) }.getOrDefault(Kip.TEK)
         koseHisto = tercih.getBoolean("koseHisto", true); parlaklikTam = tercih.getBoolean("parlaklik", false); sesGosterge = tercih.getBoolean("sesGosterge", true)
         hevc = tercih.getBoolean("hevc", true); mbps = tercih.getInt("mbps", 50); sesKayit = tercih.getBoolean("sesKayit", true)
+        kompTur = runCatching { KompTur.valueOf(tercih.getString("komp", "KAPALI")!!) }.getOrDefault(KompTur.KAPALI); kompYon = tercih.getInt("kompYon", 0)
+        sonKomp = runCatching { KompTur.valueOf(tercih.getString("sonKomp", "SPIRAL")!!) }.getOrDefault(KompTur.SPIRAL)
+        asistanAcik = tercih.getBoolean("asistan", false); teraziAcik = tercih.getBoolean("terazi", false); oneriAcik = tercih.getBoolean("oneri", true)
 
         val kok = FrameLayout(this).apply { setBackgroundColor(SIYAH) }
         val dikey = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -153,8 +173,35 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Yardımcıdan gelen konu: katmana, öneriye */
+    private fun asistanSonuc(r: android.graphics.RectF?, ad: String) {
+        val kk = kompler[etkin] ?: return
+        kk.konu = r; kk.konuAdi = ad
+        if (kompTur == KompTur.KAPALI && r != null) { kompTur = sonKomp; kompUygula() } // yardımcı açıkken bir kılavuz gerekir
+        val cip = oneriCip[etkin] ?: return
+        val o = if (oneriAcik) kompozisyonOner(r, kompTur, kk.goruntuOrani()) else null
+        sonOneri = o
+        if (o == null || kk.hizalama > 0.85f) cip.visibility = View.GONE
+        else { cip.text = "ÖNERİ: ${o.first.ad}  ›  UYGULA"; cip.visibility = View.VISIBLE }
+    }
+
+    private fun kompUygula() {
+        kompler.forEach { it?.apply { tur = kompTur; yon = kompYon; asistan = asistanAcik } }
+        tercih.edit().putString("komp", kompTur.name).putInt("kompYon", kompYon).putString("sonKomp", sonKomp.name).putBoolean("asistan", asistanAcik).putBoolean("terazi", teraziAcik).putBoolean("oneri", oneriAcik).apply()
+        teraziKaydi(); olcumBagla()
+        if (this::alt.isInitialized) altCiz()
+    }
+
+    private fun teraziKaydi() {
+        sensorler.unregisterListener(teraziDinle)
+        if (teraziAcik && onde) sensorler.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY)?.let { sensorler.registerListener(teraziDinle, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
+        if (!teraziAcik) kompler.forEach { it?.egim = null }
+    }
+
     private fun olcumBagla() {
-        monitorler.forEachIndexed { i, m -> m?.olcumKaresi = if (i == etkin && (olcum != null || koseHisto)) { buf, w, h -> olcum?.kare(buf, w, h); if (koseHisto) kose.kare(buf, w, h) } else null }
+        if (asistanAcik && asistan == null) asistan = Asistan { r, ad -> runOnUiThread { asistanSonuc(r, ad) } }
+        if (!asistanAcik) { asistan?.kapat(); asistan = null; kompler.forEach { it?.konu = null }; oneriCip.forEach { it?.visibility = View.GONE } }
+        monitorler.forEachIndexed { i, m -> m?.olcumKaresi = if (i == etkin && (olcum != null || koseHisto || asistanAcik)) { buf, w, h -> olcum?.kare(buf, w, h); if (koseHisto) kose.kare(buf, w, h); if (ayarlar[i].zoom == 1f) asistan?.kare(buf, w, h) } else null }
         if (this::kose.isInitialized) kose.visibility = if (koseHisto) View.VISIBLE else View.INVISIBLE
     }
 
@@ -163,6 +210,13 @@ class MainActivity : Activity() {
         monitorler[i] = m; sonYuzey[i] = null; acici[i] = null
         m.yuzeyHazir = { y -> sonYuzey[i] = y; acici[i]?.invoke() }
         val kutu = FrameLayout(this); kutu.addView(m, FrameLayout.LayoutParams(-1, -1))
+        val kk = KompozisyonGorunum(this) { m.goruntuAlani() }.also { it.tur = kompTur; it.yon = kompYon; it.asistan = asistanAcik }
+        kompler[i] = kk
+        kutu.addView(kk, FrameLayout.LayoutParams(-1, -1))
+        val cip = TextView(this).apply { visibility = View.GONE; textSize = 13f; typeface = dar; setTextColor(Color.BLACK); setPadding(dp(14f), dp(8f), dp(14f), dp(8f)); background = Tema.kapsul(SARI, dp(16f).toFloat())
+            setOnClickListener { sonOneri?.let { (t, y) -> kompTur = t; kompYon = y; sonKomp = t; kompUygula(); visibility = View.GONE } } }
+        oneriCip[i] = cip
+        kutu.addView(cip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(10f) })
         m.setOnClickListener {
             when {
                 serit.visibility == View.VISIBLE -> seritKapat()
@@ -316,6 +370,9 @@ class MainActivity : Activity() {
         c("FALSE", a.falseColor) { a.falseColor = !a.falseColor }
         c(if (a.lutAcik) "LUT ✓" else "LUT", a.lutAcik) { if (a.lutAdi.isEmpty()) panelAc(Sekme.LUT) else a.lutAcik = !a.lutAcik }
         c("KILAVUZ", a.kilavuz > 0f || a.izgara) { if (a.kilavuz > 0f || a.izgara) { a.kilavuz = 0f; a.izgara = false } else a.kilavuz = 2.39f }
+        c(if (kompTur == KompTur.KAPALI) "KOMPOZİSYON" else kompTur.ad.uppercase(Locale("tr")), kompTur != KompTur.KAPALI) { if (kompTur == KompTur.KAPALI) kompTur = sonKomp else { sonKomp = kompTur; kompTur = KompTur.KAPALI }; kompUygula() }
+        c("YARDIMCI", asistanAcik) { asistanAcik = !asistanAcik; kompUygula() }
+        c("TERAZİ", teraziAcik) { teraziAcik = !teraziAcik; kompUygula() }
         alt.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(orta) }, LinearLayout.LayoutParams(0, -2, 1f))
         ses = SesGostergesi(this).apply { visibility = if (sesGosterge) View.VISIBLE else View.INVISIBLE }
         alt.addView(ses, LinearLayout.LayoutParams(dp(170f), dp(44f)).apply { marginStart = dp(10f) })
@@ -417,6 +474,15 @@ class MainActivity : Activity() {
                 anahtar(ic, "SİYAH-BEYAZ", a.monokrom) { a.monokrom = it }
                 anahtar(ic, "TEMİZ GÖRÜNTÜ", a.temiz) { a.temiz = it }
                 secenek(ic, "BÜYÜTME", listOf("1x", "2x", "4x"), when (a.zoom) { 2f -> 1; 4f -> 2; else -> 0 }) { a.zoom = floatArrayOf(1f, 2f, 4f)[it] }
+            }
+            Sekme.KOMPOZISYON -> {
+                secenek(ic, "KOMPOZİSYON KILAVUZU", KompTur.values().map { it.ad }, kompTur.ordinal) { kompTur = KompTur.values()[it]; if (kompTur != KompTur.KAPALI) sonKomp = kompTur; kompUygula() }
+                if (kompTur == KompTur.SPIRAL || kompTur == KompTur.UCGEN) secenek(ic, "YÖN", listOf("Sağ alt", "Sol alt", "Sağ üst", "Sol üst"), kompYon) { kompYon = it; kompUygula() }
+                anahtar(ic, "AKILLI YARDIMCI", asistanAcik) { asistanAcik = it; kompUygula() }
+                aciklama(ic, "Yardımcı yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca ibre yeşile döner. Telefonun içinde çalışır, internet gerekmez.")
+                anahtar(ic, "KOMPOZİSYON ÖNERİSİ", oneriAcik) { oneriAcik = it; kompUygula() }
+                aciklama(ic, "Konuya en az hareketle uyan kılavuzu üstte önerir; dokununca uygulanır.")
+                anahtar(ic, "TERAZİ (UFUK)", teraziAcik) { teraziAcik = it; kompUygula() }
             }
             Sekme.KILAVUZ -> {
                 val oran = floatArrayOf(0f, 2.39f, 2.35f, 2f, 1.85f, 16f / 9f, 4f / 3f, 0.8f, 9f / 16f, 1f)
@@ -643,13 +709,13 @@ class MainActivity : Activity() {
         when { panel.visibility == View.VISIBLE -> panelKapat(); serit.visibility == View.VISIBLE -> seritKapat(); else -> @Suppress("DEPRECATION") super.onBackPressed() }
     }
     override fun onResume() {
-        super.onResume(); onde = true; tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat()
+        super.onResume(); onde = true; teraziKaydi(); tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat()
         for (i in 0..1) if (bekleyenAcma[i]) { bekleyenAcma[i] = false; if (sonYuzey[i] != null) acici[i]?.invoke() }
     }
     override fun onPause() {
-        super.onPause(); onde = false
+        super.onPause(); onde = false; sensorler.unregisterListener(teraziDinle)
         if (kamera()?.kayitta == true) kayitDugmesi() // arka plana geçerken kayıt güvenle kapanır
         sesOlcer.durdur(); monitorler.forEach { it?.onPause() }
     }
-    override fun onDestroy() { super.onDestroy(); dongu.removeCallbacksAndMessages(null); sesOlcer.durdur(); kaynaklar.forEach { it?.durdur() } }
+    override fun onDestroy() { super.onDestroy(); asistan?.kapat(); dongu.removeCallbacksAndMessages(null); sesOlcer.durdur(); kaynaklar.forEach { it?.durdur() } }
 }
