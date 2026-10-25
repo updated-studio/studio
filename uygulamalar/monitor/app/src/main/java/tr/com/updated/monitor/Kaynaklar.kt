@@ -2,6 +2,7 @@ package tr.com.updated.monitor
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
@@ -9,6 +10,11 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.DngCreator
+import android.hardware.camera2.TotalCaptureResult
+import android.media.ExifInterface
+import android.media.Image
+import android.media.ImageReader
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Handler
@@ -17,6 +23,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Range
 import android.util.Size
 import android.view.Surface
+import java.io.OutputStream
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -56,6 +63,7 @@ data class KameraAyari(
     var boyut: Size? = null, var fps: Range<Int>? = null,
     var iso: Int? = null, var pozlamaNs: Long? = null, var ev: Int = 0,
     var awb: Int = CameraMetadata.CONTROL_AWB_MODE_AUTO, var odakMesafe: Float? = null, var sabitleme: Boolean = true,
+    var fotoBoyut: Size? = null, var raw: Boolean = false,
 )
 
 /** Kameranın yetenekleri (ayar listeleri buradan çizilir) */
@@ -81,6 +89,21 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     val kayitta: Boolean get() = kaydedici != null
     private var hataGeri: (String) -> Unit = {}
 
+    /** Fotoğraf modu: oturuma JPEG (ve istenirse RAW/DNG) okuyucusu eklenir, önizleme fotoğrafın en/boy oranına geçer */
+    @Volatile var fotoModu = false
+    private var jpegOkuyucu: ImageReader? = null
+    private var rawOkuyucu: ImageReader? = null
+    private var rawDustu = false // bu telefonda RAW + JPEG + önizleme birlikte kurulamadı
+    private var cekiliyor = false
+    private val harita get() = oz.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+    val fotoBoyutlari: List<Size> by lazy { harita?.getOutputSizes(ImageFormat.JPEG)?.sortedByDescending { it.width * it.height }.orEmpty() }
+    val rawVar: Boolean by lazy {
+        CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_RAW in (oz.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)) &&
+            harita?.getOutputSizes(ImageFormat.RAW_SENSOR)?.isNotEmpty() == true
+    }
+    val rawAcik: Boolean get() = rawOkuyucu != null
+    fun secilenFotoBoyut(): Size? = ayar.fotoBoyut?.takeIf { it in fotoBoyutlari } ?: fotoBoyutlari.firstOrNull()
+
     val yetenek: KameraYetenek by lazy {
         val harita = oz.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
         val boyutlar = harita?.getOutputSizes(SurfaceTexture::class.java)?.sortedByDescending { it.width * it.height }.orEmpty()
@@ -94,8 +117,14 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     }
 
     /** Varsayılan boyut: 1080p'yi geçmeyen en büyük 16:9 (yoksa en büyük) */
-    fun secilenBoyut(): Size = ayar.boyut ?: yetenek.boyutlar.filter { it.width <= 1920 && it.height <= 1080 && kotlin.math.abs(it.width * 9 - it.height * 16) < it.width / 10 }.maxByOrNull { it.width * it.height }
+    fun secilenBoyut(): Size = (if (fotoModu) fotoOnizleme() else ayar.boyut) ?: yetenek.boyutlar.filter { it.width <= 1920 && it.height <= 1080 && kotlin.math.abs(it.width * 9 - it.height * 16) < it.width / 10 }.maxByOrNull { it.width * it.height }
         ?: yetenek.boyutlar.filter { it.width <= 1920 }.maxByOrNull { it.width * it.height } ?: Size(1920, 1080)
+
+    /** Fotoğrafla aynı en/boy oranında, 1080p'yi geçmeyen en büyük önizleme */
+    private fun fotoOnizleme(): Size? {
+        val f = secilenFotoBoyut() ?: return null
+        return yetenek.boyutlar.filter { it.width <= 1920 && it.height <= 1440 && kotlin.math.abs(it.width.toLong() * f.height - it.height.toLong() * f.width) < it.width.toLong() * f.height / 50 }.maxByOrNull { it.width * it.height }
+    }
 
     @SuppressLint("MissingPermission")
     override fun baslat(yuzey: Surface, boyut: (Int, Int) -> Unit, hata: (String) -> Unit) {
@@ -126,15 +155,96 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
 
     private fun oturumKur() {
         val c = cihaz ?: return
-        val hedefler = listOfNotNull(onizleme, kaydedici?.surface)
-        runCatching { oturum?.close() }
+        runCatching { oturum?.close() }; oturum = null
+        okuyuculariKur()
+        val hedefler = listOfNotNull(onizleme, kaydedici?.surface, jpegOkuyucu?.surface, rawOkuyucu?.surface)
         try {
             @Suppress("DEPRECATION")
             c.createCaptureSession(hedefler, object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(s: CameraCaptureSession) { oturum = s; istekGonder(); if (kaydedici != null) runCatching { kaydedici?.start() }.onFailure { hataGeri("Kayıt başlatılamadı: ${it.message}"); HataKaydi.not("kayit", it.stackTraceToString()); kayitBirak() } }
-                override fun onConfigureFailed(s: CameraCaptureSession) { hataGeri("Görüntü oturumu kurulamadı (bu çözünürlük/kare hızı desteklenmiyor olabilir)."); HataKaydi.not("kamera", "onConfigureFailed $ad ${secilenBoyut()} ${ayar.fps}") }
+                override fun onConfigureFailed(s: CameraCaptureSession) {
+                    if (rawOkuyucu != null) { rawDustu = true; runCatching { rawOkuyucu?.close() }; rawOkuyucu = null; hataGeri("Bu kamera RAW'ı önizlemeyle birlikte veremiyor; yalnız JPEG çekilecek."); oturumKur(); return }
+                    hataGeri("Görüntü oturumu kurulamadı (bu çözünürlük/kare hızı desteklenmiyor olabilir)."); HataKaydi.not("kamera", "onConfigureFailed $ad ${secilenBoyut()} ${ayar.fps}") }
             }, h)
         } catch (e: Exception) { hataGeri(e.message ?: "Oturum kurulamadı"); HataKaydi.not("kamera", e.stackTraceToString()) }
+    }
+
+    private fun okuyuculariKur() {
+        val foto = fotoModu && kaydedici == null
+        val fb = if (foto) secilenFotoBoyut() else null
+        if (fb == null || jpegOkuyucu?.let { it.width != fb.width || it.height != fb.height } == true) { runCatching { jpegOkuyucu?.close() }; jpegOkuyucu = null }
+        if (fb != null && jpegOkuyucu == null) jpegOkuyucu = ImageReader.newInstance(fb.width, fb.height, ImageFormat.JPEG, 2)
+        val rawIste = foto && ayar.raw && rawVar && !rawDustu
+        if (!rawIste) { runCatching { rawOkuyucu?.close() }; rawOkuyucu = null }
+        else if (rawOkuyucu == null) harita?.getOutputSizes(ImageFormat.RAW_SENSOR)?.maxByOrNull { it.width * it.height }?.let { rawOkuyucu = ImageReader.newInstance(it.width, it.height, ImageFormat.RAW_SENSOR, 2) }
+    }
+
+    /** Fotoğraf/video modu değişince oturum yeniden kurulur (kayıt sırasında değişmez) */
+    fun modDegistir(foto: Boolean, boyut: (Int, Int) -> Unit) { if (kayitta) return; fotoModu = foto; oturumYenile(boyut) }
+
+    /** Telefonun o anki tutuluşuna göre fotoğrafın/videonun dik görünmesi için gereken açı */
+    fun cikisYonu(): Int = if (haricimi) 0 else if (onKamera) (sensorYonu + ekranYonu) % 360 else (sensorYonu - ekranYonu + 360) % 360
+
+    /** Ayarları (pozlama, ISO, beyaz dengesi, odak, sabitleme) bir isteğe uygular */
+    private fun ayarUygula(r: CaptureRequest.Builder, foto: Boolean) {
+        ayar.fps?.let { if (!foto) r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+        val elle = ayar.iso != null || ayar.pozlamaNs != null
+        if (elle && yetenek.elleKontrol) {
+            r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
+            r.set(CaptureRequest.SENSOR_SENSITIVITY, ayar.iso ?: yetenek.isoAralik?.lower?.coerceAtLeast(100) ?: 100)
+            val poz = ayar.pozlamaNs ?: 1_000_000_000L / 50
+            r.set(CaptureRequest.SENSOR_EXPOSURE_TIME, poz)
+            if (foto) r.set(CaptureRequest.SENSOR_FRAME_DURATION, poz) // uzun pozlama: kare süresi pozlama kadar
+            else ayar.fps?.let { r.set(CaptureRequest.SENSOR_FRAME_DURATION, maxOf(poz, 1_000_000_000L / it.upper)) }
+        } else {
+            r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
+            r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, ayar.ev)
+        }
+        r.set(CaptureRequest.CONTROL_AWB_MODE, ayar.awb)
+        if (ayar.odakMesafe != null && yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, ayar.odakMesafe!!) }
+        else r.set(CaptureRequest.CONTROL_AF_MODE, if (fotoModu) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+        r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (ayar.sabitleme && !foto) CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON else CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
+    }
+
+    /**
+     * Fotoğraf çeker: JPEG (ve RAW açıksa DNG). `kaydet(dosyaAdı, mime, yaz)` dosyayı galeriye yazar, başarıyı döndürür.
+     * `sonuc` her dosya yazıldıktan sonra bir kez çağrılır: hata yoksa null.
+     */
+    fun fotoCek(kaydet: (String, String, (OutputStream) -> Unit) -> Boolean, sonuc: (String?) -> Unit) {
+        h.post {
+            val c = cihaz; val s = oturum; val jr = jpegOkuyucu
+            if (c == null || s == null || jr == null) { sonuc("Kamera fotoğrafa hazır değil."); return@post }
+            if (cekiliyor) return@post
+            cekiliyor = true
+            val ad = "UPDATED_" + java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
+            val rr = rawOkuyucu; val yon = cikisYonu()
+            var bekleyen = if (rr != null) 2 else 1; var hata: String? = null
+            fun bitti(e: String?) { if (e != null && hata == null) hata = e; if (--bekleyen == 0) { cekiliyor = false; sonuc(hata) } }
+            jr.setOnImageAvailableListener({ r ->
+                val img = runCatching { r.acquireNextImage() }.getOrNull() ?: return@setOnImageAvailableListener
+                try { val buf = img.planes[0].buffer; val b = ByteArray(buf.remaining()); buf.get(b); bitti(if (kaydet("$ad.jpg", "image/jpeg") { it.write(b) }) null else "JPEG kaydedilemedi.") }
+                catch (e: Exception) { bitti("JPEG: ${e.message}") } finally { img.close() }
+            }, h)
+            var meta: TotalCaptureResult? = null; var rawImg: Image? = null
+            fun dng() {
+                val m = meta ?: return; val im = rawImg ?: return; rawImg = null
+                try {
+                    val d = DngCreator(oz, m).setOrientation(when (yon) { 90 -> ExifInterface.ORIENTATION_ROTATE_90; 180 -> ExifInterface.ORIENTATION_ROTATE_180; 270 -> ExifInterface.ORIENTATION_ROTATE_270; else -> ExifInterface.ORIENTATION_NORMAL })
+                    val ok = kaydet("$ad.dng", "image/x-adobe-dng") { d.writeImage(it, im) }; d.close(); bitti(if (ok) null else "RAW kaydedilemedi.")
+                } catch (e: Exception) { bitti("RAW: ${e.message}"); HataKaydi.not("foto", e.stackTraceToString()) } finally { im.close() }
+            }
+            rr?.setOnImageAvailableListener({ r -> rawImg = runCatching { r.acquireNextImage() }.getOrNull(); dng() }, h)
+            try {
+                val r = c.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                r.addTarget(jr.surface); rr?.let { r.addTarget(it.surface) }; onizleme?.let { r.addTarget(it) }
+                ayarUygula(r, foto = true)
+                r.set(CaptureRequest.JPEG_ORIENTATION, yon); r.set(CaptureRequest.JPEG_QUALITY, 95.toByte())
+                s.capture(r.build(), object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureCompleted(ss: CameraCaptureSession, q: CaptureRequest, t: TotalCaptureResult) { meta = t; if (rr != null) dng() }
+                    override fun onCaptureFailed(ss: CameraCaptureSession, q: CaptureRequest, f: android.hardware.camera2.CaptureFailure) { bekleyen = 1; bitti("Çekim başarısız oldu.") }
+                }, h)
+            } catch (e: Exception) { cekiliyor = false; sonuc(e.message ?: "Çekim başarısız."); HataKaydi.not("foto", e.stackTraceToString()) }
+        }
     }
 
     /** El ile ayarları uygular (oturumu kapatmadan) */
@@ -143,21 +253,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         try {
             val r = c.createCaptureRequest(if (kaydedici != null) CameraDevice.TEMPLATE_RECORD else CameraDevice.TEMPLATE_PREVIEW)
             onizleme?.let { r.addTarget(it) }; kaydedici?.surface?.let { r.addTarget(it) }
-            ayar.fps?.let { r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
-            val elle = ayar.iso != null || ayar.pozlamaNs != null
-            if (elle && yetenek.elleKontrol) {
-                r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
-                r.set(CaptureRequest.SENSOR_SENSITIVITY, ayar.iso ?: yetenek.isoAralik?.lower?.coerceAtLeast(100) ?: 100)
-                r.set(CaptureRequest.SENSOR_EXPOSURE_TIME, ayar.pozlamaNs ?: 1_000_000_000L / 50)
-                ayar.fps?.let { r.set(CaptureRequest.SENSOR_FRAME_DURATION, 1_000_000_000L / it.upper) }
-            } else {
-                r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
-                r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, ayar.ev)
-            }
-            r.set(CaptureRequest.CONTROL_AWB_MODE, ayar.awb)
-            if (ayar.odakMesafe != null && yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, ayar.odakMesafe!!) }
-            else r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
-            r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (ayar.sabitleme) CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON else CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
+            ayarUygula(r, foto = false)
             s.setRepeatingRequest(r.build(), null, h)
         } catch (e: Exception) { HataKaydi.not("kamera", "istek: " + e.stackTraceToString()) }
     }
@@ -181,7 +277,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                 m.setVideoSize(b.width, b.height); m.setVideoFrameRate(fps); m.setVideoEncodingBitRate(mbps * 1_000_000)
                 if (ses) { m.setAudioEncoder(MediaRecorder.AudioEncoder.AAC); m.setAudioSamplingRate(48000); m.setAudioEncodingBitRate(192_000); m.setAudioChannels(2) }
                 // Oynatıcı videoyu, telefon kayıt anında nasıl tutulduysa öyle dik göstersin
-                if (!haricimi) m.setOrientationHint(if (onKamera) (sensorYonu + ekranYonu) % 360 else (sensorYonu - ekranYonu + 360) % 360)
+                m.setOrientationHint(cikisYonu())
                 m.prepare()
                 kaydedici = m; kayitDosyasi = dosya
                 oturumKur() // kayıt yüzeyiyle; başlat onConfigured'da
@@ -210,6 +306,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         h.post {
             runCatching { kaydedici?.stop() }; kayitBirak()
             runCatching { oturum?.close() }; runCatching { cihaz?.close() }; oturum = null; cihaz = null
+            runCatching { jpegOkuyucu?.close() }; runCatching { rawOkuyucu?.close() }; jpegOkuyucu = null; rawOkuyucu = null
             is_.quitSafely(); bitti()
         }
     }
