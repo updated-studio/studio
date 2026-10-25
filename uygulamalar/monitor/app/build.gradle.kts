@@ -13,10 +13,10 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "tr.com.updated.monitor"
-        minSdk = 28            // Android 9: GLES 3, Camera2 harici kamera (UVC) Android 14+ cihazlarda
+        minSdk = 29            // Android 10: GLES 3, MediaStore klasörleri; Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
     // İmza anahtarı yalnız sunucuda (/opt/updated/monitor-imza, depoya girmez). Aynı anahtar = sonraki sürümler güncelleme olarak kurulur.
     signingConfigs {

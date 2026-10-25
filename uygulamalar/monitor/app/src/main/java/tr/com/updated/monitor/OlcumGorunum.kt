@@ -37,9 +37,9 @@ class OlcumGorunum(context: Context) : View(context) {
     fun kare(b: ByteBuffer, w: Int, h: Int) {
         if (!mesgul.compareAndSet(false, true)) return
         val kopya = ByteArray(w * h * 4); b.position(0); b.get(kopya)
-        is_.execute {
-            try { bitmapler = hesapla(kopya, w, h); postInvalidate() } finally { mesgul.set(false) }
-        }
+        try {
+            is_.execute { try { bitmapler = hesapla(kopya, w, h); postInvalidate() } catch (_: Throwable) {} finally { mesgul.set(false) } }
+        } catch (_: java.util.concurrent.RejectedExecutionException) { mesgul.set(false) } // görünüm kaldırıldı
     }
 
     private fun hesapla(p: ByteArray, w: Int, h: Int): Map<Tur, Bitmap> {
