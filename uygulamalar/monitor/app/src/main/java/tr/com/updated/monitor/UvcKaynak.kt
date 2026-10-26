@@ -35,8 +35,12 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice) : Kaynak {
                 if (bitti || d.deviceName != aygit.deviceName) return
                 h.post {
                     try {
+                        // Bazı telefonlarda çekirdeğin kendi UVC sürücüsü aygıtı tutar (libusb "meşgul" -6 der). Android'in
+                        // claimInterface(zorla) çağrısı o sürücüyü ayırır; bırakınca arayüz bize kalır.
+                        surucuyuAyir(blok)
                         val k = UVCCamera(UVCParam())
-                        val r = k.open(blok)
+                        var r = k.open(blok)
+                        if (r == -6) { Thread.sleep(500); surucuyuAyir(blok); r = k.open(blok) }
                         if (r != 0) { hata("USB görüntü açılamadı (kod $r)."); HataKaydi.not("uvc", "open $r · ${usbOzet(aygit)}"); return@post }
                         kamera = k
                         // 1080p'yi geçmeyen en büyük; aynı boyutta MJPEG (bant genişliği az) tercih
@@ -58,6 +62,15 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice) : Kaynak {
         izleyici = m
         m.register()
         m.requestPermission(aygit) // izin varsa doğrudan açar, yoksa Android sorar
+    }
+
+    private fun surucuyuAyir(blok: USBMonitor.UsbControlBlock) {
+        val c = runCatching { blok.connection }.getOrNull() ?: return
+        for (i in 0 until aygit.interfaceCount) {
+            val arayuz = aygit.getInterface(i)
+            if (arayuz.interfaceClass != UsbConstants.USB_CLASS_VIDEO) continue
+            runCatching { if (c.claimInterface(arayuz, true)) c.releaseInterface(arayuz) }
+        }
     }
 
     override fun durdur() {
