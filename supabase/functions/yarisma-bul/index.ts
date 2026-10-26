@@ -1,7 +1,7 @@
 // Yarışma tarayıcısı (26 Ekim 2026, offocus yol haritası 3): yapay zekâ Google aramasıyla önümüzdeki aylarda son başvurusu olan
 // fotoğraf, kısa film ve video yarışmalarını bulur; panele "öneri" olarak bırakır (site /api/yarisma/oneri, x-studio-key).
 // Ekip Stüdyo → Site → Yarışmalar'da resmi sayfadan kontrol edip "Yayında" yapar. Haftada bir (göç 0038) ya da Stüdyo'dan elle.
-// Kötüye kullanım: oturumsuz çağrı yalnız son tarama 6 günden eskiyse çalışır; Stüdyo'dan elle en çok saatte bir.
+// Kötüye kullanım: oturumsuz çağrı yalnız son başarılı tarama 6 günden eskiyse çalışır; her durumda en çok saatte bir.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -60,9 +60,12 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const { data: k } = jwt ? await sb.auth.getUser(jwt) : { data: null };
   const kisi = k?.user ?? null;
+  // Zamanlayıcı her gün çağırır; son BAŞARILI tarama 6 günden yeniyse atlar (yapay zekâ kotası dolduğu gün ertesi gün yeniden dener)
   const { data: sonTarama } = await sb.from("yarisma_tarama").select("at").order("at", { ascending: false }).limit(1);
+  const { data: sonBasarili } = await sb.from("yarisma_tarama").select("at").is("hata", null).order("at", { ascending: false }).limit(1);
   const once = sonTarama?.[0]?.at ? Date.now() - +new Date(sonTarama[0].at) : Infinity;
-  if (!kisi && once < 6 * 864e5) return yanit({ atlandi: "Son tarama 6 günden yeni" });
+  const basariliOnce = sonBasarili?.[0]?.at ? Date.now() - +new Date(sonBasarili[0].at) : Infinity;
+  if (!kisi && (basariliOnce < 6 * 864e5 || once < 3600e3)) return yanit({ atlandi: "Son tarama yeni" });
   if (kisi && once < 3600e3) return yanit({ error: "Son tarama bir saatten yeni; biraz sonra yeniden dene." }, 429);
 
   // Kayıt hemen yazılır (aynı anda ikinci tarama başlamasın); tarama arka planda sürer, sonuç kayda ve bildirime düşer
