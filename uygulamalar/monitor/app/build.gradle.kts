@@ -17,8 +17,8 @@ android {
         applicationId = "tr.com.updated.monitor"
         minSdk = 29            // Android 10: GLES 3, MediaStore klasörleri; Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.8.0"
+        versionCode = 15
+        versionName = "0.8.1"
         buildConfigField("String", "GUNCELLEME_ADRESI", "\"" + (if (indirKlasoru.isEmpty()) "" else "https://studio.updated.com.tr/indir/$indirKlasoru/") + "\"")
         ndk { abiFilters += listOf("arm64-v8a") } // güncel Android telefonların hepsi; ML Kit kitaplıkları diğer işlemciler için APK'yı 3 kat büyütüyordu
     }
@@ -53,6 +53,8 @@ dependencies {
     // Akıllı kompozisyon yardımcısı: konu ve yüz algılama telefonun içinde (internetsiz), modeller uygulamayla gelir
     implementation("com.google.mlkit:object-detection:17.0.2")
     implementation("com.google.mlkit:face-detection:16.1.7")
+    // Doğrudan USB görüntü (UVC): libuvc + libusb; Android'in harici kamera desteği olmayan telefonlarda da çalışır
+    implementation("com.herohan:UVCAndroid:1.0.13")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core:1.6.1")

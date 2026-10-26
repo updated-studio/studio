@@ -66,6 +66,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 26 Ekim 2026
+- Kullanıcı Sony a7 V'yi USB-C ile bağlayamadı (Monitor+ bağlanıyor). UPDATED Kamera 0.8.1: doğrudan UVC sürücüsü (com.herohan:UVCAndroid 1.0.13, UvcKaynak.kt) Monitör'de; Camera2 harici kamera yoksa UVC; makine PTP/depolama modundaysa "USB yayını moduna al" anlatımı + tanı kaydı (monitor_hatalar tur=usb). Kayıt UVC'de yok. Monitor+ PTP canlı görüntüyle bağlanıyorsa (makine USB yayını modunda değilken) o ayrı iş. Yarışmalar/haftalık görev sonrası yol haritası 5'te ara (DURUM).
 - Kamera uygulamasına ara verildi (kullanıcı: "diğer işlere dönelim"; sırada timelapse). Yarışmalar takvimi (offocus 3): Fatih "yarışmalar üyelik gerektirsin… kayıtların tutulması için", A seçildi (liste açık, bağlantı/ayrıntı/hatırlatma Uper'e). Stüdyo: fonksiyon yarisma-bul (Gemini arama, haftalık; öneriler panele durum=oneri), göç 0038 (yarisma_tarama + cron pazartesi 09.00). Site tarafı site deposunda.
 - UPDATED Kamera 0.7.1: Robolectric ekran görüntüsü testleri (app/src/test, `gradle testReleaseUnitTest`, çıktı app/build/ekranlar) kuruldu; bulunan taşma/hiza hataları düzeltildi. 0.8.0: Analiz.kt (Sobel+Hough+en küçük kareler: ufuk, öncü çizgi/kaçış noktası, simetri, denge), ipucuUret (kenar kesilmesi, boyut, portre göz hizası/bakış, ufuk, kılavuza oturma, denge), KompTur.ONCU, dikey kadrajda spiral yönü. AnalizTest/IpucuTest yapay görüntülerle geçiyor. Cihazda denenmedi. Sırada timelapse.
 

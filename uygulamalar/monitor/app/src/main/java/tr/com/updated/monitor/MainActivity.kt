@@ -226,9 +226,13 @@ class MainActivity : Activity() {
                     val l = kaynakKameralari()
                     val id = (if (proMod && i == 0) intent.getStringExtra("kamera") else null) ?: tercih.getString("kamera$i", null)
                     val k = l.firstOrNull { it.first == id } ?: l.firstOrNull()
-                    if (k != null) kameraAc(i, k) else if (!proMod && i == 0) dongu.postDelayed({ tost("USB görüntü kaynağı yok: HDMI→USB çeviriciyi tak ya da KAYNAK'tan ağ yayını aç.") }, 600)
+                    // Android'in harici kamera desteği yoksa doğrudan USB sürücüsüyle (UVC)
+                    val uvc = if (!proMod && i == 0 && k == null) UvcKaynak.aygitlar(this).firstOrNull() else null
+                    if (k != null) kameraAc(i, k) else if (uvc != null) uvcAc(i, uvc) else if (!proMod && i == 0) dongu.postDelayed({ usbTani() }, 600)
                 }
                 "ag" -> tercih.getString("ag$i", null)?.let { agAc(i, it) }
+                "uvc" -> UvcKaynak.aygitlar(this).firstOrNull { "%04x:%04x".format(it.vendorId, it.productId) == tercih.getString("uvc$i", null) }?.let { uvcAc(i, it) }
+                    ?: if (i == 0) UvcKaynak.aygitlar(this).firstOrNull()?.let { uvcAc(i, it) } else null
             }
             ayarlar[i].takeIf { it.lutAcik && it.lutAdi.isNotEmpty() }?.let { a -> runCatching { File(lutKlasoru, a.lutAdi).inputStream().use { Lut.oku(a.lutAdi, it) } }.getOrNull()?.let { monitorler[i]?.lutYukle(it) } }
         }
@@ -345,7 +349,7 @@ class MainActivity : Activity() {
     private fun ustCiz() {
         ust.removeAllViews()
         val k = kamera(); val a = kamAyar[etkin]
-        val ag = kaynaklar[etkin] is AgKaynak
+        val ag = kaynaklar[etkin] is AgKaynak || kaynaklar[etkin] is UvcKaynak
         val fps = when { ag -> "—"; a.fps != null -> if (a.fps!!.lower == a.fps!!.upper) "${a.fps!!.upper}" else "${a.fps!!.lower}–${a.fps!!.upper}"; else -> "OTO" }
         val fpsSayi = a.fps?.upper ?: 30
         val ens = when { ag || k == null -> "—"; a.pozlamaNs == null -> "OTO"; else -> { val t = a.pozlamaNs!! / 1e9; val aci = 360.0 * fpsSayi * t; if (abs(aci - 180) < 6 && !fotoMod) "180°" else if (t >= 1) "${t.toInt()} sn" else "1/${(1 / t).toInt()}" } }
@@ -541,7 +545,7 @@ class MainActivity : Activity() {
 
     /* ================= kayıt ================= */
     private fun kayitDugmesi() {
-        val k = kamera() ?: return tost(if (kaynaklar[etkin] is AgKaynak) "Ağ yayınında kayıt yok; kamera ya da USB kaynağı seç." else "Kaynak yok.")
+        val k = kamera() ?: return tost(if (kaynaklar[etkin] is AgKaynak) "Ağ yayınında kayıt yok; kamera ya da USB kaynağı seç." else if (kaynaklar[etkin] is UvcKaynak) "Doğrudan USB kaynakta kayıt henüz yok; kaydı kameranın kendisinde al." else "Kaynak yok.")
         if (k.kayitta) {
             k.kayitDurdur { ok -> runOnUiThread {
                 kayitUri?.let { u -> contentResolver.update(u, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null); if (ok) { sonUri = u; sonMime = "video/mp4"; runCatching { sonCekim.setImageBitmap(contentResolver.loadThumbnail(u, Size(160, 100), null)) } } }
@@ -758,8 +762,10 @@ class MainActivity : Activity() {
             Sekme.KAYNAK -> {
                 val kamlar = kaynakKameralari()
                 kamlar.forEach { kk -> satir(ic, kk.second, kaynakAdi[etkin] == kk.second) { kameraAc(etkin, kk); panelCiz() } }
+                if (!proMod) UvcKaynak.aygitlar(this).forEach { d -> val ad = "USB görüntü (doğrudan): " + (d.productName ?: d.manufacturerName ?: "aygıt")
+                    satir(ic, ad, (kaynaklar[etkin] as? UvcKaynak)?.aygit?.deviceName == d.deviceName) { uvcAc(etkin, d); panelCiz() } }
                 if (!proMod) satir(ic, "Ağ yayını (RTSP · RTMP · HLS)…", kaynaklar[etkin] is AgKaynak) { agSor() }
-                if (!proMod && kamlar.none { it.second.startsWith("USB") }) aciklama(ic, "USB görüntü kaynağı yok: HDMI→USB çeviriciyi tak. Android 14+ ve telefonun harici kamera desteği gerekir.")
+                if (!proMod && kamlar.none { it.second.startsWith("USB") } && UvcKaynak.aygitlar(this).isEmpty()) { aciklama(ic, "USB görüntü kaynağı yok. HDMI→USB çeviriciyi ya da kamerayı USB-C ile tak; fotoğraf makinesini \"USB yayını\" (USB Streaming) moduna al."); satir(ic, "Takılı USB aygıtını denetle", false) { taniGosterildi = false; usbTani() } }
                 val ana = floatArrayOf(1f, 1.33f, 1.5f, 1.6f, 1.8f, 2f)
                 secenek(ic, "ANAMORFİK AÇMA", listOf("Kapalı", "1,33x", "1,5x", "1,6x", "1,8x", "2x"), ana.indexOfFirst { abs(it - a.desqueeze) < 0.01f }.coerceAtLeast(0)) { a.desqueeze = ana[it] }
                 secenek(ic, "DÖNDÜR", listOf("0°", "90°", "180°", "270°"), a.dondur / 90) { a.dondur = it * 90; monitorler[etkin]?.let { m -> m.tampon(m.kaynakBoyut[0], m.kaynakBoyut[1]) } }
@@ -839,6 +845,54 @@ class MainActivity : Activity() {
         val e = EditText(this).apply { setText(tercih.getString("ag$etkin", "rtsp://")); setSingleLine() }
         AlertDialog.Builder(this).setTitle("Ağ yayını adresi").setMessage("Ör. rtsp://192.168.1.20:554/live · rtmp://… · https://…/index.m3u8")
             .setView(e).setPositiveButton("Bağlan") { _, _ -> agAc(etkin, e.text.toString().trim()); if (panel.visibility == View.VISIBLE) panelCiz() }.setNegativeButton("Vazgeç", null).show()
+    }
+
+    /** Doğrudan USB görüntü (UVC): Android'in harici kamera desteği gerekmez */
+    private fun uvcAc(i: Int, d: android.hardware.usb.UsbDevice) {
+        val m = monitorler[i] ?: return
+        tercih.edit().putString("kaynak$i", "uvc").putString("uvc$i", "%04x:%04x".format(d.vendorId, d.productId)).apply()
+        val k = UvcKaynak(this, d)
+        kaynakAdi[i] = k.ad; m.ayarlar.dondur = 0; m.otoDondur = 0
+        acici[i] = {
+            kaynaklar[i]?.durdur()
+            val y = UvcKaynak(this, d); kaynaklar[i] = y
+            y.baslat(sonYuzey[i]!!, { w, h -> m.tampon(w, h); runOnUiThread { ustCiz(); tost("${y.ad} · ${y.cozunurluk}") } }, { hata -> runOnUiThread { tost(hata) } })
+        }
+        if (sonYuzey[i] != null) acici[i]?.invoke()
+        ustCiz()
+    }
+
+    /** USB'de görüntü aygıtı yoksa: takılı aygıtı söyle (fotoğraf makinesi yanlış USB modundaysa ne yapılacağını anlat) */
+    private var taniGosterildi = false
+    private fun usbTani() {
+        val um = getSystemService(USB_SERVICE) as android.hardware.usb.UsbManager
+        val l = um.deviceList.values.toList()
+        l.forEach { HataKaydi.not("usb", UvcKaynak.usbOzet(it)) } // tanı kaydı (aynı aygıt bir kez)
+        val ptp = l.firstOrNull { UvcKaynak.ptpMi(it) || it.deviceClass == android.hardware.usb.UsbConstants.USB_CLASS_MASS_STORAGE || (0 until it.interfaceCount).any { k -> it.getInterface(k).interfaceClass == android.hardware.usb.UsbConstants.USB_CLASS_MASS_STORAGE } }
+        if (ptp != null && !taniGosterildi && !isFinishing) {
+            taniGosterildi = true
+            val ad = listOfNotNull(ptp.manufacturerName, ptp.productName).joinToString(" ").ifEmpty { "Fotoğraf makinesi" }
+            AlertDialog.Builder(this).setTitle("$ad bağlı, ama görüntü vermiyor").setMessage(
+                "Makine USB'de dosya aktarımı/uzaktan kumanda modunda. Görüntü için makineyi \"USB yayını\" moduna al:\n\n" +
+                "• Sony (a7 IV, a7 V, a7S III, ZV serisi): MENÜ → Ağ (ya da Kurulum) → USB → USB Bağlantı Modu → \"USB Yayını\" (USB Streaming). Bazı modellerde kabloyu takınca çıkan soruda \"Canlı Yayın (USB Yayını)\"nı seç.\n" +
+                "• Canon: menüde \"UVC/UAC\" ya da \"Web kamerası\" modu.\n" +
+                "• Nikon/Fujifilm: menüde \"USB: Web kamerası (UVC)\".\n\n" +
+                "Sonra kabloyu çıkarıp yeniden tak; Android \"USB aygıtına erişim\" sorarsa İzin ver.")
+                .setPositiveButton("Tamam", null).show()
+        } else if (l.isEmpty()) tost("USB görüntü kaynağı yok: kamerayı ya da HDMI→USB çeviriciyi tak ya da KAYNAK'tan ağ yayını aç.")
+    }
+
+    private val usbDinle = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: Intent) {
+            if (proMod) return
+            @Suppress("DEPRECATION") val d = i.getParcelableExtra<android.hardware.usb.UsbDevice>(android.hardware.usb.UsbManager.EXTRA_DEVICE) ?: return
+            if (i.action == android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED) {
+                HataKaydi.not("usb", UvcKaynak.usbOzet(d))
+                if (UvcKaynak.gorunturVar(d)) { if (kaynaklar[etkin] == null || kaynaklar[etkin] is UvcKaynak) uvcAc(etkin, d) } else { taniGosterildi = false; dongu.postDelayed({ usbTani() }, 800) }
+            } else if (i.action == android.hardware.usb.UsbManager.ACTION_USB_DEVICE_DETACHED) {
+                val k = kaynaklar[etkin]; if (k is UvcKaynak && k.aygit.deviceName == d.deviceName) { k.durdur(); kaynaklar[etkin] = null; ustCiz() }
+            }
+        }
     }
 
     private fun agAc(i: Int, adres: String) {
@@ -977,11 +1031,14 @@ class MainActivity : Activity() {
     }
     override fun onResume() {
         super.onResume(); onde = true; teraziKaydi(); yonuAyarla()
+        if (!proMod) { val f = IntentFilter().apply { addAction(android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED); addAction(android.hardware.usb.UsbManager.ACTION_USB_DEVICE_DETACHED) }
+            if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(usbDinle, f, RECEIVER_EXPORTED) else registerReceiver(usbDinle, f) }
         (getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).registerDisplayListener(ekranDinle, null); tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat()
         for (i in 0..1) if (bekleyenAcma[i]) { bekleyenAcma[i] = false; if (sonYuzey[i] != null) acici[i]?.invoke() }
     }
     override fun onPause() {
         super.onPause(); onde = false; sensorler.unregisterListener(teraziDinle)
+        if (!proMod) runCatching { unregisterReceiver(usbDinle) }
         (getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).unregisterDisplayListener(ekranDinle)
         if (kamera()?.kayitta == true) kayitDugmesi() // arka plana geçerken kayıt güvenle kapanır
         sesOlcer.durdur(); monitorler.forEach { it?.onPause() }
