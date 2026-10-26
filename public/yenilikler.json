@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-26-a",
+    "tarih": "26 Ekim 2026",
+    "baslik": "Yarışmalar takvimi",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Site → Yarışmalar: fotoğraf, kısa film ve video yarışmaları buradan eklenir.",
+          "Her pazartesi yeni yarışmalar otomatik bulunur ve \"Öneri\" olarak gelir; resmi sayfadan kontrol edip \"Yayında\" yap.",
+          "Sitede /yarismalar sayfası: liste herkese açık, başvuru bağlantısı ve hatırlatma Uper'lere."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-25-b",
     "tarih": "25 Ekim 2026",
     "baslik": "Sistem durumu, telefon bildirimi",
