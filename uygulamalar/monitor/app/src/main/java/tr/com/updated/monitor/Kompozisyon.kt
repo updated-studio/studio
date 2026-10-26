@@ -18,30 +18,32 @@ import kotlin.math.sin
 
 /** Kompozisyon kılavuzları (Fatih'in fikri, 25 Ekim 2026): menüden seçilir, görüntünün üstüne çizilir */
 enum class KompTur(val ad: String) {
-    KAPALI("Kapalı"), UCTE_BIR("Üçte bir"), PHI("Phi ızgarası"), SPIRAL("Altın spiral"), KOSEGEN("Köşegenler"), UCGEN("Altın üçgenler"), SIMETRI("Simetri")
+    KAPALI("Kapalı"), UCTE_BIR("Üçte bir"), PHI("Phi ızgarası"), SPIRAL("Altın spiral"), KOSEGEN("Köşegenler"), UCGEN("Altın üçgenler"), SIMETRI("Simetri"), ONCU("Öncü çizgi")
 }
 
 private const val FI = 1.6180339f
 
 /** Her kılavuzun "güçlü noktaları" (0–1, görüntü alanına göre); yön: spiral/üçgen için 0–3 (yatay/dikey ayna) */
-fun gucluNoktalar(t: KompTur, yon: Int): List<PointF> {
+fun gucluNoktalar(t: KompTur, yon: Int, oran: Float = 16f / 9f): List<PointF> {
     fun c(x: Float, y: Float) = PointF(if (yon and 1 == 1) 1 - x else x, if (yon and 2 == 2) 1 - y else y)
     return when (t) {
         KompTur.UCTE_BIR -> listOf(PointF(1 / 3f, 1 / 3f), PointF(2 / 3f, 1 / 3f), PointF(1 / 3f, 2 / 3f), PointF(2 / 3f, 2 / 3f))
         KompTur.PHI -> { val a = 1 - 1 / FI; val b = 1 / FI; listOf(PointF(a, a), PointF(b, a), PointF(a, b), PointF(b, b)) }
-        KompTur.SPIRAL -> listOf(spiralGozu().let { c(it.x, it.y) })
+        KompTur.SPIRAL -> listOf(spiralGozu(oran < 1f).let { c(it.x, it.y) })
         KompTur.UCGEN -> { val (p1, p2) = ucgenAyaklari(); listOf(c(p1.x, p1.y), c(p2.x, p2.y)) }
         KompTur.KOSEGEN -> listOf(PointF(0.5f, 0.5f), PointF(0.25f, 0.25f), PointF(0.75f, 0.75f), PointF(0.25f, 0.75f), PointF(0.75f, 0.25f))
         KompTur.SIMETRI -> listOf(PointF(0.5f, 0.5f))
+        KompTur.ONCU -> listOf(PointF(0.5f, 0.42f)) // görüntüde kaçış noktası bulunursa o kullanılır
         KompTur.KAPALI -> emptyList()
     }
 }
 
 /** Altın spiral: dikdörtgen her adımda 1/φ oranında bölünür (sol, üst, sağ, alt…); her parçaya çeyrek elips yayı */
-private fun spiralParcalari(adim: Int = 10): List<Pair<RectF, Int>> {
+private fun spiralParcalari(adim: Int = 10, dikey: Boolean = false): List<Pair<RectF, Int>> {
+    // Dikey kadrajda ilk bölme yataydan (üst parça) başlar: spiral uzun kenar boyunca açılır
     var r = RectF(0f, 0f, 1f, 1f); val l = ArrayList<Pair<RectF, Int>>()
     for (i in 0 until adim) {
-        val yon = i % 4
+        val yon = (i + if (dikey) 1 else 0) % 4
         val p: RectF
         when (yon) {
             0 -> { val x = r.left + r.width() / FI; p = RectF(r.left, r.top, x, r.bottom); r = RectF(x, r.top, r.right, r.bottom) }
@@ -53,7 +55,7 @@ private fun spiralParcalari(adim: Int = 10): List<Pair<RectF, Int>> {
     }
     return l
 }
-fun spiralGozu(): PointF { val son = spiralParcalari(14).last().first; return PointF(son.centerX(), son.centerY()) }
+fun spiralGozu(dikey: Boolean = false): PointF { val son = spiralParcalari(14, dikey).last().first; return PointF(son.centerX(), son.centerY()) }
 /** Altın üçgen: sol üst–sağ alt köşegenine diğer iki köşeden dik inen çizgilerin ayakları */
 private fun ucgenAyaklari(oran: Float = 16f / 9f): Pair<PointF, PointF> {
     // Görüntü oranında hesap (dik açı gerçek piksellerde): köşegen (0,0)-(1,1)
@@ -75,6 +77,12 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
     var egimTaban = 0f
     var asistan = false
     var hizalama = 0f; private set
+    /** Görüntü analizi (ufuk, öncü çizgiler, kaçış noktası); yardımcı açıkken çizilir */
+    var analiz: AnalizSonuc? = null; set(v) { field = v; postInvalidate() }
+    /** Kısa yön tarifi (ibrenin üstünde) */
+    var ipucu: String? = null; set(v) { if (field != v) { field = v; postInvalidate() } }
+    /** Konunun gitmesi gereken güçlü nokta (yön tarifi için) */
+    var hedefNokta: N? = null; private set
     fun goruntuOrani(): Float { val r = alan(); return if (r.height() > 0f) r.width() / r.height() else 16f / 9f }
     private val yesil = Color.rgb(60, 220, 110); private val sari = Color.rgb(255, 196, 0)
     private val cizgi = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2.2f; color = Color.argb(200, 255, 255, 255); setShadowLayer(2f, 0f, 0f, Color.argb(160, 0, 0, 0)) }
@@ -96,7 +104,7 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
             KompTur.PHI -> for (k in floatArrayOf(1 - 1 / FI, 1 / FI)) { c.drawLine(X(k), r.top, X(k), r.bottom, cizgi); c.drawLine(r.left, Y(k), r.right, Y(k), cizgi) }
             KompTur.SPIRAL -> {
                 val yol = Path()
-                for ((p, yonP) in spiralParcalari(10)) {
+                for ((p, yonP) in spiralParcalari(10, r.width() < r.height())) {
                     val ax = floatArrayOf(yx(p.left), yx(p.right)); val ay = floatArrayOf(yy(p.top), yy(p.bottom))
                     val kare = RectF(X(ax.min()), Y(ay.min()), X(ax.max()), Y(ay.max()))
                     c.drawRect(kare, ince)
@@ -122,19 +130,30 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
             }
             KompTur.SIMETRI -> { c.drawLine(X(0.5f), r.top, X(0.5f), r.bottom, cizgi); c.drawLine(r.left, Y(0.5f), r.right, Y(0.5f), cizgi)
                 val kes = Paint(ince).apply { pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f) }; c.drawLine(r.left, r.top, r.right, r.bottom, kes); c.drawLine(r.right, r.top, r.left, r.bottom, kes) }
+            KompTur.ONCU -> {
+                // Alt köşelerden ve alt üçte birlerden kaçış noktasına (bulunduysa görüntüdekine)
+                val k = analiz?.kacis?.takeIf { it.x in 0f..1f && it.y in 0f..1f } ?: N(0.5f, 0.42f)
+                for ((x, y) in listOf(0f to 1f, 1f to 1f, 0f to 2 / 3f, 1f to 2 / 3f)) c.drawLine(X(x), Y(y), X(k.x), Y(k.y), if (y == 1f) cizgi else ince)
+            }
             KompTur.KAPALI -> {}
         }
-        val noktalar = gucluNoktalar(tur, yon).let { if (tur == KompTur.UCGEN) { val (a1, a2) = ucgenAyaklari(r.width() / r.height()); listOf(PointF(yx(a1.x), yy(a1.y)), PointF(yx(a2.x), yy(a2.y))) } else it }
+        val noktalar = gucluNoktalar(tur, yon, r.width() / r.height()).let { if (tur == KompTur.ONCU) listOf(analiz?.kacis?.takeIf { k -> k.x in 0f..1f && k.y in 0f..1f }?.let { k -> PointF(k.x, k.y) } ?: it[0]) else if (tur == KompTur.UCGEN) { val (a1, a2) = ucgenAyaklari(r.width() / r.height()); listOf(PointF(yx(a1.x), yy(a1.y)), PointF(yx(a2.x), yy(a2.y))) } else it }
         noktalar.forEach { c.drawCircle(X(it.x), Y(it.y), 7f, nokta) }
 
         // Akıllı yardımcı: konudan en yakın güçlü noktaya ok + ibre
-        hizalama = 0f
+        hizalama = 0f; hedefNokta = null
+        // Analiz: ufuk (mavi kesikli) ve öncü çizgiler (turuncu, ince)
+        val an = analiz
+        if (asistan && an != null) {
+            an.ufuk?.let { u -> c.drawLine(X(u.a.x), Y(u.a.y), X(u.b.x), Y(u.b.y), Paint(ince).apply { color = Color.argb(200, 106, 152, 248); strokeWidth = 3f; pathEffect = DashPathEffect(floatArrayOf(18f, 12f), 0f) }) }
+            if (tur == KompTur.ONCU) an.oncu.forEach { l -> c.drawLine(X(l.a.x), Y(l.a.y), X(l.b.x), Y(l.b.y), Paint(ince).apply { color = Color.argb(170, 255, 107, 26); strokeWidth = 3f }) }
+        }
         val k = konu
         if (asistan && k != null && noktalar.isNotEmpty()) {
             val kx = k.centerX(); val ky = k.centerY()
             val hedef = noktalar.minBy { hypot((it.x - kx) * r.width(), (it.y - ky) * r.height()) }
             val mesafe = hypot((hedef.x - kx) * r.width(), (hedef.y - ky) * r.height()) / r.height()
-            hizalama = (1f - mesafe / 0.35f).coerceIn(0f, 1f)
+            hizalama = (1f - mesafe / 0.35f).coerceIn(0f, 1f); hedefNokta = N(hedef.x, hedef.y)
             val tamam = mesafe < 0.045f
             val renk = if (tamam) yesil else if (hizalama > 0.6f) sari else Color.WHITE
             c.drawRect(RectF(X(k.left), Y(k.top), X(k.right), Y(k.bottom)), Paint(ince).apply { color = renk; strokeWidth = 3f })
@@ -150,6 +169,7 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
             ibre(c, r, hizalama, tamam)
             if (konuAdi.isNotEmpty()) c.drawText(konuAdi, X(k.left), Y(k.top) - 10f, yazi)
         }
+        if (asistan) ipucuCiz(c, r)
         // Terazi: ufuk çizgisi, düzse yeşil
         egim?.let { e ->
             val duz = abs(e) < 1f; val uz = min(r.width(), r.height()) * 0.28f
@@ -161,6 +181,19 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
             c.drawText("%.1f°".format(e).replace('.', ','), cx + uz + 40f, cy + 10f, yazi.apply { color = if (duz) yesil else Color.WHITE })
             yazi.color = Color.WHITE
         }
+    }
+
+    private val ipucuZemin = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(185, 18, 20, 24) }
+    private val ipucuYazi = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 30f; color = Color.WHITE; isFakeBoldText = true }
+    /** Yön tarifi: ibrenin üstünde ortalı hap */
+    private fun ipucuCiz(c: Canvas, r: RectF) {
+        val t = ipucu ?: return
+        ipucuYazi.textSize = (min(r.width(), r.height()) * 0.045f).coerceIn(26f, 40f)
+        val gen = ipucuYazi.measureText(t); val yuk = ipucuYazi.textSize * 1.9f
+        val alt = r.bottom - min(r.width(), r.height()) * 0.11f - 70f
+        val kutu = RectF(r.centerX() - gen / 2 - 24f, alt - yuk, r.centerX() + gen / 2 + 24f, alt)
+        c.drawRoundRect(kutu, yuk / 2, yuk / 2, ipucuZemin)
+        c.drawText(t, kutu.left + 24f, kutu.centerY() + ipucuYazi.textSize * 0.36f, ipucuYazi)
     }
 
     /** Alt ortada yarım daire ibre: 0 = uzak, 1 = tam yerinde (yeşil) */
@@ -180,11 +213,16 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
 }
 
 /** Öneri: konuya en az hareketle uyan kılavuz (kapalı ve mevcut hariç) */
-fun kompozisyonOner(konu: RectF?, mevcut: KompTur, oran: Float): Pair<KompTur, Int>? {
+fun kompozisyonOner(konu: RectF?, mevcut: KompTur, oran: Float, analiz: AnalizSonuc? = null): Pair<KompTur, Int>? {
+    // Görüntünün kendisi: ayna gibi simetrik sahne → simetri; iki yandan gelen çizgiler bir noktada buluşuyorsa → öncü çizgi
+    if (analiz != null && (konu == null || abs(konu.centerX() - 0.5f) < 0.12f)) {
+        if (analiz.simetri > 0.8f) return if (mevcut == KompTur.SIMETRI) null else KompTur.SIMETRI to 0
+        if (analiz.kacis != null && analiz.oncu.size >= 2) return if (mevcut == KompTur.ONCU) null else KompTur.ONCU to 0
+    }
     val k = konu ?: return null
     val adaylar = ArrayList<Triple<KompTur, Int, Float>>()
     for (t in listOf(KompTur.UCTE_BIR, KompTur.PHI, KompTur.SPIRAL, KompTur.UCGEN)) for (y in if (t == KompTur.SPIRAL || t == KompTur.UCGEN) 0..3 else 0..0) {
-        val n = gucluNoktalar(t, y).minOf { hypot((it.x - k.centerX()) * oran, it.y - k.centerY()) }
+        val n = gucluNoktalar(t, y, oran).minOf { hypot((it.x - k.centerX()) * oran, it.y - k.centerY()) }
         adaylar.add(Triple(t, y, n))
     }
     // Konu ortadaysa ve iriyse simetri

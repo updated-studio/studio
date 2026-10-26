@@ -65,6 +65,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 26 Ekim 2026
+- UPDATED Kamera 0.7.1: Robolectric ekran görüntüsü testleri (app/src/test, `gradle testReleaseUnitTest`, çıktı app/build/ekranlar) kuruldu; bulunan taşma/hiza hataları düzeltildi. 0.8.0: Analiz.kt (Sobel+Hough+en küçük kareler: ufuk, öncü çizgi/kaçış noktası, simetri, denge), ipucuUret (kenar kesilmesi, boyut, portre göz hizası/bakış, ufuk, kılavuza oturma, denge), KompTur.ONCU, dikey kadrajda spiral yönü. AnalizTest/IpucuTest yapay görüntülerle geçiyor. Cihazda denenmedi. Sırada timelapse.
+
 ### 25 Ekim 2026
 - UPDATED Kamera 0.7.0: yeni yapı (kullanıcı taslağı onayladı: claude.ai/artifact/747UjEJkhsQPBjovYyZVwg). KameraActivity = açılış, iPhone gibi sade, dikey sabit, ikonlar döner, modlar Video/Foto/Portre/Gece/Işık izi/Samanyolu/Monitör, dokunarak odak, yakınlaştırma (CONTROL_ZOOM_RATIO), flaş (ön ölçümlü), kılavuz menüsü, ayarlar. Açılışta Kamera/Monitör sorusu yalnız süreç baştan açılınca. MainActivity artık mod=pro (telefon kameraları) / mod=monitor (USB + ağ), dikey/yatay düzen, güvenli alan payı, IBM Plex Sans Condensed. Sırada: analiz geliştirmeleri, sonra timelapse.
 - UPDATED Kamera 0.5.1: uygulama içinden güncelleme (surum.json + PackageInstaller; derle.sh notu yazıyor, son 3 APK kalıyor). 0.6.0: sahneler (Sahne.kt): ışık izi (MAX birleştirme, süre seçimi), Samanyolu (uzun pozlama ya da 16 kare ORT), gece (telefonun gece modu ya da 8 kare), gün batımı/spor/portre/manzara (Camera2 sahne modu ya da karşılığı); otomatik öneri (ISO×sn, yerçekimi, renk, yüz). Cihazda denenmedi; sırada timelapse.

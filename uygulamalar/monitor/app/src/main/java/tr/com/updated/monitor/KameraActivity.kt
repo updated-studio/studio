@@ -107,6 +107,7 @@ class KameraActivity : Activity() {
     private var kompTur = KompTur.KAPALI; private var kompYon = 0; private var sonKomp = KompTur.SPIRAL
     private var asistanAcik = false; private var teraziAcik = false; private var oneriAcik = true; private var sahneOto = true
     private var asistan: Asistan? = null
+    private val analiz = GoruntuAnaliz(); private var sonYuz: YuzBilgi? = null; private val ipucuSabit = IpucuSabitle()
     private var sonOneri: Pair<KompTur, Int>? = null
     private var sahneOnerisi: Sahne? = null
     @Volatile private var renkOrt = floatArrayOf(0f, 0f, 0f); @Volatile private var yercekimZ = 0f
@@ -392,11 +393,13 @@ class KameraActivity : Activity() {
         komp.tur = kompTur; komp.yon = kompYon; komp.asistan = asistanAcik
         tercih.edit().putString("komp", kompTur.name).putInt("kompYon", kompYon).putString("sonKomp", sonKomp.name).putBoolean("asistan", asistanAcik)
             .putBoolean("terazi", teraziAcik).putBoolean("oneri", oneriAcik).putBoolean("sahneOto", sahneOto).apply()
-        if (asistanAcik && asistan == null) asistan = Asistan { r, ad -> runOnUiThread { asistanSonuc(r, ad) } }
+        if (asistanAcik && asistan == null) asistan = Asistan { r, ad, yuz -> runOnUiThread { sonYuz = yuz; asistanSonuc(r, ad) } }
         if (!asistanAcik) { asistan?.kapat(); asistan = null; komp.konu = null; oneriCip.visibility = View.GONE }
         if (!teraziAcik) komp.egim = null
         sensorKaydi()
-        monitor.olcumKaresi = if (asistanAcik || sahneOto) { buf, w, h -> asistan?.kare(buf, w, h); if (sahneOto) renkOlc(buf, w, h) } else null
+        if (!asistanAcik) { komp.analiz = null; komp.ipucu = null }
+        monitor.olcumKaresi = if (asistanAcik || sahneOto) { buf, w, h -> asistan?.kare(buf, w, h); if (sahneOto) renkOlc(buf, w, h)
+            if (asistanAcik) { val oran = komp.goruntuOrani(); analiz.kare(buf, w, h, oran) { s -> runOnUiThread { komp.analiz = s; ipucuGuncelle() } } } } else null
         (0 until ustSerit.childCount).map { ustSerit.getChildAt(it) }.forEach { v ->
             if (v is ImageView && v.tag == "yardimci") v.setColorFilter(if (asistanAcik) TURUNCU else Color.WHITE)
             if (v is ImageView && v.tag == "terazi") v.setColorFilter(if (teraziAcik) TURUNCU else Color.WHITE)
@@ -412,10 +415,17 @@ class KameraActivity : Activity() {
     private fun asistanSonuc(r: RectF?, ad: String) {
         komp.konu = r; komp.konuAdi = ad
         if (kompTur == KompTur.KAPALI && r != null) { kompTur = sonKomp; kompUygula() }
-        val o = if (oneriAcik) kompozisyonOner(r, kompTur, komp.goruntuOrani()) else null
+        val o = if (oneriAcik) kompozisyonOner(r, kompTur, komp.goruntuOrani(), komp.analiz) else null
         sonOneri = o
         if (o == null || komp.hizalama > 0.85f || kayitCip.visibility == View.VISIBLE) oneriCip.visibility = View.GONE
         else { oneriCip.text = "Öneri: ${o.first.ad}  ›  Uygula"; oneriCip.visibility = View.VISIBLE }
+        ipucuGuncelle()
+    }
+
+    /** Yön tarifi: konu, yüz ve görüntü analizinden tek satır (titremesin diye sabitlenir) */
+    private fun ipucuGuncelle() {
+        komp.ipucu = if (!asistanAcik || kayitCip.visibility == View.VISIBLE) null
+            else ipucuSabit.ver(ipucuUret(komp.konu, komp.konuAdi, sonYuz.takeIf { komp.konuAdi == "Yüz" }, komp.analiz, komp.hedefNokta, komp.hizalama))
     }
 
     private fun renkOlc(b: java.nio.ByteBuffer, w: Int, h: Int) {
@@ -793,5 +803,5 @@ class KameraActivity : Activity() {
     }
     @Deprecated("Geri: açık menü önce kapanır")
     override fun onBackPressed() { if (acilir != null) acilirKapat() else @Suppress("DEPRECATION") super.onBackPressed() }
-    override fun onDestroy() { super.onDestroy(); asistan?.kapat(); dongu.removeCallbacksAndMessages(null); kaynak?.durdur() }
+    override fun onDestroy() { super.onDestroy(); asistan?.kapat(); analiz.kapat(); dongu.removeCallbacksAndMessages(null); kaynak?.durdur() }
 }

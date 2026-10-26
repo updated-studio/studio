@@ -55,6 +55,23 @@ class EkranTest {
         }
     }
 
+    /** Kompozisyon katmanı: konu, ok, ibre, ufuk, öncü çizgiler ve yön tarifi gri bir görüntünün üstünde */
+    @Test fun katman() {
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        val c = ApplicationProvider.getApplicationContext<Context>()
+        val w = 1179; val h = 1572
+        for ((ad, tur) in listOf("spiral" to KompTur.SPIRAL, "oncu" to KompTur.ONCU)) {
+            val v = KompozisyonGorunum(c) { android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()) }
+            v.tur = tur; v.asistan = true
+            v.konu = android.graphics.RectF(0.2f, 0.35f, 0.4f, 0.6f); v.konuAdi = "Yüz"; v.egim = 2.4f
+            v.analiz = AnalizSonuc(Cizgi(N(0f, 0.55f), N(1f, 0.52f), 2f, 0.2f), listOf(Cizgi(N(0f, 1f), N(0.5f, 0.4f), 50f, 0.1f), Cizgi(N(1f, 1f), N(0.5f, 0.4f), -50f, 0.1f)), N(0.5f, 0.4f), 0.4f, N(0.5f, 0.5f))
+            v.ipucu = "Telefonu biraz sola çevir"
+            v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)); v.layout(0, 0, w, h)
+            val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); val cv = Canvas(b); cv.drawColor(android.graphics.Color.rgb(58, 64, 73)); v.draw(cv)
+            File(klasor, "katman-$ad.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+    }
+
     @Test fun proVeMonitor() {
         for ((ad, q) in boyutlar) for (yon in listOf("port", "land")) for (mod in listOf("pro", "monitor")) {
             RuntimeEnvironment.setQualifiers(nitelik(q, yon == "land"))

@@ -98,6 +98,7 @@ class MainActivity : Activity() {
     private var kompTur = KompTur.KAPALI; private var kompYon = 0; private var sonKomp = KompTur.SPIRAL
     private var asistanAcik = false; private var teraziAcik = false; private var oneriAcik = true
     private var asistan: Asistan? = null
+    private val analiz = GoruntuAnaliz(); private var sonYuz: YuzBilgi? = null; private val ipucuSabit = IpucuSabitle()
     private var sonOneri: Pair<KompTur, Int>? = null
     private val sensorler by lazy { getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager }
     private val teraziDinle = object : android.hardware.SensorEventListener {
@@ -234,15 +235,23 @@ class MainActivity : Activity() {
     }
 
     /** Yardımcıdan gelen konu: katmana, öneriye */
+    /** Yön tarifi: konu, yüz ve görüntü analizinden tek satır (titremesin diye sabitlenir) */
+    private fun ipucuGuncelle() {
+        val kk = kompler[etkin] ?: return
+        kk.ipucu = if (!asistanAcik || kamera()?.kayitta == true) null
+            else ipucuSabit.ver(ipucuUret(kk.konu, kk.konuAdi, sonYuz.takeIf { kk.konuAdi == "Yüz" }, kk.analiz, kk.hedefNokta, kk.hizalama))
+    }
+
     private fun asistanSonuc(r: android.graphics.RectF?, ad: String) {
         val kk = kompler[etkin] ?: return
         kk.konu = r; kk.konuAdi = ad
         if (kompTur == KompTur.KAPALI && r != null) { kompTur = sonKomp; kompUygula() } // yardımcı açıkken bir kılavuz gerekir
         val cip = oneriCip[etkin] ?: return
-        val o = if (oneriAcik) kompozisyonOner(r, kompTur, kk.goruntuOrani()) else null
+        val o = if (oneriAcik) kompozisyonOner(r, kompTur, kk.goruntuOrani(), kk.analiz) else null
         sonOneri = o
         if (o == null || kk.hizalama > 0.85f) cip.visibility = View.GONE
         else { cip.text = "ÖNERİ: ${o.first.ad}  ›  UYGULA"; cip.visibility = View.VISIBLE }
+        ipucuGuncelle()
     }
 
     private fun kompUygula() {
@@ -259,9 +268,9 @@ class MainActivity : Activity() {
     }
 
     private fun olcumBagla() {
-        if (asistanAcik && asistan == null) asistan = Asistan { r, ad -> runOnUiThread { asistanSonuc(r, ad) } }
-        if (!asistanAcik) { asistan?.kapat(); asistan = null; kompler.forEach { it?.konu = null }; oneriCip.forEach { it?.visibility = View.GONE } }
-        monitorler.forEachIndexed { i, m -> m?.olcumKaresi = if (i == etkin && (olcum != null || koseHisto || asistanAcik || sahneOto)) { buf, w, h -> olcum?.kare(buf, w, h); if (koseHisto) kose.kare(buf, w, h); if (ayarlar[i].zoom == 1f) asistan?.kare(buf, w, h); if (sahneOto) renkOlc(buf, w, h) } else null }
+        if (asistanAcik && asistan == null) asistan = Asistan { r, ad, yuz -> runOnUiThread { sonYuz = yuz; asistanSonuc(r, ad) } }
+        if (!asistanAcik) { asistan?.kapat(); asistan = null; kompler.forEach { it?.konu = null; it?.analiz = null; it?.ipucu = null }; oneriCip.forEach { it?.visibility = View.GONE } }
+        monitorler.forEachIndexed { i, m -> m?.olcumKaresi = if (i == etkin && (olcum != null || koseHisto || asistanAcik || sahneOto)) { buf, w, h -> olcum?.kare(buf, w, h); if (koseHisto) kose.kare(buf, w, h); if (ayarlar[i].zoom == 1f) { asistan?.kare(buf, w, h); if (asistanAcik) kompler[i]?.let { kk -> analiz.kare(buf, w, h, kk.goruntuOrani()) { s -> runOnUiThread { kk.analiz = s; ipucuGuncelle() } } } }; if (sahneOto) renkOlc(buf, w, h) } else null }
         if (this::kose.isInitialized) kose.visibility = if (koseHisto) View.VISIBLE else View.INVISIBLE
     }
 
@@ -977,5 +986,5 @@ class MainActivity : Activity() {
         if (kamera()?.kayitta == true) kayitDugmesi() // arka plana geçerken kayıt güvenle kapanır
         sesOlcer.durdur(); monitorler.forEach { it?.onPause() }
     }
-    override fun onDestroy() { super.onDestroy(); asistan?.kapat(); dongu.removeCallbacksAndMessages(null); sesOlcer.durdur(); kaynaklar.forEach { it?.durdur() } }
+    override fun onDestroy() { super.onDestroy(); asistan?.kapat(); analiz.kapat(); dongu.removeCallbacksAndMessages(null); sesOlcer.durdur(); kaynaklar.forEach { it?.durdur() } }
 }
