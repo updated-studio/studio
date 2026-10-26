@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-26-b",
+    "tarih": "26 Ekim 2026",
+    "baslik": "Haftalık fotoğraf görevi",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Site → Haftalık görev: her pazartesi yeni tema; girilmezse sıradaki tema kendiliğinden açılır.",
+          "Uper'lerin yüklediği fotoğraflar \"Onay bekliyor\" gelir; uygunsuz ya da başkasına ait olanı \"Reddedildi\" yap.",
+          "Oylama ve sonuç kendiliğinden işler; sitede /gorev."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-26-a",
     "tarih": "26 Ekim 2026",
     "baslik": "Yarışmalar takvimi",
