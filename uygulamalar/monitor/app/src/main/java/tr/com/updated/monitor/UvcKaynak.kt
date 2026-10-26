@@ -42,6 +42,11 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
             override fun onDeviceOpen(d: UsbDevice, blok: USBMonitor.UsbControlBlock, yeni: Boolean) {
                 if (bitti || d.deviceName != aygit.deviceName) return
                 h.post {
+                    if (yiginMi()) { // libuvc yığın uçta yük boyunda (ör. 1,4 MB) tek aktarım ister; usbfs reddeder. Doğrudan yalın okuyucu.
+                        runCatching { izleyici?.unregister() }; runCatching { izleyici?.destroy() }; izleyici = null
+                        runCatching { yalinBaslat(yuzey, boyut, hata) }.onFailure { e -> hata("USB görüntü başlatılamadı: ${e.message}"); HataKaydi.not("uvc-yalin", e.stackTraceToString() + "\n" + usbOzet(aygit)) }
+                        return@post
+                    }
                     try {
                         // Bazı telefonlarda çekirdeğin kendi UVC sürücüsü aygıtı tutar (libusb "meşgul" -6 der). Android'in
                         // claimInterface(zorla) çağrısı o sürücüyü ayırır; bırakınca arayüz bize kalır.
@@ -101,6 +106,10 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
         }
     }
 
+    /** Görüntü akışı yığın (bulk) uçtan mı (eşzamanlı alt ayar yok) */
+    private fun yiginMi() = (0 until aygit.interfaceCount).map { aygit.getInterface(it) }.filter { it.interfaceClass == UsbConstants.USB_CLASS_VIDEO && it.interfaceSubclass == 2 }
+        .let { l -> l.isNotEmpty() && l.none { a -> (0 until a.endpointCount).any { a.getEndpoint(it).type == UsbConstants.USB_ENDPOINT_XFER_ISOC } } }
+
     /** Tanı için: görüntü akış arayüzlerinin uçları (B = yığın/bulk, E = eşzamanlı/isochronous) ve paket boyları */
     private fun uclar() = (0 until aygit.interfaceCount).map { aygit.getInterface(it) }.filter { it.interfaceClass == UsbConstants.USB_CLASS_VIDEO && it.interfaceSubclass == 2 }
         .joinToString(" ") { a -> "vs${a.id}/alt${a.alternateSetting}:" + (0 until a.endpointCount).joinToString(",") { e -> a.getEndpoint(e).let { u -> (if (u.type == UsbConstants.USB_ENDPOINT_XFER_BULK) "B" else if (u.type == UsbConstants.USB_ENDPOINT_XFER_ISOC) "E" else "?") + u.maxPacketSize } } }
@@ -122,6 +131,7 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
         val uc = (0 until vs.endpointCount).map { vs.getEndpoint(it) }.first { it.type == UsbConstants.USB_ENDPOINT_XFER_BULK && it.direction == UsbConstants.USB_DIR_IN }
         vc?.let { c.claimInterface(it, true) }
         if (!c.claimInterface(vs, true)) { hata("USB görüntü arayüzü alınamadı."); HataKaydi.not("uvc-yalin", "claim yok · ${usbOzet(aygit)}"); return }
+        c.controlTransfer(0x02, 0x01, 0, uc.address, null, 0, 500) // uç durdurulmuşsa (önceki deneme) aç: CLEAR_FEATURE(ENDPOINT_HALT)
         c.setInterface(vs) // SET_INTERFACE alt 0: bazı aygıtlar akıştan önce bunu bekler (Linux sürücüsü de yapar)
 
         // Ham tanımlayıcılardan: UVC sürümü (denetim boyu) ve bu arayüzün MJPEG çerçeveleri
@@ -170,27 +180,41 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
         val kuyruk = java.util.concurrent.ArrayBlockingQueue<ByteArray>(2)
         var bayt = 0L; var kare = 0; var cozulmeyen = 0; var hataSay = 0; var cizilen = 0
         okuyucu = Thread({
-            val tampon = ByteArray(yuk)
+            // Yük (payload) 1 MB'ı aşabilir; usbfs tek seferde bu kadarını kabul etmez. 64 KB'lık parçalarla okunur: başlık yalnız
+            // yükün ilk parçasında; kısa parça ya da yük boyuna ulaşmak yükü bitirir.
+            val parca = 65536
+            val tampon = ByteArray(parca)
             val birikim = java.io.ByteArrayOutputStream(enKare)
-            var fid = -1; var bosSure = 0L; var son = System.currentTimeMillis()
+            var fid = -1; var bosSure = 0L; var son = System.currentTimeMillis(); var yukte = 0; var bfh = 0; var atla = false
             while (!bitti) {
-                val n = c.bulkTransfer(uc, tampon, tampon.size, 500)
+                val iste = minOf(parca, yuk - yukte) // yük sınırını aşma: kısa paket gelmezse sonraki yüke taşar
+                val n = c.bulkTransfer(uc, tampon, iste, 500)
                 val simdi = System.currentTimeMillis()
                 if (n < 0) {
-                    hataSay++; bosSure += simdi - son; son = simdi
-                    if (bosSure > 8000 && kare == 0) { if (!bitti) { hata("Makine bağlandı ama görüntü göndermedi."); HataKaydi.not("uvc-yalin", "veri yok · probe $r1/$r2/$r3 · yük $yuk · bayt $bayt · ${uclar()} · ${usbOzet(aygit)}") }; return@Thread }
+                    hataSay++; bosSure += simdi - son; son = simdi; yukte = 0
+                    if (hataSay % 200 == 0) Thread.sleep(5)
+                    if (bosSure > 8000 && kare == 0) { if (!bitti) { hata("Makine bağlandı ama görüntü göndermedi."); HataKaydi.not("uvc-yalin", "veri yok · probe $r1/$r2/$r3 · yük $yuk · bayt $bayt · aktarım hatası $hataSay · ${uclar()} · ${usbOzet(aygit)}") }; return@Thread }
                     continue
                 }
                 bosSure = 0; son = simdi; bayt += n
-                if (n < 2) continue
-                val hle = tampon[0].toInt() and 0xFF; val bfh = tampon[1].toInt() and 0xFF
-                if (hle < 2 || hle > 12 || hle > n) { if (fid >= 0) birikim.write(tampon, 0, n); continue } // başlıksız devam verisi
-                val f = bfh and 1
-                if (fid >= 0 && f != fid && birikim.size() > 0) { kuyruk.offer(birikim.toByteArray()); kare++; birikim.reset() }
-                fid = f
-                if (bfh and 0x40 != 0) { birikim.reset(); continue } // aygıt hatalı yük bildirdi
-                birikim.write(tampon, hle, n - hle)
-                if (bfh and 2 != 0 && birikim.size() > 0) { kuyruk.offer(birikim.toByteArray()); kare++; birikim.reset() }
+                var bas = 0
+                if (yukte == 0) { // yeni yük: başlık
+                    if (n < 2) continue
+                    val hle = tampon[0].toInt() and 0xFF
+                    if (hle < 2 || hle > n) { atla = true } else {
+                        bfh = tampon[1].toInt() and 0xFF; bas = hle; atla = bfh and 0x40 != 0
+                        val f = bfh and 1
+                        if (fid >= 0 && f != fid && birikim.size() > 0) { kuyruk.offer(birikim.toByteArray()); kare++; birikim.reset() }
+                        fid = f
+                        if (atla) birikim.reset()
+                    }
+                }
+                if (!atla && n > bas) birikim.write(tampon, bas, n - bas)
+                yukte += n
+                if (n < iste || yukte >= yuk) { // yük bitti
+                    if (!atla && bfh and 2 != 0 && birikim.size() > 0) { kuyruk.offer(birikim.toByteArray()); kare++; birikim.reset() }
+                    yukte = 0; atla = false
+                }
             }
         }, "uvc-oku").also { it.start() }
         cizici = Thread({
