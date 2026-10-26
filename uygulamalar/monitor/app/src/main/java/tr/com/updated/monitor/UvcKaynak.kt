@@ -32,6 +32,8 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
     private var okuyucu: Thread? = null
     private var cizici: Thread? = null
     var cozunurluk: String = ""; private set
+    /** Kaynağın kare hızı (kayıt için) */
+    var fps = 30; private set
 
     override fun baslat(yuzey: Surface, boyut: (Int, Int) -> Unit, hata: (String) -> Unit) {
         val m = USBMonitor(ctx, object : USBMonitor.OnDeviceConnectListener {
@@ -76,6 +78,7 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
                             runCatching { k.stopPreview() }
                             val fps = s.fpsList?.filter { it in 24..30 }?.maxOrNull() ?: s.fpsList?.maxOrNull() ?: s.fps
                             runCatching { k.setPreviewSize(s.width, s.height, s.type, fps) }.getOrElse { runCatching { k.setPreviewSize(s.width, s.height, s.type) } }
+                            this@UvcKaynak.fps = fps.takeIf { it in 1..120 } ?: 30
                             cozunurluk = "${s.width}×${s.height} · ${fps} fps · ${if (s.type == UVCCamera.UVC_VS_FRAME_MJPEG) "MJPEG" else "YUV"}"
                             boyut(s.width, s.height)
                             k.setPreviewDisplay(yuzey)
@@ -130,7 +133,10 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
         if (vs == null) { hata("Makine bağlandı ama görüntü göndermedi."); HataKaydi.not("uvc-yalin", "yığın uç yok · ${uclar()} · ${usbOzet(aygit)}"); return }
         val uc = (0 until vs.endpointCount).map { vs.getEndpoint(it) }.first { it.type == UsbConstants.USB_ENDPOINT_XFER_BULK && it.direction == UsbConstants.USB_DIR_IN }
         vc?.let { c.claimInterface(it, true) }
-        if (!c.claimInterface(vs, true)) { hata("USB görüntü arayüzü alınamadı."); HataKaydi.not("uvc-yalin", "claim yok · ${usbOzet(aygit)}"); return }
+        // Önceki bağlantı (yeniden takma, kaynağı yeniden açma) arayüzü henüz bırakmamış olabilir: kısa aralıklarla yeniden dene
+        var alindi = false
+        for (n in 0 until 12) { if (bitti) return; if (c.claimInterface(vs, true)) { alindi = true; break }; Thread.sleep(250) }
+        if (!alindi) { hata("USB görüntü arayüzü alınamadı."); HataKaydi.not("uvc-yalin", "claim yok · ${usbOzet(aygit)}"); return }
         c.controlTransfer(0x02, 0x01, 0, uc.address, null, 0, 500) // uç durdurulmuşsa (önceki deneme) aç: CLEAR_FEATURE(ENDPOINT_HALT)
         c.setInterface(vs) // SET_INTERFACE alt 0: bazı aygıtlar akıştan önce bunu bekler (Linux sürücüsü de yapar)
 
@@ -172,6 +178,7 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kare
         val enKare = pu32(18).takeIf { it in 1..(64 shl 20) } ?: (s.w * s.h * 2)
         val yuk = pu32(22).takeIf { it in 512..(8 shl 20) } ?: 16384
         val fps = if (s.aralik > 0) 10_000_000 / s.aralik else 0
+        if (fps in 1..120) this.fps = fps
         val ozet = "${s.w}×${s.h} · $fps fps · MJPEG · yalın"
         cozunurluk = ozet
         boyut(s.w, s.h)

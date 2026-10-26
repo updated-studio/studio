@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UPDATED Kamera ikonu (24×24, çizgi) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M22,12H2 M5.5,5h13l3.5,7v6a2,2 0 0 1 -2,2H4a2,2 0 0 1 -2,-2v-6z M6,16h0.01 M10,16h0.01" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+</vector>

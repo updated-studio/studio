@@ -39,6 +39,15 @@ class EkranTest {
         File(klasor, "$ad.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    /** Kamera yok: görüntü alanına örnek bir sahne (gök, ufuk, zemin) koyar ki saydam şeritler görülsün */
+    private fun ornekGoruntu(a: Activity) {
+        val kok = (a.findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as android.view.ViewGroup)
+        val alan = kok.getChildAt(0) as android.view.ViewGroup
+        alan.addView(View(a).apply { background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(android.graphics.Color.rgb(96, 140, 190), android.graphics.Color.rgb(214, 170, 120), android.graphics.Color.rgb(70, 82, 60), android.graphics.Color.rgb(40, 46, 36))) }, 0,
+            android.widget.FrameLayout.LayoutParams(-1, -1))
+    }
+
     private fun tercih(ad: String) = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences(ad, Context.MODE_PRIVATE)
 
     @Test fun kamera() {
@@ -48,7 +57,7 @@ class EkranTest {
             Robolectric.buildActivity(KameraActivity::class.java).setup().use { c -> kaydet(c.get(), "kamera-giris-$ad") }
             KameraActivity.girisSoruldu = true
             Robolectric.buildActivity(KameraActivity::class.java).setup().use { c ->
-                val a = c.get(); kaydet(a, "kamera-$ad")
+                val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-$ad")
                 a.window.decorView.findViewWithText("Kompozisyon kılavuzu")?.performClick(); kaydet(a, "kamera-kilavuz-$ad")
                 a.window.decorView.findViewWithText("Ayarlar")?.performClick(); kaydet(a, "kamera-ayarlar-$ad")
             }
@@ -76,7 +85,7 @@ class EkranTest {
         for ((ad, q) in boyutlar) for (yon in listOf("port", "land")) for (mod in listOf("pro", "monitor")) {
             RuntimeEnvironment.setQualifiers(nitelik(q, yon == "land"))
             val i = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java).putExtra("mod", mod)
-            Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> kaydet(c.get(), "$mod-$yon-$ad") }
+            Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> if (mod == "monitor") ornekGoruntu(c.get()); kaydet(c.get(), "$mod-$yon-$ad") }
         }
     }
 }

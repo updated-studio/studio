@@ -17,8 +17,8 @@ android {
         applicationId = "tr.com.updated.monitor"
         minSdk = 29            // Android 10: GLES 3, MediaStore klasörleri; Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.8.5"
+        versionCode = 20
+        versionName = "0.9.0"
         buildConfigField("String", "GUNCELLEME_ADRESI", "\"" + (if (indirKlasoru.isEmpty()) "" else "https://studio.updated.com.tr/indir/$indirKlasoru/") + "\"")
         ndk { abiFilters += listOf("arm64-v8a") } // güncel Android telefonların hepsi; ML Kit kitaplıkları diğer işlemciler için APK'yı 3 kat büyütüyordu
     }

@@ -44,7 +44,8 @@ import kotlin.math.abs
 import kotlin.math.atan2
 
 /**
- * UPDATED Kamera: telefonun normal kamerası (iPhone kamerası gibi sade). Ekran dikey sabit; telefon döndükçe yalnız ikonlar döner.
+ * UPDATED Kamera: telefonun normal kamerası (iPhone kamerası sadeliğinde, Final Cut Camera'nın araç şeridiyle). Üstte yuvarlak düğmeler ve
+ * biçim etiketi, altta araç şeridi (dokununca cetvel açılır), mod şeridi ve deklanşör. Ekran dikey sabit; telefon döndükçe yalnız ikonlar döner.
  * Modlar altta kaydırılır (Video · Foto · Portre · Gece · Işık izi · Samanyolu · Monitör). PRO düğmesi Blackmagic düzenini
  * (MainActivity, mod=pro), Monitör dış kamera izlemeyi (MainActivity, mod=monitor) açar. Uygulama baştan açılınca hangisi
  * olacağı sorulur; alta alınıp geri gelince sorulmaz.
@@ -76,6 +77,8 @@ class KameraActivity : Activity() {
     private lateinit var monitor: MonitorGorunum
     private lateinit var komp: KompozisyonGorunum
     private lateinit var ustSerit: LinearLayout
+    /** Final Cut Camera tarzı araç şeridi: pozlama, beyaz denge, odak, kılavuz, yardımcı, terazi (simge + kısa yazı) */
+    private lateinit var aracSerit: LinearLayout
     private lateinit var modSerit: LinearLayout
     private lateinit var modKaydir: HorizontalScrollView
     private lateinit var altSira: FrameLayout
@@ -206,13 +209,12 @@ class KameraActivity : Activity() {
         kutu.addView(odakKare, FrameLayout.LayoutParams(dp(72f), dp(72f)))
         oneriCip = cip(MAVI_ACIK).apply { setOnClickListener { sonOneri?.let { (t, y) -> kompTur = t; kompYon = y; sonKomp = t; kompUygula() }; visibility = View.GONE } }
         kutu.addView(oneriCip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(12f) })
-        kayitCip = TextView(this).apply { textSize = 14f; typeface = mono; setTextColor(Color.WHITE); setPadding(dp(12f), dp(5f), dp(12f), dp(5f)); background = Tema.kapsul(Color.rgb(229, 72, 77), dp(14f).toFloat()); visibility = View.GONE }
-        kutu.addView(kayitCip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(12f) })
+        Tema.simge(oneriCip, R.drawable.ic_oneri, MAVI_ACIK, 16f)
+        kayitCip = TextView(this).apply { textSize = 15f; typeface = mono; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setPadding(dp(12f), dp(5f), dp(12f), dp(5f)); background = Tema.kapsul(Color.rgb(229, 72, 77), dp(14f).toFloat()); visibility = View.GONE }
         sahneCip = cip(MAVI_ACIK).apply { setOnClickListener { sahneUygula(); visibility = View.GONE } }
+        Tema.simge(sahneCip, R.drawable.ic_sahne, MAVI_ACIK, 16f)
         kutu.addView(sahneCip, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply { bottomMargin = dp(64f); marginStart = dp(12f) })
-        bilgiCip = TextView(this).apply { textSize = 12f; typeface = mono; setTextColor(Color.WHITE); setPadding(dp(10f), dp(5f), dp(10f), dp(5f)); background = cam(dp(12f).toFloat()); setOnClickListener { ayarlarAc() } }
-        donenler.add(bilgiCip)
-        kutu.addView(bilgiCip, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { bottomMargin = dp(64f); marginEnd = dp(12f) })
+        bilgiCip = TextView(this).apply { textSize = 12f; typeface = mono; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setPadding(dp(12f), dp(6f), dp(12f), dp(6f)); background = cam(dp(14f).toFloat()); setOnClickListener { ayarlarAc() }; contentDescription = "Biçim" }
         zoomSira = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         kutu.addView(zoomSira, FrameLayout.LayoutParams(-1, dp(48f), Gravity.BOTTOM).apply { bottomMargin = dp(10f) })
         sureSira = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; visibility = View.GONE }
@@ -223,23 +225,39 @@ class KameraActivity : Activity() {
         kok.addView(kutu)
         dokunmaKur()
 
-        // Üst cam şerit
-        ustSerit = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; background = cam(dp(26f).toFloat()); setPadding(dp(4f), 0, dp(4f), 0) }
-        fun ekle(v: View, w: Int = dp(44f)) = ustSerit.addView(v, LinearLayout.LayoutParams(w, dp(44f)))
+        // Üst sıra (iPhone gibi): solda Monitör ve flaş, ortada biçim (kayıtta süre), sağda PRO ve ayarlar; hepsi yuvarlak cam düğme
+        ustSerit = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4f), 0, dp(4f), 0) }
+        fun ekle(v: View, w: Int = dp(40f)) = ustSerit.addView(v, LinearLayout.LayoutParams(w, dp(40f)).apply { marginEnd = dp(8f) })
         fun bosluk() = ustSerit.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        ekle(ikon(R.drawable.ic_monitor, "Monitör") { monitoreGec() }.apply { setColorFilter(MAVI_ACIK) }); bosluk()
-        val flasKutu = FrameLayout(this).apply { setOnClickListener { flasDegistir() }; contentDescription = "Flaş" }
+        ekle(ikon(R.drawable.ic_monitor, "Monitör") { monitoreGec() }.apply { setColorFilter(MAVI_ACIK); background = Tema.kapsul(CAM) })
+        val flasKutu = FrameLayout(this).apply { setOnClickListener { flasDegistir() }; contentDescription = "Flaş"; background = Tema.kapsul(CAM) }
         flasIkon = ImageView(this).apply { setImageResource(R.drawable.ic_flas_yok); scaleType = ImageView.ScaleType.CENTER }
         flasHarf = TextView(this).apply { text = "A"; textSize = 9f; typeface = kosulKalin; setTextColor(Color.WHITE); visibility = View.GONE }
         flasKutu.addView(flasIkon, FrameLayout.LayoutParams(-1, -1)); flasKutu.addView(flasHarf, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { marginEnd = dp(8f); bottomMargin = dp(6f) })
         donenler.add(flasKutu); ekle(flasKutu); bosluk()
-        ekle(ikon(R.drawable.ic_kilavuz, "Kompozisyon kılavuzu") { kilavuzMenu() }); bosluk()
-        ekle(ikon(R.drawable.ic_yardimci, "Akıllı yardımcı") { asistanAcik = !asistanAcik; kompUygula() }.apply { tag = "yardimci" }); bosluk()
-        ekle(ikon(R.drawable.ic_terazi, "Terazi") { teraziAcik = !teraziAcik; kompUygula() }.apply { tag = "terazi" }); bosluk()
-        val pro = etiket("PRO", 15f).apply { background = GradientDrawable().apply { cornerRadius = dp(17f).toFloat(); setStroke(dp(1f), Color.argb(72, 255, 255, 255)) }; setOnClickListener { proyaGec() }; contentDescription = "PRO" }
-        donenler.add(pro); ustSerit.addView(pro, LinearLayout.LayoutParams(dp(58f), dp(34f))); bosluk()
-        ekle(ikon(R.drawable.ic_ayar, "Ayarlar") { ayarlarAc() })
+        val orta = FrameLayout(this)
+        orta.addView(bilgiCip, FrameLayout.LayoutParams(-2, dp(30f), Gravity.CENTER)); orta.addView(kayitCip, FrameLayout.LayoutParams(-2, dp(30f), Gravity.CENTER))
+        ustSerit.addView(orta, LinearLayout.LayoutParams(-2, dp(40f))); bosluk()
+        val pro = etiket("PRO", 14f).apply { background = Tema.kapsul(CAM); setOnClickListener { proyaGec() }; contentDescription = "PRO" }
+        donenler.add(pro); ustSerit.addView(pro, LinearLayout.LayoutParams(dp(56f), dp(40f)).apply { marginEnd = dp(8f) })
+        ustSerit.addView(ikon(R.drawable.ic_ayar, "Ayarlar") { ayarlarAc() }.apply { background = Tema.kapsul(CAM) }, LinearLayout.LayoutParams(dp(40f), dp(40f)))
         kok.addView(ustSerit)
+
+        // Araç şeridi (Final Cut Camera gibi): simge + kısa yazı; pozlama, beyaz denge ve odakta cetvel açılır
+        aracSerit = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(8f), 0, dp(8f), 0) }
+        fun arac(res: Int, ad: String, etiketi: String, is_: () -> Unit) {
+            val k = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; contentDescription = ad; tag = etiketi; setOnClickListener { is_() } }
+            k.addView(ImageView(this).apply { setImageResource(res); donenler.add(this) }, LinearLayout.LayoutParams(dp(22f), dp(22f)))
+            k.addView(TextView(this).apply { textSize = 11f; typeface = kosul; setTextColor(Color.WHITE); gravity = Gravity.CENTER; isSingleLine = true; setPadding(0, dp(3f), 0, 0) })
+            aracSerit.addView(k, LinearLayout.LayoutParams(0, -1, 1f))
+        }
+        arac(R.drawable.ic_pozlama, "Pozlama", "poz") { cetvelAc(Cetvel.POZ) }
+        arac(R.drawable.ic_beyaz, "Beyaz denge", "bd") { cetvelAc(Cetvel.BD) }
+        arac(R.drawable.ic_odak, "Odak", "odak") { cetvelAc(Cetvel.ODAK) }
+        arac(R.drawable.ic_kilavuz, "Kompozisyon kılavuzu", "kilavuz") { kilavuzMenu() }
+        arac(R.drawable.ic_yardimci, "Akıllı yardımcı", "yardimci") { asistanAcik = !asistanAcik; kompUygula() }
+        arac(R.drawable.ic_terazi, "Terazi", "terazi") { teraziAcik = !teraziAcik; kompUygula() }
+        kok.addView(aracSerit)
 
         // Mod şeridi
         modSerit = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -267,10 +285,11 @@ class KameraActivity : Activity() {
     private fun yerlestir() {
         if (!this::kok.isInitialized) return
         val u = if (ustBosluk == 0) dp(32f) else ustBosluk; val a = if (altBosluk == 0) dp(16f) else altBosluk
-        ustSerit.layoutParams = FrameLayout.LayoutParams(-1, dp(56f), Gravity.TOP).apply { topMargin = u + dp(6f); marginStart = dp(12f); marginEnd = dp(12f) }
+        ustSerit.layoutParams = FrameLayout.LayoutParams(-1, dp(48f), Gravity.TOP).apply { topMargin = u + dp(4f); marginStart = dp(14f); marginEnd = dp(14f) }
         altSira.layoutParams = FrameLayout.LayoutParams(-1, dp(96f), Gravity.BOTTOM).apply { bottomMargin = a + dp(8f) }
         modKaydir.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.BOTTOM).apply { bottomMargin = a + dp(8f) + dp(100f) }
-        kutu.layoutParams = FrameLayout.LayoutParams(-1, -1).apply { topMargin = u + dp(68f); bottomMargin = a + dp(8f) + dp(146f) }
+        aracSerit.layoutParams = FrameLayout.LayoutParams(-1, dp(52f), Gravity.BOTTOM).apply { bottomMargin = a + dp(8f) + dp(142f) }
+        kutu.layoutParams = FrameLayout.LayoutParams(-1, -1).apply { topMargin = u + dp(56f); bottomMargin = a + dp(8f) + dp(198f) }
         kok.requestLayout()
     }
 
@@ -400,11 +419,7 @@ class KameraActivity : Activity() {
         if (!asistanAcik) { komp.analiz = null; komp.ipucu = null }
         monitor.olcumKaresi = if (asistanAcik || sahneOto) { buf, w, h -> asistan?.kare(buf, w, h); if (sahneOto) renkOlc(buf, w, h)
             if (asistanAcik) { val oran = komp.goruntuOrani(); analiz.kare(buf, w, h, oran) { s -> runOnUiThread { komp.analiz = s; ipucuGuncelle() } } } } else null
-        (0 until ustSerit.childCount).map { ustSerit.getChildAt(it) }.forEach { v ->
-            if (v is ImageView && v.tag == "yardimci") v.setColorFilter(if (asistanAcik) TURUNCU else Color.WHITE)
-            if (v is ImageView && v.tag == "terazi") v.setColorFilter(if (teraziAcik) TURUNCU else Color.WHITE)
-            if (v is ImageView && v.contentDescription == "Kompozisyon kılavuzu") v.setColorFilter(if (kompTur != KompTur.KAPALI) TURUNCU else Color.WHITE)
-        }
+        if (this::aracSerit.isInitialized) aracCiz()
     }
 
     private fun sensorKaydi() {
@@ -438,7 +453,7 @@ class KameraActivity : Activity() {
     private fun kilavuzMenu() {
         if (acilir != null) return acilirKapat()
         val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = pano(dp(26f).toFloat()); setPadding(dp(16f), dp(14f), dp(16f), dp(10f)); isClickable = true }
-        p.addView(etiket("KOMPOZİSYON KILAVUZU", 13f, GRI).apply { gravity = Gravity.START; setPadding(dp(4f), 0, 0, dp(10f)) })
+        p.addView(etiket("KOMPOZİSYON KILAVUZU", 13f, GRI).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; setPadding(dp(4f), 0, 0, dp(10f)); Tema.simge(this, R.drawable.ic_kilavuz, GRI, 16f) })
         val izgara = android.widget.GridLayout(this).apply { columnCount = 4 }
         KompTur.values().forEach { t ->
             val h = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(3f), dp(4f), dp(3f), dp(6f)); setOnClickListener { kompTur = t; if (t != KompTur.KAPALI) sonKomp = t; kompUygula(); acilirKapat(); kilavuzMenu() } }
@@ -465,7 +480,7 @@ class KameraActivity : Activity() {
 
     private fun anahtar(ad: String, acik: Boolean, degis: (Boolean) -> Unit): View {
         val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4f), dp(8f), dp(4f), dp(8f)) }
-        s.addView(TextView(this).apply { text = ad; textSize = 15f; setTextColor(Color.WHITE) }, LinearLayout.LayoutParams(0, -2, 1f))
+        s.addView(TextView(this).apply { text = ad; textSize = 15f; setTextColor(Color.WHITE); Tema.simgeAdi(ad)?.let { Tema.simge(this, it, GRI) } }, LinearLayout.LayoutParams(0, -2, 1f))
         val sw = android.widget.Switch(this).apply { isChecked = acik; thumbTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
             trackTintList = android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(TURUNCU, Color.argb(70, 255, 255, 255))); trackTintMode = android.graphics.PorterDuff.Mode.SRC
             setOnCheckedChangeListener { _, b -> degis(b) } }
@@ -473,25 +488,118 @@ class KameraActivity : Activity() {
         return s
     }
 
-    private fun acilirAc(v: View, ustTan: Boolean) {
+    private fun acilirAc(v: View, ustTan: Boolean, altPay: Int = 0) {
         acilirKapat()
         val perde = FrameLayout(this).apply { setOnClickListener { acilirKapat() } }
         val lp = FrameLayout.LayoutParams(-1, -2, if (ustTan) Gravity.TOP else Gravity.BOTTOM).apply {
             marginStart = dp(12f); marginEnd = dp(12f)
-            if (ustTan) topMargin = (ustSerit.layoutParams as FrameLayout.LayoutParams).topMargin + dp(62f) else bottomMargin = altBosluk + dp(12f)
+            if (ustTan) topMargin = (ustSerit.layoutParams as FrameLayout.LayoutParams).topMargin + dp(54f) else bottomMargin = (if (altBosluk == 0) dp(16f) else altBosluk) + dp(12f) + altPay
         }
         perde.addView(v, lp)
         kok.addView(perde, FrameLayout.LayoutParams(-1, -1)); acilir = perde
     }
-    private fun acilirKapat() { acilir?.let { kok.removeView(it) }; acilir = null }
+    private fun acilirKapat() { acilir?.let { kok.removeView(it) }; acilir = null; if (this::aracSerit.isInitialized) aracCiz() }
+
+    /* ================= cetvel: pozlama, beyaz denge, odak (Final Cut Camera gibi alttan) ================= */
+    enum class Cetvel { POZ, BD, ODAK }
+    private val BD_ADLARI = linkedMapOf(CameraMetadata.CONTROL_AWB_MODE_AUTO to "Oto", CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT to "3200K",
+        CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT to "4000K", CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT to "5600K", CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT to "6500K", CameraMetadata.CONTROL_AWB_MODE_SHADE to "7500K")
+    private val BD_ACIKLAMA = mapOf(CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT to "Ampul", CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT to "Floresan", CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT to "Gün ışığı",
+        CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT to "Bulutlu", CameraMetadata.CONTROL_AWB_MODE_SHADE to "Gölge")
+    private fun evYazi(ev: Int, adim: Float) = if (ev == 0) "±0" else "%+.1f".format(ev * adim).replace('.', ',')
+
+    private fun cetvelAc(c: Cetvel) {
+        val k = kaynak ?: return tost("Kamera hazır değil.")
+        val y = k.yetenek
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = pano(dp(22f).toFloat()); setPadding(dp(16f), dp(12f), dp(16f), dp(12f)); isClickable = true }
+        val bas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val baslik = TextView(this).apply { textSize = 15f; typeface = kosul; setTextColor(Color.WHITE) }
+        val deger = TextView(this).apply { textSize = 15f; typeface = mono; setTextColor(TURUNCU); setPadding(dp(10f), 0, 0, 0) }
+        bas.addView(baslik); bas.addView(deger); bas.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        val oto = etiket("OTO", 13f, Color.BLACK).apply { setPadding(dp(14f), 0, dp(14f), 0) }
+        bas.addView(oto, LinearLayout.LayoutParams(-2, dp(30f)))
+        p.addView(bas)
+        fun otoCiz(acik: Boolean) { oto.background = Tema.kapsul(if (acik) TURUNCU else Color.argb(36, 255, 255, 255)); oto.setTextColor(if (acik) Color.BLACK else Color.WHITE) }
+        fun cubuk(en: Int, simdi: Int, degisti: (Int) -> Unit) = p.addView(android.widget.SeekBar(this).apply {
+            max = en; progress = simdi
+            progressTintList = android.content.res.ColorStateList.valueOf(TURUNCU); thumbTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.argb(90, 255, 255, 255))
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: android.widget.SeekBar?, v: Int, kullanici: Boolean) { if (kullanici) degisti(v) }
+                override fun onStartTrackingTouch(s: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(s: android.widget.SeekBar?) { ayarKaydet() }
+            }) }, LinearLayout.LayoutParams(-1, dp(44f)).apply { topMargin = dp(6f) })
+        fun not(t: String) = p.addView(TextView(this).apply { text = t; textSize = 12f; setTextColor(GRI); setPadding(0, dp(4f), 0, 0) })
+        when (c) {
+            Cetvel.POZ -> {
+                Tema.simge(baslik, R.drawable.ic_pozlama, Color.WHITE); baslik.text = "Pozlama"
+                val r = y.evAralik
+                if (r == null || r.upper == 0) { deger.text = ""; oto.visibility = View.GONE; not("Bu kamerada pozlama telafisi yok.") }
+                else {
+                    deger.text = evYazi(ayar.ev, y.evAdim); otoCiz(ayar.ev == 0)
+                    cubuk(r.upper - r.lower, ayar.ev - r.lower) { v -> ayar.ev = v + r.lower; k.ayarDegisti(); deger.text = evYazi(ayar.ev, y.evAdim); otoCiz(ayar.ev == 0) }
+                    oto.setOnClickListener { ayar.ev = 0; k.ayarDegisti(); ayarKaydet(); cetvelAc(c) }
+                    not("Sola: daha karanlık · sağa: daha aydınlık")
+                }
+            }
+            Cetvel.BD -> {
+                Tema.simge(baslik, R.drawable.ic_beyaz, Color.WHITE); baslik.text = "Beyaz denge"
+                deger.text = BD_ADLARI[ayar.awb] ?: "Oto"; oto.visibility = View.GONE
+                val satir = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                BD_ADLARI.keys.filter { it in y.awbModlari }.forEach { m ->
+                    val sec = ayar.awb == m
+                    satir.addView(LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(12f), dp(6f), dp(12f), dp(6f))
+                        background = Tema.kapsul(if (sec) TURUNCU else Color.argb(30, 255, 255, 255), dp(12f).toFloat())
+                        addView(etiket(BD_ADLARI[m]!!, 13f, if (sec) Color.BLACK else Color.WHITE))
+                        BD_ACIKLAMA[m]?.let { addView(etiket(it, 10f, if (sec) Color.DKGRAY else GRI)) }
+                        setOnClickListener { ayar.awb = m; k.ayarDegisti(); ayarKaydet(); cetvelAc(c) }
+                    }, LinearLayout.LayoutParams(-2, dp(48f)).apply { marginEnd = dp(6f) })
+                }
+                p.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(satir) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10f) })
+            }
+            Cetvel.ODAK -> {
+                Tema.simge(baslik, R.drawable.ic_odak, Color.WHITE); baslik.text = "Odak"
+                fun yaz() { deger.text = ayar.odakMesafe?.let { if (it <= 0f) "Sonsuz" else "%.2f m".format(1f / it).replace('.', ',') } ?: "Oto"; otoCiz(ayar.odakMesafe == null) }
+                yaz()
+                oto.setOnClickListener { ayar.odakMesafe = null; k.ayarDegisti(); k.odakSerbest(); ayarKaydet(); cetvelAc(c) }
+                if (y.minOdak > 0f) {
+                    cubuk(1000, ((ayar.odakMesafe ?: 0f) / y.minOdak * 1000).toInt()) { v -> ayar.odakMesafe = y.minOdak * v / 1000f; k.ayarDegisti(); yaz() }
+                    not("Sola: uzak (sonsuz) · sağa: yakın. Ekrana dokunmak da odaklar.")
+                } else not("Bu kamerada el ile odak yok; ekrana dokunarak odakla.")
+            }
+        }
+        acilirAc(p, ustTan = false, altPay = dp(194f))
+        aracCiz(c)
+    }
+
+    /** Araç şeridinin yazıları ve renkleri: ayar değişmişse değeri turuncu yazar */
+    private fun aracCiz(acik: Cetvel? = null) {
+        val k = kaynak; val evAdim = k?.yetenek?.evAdim?.takeIf { it > 0 } ?: 1f
+        for (i in 0 until aracSerit.childCount) {
+            val v = aracSerit.getChildAt(i) as LinearLayout
+            val ikon = v.getChildAt(0) as ImageView; val yazi = v.getChildAt(1) as TextView
+            val (metin, etkin) = when (v.tag) {
+                "poz" -> (if (ayar.ev == 0) "Pozlama" else evYazi(ayar.ev, evAdim)) to (ayar.ev != 0 || acik == Cetvel.POZ)
+                "bd" -> (if (ayar.awb == CameraMetadata.CONTROL_AWB_MODE_AUTO) "Beyaz" else BD_ADLARI[ayar.awb] ?: "Beyaz") to (ayar.awb != CameraMetadata.CONTROL_AWB_MODE_AUTO || acik == Cetvel.BD)
+                "odak" -> (if (ayar.odakMesafe == null) "Odak" else "MF") to (ayar.odakMesafe != null || acik == Cetvel.ODAK)
+                "kilavuz" -> (if (kompTur == KompTur.KAPALI) "Kılavuz" else kompTur.ad) to (kompTur != KompTur.KAPALI)
+                "yardimci" -> "Yardımcı" to asistanAcik
+                "terazi" -> "Terazi" to teraziAcik
+                else -> "" to false
+            }
+            yazi.text = metin; val renk = if (etkin) TURUNCU else Color.WHITE
+            yazi.setTextColor(renk); ikon.setColorFilter(renk)
+        }
+    }
 
     /* ================= ayarlar ================= */
     private fun ayarlarAc() {
         val k = kaynak
         val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18f), dp(16f), dp(18f), dp(16f)) }
-        fun baslik(t: String) = ic.addView(etiket(t, 13f, GRI).apply { gravity = Gravity.START; setPadding(0, dp(14f), 0, dp(6f)) })
+        fun baslik(t: String, simge: Int) = ic.addView(etiket(t, 13f, GRI).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; setPadding(0, dp(14f), 0, dp(6f)); Tema.simge(this, simge, GRI, 16f) })
         fun secim(ad: String, secenekler: List<String>, secili: Int, sec: (Int) -> Unit) {
-            ic.addView(TextView(this).apply { text = ad; textSize = 14f; setTextColor(Color.WHITE); setPadding(0, dp(8f), 0, dp(6f)) })
+            ic.addView(TextView(this).apply { text = ad; textSize = 14f; setTextColor(Color.WHITE); setPadding(0, dp(8f), 0, dp(6f)); Tema.simgeAdi(ad)?.let { Tema.simge(this, it, GRI) } })
             val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             secenekler.forEachIndexed { i, o -> s.addView(etiket(o, 13f, if (i == secili) Color.BLACK else Color.WHITE).apply {
                 background = Tema.kapsul(if (i == secili) TURUNCU else Color.argb(26, 255, 255, 255), dp(10f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
@@ -499,15 +607,15 @@ class KameraActivity : Activity() {
             ic.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(s) })
         }
         if (k != null) {
-            baslik("FOTOĞRAF")
+            baslik("FOTOĞRAF", R.drawable.ic_foto)
             val fb = k.fotoBoyutlari.distinctBy { it.width * 10 / it.height }.take(2) + k.fotoBoyutlari.take(4)
             val liste = fb.distinct().sortedByDescending { it.width * it.height }.take(5); val fs = k.secilenFotoBoyut()
-            if (liste.isNotEmpty()) secim("Çözünürlük", liste.map { "%.0f MP · %s".format(it.width * it.height / 1e6, oran(it)) }, liste.indexOf(fs).coerceAtLeast(0)) {
+            if (liste.isNotEmpty()) secim("Fotoğraf çözünürlüğü", liste.map { "%.0f MP · %s".format(it.width * it.height / 1e6, oran(it)) }, liste.indexOf(fs).coerceAtLeast(0)) {
                 ayar.fotoBoyut = liste[it]; ayarKaydet(); k.oturumYenile { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz() } } }
             if (k.rawVar) ic.addView(anahtar("RAW (DNG) da kaydet", ayar.raw) { ayar.raw = it; ayarKaydet(); k.oturumYenile { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz() } } })
             secim("Zamanlayıcı", listOf("Kapalı", "3 sn", "10 sn"), when (zamanlayici) { 3 -> 1; 10 -> 2; else -> 0 }) { zamanlayici = intArrayOf(0, 3, 10)[it]; tercih.edit().putInt("zamanlayici", zamanlayici).apply() }
             ic.addView(anahtar("Deklanşör sesi", deklansorSesi) { deklansorSesi = it; tercih.edit().putBoolean("deklansor", it).apply() })
-            baslik("VİDEO")
+            baslik("VİDEO", R.drawable.ic_video)
             val vb = listOf(Size(1280, 720), Size(1920, 1080), Size(3840, 2160)).filter { it in k.yetenek.boyutlar }
             if (vb.isNotEmpty()) secim("Çözünürlük", vb.map { when (it.height) { 720 -> "720p"; 1080 -> "1080p"; else -> "4K" } }, vb.indexOf(ayar.boyut ?: Size(1920, 1080)).coerceAtLeast(0)) {
                 ayar.boyut = vb[it]; ayarKaydet(); if (!mod.foto) k.oturumYenile { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz() } } }
@@ -515,13 +623,13 @@ class KameraActivity : Activity() {
             if (fpsler.size > 1) secim("Kare hızı", fpsler.map { "${it.upper} fps" }, if (ayar.fps == Range(60, 60)) 1 else 0) {
                 ayar.fps = fpsler[it]; ayarKaydet(); if (!mod.foto) k.oturumYenile { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz() } } }
         }
-        baslik("YARDIMCILAR")
+        baslik("YARDIMCILAR", R.drawable.ic_yardimci)
         ic.addView(anahtar("Otomatik sahne önerisi", sahneOto) { sahneOto = it; kompUygula() })
-        baslik("UYGULAMA")
+        baslik("UYGULAMA", R.drawable.ic_bilgi)
         ic.addView(anahtar("Açılışta Kamera / Monitör sor", tercih.getString("giris", null) == null) { if (it) tercih.edit().remove("giris").apply() else tercih.edit().putString("giris", "kamera").apply() })
-        ic.addView(TextView(this).apply { text = "Güncellemeleri denetle"; textSize = 15f; setTextColor(MAVI_ACIK); setPadding(0, dp(12f), 0, dp(8f)); setOnClickListener { Guncelleme.denetle(this@KameraActivity, sessiz = false) } })
+        ic.addView(TextView(this).apply { text = "Güncellemeleri denetle"; textSize = 15f; setTextColor(MAVI_ACIK); setPadding(0, dp(12f), 0, dp(8f)); Tema.simge(this, R.drawable.ic_guncelle, MAVI_ACIK); setOnClickListener { Guncelleme.denetle(this@KameraActivity, sessiz = false) } })
         ic.addView(TextView(this).apply { text = "UPDATED Kamera ${packageManager.getPackageInfo(packageName, 0).versionName} · çökme ve donmalar kendiliğinden bildirilir (yalnız hata ayrıntısı ve cihaz modeli)."; textSize = 12f; setTextColor(GRI); setPadding(0, dp(6f), 0, 0) })
-        ic.addView(etiket("AYARLAR", 18f).apply { gravity = Gravity.START; typeface = kosulKalin; setPadding(0, 0, 0, dp(2f)) }, 0)
+        ic.addView(etiket("AYARLAR", 18f).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; typeface = kosulKalin; setPadding(0, 0, 0, dp(2f)); Tema.simge(this, R.drawable.ic_ayar, Color.WHITE, 20f) }, 0)
         val p = ScrollView(this).apply { background = pano(dp(26f).toFloat()); addView(ic); isClickable = true; clipToOutline = true }
         acilirAc(p, ustTan = false)
         // İçerik kadar yükseklik; uzunsa ekranın %62'sinde kayar
@@ -541,7 +649,7 @@ class KameraActivity : Activity() {
         k.fotoModu = mod.foto; k.sahne = mod.sahne; k.ekranYonu = (360 - fizikselYon) % 360
         @Suppress("DEPRECATION") monitor.otoDondur = windowManager.defaultDisplay.rotation * 90
         kaynak = k
-        k.baslat(y, { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); zoomCiz(); flasCiz() } }, { hata -> runOnUiThread { if (hata == "POLITIKA") engelli() else tost(hata) } })
+        k.baslat(y, { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); zoomCiz(); flasCiz(); aracCiz() } }, { hata -> runOnUiThread { if (hata == "POLITIKA") engelli() else tost(hata) } })
     }
 
     private fun kameraCevir() {
@@ -573,7 +681,7 @@ class KameraActivity : Activity() {
             mod.foto -> k.secilenFotoBoyut()?.let { "%.0f MP · %s".format(it.width * it.height / 1e6, if (k.rawAcik) "RAW" else "JPEG") } ?: "FOTO"
             else -> { val b = k.secilenBoyut(); "${when { b.height >= 2160 -> "4K"; b.height >= 1080 -> "1080p"; else -> "${b.height}p" }} · ${ayar.fps?.upper ?: 30}" }
         }
-        bilgiCip.visibility = if (k == null) View.GONE else View.VISIBLE
+        bilgiCip.visibility = if (k == null || kayitCip.visibility == View.VISIBLE) View.INVISIBLE else View.VISIBLE
     }
 
     /* ================= çekim ================= */
@@ -638,7 +746,7 @@ class KameraActivity : Activity() {
         if (k.kayitta) {
             k.kayitDurdur { ok -> runOnUiThread {
                 kayitUri?.let { u -> contentResolver.update(u, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null); if (ok) { sonUri = u; sonMime = "video/mp4"; kucukResim(u) } else contentResolver.delete(u, null, null) }
-                kayitUri = null; deklansorDugme.kayitta = false; kayitCip.visibility = View.GONE
+                kayitUri = null; deklansorDugme.kayitta = false; kayitCip.visibility = View.GONE; bilgiCiz()
                 if (!ok) tost("Kayıt kaydedilemedi (çok kısa olabilir).")
             } }
             return
@@ -654,7 +762,7 @@ class KameraActivity : Activity() {
         val mbps = when { b.height >= 2160 -> 50; b.height >= 1080 -> if (fps > 30) 30 else 20; else -> 12 }
         k.kayitBasla(fd, false, mbps, true) { hata -> runOnUiThread {
             if (hata != null) { tost("Kayıt başlamadı: $hata"); contentResolver.delete(uri, null, null); kayitUri = null; return@runOnUiThread }
-            kayitBas = System.currentTimeMillis(); deklansorDugme.kayitta = true; kayitCip.visibility = View.VISIBLE; oneriCip.visibility = View.GONE
+            kayitBas = System.currentTimeMillis(); deklansorDugme.kayitta = true; kayitCip.text = "●  00:00"; kayitCip.visibility = View.VISIBLE; bilgiCip.visibility = View.INVISIBLE; oneriCip.visibility = View.GONE
         } }
     }
 

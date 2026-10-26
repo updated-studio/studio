@@ -33,10 +33,24 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
 
     init {
         setEGLContextClientVersion(3)
+        // Kayıt kodlayıcısının yüzeyine de çizebilmek için "kaydedilebilir" yapılandırma (yoksa herhangi bir RGB888)
+        if (android.os.Build.FINGERPRINT != "robolectric") setEGLConfigChooser { egl, d -> // ekran testlerinde (Robolectric) EGL yok
+            fun sec(kayit: Boolean): javax.microedition.khronos.egl.EGLConfig? {
+                val o = intArrayOf(0x3024, 8, 0x3023, 8, 0x3022, 8, 0x3040, 0x40) + (if (kayit) intArrayOf(0x3142, 1) else intArrayOf()) + intArrayOf(0x3038)
+                val l = arrayOfNulls<javax.microedition.khronos.egl.EGLConfig>(1); val n = IntArray(1)
+                return if (egl.eglChooseConfig(d, o, l, 1, n) && n[0] > 0) l[0] else null
+            }
+            sec(true) ?: sec(false) ?: throw IllegalArgumentException("EGL yapılandırması yok")
+        }
         preserveEGLContextOnPause = true
         setRenderer(r)
         renderMode = RENDERMODE_WHEN_DIRTY
     }
+
+    /** Kayıt: her yeni kare araçsız (LUT, odak, zebra, kılavuz yok) bu yüzeye de çizilir; null = kayıt yok */
+    @Volatile var kayitYuzeyi: Surface? = null
+    /** Kayıt boyutu: ekrandaki yönüyle kaynak boyutu (kodlayıcı için çift sayı) */
+    fun kayitBoyutu(): Pair<Int, Int> { val d = yanDurur(); val w = if (d) kaynakBoyut[1] else kaynakBoyut[0]; val h = if (d) kaynakBoyut[0] else kaynakBoyut[1]; return (w and 1.inv()) to (h and 1.inv()) }
 
     fun lutYukle(lut: Lut) { bekleyenLut = lut; ayarlar.lutAcik = true; requestRender() }
     fun ekranGoruntusu(geri: (Bitmap) -> Unit) { ekranGoruntusuIste = geri; requestRender() }
@@ -234,6 +248,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
                 GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
                 olcumKaresi?.invoke(olcumTampon, OW, OH)
             }
+            if (kareGeldi) kayitCiz()
             if (kareGeldi) birlestirme?.let { runCatching { birlestirAdim(it) }.onFailure { e -> birlestirSil(); birlestirme = null; GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); HataKaydi.not("birlestir", e.stackTraceToString()); post { it.bitti(null) } } }
             ekranGoruntusuIste?.let { geri ->
                 ekranGoruntusuIste = null
@@ -244,6 +259,35 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
                 val dogru = Bitmap.createBitmap(bmp, 0, 0, gw, gh, m, false)
                 post { geri(dogru) }
             }
+        }
+
+        // Kayıt yüzeyi (kodlayıcının girişi): aynı EGL bağlamıyla ikinci bir pencere yüzeyi
+        private var kayitEgl: android.opengl.EGLSurface? = null; private var kayitHedef: Surface? = null
+        private fun kayitCiz() {
+            val hedef = kayitYuzeyi
+            val dpy = android.opengl.EGL14.eglGetCurrentDisplay()
+            if (hedef !== kayitHedef) {
+                kayitEgl?.let { android.opengl.EGL14.eglDestroySurface(dpy, it) }; kayitEgl = null; kayitHedef = hedef
+                if (hedef != null) runCatching {
+                    val bag = android.opengl.EGL14.eglGetCurrentContext(); val no = IntArray(1)
+                    android.opengl.EGL14.eglQueryContext(dpy, bag, android.opengl.EGL14.EGL_CONFIG_ID, no, 0)
+                    val l = arrayOfNulls<android.opengl.EGLConfig>(1); val n = IntArray(1)
+                    android.opengl.EGL14.eglChooseConfig(dpy, intArrayOf(android.opengl.EGL14.EGL_CONFIG_ID, no[0], android.opengl.EGL14.EGL_NONE), 0, l, 0, 1, n, 0)
+                    kayitEgl = android.opengl.EGL14.eglCreateWindowSurface(dpy, l[0], hedef, intArrayOf(android.opengl.EGL14.EGL_NONE), 0).takeIf { it != android.opengl.EGL14.EGL_NO_SURFACE }
+                    if (kayitEgl == null) HataKaydi.not("kayit", "kayıt yüzeyi açılamadı: egl ${android.opengl.EGL14.eglGetError()}")
+                }.onFailure { HataKaydi.not("kayit", it.stackTraceToString()) }
+            }
+            val es = kayitEgl ?: return
+            val ciz = android.opengl.EGL14.eglGetCurrentSurface(android.opengl.EGL14.EGL_DRAW); val oku = android.opengl.EGL14.eglGetCurrentSurface(android.opengl.EGL14.EGL_READ)
+            val bag = android.opengl.EGL14.eglGetCurrentContext()
+            if (!android.opengl.EGL14.eglMakeCurrent(dpy, es, es, bag)) return
+            val (w, h) = kayitBoyutu()
+            GLES30.glViewport(0, 0, w, h); GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+            ciz(0, 0, w, h, w.toFloat(), h.toFloat(), ham = true, olcum = true, tam = true)
+            android.opengl.EGLExt.eglPresentationTimeANDROID(dpy, es, System.nanoTime())
+            android.opengl.EGL14.eglSwapBuffers(dpy, es)
+            android.opengl.EGL14.eglMakeCurrent(dpy, ciz, oku, bag)
+            GLES30.glViewport(0, 0, gw, gh)
         }
 
         /** Görüntüyü (kw:kh oranıyla) verilen alana sığdırarak çizer; ham = araçsız, olcum = kılavuz/vurgu yok */
