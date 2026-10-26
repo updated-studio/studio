@@ -55,7 +55,7 @@ class SesGostergesi(c: Context) : View(c) {
             if (w > krm) { p.color = Color.rgb(230, 50, 40); c.drawRect(krm, y, w, y + kanalH, p) }
             val tx = width * ((tepe[i] + 60f) / 60f).coerceIn(0f, 1f); p.color = Color.WHITE; c.drawRect(tx - 2f, y, tx, y + kanalH, p)
         }
-        for (db in intArrayOf(-48, -24, -12, -6, 0)) { val x = width * ((db + 60f) / 60f); c.drawText("$db", (x - 14f).coerceAtLeast(0f), height - 2f, yazi) }
+        if (width > 300) for (db in intArrayOf(-48, -24, -12, -6, 0)) { val x = width * ((db + 60f) / 60f); c.drawText("$db", (x - 14f).coerceAtLeast(0f), height - 2f, yazi) }
     }
 }
 

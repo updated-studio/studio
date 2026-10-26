@@ -17,8 +17,8 @@ android {
         applicationId = "tr.com.updated.monitor"
         minSdk = 29            // Android 10: GLES 3, MediaStore klasörleri; Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.7.0"
+        versionCode = 13
+        versionName = "0.7.1"
         buildConfigField("String", "GUNCELLEME_ADRESI", "\"" + (if (indirKlasoru.isEmpty()) "" else "https://studio.updated.com.tr/indir/$indirKlasoru/") + "\"")
         ndk { abiFilters += listOf("arm64-v8a") } // güncel Android telefonların hepsi; ML Kit kitaplıkları diğer işlemciler için APK'yı 3 kat büyütüyordu
     }
@@ -40,6 +40,8 @@ android {
     buildFeatures { buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
+    // Ekran görüntüsü testleri (telefon olmadan): Robolectric gerçek çizimle (native graphics) ekranları PNG'ye döker
+    testOptions { unitTests { isIncludeAndroidResources = true; all { it.maxHeapSize = "1200m"; it.systemProperty("robolectric.graphicsMode", "NATIVE") } } }
 }
 
 dependencies {
@@ -51,4 +53,7 @@ dependencies {
     // Akıllı kompozisyon yardımcısı: konu ve yüz algılama telefonun içinde (internetsiz), modeller uygulamayla gelir
     implementation("com.google.mlkit:object-detection:17.0.2")
     implementation("com.google.mlkit:face-detection:16.1.7")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
 }

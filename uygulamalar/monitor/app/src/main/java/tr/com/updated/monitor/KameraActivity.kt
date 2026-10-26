@@ -173,6 +173,8 @@ class KameraActivity : Activity() {
 
     /* ================= iskelet ================= */
     private fun cam(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(CAM); setStroke(1, Color.argb(26, 255, 255, 255)) }
+    /** Açılır paneller: arkadaki düğmeler karışmasın diye neredeyse opak */
+    private fun pano(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(Color.argb(244, 30, 33, 38)); setStroke(1, Color.argb(26, 255, 255, 255)) }
 
     private fun ikon(res: Int, aciklama: String, is_: () -> Unit) = ImageView(this).apply {
         setImageResource(res); contentDescription = aciklama; scaleType = ImageView.ScaleType.CENTER
@@ -425,7 +427,7 @@ class KameraActivity : Activity() {
     /** Kılavuz menüsü: ayarlara gitmeden kılavuz, yön, yardımcı, öneri, terazi */
     private fun kilavuzMenu() {
         if (acilir != null) return acilirKapat()
-        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = cam(dp(26f).toFloat()); setPadding(dp(16f), dp(14f), dp(16f), dp(10f)); isClickable = true }
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = pano(dp(26f).toFloat()); setPadding(dp(16f), dp(14f), dp(16f), dp(10f)); isClickable = true }
         p.addView(etiket("KOMPOZİSYON KILAVUZU", 13f, GRI).apply { gravity = Gravity.START; setPadding(dp(4f), 0, 0, dp(10f)) })
         val izgara = android.widget.GridLayout(this).apply { columnCount = 4 }
         KompTur.values().forEach { t ->
@@ -455,7 +457,7 @@ class KameraActivity : Activity() {
         val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4f), dp(8f), dp(4f), dp(8f)) }
         s.addView(TextView(this).apply { text = ad; textSize = 15f; setTextColor(Color.WHITE) }, LinearLayout.LayoutParams(0, -2, 1f))
         val sw = android.widget.Switch(this).apply { isChecked = acik; thumbTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
-            trackTintList = android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(TURUNCU, Color.argb(70, 255, 255, 255)))
+            trackTintList = android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()), intArrayOf(TURUNCU, Color.argb(70, 255, 255, 255))); trackTintMode = android.graphics.PorterDuff.Mode.SRC
             setOnCheckedChangeListener { _, b -> degis(b) } }
         s.addView(sw)
         return s
@@ -509,9 +511,11 @@ class KameraActivity : Activity() {
         ic.addView(anahtar("Açılışta Kamera / Monitör sor", tercih.getString("giris", null) == null) { if (it) tercih.edit().remove("giris").apply() else tercih.edit().putString("giris", "kamera").apply() })
         ic.addView(TextView(this).apply { text = "Güncellemeleri denetle"; textSize = 15f; setTextColor(MAVI_ACIK); setPadding(0, dp(12f), 0, dp(8f)); setOnClickListener { Guncelleme.denetle(this@KameraActivity, sessiz = false) } })
         ic.addView(TextView(this).apply { text = "UPDATED Kamera ${packageManager.getPackageInfo(packageName, 0).versionName} · çökme ve donmalar kendiliğinden bildirilir (yalnız hata ayrıntısı ve cihaz modeli)."; textSize = 12f; setTextColor(GRI); setPadding(0, dp(6f), 0, 0) })
-        val p = ScrollView(this).apply { background = cam(dp(26f).toFloat()); addView(ic); isClickable = true }
+        ic.addView(etiket("AYARLAR", 18f).apply { gravity = Gravity.START; typeface = kosulKalin; setPadding(0, 0, 0, dp(2f)) }, 0)
+        val p = ScrollView(this).apply { background = pano(dp(26f).toFloat()); addView(ic); isClickable = true; clipToOutline = true }
         acilirAc(p, ustTan = false)
-        p.layoutParams = (p.layoutParams as FrameLayout.LayoutParams).apply { height = (resources.displayMetrics.heightPixels * 0.62f).toInt() }
+        // İçerik kadar yükseklik; uzunsa ekranın %62'sinde kayar
+        p.post { val en = (resources.displayMetrics.heightPixels * 0.62f).toInt(); if (p.height > en) p.layoutParams = (p.layoutParams as FrameLayout.LayoutParams).apply { height = en } }
     }
     private fun oran(s: Size): String { val r = s.width.toFloat() / s.height; return when { abs(r - 4f / 3) < 0.03f -> "4:3"; abs(r - 16f / 9) < 0.03f -> "16:9"; abs(r - 1f) < 0.03f -> "1:1"; else -> "%.2f".format(r) } }
 
@@ -722,7 +726,7 @@ class KameraActivity : Activity() {
     /** Açılış: Kamera mı Monitör mü (uygulama baştan açılınca bir kez) */
     private fun girisGoster() {
         val p = FrameLayout(this).apply { setBackgroundColor(Color.rgb(27, 30, 35)); isClickable = true }
-        val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(24f), dp(96f), dp(24f), dp(24f)) }
+        val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(24f), dp(48f), dp(24f), dp(48f)) }
         ic.addView(TextView(this).apply { text = "UPDATED"; textSize = 30f; setTextColor(Color.WHITE); typeface = runCatching { Typeface.create("sans-serif-condensed", Typeface.BOLD) }.getOrNull(); letterSpacing = 0.04f })
         ic.addView(TextView(this).apply { text = "Ne yapmak istiyorsun?"; textSize = 15f; setTextColor(Color.rgb(201, 205, 211)); setPadding(0, dp(6f), 0, dp(28f)) })
         val hatirla = CheckBox(this).apply { text = "Seçimimi hatırla (ayarlardan değişir)"; setTextColor(Color.rgb(201, 205, 211)); buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(37, 99, 235)) }
@@ -741,7 +745,7 @@ class KameraActivity : Activity() {
             girisSoruldu = true; secimYapildi = true; if (hatirla.isChecked) tercih.edit().putString("giris", "monitor").apply(); kok.removeView(p); monitoreGec()
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
         ic.addView(hatirla)
-        p.addView(ScrollView(this).apply { addView(ic) }, FrameLayout.LayoutParams(-1, -1))
+        p.addView(ScrollView(this).apply { isFillViewport = true; addView(ic, FrameLayout.LayoutParams(-1, -1)) }, FrameLayout.LayoutParams(-1, -1))
         kok.addView(p, FrameLayout.LayoutParams(-1, -1))
     }
 
