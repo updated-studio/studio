@@ -851,12 +851,11 @@ class MainActivity : Activity() {
     private fun uvcAc(i: Int, d: android.hardware.usb.UsbDevice) {
         val m = monitorler[i] ?: return
         tercih.edit().putString("kaynak$i", "uvc").putString("uvc$i", "%04x:%04x".format(d.vendorId, d.productId)).apply()
-        val k = UvcKaynak(this, d)
-        kaynakAdi[i] = k.ad; m.ayarlar.dondur = 0; m.otoDondur = 0
+        kaynakAdi[i] = "USB: " + (d.productName ?: d.manufacturerName ?: "Görüntü aygıtı"); m.ayarlar.dondur = 0; m.otoDondur = 0
         acici[i] = {
             kaynaklar[i]?.durdur()
-            val y = UvcKaynak(this, d); kaynaklar[i] = y
-            y.baslat(sonYuzey[i]!!, { w, h -> m.tampon(w, h); runOnUiThread { ustCiz(); tost("${y.ad} · ${y.cozunurluk}") } }, { hata -> runOnUiThread { tost(hata) } })
+            val y = UvcKaynak(this, d, { m.gelenKare }, { c -> runOnUiThread { tost("${kaynakAdi[i]} · $c") } }); kaynaklar[i] = y
+            y.baslat(sonYuzey[i]!!, { w, h -> m.tampon(w, h); runOnUiThread { ustCiz() } }, { hata -> runOnUiThread { tost(hata) } })
         }
         if (sonYuzey[i] != null) acici[i]?.invoke()
         ustCiz()

@@ -60,6 +60,8 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     /** Kaynağın boyutu belli olunca: oran ve tampon boyutu (kamera bu boyutta yazar) */
     fun tampon(w: Int, h: Int) { kaynakBoyut = intArrayOf(w, h); yuzeyDokusu?.setDefaultBufferSize(w, h); requestRender() }
     @Volatile private var yuzeyDokusu: SurfaceTexture? = null
+    /** Kaynaktan gelen kare sayısı (USB kaynağı görüntü gönderiyor mu denetimi) */
+    @Volatile var gelenKare = 0L; private set
     /** Telefon kamerasında ekranın dönüşünü dengeleyen otomatik açı; kullanıcının DÖNDÜR ayarı bunun üstüne eklenir */
     @Volatile var otoDondur = 0
         set(v) { field = v; requestRender() }
@@ -118,7 +120,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
         override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) { gw = w; gh = h }
 
         @Volatile private var yeniKare = false
-        override fun onFrameAvailable(s: SurfaceTexture?) { yeniKare = true; requestRender() }
+        override fun onFrameAvailable(s: SurfaceTexture?) { yeniKare = true; gelenKare++; requestRender() }
 
         // Birleştirme tamponu (mümkünse 16 bit kayan nokta: ortalamada renk kademelenmesi olmasın)
         private var bFbo = 0; private var bTex = 0; private var bW = 0; private var bH = 0; private var bKare = 0; private var bBas = 0L

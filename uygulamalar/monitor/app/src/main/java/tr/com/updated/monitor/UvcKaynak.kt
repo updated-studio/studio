@@ -16,7 +16,7 @@ import com.serenegiant.usb.UVCParam
  * UVCAndroid kitaplığı). Sony, Canon gibi fotoğraf makineleri "USB yayını" (USB Streaming) modunda, HDMI→USB çeviriciler
  * her zaman UVC'dir. Görüntü MonitorGorunum'ün yüzeyine çizilir; araçlar (odak, zebra, LUT, ölçümler) aynen çalışır.
  */
-class UvcKaynak(private val ctx: Context, val aygit: UsbDevice) : Kaynak {
+class UvcKaynak(private val ctx: Context, val aygit: UsbDevice, private val kareSayaci: () -> Long, private val basladi: (String) -> Unit = {}) : Kaynak {
     override val ad: String = "USB: " + (aygit.productName ?: aygit.manufacturerName ?: "Görüntü aygıtı")
     private val is_ = HandlerThread("uvc").also { it.start() }
     private val h = Handler(is_.looper)
@@ -43,16 +43,31 @@ class UvcKaynak(private val ctx: Context, val aygit: UsbDevice) : Kaynak {
                         if (r == -6) { Thread.sleep(500); surucuyuAyir(blok); r = k.open(blok) }
                         if (r != 0) { hata("USB görüntü açılamadı (kod $r)."); HataKaydi.not("uvc", "open $r · ${usbOzet(aygit)}"); return@post }
                         kamera = k
-                        // 1080p'yi geçmeyen en büyük; aynı boyutta MJPEG (bant genişliği az) tercih
                         val l = k.supportedSizeList.orEmpty()
-                        val s = l.filter { it.width <= 1920 && it.height <= 1080 }.sortedWith(compareByDescending<com.serenegiant.usb.Size> { it.width * it.height }.thenByDescending { it.type == UVCCamera.UVC_VS_FRAME_MJPEG }).firstOrNull() ?: l.maxByOrNull { it.width * it.height }
-                        if (s == null) { hata("Aygıt görüntü biçimi bildirmedi."); HataKaydi.not("uvc", "boyut yok · ${usbOzet(aygit)}"); return@post }
-                        val fps = s.fpsList?.maxOrNull() ?: s.fps
-                        runCatching { k.setPreviewSize(s.width, s.height, s.type, fps) }.getOrElse { k.setPreviewSize(s.width, s.height) }
-                        cozunurluk = "${s.width}×${s.height} · ${fps} fps · ${if (s.type == UVCCamera.UVC_VS_FRAME_MJPEG) "MJPEG" else "YUV"}"
-                        boyut(s.width, s.height)
-                        k.setPreviewDisplay(yuzey)
-                        k.startPreview()
+                        if (l.isEmpty()) { hata("Aygıt görüntü biçimi bildirmedi."); HataKaydi.not("uvc", "boyut yok · ${usbOzet(aygit)}"); return@post }
+                        // Denenecek biçimler: önce 1080p'yi geçmeyen MJPEG (büyükten küçüğe), sonra diğer MJPEG, sonra sıkıştırılmamış.
+                        // Görüntü 4 sn içinde gelmezse sıradakine geçilir (bazı makineler bazı boyut/kare hızlarında hiç kare göndermez).
+                        val mj = l.filter { it.type == UVCCamera.UVC_VS_FRAME_MJPEG }
+                        val adaylar = (mj.filter { it.height <= 1080 }.sortedByDescending { it.width * it.height } + mj.filter { it.height > 1080 }.sortedBy { it.width * it.height } +
+                            l.filter { it.type != UVCCamera.UVC_VS_FRAME_MJPEG && it.height <= 1080 }.sortedByDescending { it.width * it.height }).distinctBy { "${it.type}:${it.width}x${it.height}" }.take(6)
+                        fun dene(i: Int) {
+                            if (bitti) return
+                            if (i >= adaylar.size) {
+                                hata("Makine bağlandı ama görüntü göndermedi. Makinede USB yayını çözünürlüğünü 1080p'ye al ve kabloyu yeniden tak.")
+                                HataKaydi.not("uvc", "kare gelmedi · biçimler ${runCatching { k.supportedSize }.getOrNull()?.take(3000)} · ${usbOzet(aygit)}"); return
+                            }
+                            val s = adaylar[i]
+                            runCatching { k.stopPreview() }
+                            val fps = s.fpsList?.filter { it in 24..30 }?.maxOrNull() ?: s.fpsList?.maxOrNull() ?: s.fps
+                            runCatching { k.setPreviewSize(s.width, s.height, s.type, fps) }.getOrElse { runCatching { k.setPreviewSize(s.width, s.height, s.type) } }
+                            cozunurluk = "${s.width}×${s.height} · ${fps} fps · ${if (s.type == UVCCamera.UVC_VS_FRAME_MJPEG) "MJPEG" else "YUV"}"
+                            boyut(s.width, s.height)
+                            k.setPreviewDisplay(yuzey)
+                            k.startPreview()
+                            val once = kareSayaci()
+                            h.postDelayed({ if (!bitti && kareSayaci() == once) dene(i + 1) else if (!bitti) { basladi(cozunurluk); HataKaydi.not("uvc-tamam", "$cozunurluk · ${usbOzet(aygit)}") } }, 4000)
+                        }
+                        dene(0)
                     } catch (e: Throwable) {
                         hata("USB görüntü başlatılamadı: ${e.message}"); HataKaydi.not("uvc", e.stackTraceToString() + "\n" + usbOzet(aygit))
                     }
