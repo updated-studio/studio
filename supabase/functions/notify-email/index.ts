@@ -77,7 +77,9 @@ async function telefonaGonder(sb: any) {
   return { gonderilen };
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  // Yalnız sunucu içindeki zamanlayıcı çağırır; dışarıdan (Caddy üzerinden) gelen çağrı reddedilir (27 Ekim 2026)
+  if (req.headers.get("x-forwarded-for")) return new Response("Yetkisiz", { status: 401 });
   const telefon = await telefonaGonder(createClient(Deno.env.get("SUPABASE_URL")!, serviceKey())).catch((e) => ({ gonderilen: 0, hata: String(e) }));
   if (telefon.gonderilen || "hata" in telefon) console.log(JSON.stringify({ telefon }));
   const pass = Deno.env.get("SMTP_PASSWORD") ?? Deno.env.get("GMAIL_APP_PASSWORD");

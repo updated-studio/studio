@@ -674,6 +674,13 @@ const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
+  // Dışarıdan (Caddy üzerinden, X-Forwarded-For'lu) gelen çağrı Stüdyo üyesi olmalı; zamanlayıcı sunucu içinden
+  // (functions:9000) doğrudan çağırır. Önceden herkes 5 dk'da bir toplama başlatıp yapay zekâ kotasını tüketebiliyordu (27 Ekim 2026).
+  if (req.headers.get("x-forwarded-for")) {
+    const { data: u } = await sb.auth.getUser((req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, ""));
+    const { data: p } = u?.user ? await sb.from("profiles").select("id").eq("id", u.user.id).maybeSingle() : { data: null };
+    if (!p) return Response.json({ hata: "Stüdyo girişi gerekli" }, { status: 401, headers: CORS });
+  }
   const govde = await req.json().catch(() => ({}));
   if (govde?.eskiCeviri) {
     // Tek seferlik: Türkçe özeti olmayan elenen/rehber/belirsiz haberlerin başlığını ücretsiz çeviriyle doldurur (yapay zekâ kullanmaz)

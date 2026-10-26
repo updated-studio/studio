@@ -65,6 +65,8 @@ Deno.serve(async (req) => {
   const { data: sonBasarili } = await sb.from("yarisma_tarama").select("at").is("hata", null).order("at", { ascending: false }).limit(1);
   const once = sonTarama?.[0]?.at ? Date.now() - +new Date(sonTarama[0].at) : Infinity;
   const basariliOnce = sonBasarili?.[0]?.at ? Date.now() - +new Date(sonBasarili[0].at) : Infinity;
+  // Oturumsuz çağrı yalnız sunucu içindeki zamanlayıcıdan (functions:9000, X-Forwarded-For'suz) kabul edilir (27 Ekim 2026)
+  if (!kisi && req.headers.get("x-forwarded-for")) return yanit({ error: "Stüdyo girişi gerekli" }, 401);
   if (!kisi && (basariliOnce < 6 * 864e5 || once < 3600e3)) return yanit({ atlandi: "Son tarama yeni" });
   if (kisi && once < 3600e3) return yanit({ error: "Son tarama bir saatten yeni; biraz sonra yeniden dene." }, 429);
 
