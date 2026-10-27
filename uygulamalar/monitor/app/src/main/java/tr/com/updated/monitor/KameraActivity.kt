@@ -46,13 +46,13 @@ import kotlin.math.atan2
 /**
  * UPDATED Kamera: telefonun normal kamerası (iPhone kamerası sadeliğinde, Final Cut Camera'nın araç şeridiyle). Üstte yuvarlak düğmeler ve
  * biçim etiketi, altta araç şeridi (dokununca cetvel açılır), mod şeridi ve deklanşör. Ekran dikey sabit; telefon döndükçe yalnız ikonlar döner.
- * Modlar altta kaydırılır (Video · Foto · Portre · Gece · Işık izi · Samanyolu · Monitör). PRO düğmesi Blackmagic düzenini
+ * Modlar altta kaydırılır (Timelapse · Video · Foto · Portre · Gece · Işık izi · Samanyolu · Monitör). PRO düğmesi Blackmagic düzenini
  * (MainActivity, mod=pro), Monitör dış kamera izlemeyi (MainActivity, mod=monitor) açar. Uygulama baştan açılınca hangisi
  * olacağı sorulur; alta alınıp geri gelince sorulmaz.
  */
 class KameraActivity : Activity() {
     enum class KMod(val ad: String, val foto: Boolean, val sahne: Sahne) {
-        VIDEO("VİDEO", false, Sahne.KAPALI), FOTO("FOTO", true, Sahne.KAPALI), PORTRE("PORTRE", true, Sahne.PORTRE),
+        TIMELAPSE("TIMELAPSE", false, Sahne.KAPALI), VIDEO("VİDEO", false, Sahne.KAPALI), FOTO("FOTO", true, Sahne.KAPALI), PORTRE("PORTRE", true, Sahne.PORTRE),
         GECE("GECE", true, Sahne.GECE), ISIK_IZI("IŞIK İZİ", true, Sahne.ISIK_IZI), SAMANYOLU("SAMANYOLU", true, Sahne.SAMANYOLU),
         MONITOR("MONİTÖR", false, Sahne.KAPALI)
     }
@@ -115,6 +115,10 @@ class KameraActivity : Activity() {
     private var sahneOnerisi: Sahne? = null
     @Volatile private var renkOrt = floatArrayOf(0f, 0f, 0f); @Volatile private var yercekimZ = 0f
     private var zamanlayici = 0; private var deklansorSesi = true; private var izSure = 10
+    // Timelapse (Timelapse.kt): kare aralığı, çekim süresi sınırı (dk, 0 = sınırsız), pozlama kilidi
+    private var tlAralik = 2000L; private var tlSure = 0; private var tlPozSabit = true
+    private var tlKaydedici: Kaydedici? = null; private var tlUri: Uri? = null
+    private fun kayitSuruyor() = kaynak?.kayitta == true || tlKaydedici != null
     private val deklansor by lazy { android.media.MediaActionSound().also { it.load(android.media.MediaActionSound.SHUTTER_CLICK) } }
 
     // Yön: telefonun fiziksel dönüşü (0/90/180/270, saat yönünde); ikonlar ters yönde döner
@@ -311,7 +315,7 @@ class KameraActivity : Activity() {
 
     private fun modSec(m: KMod) {
         if (m == mod) return
-        if (kaynak?.kayitta == true) return tost("Kayıt sürerken mod değişmez.")
+        if (kayitSuruyor()) return tost("Kayıt sürerken mod değişmez.")
         if (m == KMod.MONITOR) { monitoreGec(); return }
         mod = m; tercih.edit().putString("mod", m.name).apply()
         modlariCiz(); modUygula()
@@ -319,9 +323,9 @@ class KameraActivity : Activity() {
 
     private fun modUygula(ilk: Boolean = false) {
         val k = kaynak
-        deklansorDugme.foto = mod.foto; deklansorDugme.kayitta = k?.kayitta == true
-        sureSira.visibility = if (mod == KMod.ISIK_IZI) View.VISIBLE else View.GONE
-        if (mod == KMod.ISIK_IZI) sureCiz()
+        deklansorDugme.foto = mod.foto; deklansorDugme.kayitta = kayitSuruyor()
+        sureSira.visibility = if (mod == KMod.ISIK_IZI || mod == KMod.TIMELAPSE) View.VISIBLE else View.GONE
+        if (mod == KMod.ISIK_IZI || mod == KMod.TIMELAPSE) sureCiz()
         sahneOnerisi = null; sahneCip.visibility = View.GONE
         if (!ilk && k != null) {
             k.sahne = mod.sahne
@@ -330,8 +334,16 @@ class KameraActivity : Activity() {
         bilgiCiz(); flasCiz()
     }
 
+    /** Mod şeridinin üstündeki hızlı seçim: ışık izinde süre, timelapse'te kare aralığı */
     private fun sureCiz() {
         sureSira.removeAllViews()
+        if (mod == KMod.TIMELAPSE) {
+            Timelapse.HIZLI.forEach { ms -> sureSira.addView(TextView(this).apply {
+                text = Timelapse.aralikYazi(ms); textSize = 13f; typeface = kosul; gravity = Gravity.CENTER; setTextColor(if (tlAralik == ms) Color.BLACK else Color.WHITE)
+                background = Tema.kapsul(if (tlAralik == ms) TURUNCU else CAM, dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0); contentDescription = "Kare aralığı ${text}"
+                setOnClickListener { if (tlKaydedici != null) return@setOnClickListener; tlAralik = ms; tercih.edit().putLong("tlAralik", ms).apply(); sureCiz(); bilgiCiz() } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
+            return
+        }
         intArrayOf(5, 10, 20, 30, 60).forEach { sn -> sureSira.addView(TextView(this).apply {
             text = "$sn sn"; textSize = 13f; typeface = kosul; gravity = Gravity.CENTER; setTextColor(if (izSure == sn) Color.BLACK else Color.WHITE)
             background = Tema.kapsul(if (izSure == sn) TURUNCU else CAM, dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
@@ -595,6 +607,7 @@ class KameraActivity : Activity() {
 
     /* ================= ayarlar ================= */
     private fun ayarlarAc() {
+        if (tlKaydedici != null) return tost("Timelapse sürerken ayarlar değişmez.")
         val k = kaynak
         val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18f), dp(16f), dp(18f), dp(16f)) }
         fun baslik(t: String, simge: Int) = ic.addView(etiket(t, 13f, GRI).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; setPadding(0, dp(14f), 0, dp(6f)); Tema.simge(this, simge, GRI, 16f) })
@@ -622,6 +635,14 @@ class KameraActivity : Activity() {
             val fpsler = listOfNotNull(Range(30, 30).takeIf { it in k.yetenek.fpsler }, Range(60, 60).takeIf { it in k.yetenek.fpsler })
             if (fpsler.size > 1) secim("Kare hızı", fpsler.map { "${it.upper} fps" }, if (ayar.fps == Range(60, 60)) 1 else 0) {
                 ayar.fps = fpsler[it]; ayarKaydet(); if (!mod.foto) k.oturumYenile { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz() } } }
+            baslik("TIMELAPSE", R.drawable.ic_zaman)
+            secim("Kare aralığı", Timelapse.ARALIKLAR.map { Timelapse.aralikYazi(it) }, Timelapse.ARALIKLAR.indexOf(tlAralik).coerceAtLeast(0)) {
+                tlAralik = Timelapse.ARALIKLAR[it]; tercih.edit().putLong("tlAralik", tlAralik).apply(); if (mod == KMod.TIMELAPSE) { sureCiz(); bilgiCiz() } }
+            secim("Çekim süresi", Timelapse.SURELER.map { Timelapse.sureYazi(it) }, Timelapse.SURELER.indexOf(tlSure).coerceAtLeast(0)) {
+                tlSure = Timelapse.SURELER[it]; tercih.edit().putInt("tlSure", tlSure).apply() }
+            ic.addView(anahtar("Pozlamayı başta sabitle", tlPozSabit) { tlPozSabit = it; tercih.edit().putBoolean("tlPozSabit", it).apply() })
+            ic.addView(TextView(this).apply { textSize = 12f; setTextColor(GRI); setPadding(0, dp(4f), 0, 0)
+                text = "Açıkken parlaklık kareden kareye oynamaz (titreme olmaz). Gün batımı gibi ışığın değiştiği çekimlerde kapat. Tripod kullan; ekran açık kalır." })
         }
         baslik("YARDIMCILAR", R.drawable.ic_yardimci)
         ic.addView(anahtar("Otomatik sahne önerisi", sahneOto) { sahneOto = it; kompUygula() })
@@ -654,7 +675,7 @@ class KameraActivity : Activity() {
 
     private fun kameraCevir() {
         if (kamListe.size < 2) return tost("Tek kamera var.")
-        if (kaynak?.kayitta == true) return
+        if (kayitSuruyor()) return
         kamIndex = (kamIndex + 1) % kamListe.size; tercih.edit().putInt("kamIndex", kamIndex).apply()
         monitor.animate().alpha(0f).setDuration(120).withEndAction { monitor.animate().alpha(1f).setStartDelay(350).setDuration(200) }
         kameraAc()
@@ -679,6 +700,7 @@ class KameraActivity : Activity() {
         bilgiCip.text = when {
             k == null -> ""
             mod.foto -> k.secilenFotoBoyut()?.let { "%.0f MP · %s".format(it.width * it.height / 1e6, if (k.rawAcik) "RAW" else "JPEG") } ?: "FOTO"
+            mod == KMod.TIMELAPSE -> { val b = k.secilenBoyut(); "${when { b.height >= 2160 -> "4K"; b.height >= 1080 -> "1080p"; else -> "${b.height}p" }} · ${Timelapse.aralikYazi(tlAralik)} · ${Timelapse.hiz(tlAralik).toInt()}× hızlı" }
             else -> { val b = k.secilenBoyut(); "${when { b.height >= 2160 -> "4K"; b.height >= 1080 -> "1080p"; else -> "${b.height}p" }} · ${ayar.fps?.upper ?: 30}" }
         }
         bilgiCip.visibility = if (k == null || kayitCip.visibility == View.VISIBLE) View.INVISIBLE else View.VISIBLE
@@ -688,6 +710,7 @@ class KameraActivity : Activity() {
     private fun deklansorBasildi() {
         acilirKapat()
         val k = kaynak ?: return tost("Kamera hazır değil.")
+        if (mod == KMod.TIMELAPSE) return timelapseDugmesi(k)
         if (!mod.foto) return videoDugmesi(k)
         if (monitor.birlestiriyor) { monitor.birlestirmeIptal(); return }
         if (geriSayiliyor) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; return }
@@ -766,6 +789,47 @@ class KameraActivity : Activity() {
         } }
     }
 
+    /**
+     * Timelapse: ekrandaki görüntü her `tlAralik`'ta bir kodlayıcıya çizilir (MonitorGorunum.kayitAraligiNs), video 30 fps oynar, ses yok.
+     * Pozlama isteğe göre başta kilitlenir; ekran açık kalır; süre sınırı varsa kendiliğinden biter.
+     */
+    private fun timelapseDugmesi(k: KameraKaynak) {
+        tlKaydedici?.let { y -> timelapseBitir(y); return }
+        val ad = "UPDATED_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}_timelapse.mp4"
+        val d = ContentValues().apply { put(MediaStore.Video.Media.DISPLAY_NAME, ad); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4"); put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/UPDATED Kamera"); put(MediaStore.Video.Media.IS_PENDING, 1) }
+        val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, d) ?: return tost("Kayıt dosyası açılamadı.")
+        val fd = contentResolver.openFileDescriptor(uri, "w") ?: run { contentResolver.delete(uri, null, null); return tost("Kayıt dosyası açılamadı.") }
+        val (w, h) = monitor.kayitBoyutu()
+        val mbps = when { maxOf(w, h) >= 3840 -> 50; maxOf(w, h) >= 1920 -> 24; else -> 12 }
+        val y = runCatching { Kaydedici(this, fd, w, h, Timelapse.FPS, mbps, false, sesIste = false, yon = fizikselYon).also { it.baslat() } }
+            .getOrElse { e -> runCatching { fd.close() }; contentResolver.delete(uri, null, null); HataKaydi.not("timelapse", e.stackTraceToString()); return tost("Timelapse başlamadı: ${e.message}") }
+        tlKaydedici = y; tlUri = uri
+        k.pozKilit = tlPozSabit; k.ayarDegisti()
+        monitor.kayitAraligiNs = tlAralik * 1_000_000L; monitor.kayitYuzeyi = y.yuzey; monitor.yenile()
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.START_VIDEO_RECORDING) }
+        kayitBas = System.currentTimeMillis(); deklansorDugme.kayitta = true
+        kayitCip.text = "●  0:00"; kayitCip.visibility = View.VISIBLE; bilgiCip.visibility = View.INVISIBLE; oneriCip.visibility = View.GONE
+    }
+
+    private fun timelapseBitir(y: Kaydedici) {
+        tlKaydedici = null; monitor.kayitYuzeyi = null; monitor.kayitAraligiNs = 0L; monitor.yenile()
+        kaynak?.let { it.pozKilit = false; it.ayarDegisti() }
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val u = tlUri; tlUri = null; deklansorDugme.kayitta = false; kayitCip.visibility = View.GONE; bilgiCiz()
+        if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.STOP_VIDEO_RECORDING) }
+        Thread {
+            // Kodlayıcı GL iş parçacığı kayıt yüzeyini bırakınca kapanır
+            Thread.sleep(150)
+            val ok = runCatching { y.bitir() }.getOrElse { HataKaydi.not("timelapse", it.stackTraceToString()); false }
+            runOnUiThread {
+                if (u == null) return@runOnUiThread
+                if (ok) { contentResolver.update(u, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null); sonUri = u; sonMime = "video/mp4"; kucukResim(u); tost("Timelapse galeride: Movies/UPDATED Kamera") }
+                else { contentResolver.delete(u, null, null); tost("Timelapse kaydedilemedi (hiç kare alınmadı).") }
+            }
+        }.start()
+    }
+
     /** Galeriye (Pictures/UPDATED Kamera) yazar; kamera iş parçacığından da çağrılır */
     private fun galeriyeYaz(ad: String, mime: String, yaz: (java.io.OutputStream) -> Unit): Uri? {
         val d = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, ad); put(MediaStore.Images.Media.MIME_TYPE, mime); put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/UPDATED Kamera"); put(MediaStore.Images.Media.IS_PENDING, 1) }
@@ -797,7 +861,7 @@ class KameraActivity : Activity() {
 
     /* ================= sahne önerisi ================= */
     private fun sahneDenetle() {
-        if (!sahneOto || mod != KMod.FOTO || kaynak?.kayitta == true) { sahneCip.visibility = View.GONE; return }
+        if (!sahneOto || mod != KMod.FOTO || kayitSuruyor()) { sahneCip.visibility = View.GONE; return }
         val k = kaynak ?: return
         val otoPoz = ayar.iso == null && ayar.pozlamaNs == null && k.sonIso > 0 && k.sonPozNs > 0
         val r = renkOrt
@@ -816,6 +880,12 @@ class KameraActivity : Activity() {
     private fun tik() {
         val k = kaynak
         if (k?.kayitta == true) { val ms = System.currentTimeMillis() - kayitBas; kayitCip.text = "●  %02d:%02d".format(ms / 60000, ms / 1000 % 60) }
+        tlKaydedici?.let { y ->
+            // Timelapse: geçen süre · çıkacak video süresi; süre sınırı dolunca biter
+            val ms = System.currentTimeMillis() - kayitBas
+            kayitCip.text = "●  ${Timelapse.saat(ms)}  →  ${Timelapse.saat(Timelapse.videoMs(monitor.kayitKareSayisi))}"
+            if (tlSure > 0 && ms >= tlSure * 60_000L) timelapseBitir(y)
+        }
         val sn = System.currentTimeMillis() / 1000
         if (sn != sonSaniye) { sonSaniye = sn; sahneDenetle() }
     }
@@ -833,11 +903,11 @@ class KameraActivity : Activity() {
 
     /* ================= PRO ve Monitör ================= */
     private fun proyaGec() {
-        if (kaynak?.kayitta == true) return tost("Önce kaydı durdur.")
+        if (kayitSuruyor()) return tost("Önce kaydı durdur.")
         startActivity(Intent(this, MainActivity::class.java).putExtra("mod", "pro").putExtra("kamera", kamListe.getOrNull(kamIndex)?.first))
     }
     private fun monitoreGec() {
-        if (kaynak?.kayitta == true) return tost("Önce kaydı durdur.")
+        if (kayitSuruyor()) return tost("Önce kaydı durdur.")
         startActivity(Intent(this, MainActivity::class.java).putExtra("mod", "monitor"))
     }
 
@@ -875,6 +945,7 @@ class KameraActivity : Activity() {
         sonKomp = runCatching { KompTur.valueOf(tercih.getString("sonKomp", "SPIRAL")!!) }.getOrDefault(KompTur.SPIRAL)
         asistanAcik = tercih.getBoolean("asistan", false); teraziAcik = tercih.getBoolean("terazi", false); oneriAcik = tercih.getBoolean("oneri", true); sahneOto = tercih.getBoolean("sahneOto", true)
         zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true); izSure = tercih.getInt("izSure", 10)
+        tlAralik = tercih.getLong("tlAralik", 2000L); tlSure = tercih.getInt("tlSure", 0); tlPozSabit = tercih.getBoolean("tlPozSabit", true)
     }
     private fun ayarOku(id: String): KameraAyari {
         val j = runCatching { JSONObject(tercih.getString("kam_$id", "{}")!!) }.getOrNull() ?: return KameraAyari()
@@ -901,6 +972,7 @@ class KameraActivity : Activity() {
         geriSayiliyor = false; ortaYazi.visibility = View.GONE
         if (monitor.birlestiriyor) monitor.birlestirmeIptal()
         kaynak?.let { k -> if (k.kayitta) videoDugmesi(k) }
+        tlKaydedici?.let { timelapseBitir(it) } // alta alınınca kamera kapanır: o ana kadarki kareler kaydedilir
         dongu.postDelayed({ if (!onde) { kaynak?.durdur(); kaynak = null } }, if (kaynak?.kayitta == true) 600 else 0)
         monitor.onPause()
     }

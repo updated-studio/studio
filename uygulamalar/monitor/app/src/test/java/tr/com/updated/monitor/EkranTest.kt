@@ -61,6 +61,8 @@ class EkranTest {
                 a.window.decorView.findViewWithText("Kompozisyon kılavuzu")?.performClick(); kaydet(a, "kamera-kilavuz-$ad")
                 a.window.decorView.findViewWithText("Ayarlar")?.performClick(); kaydet(a, "kamera-ayarlar-$ad")
             }
+            tercih("kamera").edit().putString("mod", "TIMELAPSE").commit()
+            Robolectric.buildActivity(KameraActivity::class.java).setup().use { c -> val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-timelapse-$ad") }
         }
     }
 

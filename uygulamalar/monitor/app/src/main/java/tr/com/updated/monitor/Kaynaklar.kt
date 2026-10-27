@@ -92,6 +92,8 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     val kayitta: Boolean get() = kaydedici != null
     private var hataGeri: (String) -> Unit = {}
 
+    /** Timelapse: otomatik pozlama ve beyaz denge o anki değerinde kilitlenir (kareler arası titreme olmaz) */
+    @Volatile var pozKilit = false
     /** Seçili sahne (Sahne.kt); ayarların üstüne uygulanır */
     @Volatile var sahne = Sahne.KAPALI
     /** Otomatik pozlamanın son ölçümü (sahne önerisi için): ISO ve pozlama süresi */
@@ -257,8 +259,10 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         } else {
             r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
             r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, ayar.ev)
+            r.set(CaptureRequest.CONTROL_AE_LOCK, pozKilit)
         }
         r.set(CaptureRequest.CONTROL_AWB_MODE, ayar.awb)
+        if (ayar.awb == CameraMetadata.CONTROL_AWB_MODE_AUTO) r.set(CaptureRequest.CONTROL_AWB_LOCK, pozKilit)
         if (ayar.odakMesafe != null && yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, ayar.odakMesafe!!) }
         else if (odakNoktasi != null) {
             val b = bolge(odakNoktasi!!)
