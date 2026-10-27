@@ -51,11 +51,12 @@ class SesGostergesi(c: Context) : View(c) {
     override fun onDraw(c: Canvas) {
         val yaziVar = width > 140 * yog
         val alan = height - (if (yaziVar) 12f * yog else 0f)
-        val kanalH = (alan - 4f * yog) / 2f
-        val adim = 3.5f * yog; p.strokeWidth = 1.6f * yog
+        val ara = if (height < 24 * yog) 2.5f * yog else 4f * yog
+        val kanalH = (alan - ara) / 2f
+        val adim = 3f * yog; p.strokeWidth = 1.4f * yog
         val n = max(8, ((width - p.strokeWidth) / adim).toInt()); val bas = p.strokeWidth / 2f
         for (i in 0..1) {
-            val y0 = i * (kanalH + 4f * yog) + p.strokeWidth / 2f; val y1 = y0 + kanalH - p.strokeWidth
+            val y0 = i * (kanalH + ara) + p.strokeWidth / 2f; val y1 = y0 + kanalH - p.strokeWidth
             val yanan = (((duzey[i] + 60f) / 60f).coerceIn(0f, 1f) * n).toInt()
             val tepeCizgi = (((tepe[i] + 60f) / 60f).coerceIn(0f, 1f) * n).toInt() - 1
             for (k in 0 until n) {

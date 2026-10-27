@@ -185,6 +185,9 @@ class MainActivity : Activity() {
         orta.addView(bolmeler, FrameLayout.LayoutParams(-1, -1))
         // Şerit, geri sayım ve öneri etiketi şeritlerin arasındaki saydam alanda (dokunuş görüntüye geçer)
         katman = FrameLayout(this)
+        // Ses göstergesi: küçük, alt şeridin hemen üstünde solda (görüntünün ortasını kapatmaz; ayar şeridi açılınca altında kalır)
+        ses = SesGostergesi(this)
+        katman.addView(ses, FrameLayout.LayoutParams(dp(if (d) 72f else 96f), dp(if (d) 14f else 16f), Gravity.BOTTOM or Gravity.START).apply { marginStart = dp(14f); bottomMargin = dp(10f) })
         serit = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(225, 18, 18, 18)); visibility = View.GONE; setPadding(dp(12f), dp(8f), dp(12f), dp(10f)); isClickable = true }
         katman.addView(serit, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         geriSayimYazi = TextView(this).apply { textSize = 96f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD); setShadowLayer(12f, 0f, 0f, Color.BLACK); visibility = View.GONE }
@@ -545,8 +548,7 @@ class MainActivity : Activity() {
         c("YARDIMCI", R.drawable.ic_yardimci, asistanAcik) { asistanAcik = !asistanAcik; kompUygula() }
         c("TERAZİ", R.drawable.ic_terazi, teraziAcik) { teraziAcik = !teraziAcik; kompUygula() }
         alt.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(orta) }, LinearLayout.LayoutParams(0, -2, 1f))
-        ses = SesGostergesi(this).apply { visibility = if (sesGosterge) View.VISIBLE else View.INVISIBLE }
-        alt.addView(ses, LinearLayout.LayoutParams(dp(if (d) 84f else 170f), dp(if (d) 24f else 34f)).apply { marginStart = dp(if (d) 6f else 10f) })
+        ses.visibility = if (sesGosterge && arayuzAcik) View.VISIBLE else View.INVISIBLE
     }
 
     /* ================= döngü: zaman kodu, ses, kalan süre ================= */
