@@ -28,8 +28,29 @@ KURALLAR:
 - "num": karşılaştırma için tek sayı, özelliğin birimi cinsinden (ör. 658), sayısal değilse null.
 - "kaynak": değeri aldığın sayfanın TAM adresi (https://…). "kanit": o sayfadan kısa alıntı (en fazla 120 karakter).
 - Fiyatı yalnız Türkiye fiyatı (TL) resmî kaynakta yazıyorsa doldur.
+- "Boyutlar": genişlik × yükseklik × derinlik, milimetre (ör. "131 × 96 × 80 mm"); lensse çap × uzunluk (ör. "Ø 81 × 128 mm"). num: null.
+- "urunSayfasi": üreticinin bu ürüne ait resmî ürün sayfasının TAM adresi (yoksa null).
 Yanıtı YALNIZ şu JSON olarak ver, başka metin yazma:
-{"ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
+{"urunSayfasi":"https://...","ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
+
+/** Künye görseli (27 Ekim 2026): üreticinin resmî ürün sayfasındaki paylaşım görseli (og:image / JSON-LD image).
+ *  Yalnız marka alan adındaki sayfalardan alınır; arka planı sunucudaki işçi siler (scripts/kunye-gorsel), editör onaylar. */
+const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; kunye gorseli)";
+const sade = (x: string) => x.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]/g, "");
+const hostAl = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+async function resmiGorsel(marka: string, adaylar: (string | null | undefined)[]): Promise<{ url: string; sayfa: string } | null> {
+  const m = sade(marka).slice(0, 5);
+  const sayfalar = [...new Set(adaylar.filter((u): u is string => !!u && /^https?:\/\//.test(u) && !!m && sade(hostAl(u)).includes(m)))].slice(0, 4);
+  for (const sayfa of sayfalar) {
+    const h = await fetch(sayfa, { headers: { "User-Agent": UA, "Accept-Language": "tr,en" }, signal: AbortSignal.timeout(15_000) }).then((r) => (r.ok ? r.text() : "")).catch(() => "");
+    if (!h) continue;
+    const meta = (ad: string) => h.match(new RegExp(`<meta[^>]+(?:property|name)=["']${ad}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1] ?? h.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${ad}["']`, "i"))?.[1];
+    const ham = meta("og:image(?::secure_url)?") ?? meta("twitter:image(?::src)?") ?? h.match(/"image"\s*:\s*(?:\[\s*)?"(https?:[^"]+\.(?:jpe?g|png|webp)[^"]*)"/i)?.[1];
+    if (!ham || /logo|favicon|default|placeholder|avatar|share-image|og-default/i.test(ham)) continue;
+    try { return { url: new URL(ham.replace(/&amp;/g, "&"), sayfa).href, sayfa }; } catch { /* sonraki */ }
+  }
+  return null;
+}
 
 /** Gemini anahtarları: önce sunucudaki ana anahtar; kotası dolunca Stüdyo → Bağlantı anahtarları'ndaki yedek (27 Ekim 2026).
  *  Kota proje başına sayılır: yedek anahtar başka bir Google hesabının ya da projesinin olmalı. */
@@ -43,7 +64,8 @@ async function geminiAnahtarlari(sb: ReturnType<typeof createClient>): Promise<s
 async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
   const anahtarlar = await geminiAnahtarlari(sb);
   if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
-  const ozellikler = (urun.specs ?? []).map((s) => `- ${s.key}${s.unit ? " · " + s.unit : ""}`).join("\n");
+  const liste = (urun.specs ?? []).some((s) => s.key === "Boyutlar") ? urun.specs ?? [] : [...(urun.specs ?? []), { key: "Boyutlar", unit: "mm" }];
+  const ozellikler = liste.map((s) => `- ${s.key}${s.unit ? " · " + s.unit : ""}`).join("\n");
   const istem = `ÜRÜN: ${urun.brand} ${urun.name}\nDOLDURULACAK ÖZELLİKLER (ad · birim):\n${ozellikler}`;
   let son = "";
   for (const [ai, key] of anahtarlar.entries()) for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
@@ -99,10 +121,12 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
   for (const u of urunler.slice(0, adet)) {
     try {
       const { v, kaynaklar } = await ara(sb, u);
-      const adlar = new Set((u.specs ?? []).map((s) => s.key));
+      const adlar = new Set([...(u.specs ?? []).map((s) => s.key), "Boyutlar"]);
       const oz = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).filter((o: { key?: string; value?: string }) => o?.key && adlar.has(o.key) && o.value)
         .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string }) => ({ key: o.key, value: String(o.value).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160) }));
-      await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length ? "bekliyor" : "hata", hata: oz.length ? null : "Kaynaklarda değer bulunamadı" });
+      const gorsel = await resmiGorsel(u.brand, [v?.urunSayfasi, ...oz.map((o: { kaynak: string | null }) => o.kaynak)]).catch(() => null);
+      await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length ? "bekliyor" : "hata", hata: oz.length ? null : "Kaynaklarda değer bulunamadı",
+        gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length });
     } catch (e) {
       // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda
