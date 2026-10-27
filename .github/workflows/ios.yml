@@ -1,6 +1,6 @@
 # UPDATED Kamera iPhone/iPad sürümü (uygulamalar/kamera-ios). GitHub'ın Mac makinesinde derlenir; Mac gerekmez.
-# Her değişiklikte imzasız derleme denetimi. TestFlight'a yükleme yalnız elle başlatınca (Actions → iOS → Run workflow)
-# ya da main'e gelince, ve dört gizli bilgi girilmişse: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (.p8 dosyasının içi), APPLE_TEAM_ID.
+# Her değişiklikte imzasız derleme denetimi. TestFlight'a yükleme her gönderimde (push) ya da elle başlatınca (Actions → iOS → Run workflow),
+# PR'da değil, ve dört gizli bilgi girilmişse: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (.p8 dosyasının içi), APPLE_TEAM_ID.
 name: iOS
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
           xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Debug \
             -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -n 60
       - name: TestFlight'a yükle
-        if: (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') && env.ASC_KEY_P8 != ''
+        if: github.event_name != 'pull_request' && env.ASC_KEY_P8 != ''
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           ANAHTAR=~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
