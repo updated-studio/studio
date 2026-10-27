@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-27-b",
+    "tarih": "27 Ekim 2026",
+    "baslik": "Künye görselleri ve UPscore",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Künye onayında ürün görseli de gelir; arka planı silinmiş, hepsi aynı zeminde.",
+          "Panelde künyeye UPscore ve Amazon ürün kodu girilebilir.",
+          "Sitede Kıyaslamalar yenilendi: okur 4 ürüne kadar kıyas yapabilir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-27-a",
     "tarih": "27 Ekim 2026",
     "baslik": "Künyeler kendiliğinden doluyor",
