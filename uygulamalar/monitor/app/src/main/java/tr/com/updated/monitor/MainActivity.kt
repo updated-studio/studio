@@ -95,9 +95,6 @@ class MainActivity : Activity() {
     /** USB görüntü ve ağ yayınının kaydı (telefon kamerası kendi MediaRecorder'ıyla kaydeder) */
     private var kaydedici: Kaydedici? = null
     private fun kayitSuruyor() = kamera()?.kayitta == true || kaydedici != null
-    /** Monitör: görüntü tam ekran, şeritler üstünde yarı saydam; PRO: Blackmagic düzeni (şeritler görüntünün dışında) */
-    private val ustuste get() = !proMod
-    private val seritZemin get() = if (ustuste) Color.argb(150, 0, 0, 0) else SIYAH
     private lateinit var katman: FrameLayout
     private var onde = false
     // Kompozisyon (Fatih'in fikri): kılavuz, akıllı yardımcı (konu algılama + ibre), terazi, öneri
@@ -127,6 +124,8 @@ class MainActivity : Activity() {
     private val sesOlcer = SesOlcer { l, r -> runOnUiThread { if (this::ses.isInitialized) ses.ayarla(l, r) } }
 
     private fun dp(v: Float) = Tema.dp(this, v)
+    /** Görüntünün üstündeki yazılar: açık sahnede de okunsun diye yumuşak koyu gölge */
+    private fun golge(t: TextView) = t.setShadowLayer(dp(3f).toFloat(), 0f, dp(1f).toFloat(), Color.argb(200, 0, 0, 0))
     private fun kamera(): KameraKaynak? = kaynaklar[etkin] as? KameraKaynak
 
     override fun onCreate(b: Bundle?) {
@@ -156,24 +155,36 @@ class MainActivity : Activity() {
         val kok = FrameLayout(this).apply { setBackgroundColor(SIYAH) }
         val dikey = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         orta = FrameLayout(this)
-        // Monitör: görüntü bütün ekranı kaplar (güvenli alan payı yalnız düğmelere), şeritler üstünde
-        if (ustuste) kok.addView(orta, FrameLayout.LayoutParams(-1, -1))
+        // Görüntü bütün ekranı kaplar (güvenli alan payı yalnız düğmelere), şeritler üstünde
+        kok.addView(orta, FrameLayout.LayoutParams(-1, -1))
+        // Şeritlerin altında kenardan içeri doğru açılan saydam kararma: menüler ve yazılar her görüntüde okunur
+        fun karartma(yon: GradientDrawable.Orientation, en: Int, boy: Int, yer: Int) = kok.addView(View(this).apply {
+            background = GradientDrawable(yon, intArrayOf(Color.argb(170, 0, 0, 0), Color.argb(90, 0, 0, 0), Color.TRANSPARENT)) }, FrameLayout.LayoutParams(en, boy, yer))
+        if (d) {
+            karartma(GradientDrawable.Orientation.TOP_BOTTOM, -1, dp(190f), Gravity.TOP)
+            karartma(GradientDrawable.Orientation.BOTTOM_TOP, -1, dp(220f), Gravity.BOTTOM)
+        } else {
+            karartma(GradientDrawable.Orientation.TOP_BOTTOM, -1, dp(100f), Gravity.TOP)
+            karartma(GradientDrawable.Orientation.BOTTOM_TOP, -1, dp(110f), Gravity.BOTTOM)
+            karartma(GradientDrawable.Orientation.LEFT_RIGHT, dp(120f), -1, Gravity.START)
+            karartma(GradientDrawable.Orientation.RIGHT_LEFT, dp(150f), -1, Gravity.END)
+        }
         kok.addView(dikey, FrameLayout.LayoutParams(-1, -1))
         if (d) {
-            tcDikey = TextView(this).apply { textSize = 24f; typeface = runCatching { resources.getFont(R.font.plex_mono_500) }.getOrDefault(Typeface.MONOSPACE); setTextColor(Color.WHITE); gravity = Gravity.CENTER; setBackgroundColor(seritZemin) }
+            tcDikey = TextView(this).apply { textSize = 24f; typeface = runCatching { resources.getFont(R.font.plex_mono_500) }.getOrDefault(Typeface.MONOSPACE); setTextColor(Color.WHITE); gravity = Gravity.CENTER; golge(this) }
             dikey.addView(tcDikey, LinearLayout.LayoutParams(-1, dp(38f)))
         } else tcDikey = null
-        ust = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setBackgroundColor(seritZemin) }
+        ust = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         dikey.addView(ust, LinearLayout.LayoutParams(-1, dp(if (d) 48f else 54f)))
         val yatay = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         dikey.addView(yatay, LinearLayout.LayoutParams(-1, 0, 1f))
-        sol = LinearLayout(this).apply { orientation = if (d) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(seritZemin)
+        sol = LinearLayout(this).apply { orientation = if (d) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL; gravity = Gravity.CENTER
             if (d) setPadding(dp(8f), dp(4f), dp(8f), dp(6f)) else setPadding(0, dp(4f), 0, dp(4f)) }
         if (d) dikey.addView(sol, dikey.indexOfChild(yatay), LinearLayout.LayoutParams(-1, dp(58f))) else yatay.addView(sol, LinearLayout.LayoutParams(dp(72f), -1))
         bolmeler = LinearLayout(this).apply { orientation = if (d) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL }
         orta.addView(bolmeler, FrameLayout.LayoutParams(-1, -1))
-        // Şerit, geri sayım ve öneri etiketi: PRO'da görüntünün kutusunda, Monitör'de şeritlerin arasındaki saydam alanda (dokunuş görüntüye geçer)
-        katman = if (ustuste) FrameLayout(this) else orta
+        // Şerit, geri sayım ve öneri etiketi şeritlerin arasındaki saydam alanda (dokunuş görüntüye geçer)
+        katman = FrameLayout(this)
         serit = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(225, 18, 18, 18)); visibility = View.GONE; setPadding(dp(12f), dp(8f), dp(12f), dp(10f)); isClickable = true }
         katman.addView(serit, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         geriSayimYazi = TextView(this).apply { textSize = 96f; setTextColor(Color.WHITE); typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD); setShadowLayer(12f, 0f, 0f, Color.BLACK); visibility = View.GONE }
@@ -183,8 +194,8 @@ class MainActivity : Activity() {
         Tema.simge(sahneCip, R.drawable.ic_sahne, Color.BLACK, 16f)
         katman.addView(sahneCip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { topMargin = dp(10f); marginStart = dp(10f) })
         yatay.addView(katman, LinearLayout.LayoutParams(0, -1, 1f))
-        sag = LinearLayout(this).apply { orientation = if (d) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL; gravity = if (d) Gravity.CENTER_VERTICAL else Gravity.CENTER_HORIZONTAL; setBackgroundColor(seritZemin); setPadding(dp(10f), dp(10f), dp(10f), dp(10f)) }
-        alt = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setBackgroundColor(seritZemin); setPadding(dp(10f), 0, dp(10f), 0) }
+        sag = LinearLayout(this).apply { orientation = if (d) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL; gravity = if (d) Gravity.CENTER_VERTICAL else Gravity.CENTER_HORIZONTAL; if (d) setPadding(dp(10f), dp(10f), dp(10f), dp(10f)) else setPadding(dp(10f), dp(2f), dp(10f), dp(2f)) }
+        alt = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(10f), 0, dp(10f), 0) }
         if (d) { dikey.addView(alt, LinearLayout.LayoutParams(-1, dp(56f))); dikey.addView(sag, LinearLayout.LayoutParams(-1, dp(104f))) }
         else { yatay.addView(sag, LinearLayout.LayoutParams(dp(96f), -1)); dikey.addView(alt, LinearLayout.LayoutParams(-1, dp(62f))) }
         panel = FrameLayout(this).apply { visibility = View.GONE; setBackgroundColor(Color.rgb(22, 22, 22)); isClickable = true }
@@ -195,7 +206,7 @@ class MainActivity : Activity() {
                 val c = i.getInsets(WindowInsets.Type.displayCutout()); val n = i.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
                 listOf(maxOf(c.left, n.left), c.top, maxOf(c.right, n.right), maxOf(c.bottom, n.bottom))
             } else { val c = i.displayCutout; listOf(c?.safeInsetLeft ?: 0, c?.safeInsetTop ?: 0, c?.safeInsetRight ?: 0, c?.safeInsetBottom ?: 0) }
-            if (ustuste) { dikey.setPadding(l, t, r, b); panel.setPadding(l, t, r, b) } else v.setPadding(l, t, r, b)
+            dikey.setPadding(l, t, r, b); panel.setPadding(l, t, r, b)
             i
         }
         setContentView(kok)
@@ -321,7 +332,7 @@ class MainActivity : Activity() {
     }
 
     private fun bolmeYap(i: Int): View {
-        val m = MonitorGorunum(this).also { it.ayarlar = ayarlar[i] }
+        val m = MonitorGorunum(this).also { it.ayarlar = ayarlar[i]; it.doldur = true }
         monitorler[i] = m; sonYuzey[i] = null; acici[i] = null
         m.yuzeyHazir = { y -> sonYuzey[i] = y; acici[i]?.invoke() }
         val kutu = FrameLayout(this); kutu.addView(m, FrameLayout.LayoutParams(-1, -1))
@@ -345,7 +356,7 @@ class MainActivity : Activity() {
     private fun arayuzCiz() {
         val g = if (arayuzAcik) View.VISIBLE else View.INVISIBLE
         alt.visibility = g; sol.visibility = g
-        if (ustuste) { ust.visibility = g; tcDikey?.visibility = g }
+        ust.visibility = g; tcDikey?.visibility = g
         for (i in 0 until bolmeler.childCount) bolmeler.getChildAt(i).foreground = if (kip == Kip.IKI && i == etkin && monitorler.getOrNull(i) != null) GradientDrawable().apply { setStroke(dp(2f), SARI) } else null
         ustCiz(); solCiz(); altCiz()
     }
@@ -354,8 +365,8 @@ class MainActivity : Activity() {
     private fun hucre(etiket: String, deger: String, agirlik: Float = 1f, p: Param? = null, renk: Int = Color.WHITE, buyuk: Boolean = false): TextView? {
         val k = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
             if (p != null) { setOnClickListener { if (acikParam == p) seritKapat() else seritAc(p) }; if (acikParam == p) setBackgroundColor(KOYU2) } }
-        if (etiket.isNotEmpty()) k.addView(TextView(this).apply { text = etiket; textSize = 10f; setTextColor(GRI); typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; isSingleLine = true })
-        val v = TextView(this).apply { text = deger; gravity = Gravity.CENTER; textSize = if (buyuk) 24f else 17f; setTextColor(renk); typeface = if (buyuk) Typeface.create("sans-serif-condensed", Typeface.BOLD) else dar; isSingleLine = true }
+        if (etiket.isNotEmpty()) k.addView(TextView(this).apply { text = etiket; textSize = 10f; setTextColor(Color.argb(215, 255, 255, 255)); typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; isSingleLine = true; golge(this) })
+        val v = TextView(this).apply { text = deger; gravity = Gravity.CENTER; textSize = if (buyuk) 24f else 17f; setTextColor(renk); typeface = if (buyuk) Typeface.create("sans-serif-condensed", Typeface.BOLD) else dar; isSingleLine = true; golge(this) }
         k.addView(v)
         ust.addView(k, LinearLayout.LayoutParams(0, -1, agirlik))
         return v
@@ -464,7 +475,7 @@ class MainActivity : Activity() {
     private fun kare(ad: String, alt: String = "", secili: Boolean = false, simge: Int? = null, is_: () -> Unit) {
         sol.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-            background = Tema.kapsul(if (secili) Color.WHITE else if (ustuste) Color.argb(170, 30, 30, 30) else KOYU, dp(8f).toFloat())
+            background = Tema.kapsul(if (secili) Color.WHITE else Color.argb(170, 30, 30, 30), dp(8f).toFloat())
             if (simge != null) addView(ImageView(this@MainActivity).apply { setImageResource(simge); setColorFilter(if (secili) Color.BLACK else Color.WHITE) }, LinearLayout.LayoutParams(dp(20f), dp(20f)))
             else addView(TextView(this@MainActivity).apply { text = ad; textSize = 13f; typeface = dar; setTextColor(if (secili) Color.BLACK else Color.WHITE); gravity = Gravity.CENTER })
             if (alt.isNotEmpty()) addView(TextView(this@MainActivity).apply { text = alt; textSize = 9f; typeface = dar; setTextColor(if (secili) Color.DKGRAY else GRI); gravity = Gravity.CENTER })
@@ -494,19 +505,19 @@ class MainActivity : Activity() {
         // FOTO · VİDEO seçimi (kayıt sürerken değişmez)
         val modlar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
         listOf(true to "FOTO", false to "VİDEO").forEach { (f, ad) -> modlar.addView(TextView(this).apply {
-            text = ad; textSize = 12f; typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; setPadding(dp(8f), dp(5f), dp(8f), dp(5f))
-            setTextColor(if (fotoMod == f) SARI else GRI)
+            text = ad; textSize = 12f; typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; setPadding(dp(8f), dp(5f), dp(8f), dp(5f)); minHeight = dp(if (d) 44f else 40f)
+            setTextColor(if (fotoMod == f) SARI else Color.argb(215, 255, 255, 255)); golge(this)
             setOnClickListener { modSec(f) } }, LinearLayout.LayoutParams(-1, -2)) }
         if (proMod) sag.addView(modlar, LinearLayout.LayoutParams(if (d) dp(70f) else -1, -2).apply { if (d) marginEnd = dp(10f) else bottomMargin = dp(6f) })
         kayitDugme = KayitDugmesi(this).apply {
             foto = fotoMod; kayitta = kayitSuruyor()
             setOnClickListener { if (fotoMod) fotoDugmesi() else kayitDugmesi() }; setOnLongClickListener { ekranGoruntusu(); true }
             contentDescription = if (fotoMod) "Fotoğraf çek (basılı tut: ekran görüntüsü)" else "Kaydı başlat/durdur (basılı tut: ekran görüntüsü)" }
-        sag.addView(kayitDugme, LinearLayout.LayoutParams(dp(if (d) 76f else 68f), dp(if (d) 76f else 68f)))
+        sag.addView(kayitDugme, LinearLayout.LayoutParams(dp(if (d) 76f else 60f), dp(if (d) 76f else 60f)))
         sag.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
         sonCekim = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; background = Tema.kapsul(KOYU, dp(6f).toFloat()); clipToOutline = true; setOnClickListener { sonUri?.let { u -> runCatching { startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(u, sonMime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) } } ?: tost("Henüz kayıt yok.") } }
-        sag.addView(sonCekim, LinearLayout.LayoutParams(dp(64f), dp(40f)).apply { if (d) marginEnd = dp(8f) else bottomMargin = dp(6f) })
-        kalanYazi = TextView(this).apply { textSize = 10f; setTextColor(GRI); typeface = dar; gravity = Gravity.CENTER }
+        sag.addView(sonCekim, LinearLayout.LayoutParams(dp(64f), dp(if (d) 40f else 28f)).apply { if (d) marginEnd = dp(8f) else bottomMargin = dp(3f) })
+        kalanYazi = TextView(this).apply { textSize = 10f; setTextColor(Color.argb(215, 255, 255, 255)); typeface = dar; gravity = Gravity.CENTER; golge(this) }
         sag.addView(kalanYazi, LinearLayout.LayoutParams(if (d) -2 else -1, -2))
     }
 
@@ -520,9 +531,9 @@ class MainActivity : Activity() {
         val a = ayarlar[etkin]
         val orta = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         fun c(ad: String, simge: Int, secili: Boolean, is_: () -> Unit) = orta.addView(TextView(this).apply {
-            text = ad; textSize = 13f; typeface = dar; setTextColor(if (secili) Color.BLACK else Color.WHITE); gravity = Gravity.CENTER; setPadding(dp(10f), dp(8f), dp(12f), dp(8f))
+            text = ad; textSize = 13f; typeface = dar; setTextColor(if (secili) Color.BLACK else Color.WHITE); gravity = Gravity.CENTER; setPadding(dp(10f), dp(8f), dp(12f), dp(8f)); minHeight = dp(44f)
             Tema.simge(this, simge, boy = 16f)
-            background = Tema.kapsul(if (secili) SARI else if (ustuste) Color.argb(170, 30, 30, 30) else KOYU, dp(6f).toFloat()); setOnClickListener { is_(); kaydet(); altCiz(); ustCiz(); yenile() }
+            background = Tema.kapsul(if (secili) SARI else Color.argb(170, 30, 30, 30), dp(6f).toFloat()); setOnClickListener { is_(); kaydet(); altCiz(); ustCiz(); yenile() }
         }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6f) })
         c("KAMERA", R.drawable.ic_geri, false) { finish() }
         c("ODAK", R.drawable.ic_odak, a.peaking) { a.peaking = !a.peaking }
@@ -535,7 +546,7 @@ class MainActivity : Activity() {
         c("TERAZİ", R.drawable.ic_terazi, teraziAcik) { teraziAcik = !teraziAcik; kompUygula() }
         alt.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(orta) }, LinearLayout.LayoutParams(0, -2, 1f))
         ses = SesGostergesi(this).apply { visibility = if (sesGosterge) View.VISIBLE else View.INVISIBLE }
-        alt.addView(ses, LinearLayout.LayoutParams(dp(if (d) 84f else 170f), dp(44f)).apply { marginStart = dp(if (d) 6f else 10f) })
+        alt.addView(ses, LinearLayout.LayoutParams(dp(if (d) 84f else 170f), dp(if (d) 24f else 34f)).apply { marginStart = dp(if (d) 6f else 10f) })
     }
 
     /* ================= döngü: zaman kodu, ses, kalan süre ================= */
@@ -556,7 +567,7 @@ class MainActivity : Activity() {
             val fk = kamera()?.takeIf { fotoMod }
             val fotoSayi = fk?.secilenFotoBoyut()?.let { b -> bos / max(1L, (b.width.toLong() * b.height * (if (fk.rawAcik) 23 else 3) / 10)) }
             val pil = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { it.getIntExtra(BatteryManager.EXTRA_LEVEL, 0) * 100 / max(1, it.getIntExtra(BatteryManager.EXTRA_SCALE, 100)) }
-            if (this::kalanYazi.isInitialized) kalanYazi.text = (if (fotoSayi != null) "$fotoSayi foto" else "${saniye / 3600}sa ${saniye / 60 % 60}dk") + "\npil %${pil ?: 0}"
+            if (this::kalanYazi.isInitialized) kalanYazi.text = (if (fotoSayi != null) "$fotoSayi foto" else "${saniye / 3600}sa ${saniye / 60 % 60}dk") + (if (dikeyEkran) "\npil %" else " · pil %") + "${pil ?: 0}"
         }
     }
 

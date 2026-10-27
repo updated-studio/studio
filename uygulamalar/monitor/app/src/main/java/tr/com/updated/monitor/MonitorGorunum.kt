@@ -66,13 +66,15 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     fun birlestir(b: BirlestirmeIstegi) { birlestirme = b; requestRender() }
     fun birlestirmeIptal() { birlestirme?.let { birlestirme = null; it.bitti(null) } }
     val birlestiriyor: Boolean get() = birlestirme != null
+    /** true: görüntü bölmeyi tam doldurur (taşan kenarlar ekranda kırpılır, kayıt yine tam kare); false: sığdırır (kenarda siyah pay) */
+    @Volatile var doldur = false
     /** Görüntünün bölme içindeki alanı (kenar boşlukları hariç; kompozisyon kılavuzu bunun üstüne çizilir) */
     fun goruntuAlani(): android.graphics.RectF {
         val a = ayarlar; val donuk = yanDurur()
         val kw = (if (donuk) kaynakBoyut[1] else kaynakBoyut[0]).toFloat() * a.desqueeze
         val kh = (if (donuk) kaynakBoyut[0] else kaynakBoyut[1]).toFloat()
         val w = width.toFloat(); val h = height.toFloat(); val oran = kw / kh
-        return if (w / h > oran) { val vw = h * oran; android.graphics.RectF((w - vw) / 2, 0f, (w + vw) / 2, h) } else { val vh = w / oran; android.graphics.RectF(0f, (h - vh) / 2, w, (h + vh) / 2) }
+        return if ((w / h > oran) != doldur) { val vw = h * oran; android.graphics.RectF((w - vw) / 2, 0f, (w + vw) / 2, h) } else { val vh = w / oran; android.graphics.RectF(0f, (h - vh) / 2, w, (h + vh) / 2) }
     }
 
     /** Kaynağın boyutu belli olunca: oran ve tampon boyutu (kamera bu boyutta yazar) */
@@ -309,7 +311,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             var vx = x; var vy = y; var vw = w; var vh = h
             if (!tam) {
                 val oran = kw / kh
-                if (w.toFloat() / h > oran) { vw = (h * oran).toInt(); vx = x + (w - vw) / 2 } else { vh = (w / oran).toInt(); vy = y + (h - vh) / 2 }
+                if ((w.toFloat() / h > oran) != doldur) { vw = (h * oran).toInt(); vx = x + (w - vw) / 2 } else { vh = (w / oran).toInt(); vy = y + (h - vh) / 2 }
             }
             GLES30.glViewport(vx, vy, vw, vh)
             val a = ayarlar

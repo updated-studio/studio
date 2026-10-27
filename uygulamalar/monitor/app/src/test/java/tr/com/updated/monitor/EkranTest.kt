@@ -40,11 +40,12 @@ class EkranTest {
     }
 
     /** Kamera yok: görüntü alanına örnek bir sahne (gök, ufuk, zemin) koyar ki saydam şeritler görülsün */
-    private fun ornekGoruntu(a: Activity) {
+    private fun ornekGoruntu(a: Activity, parlak: Boolean = false) {
         val kok = (a.findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as android.view.ViewGroup)
         val alan = kok.getChildAt(0) as android.view.ViewGroup
         alan.addView(View(a).apply { background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(android.graphics.Color.rgb(96, 140, 190), android.graphics.Color.rgb(214, 170, 120), android.graphics.Color.rgb(70, 82, 60), android.graphics.Color.rgb(40, 46, 36))) }, 0,
+            if (parlak) intArrayOf(android.graphics.Color.rgb(236, 242, 248), android.graphics.Color.rgb(250, 236, 205), android.graphics.Color.rgb(222, 226, 214), android.graphics.Color.rgb(246, 246, 240))
+            else intArrayOf(android.graphics.Color.rgb(96, 140, 190), android.graphics.Color.rgb(214, 170, 120), android.graphics.Color.rgb(70, 82, 60), android.graphics.Color.rgb(40, 46, 36))) }, 0,
             android.widget.FrameLayout.LayoutParams(-1, -1))
     }
 
@@ -83,11 +84,16 @@ class EkranTest {
         }
     }
 
+    /** Ses göstergesinde örnek düzey (sol −14, sağ −7 dB) ki çizgilerin renkleri görülsün */
+    private fun ornekSes(v: View) { if (v is SesGostergesi) v.ayarla(-14f, -7f) else if (v is android.view.ViewGroup) for (i in 0 until v.childCount) ornekSes(v.getChildAt(i)) }
+
     @Test fun proVeMonitor() {
         for ((ad, q) in boyutlar) for (yon in listOf("port", "land")) for (mod in listOf("pro", "monitor")) {
             RuntimeEnvironment.setQualifiers(nitelik(q, yon == "land"))
             val i = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java).putExtra("mod", mod)
-            Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> if (mod == "monitor") ornekGoruntu(c.get()); kaydet(c.get(), "$mod-$yon-$ad") }
+            Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> val a = c.get(); ornekGoruntu(a); ornekSes(a.window.decorView); kaydet(a, "$mod-$yon-$ad") }
+            // Parlak sahne (kar, beyaz duvar): küçük yazılar ve göstergeler yine okunmalı
+            if (ad == "orta" && mod == "pro") Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> val a = c.get(); ornekGoruntu(a, parlak = true); ornekSes(a.window.decorView); kaydet(a, "$mod-$yon-parlak") }
         }
     }
 }
