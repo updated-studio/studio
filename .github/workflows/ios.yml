@@ -1,0 +1,45 @@
+# UPDATED Kamera iPhone/iPad sürümü (uygulamalar/kamera-ios). GitHub'ın Mac makinesinde derlenir; Mac gerekmez.
+# Her değişiklikte imzasız derleme denetimi. TestFlight'a yükleme yalnız elle başlatınca (Actions → iOS → Run workflow)
+# ya da main'e gelince, ve dört gizli bilgi girilmişse: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (.p8 dosyasının içi), APPLE_TEAM_ID.
+name: iOS
+on:
+  push:
+    paths: ['uygulamalar/kamera-ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['uygulamalar/kamera-ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency: { group: ios-${{ github.ref }}, cancel-in-progress: true }
+jobs:
+  derle:
+    runs-on: macos-15
+    defaults:
+      run: { shell: bash, working-directory: uygulamalar/kamera-ios }
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Derleme denetimi (imzasız, simülatör)
+        run: |
+          xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -n 60
+      - name: TestFlight'a yükle
+        if: (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') && env.ASC_KEY_P8 != ''
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          ANAHTAR=~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
+          printf '%s\n' "$ASC_KEY_P8" > "$ANAHTAR"
+          YETKI=(-allowProvisioningUpdates -authenticationKeyPath "$ANAHTAR" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/UpdatedKamera.xcarchive archive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION=${{ github.run_number }} "${YETKI[@]}" | tail -n 60
+          plutil -replace teamID -string "$APPLE_TEAM_ID" ExportOptions.plist
+          xcodebuild -exportArchive -archivePath build/UpdatedKamera.xcarchive -exportOptionsPlist ExportOptions.plist \
+            -exportPath build/cikti "${YETKI[@]}" | tail -n 60
+          rm -f "$ANAHTAR"
+          echo "::notice title=TestFlight::Yapı ${{ github.run_number }} yüklendi; Apple işledikten sonra (10-30 dk) TestFlight'ta görünür."
