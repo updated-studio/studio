@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-27-a",
+    "tarih": "27 Ekim 2026",
+    "baslik": "Künyeler kendiliğinden doluyor",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Yapay zekâ her gün birkaç ürünün özelliklerini resmî kaynağından bulup öneriyor.",
+          "Öneriler Site → Künye onayı'na düşer; onaylanmadan siteye geçmez.",
+          "Panelde yüklenen görselin dosya adı kendiliğinden sadeleşir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-26-b",
     "tarih": "26 Ekim 2026",
     "baslik": "Haftalık fotoğraf görevi",
