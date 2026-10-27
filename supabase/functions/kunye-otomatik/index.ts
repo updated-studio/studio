@@ -2,6 +2,8 @@
 // resmî üretici sayfasını (yoksa güvenilir kaynağı) bulur, ürünün özellik şablonundaki değerleri kaynak bağlantısı ve kanıtıyla önerir.
 // Öneriler public.kunye_oneriler'e yazılır (göç 0036); editör Stüdyo → Site → Künye onayı'ndan onaylayınca panele yazılır.
 // POST { adet?: 1-3, urun_id?: number } · Giriş: Stüdyo oturumu. Ürünler panelin herkese açık API'sinden okunur.
+// Zamanlayıcı (27 Ekim 2026, kullanıcı: "her gün otomatik"): günde 4 kez sunucu içinden 3'er ürün (göç 0042); oturumsuz çağrı yalnız
+// sunucu içinden (X-Forwarded-For'suz) kabul edilir, arka planda çalışır. Kota dolunca durur, ürünü "hata" diye işaretlemez (ertesi tur yeniden dener).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -68,11 +70,18 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return yanit({ error: "POST gerekli" }, 405);
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
   const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const { data: k } = await sb.auth.getUser(jwt);
-  if (!k?.user) return yanit({ error: "Stüdyo girişi gerekli" }, 401);
+  const { data: k } = jwt ? await sb.auth.getUser(jwt) : { data: null };
+  const zamanlayici = !k?.user && !req.headers.get("x-forwarded-for");
+  if (!k?.user && !zamanlayici) return yanit({ error: "Stüdyo girişi gerekli" }, 401);
   const b = await req.json().catch(() => ({}));
-  const adet = Math.min(3, Math.max(1, Number(b.adet) || 2));
+  const adet = Math.min(3, Math.max(1, Number(b.adet) || (zamanlayici ? 3 : 2)));
+  if (zamanlayici) { EdgeRuntime.waitUntil(isle(sb, b, adet)); return yanit({ basladi: true }); }
+  return yanit(await isle(sb, b, adet));
+});
 
+const kotaDolu = (m: string) => /\b429\b|RESOURCE_EXHAUSTED|quota/i.test(m);
+
+async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown }, adet: number) {
   // Aday ürünler: tek ürün istendiyse o; yoksa değerlerinin yarısından azı dolu ve bekleyen önerisi olmayanlar
   let urunler: Urun[] = [];
   if (Number.isInteger(b.urun_id)) {
@@ -96,9 +105,11 @@ Deno.serve(async (req) => {
       await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length ? "bekliyor" : "hata", hata: oz.length ? null : "Kaynaklarda değer bulunamadı" });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length });
     } catch (e) {
+      // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda
+      if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu" }); break; }
       await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, durum: "hata", hata: String((e as Error).message).slice(0, 300) });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "hata" });
     }
   }
-  return yanit({ islenen: sonuc, kalan });
-});
+  return { islenen: sonuc, kalan };
+}
