@@ -10,6 +10,9 @@ struct AnaEkran: View {
     @State private var proPanel: ProPanelTuru?
     @State private var uyariMod: ProMod?
     @State private var yardim = false
+    /// Masa (çok kamera) ya da Wi-Fi kamera açıkken ana kamera durur
+    @State private var ekran: Ekran?
+    enum Ekran: String, Identifiable { case masa, wifi; var id: String { rawValue } }
     @Environment(\.scenePhase) private var evre
 
     var body: some View {
@@ -54,7 +57,17 @@ struct AnaEkran: View {
         }
         .onAppear { kamera.baslat() }
         .onChange(of: evre) { _, yeni in
+            guard ekran == nil else { return }
             if yeni == .active { kamera.baslat() } else if yeni == .background { kamera.durdur() }
+        }
+        .onChange(of: ekran) { _, yeni in
+            if yeni == nil { kamera.baslat() } else { kamera.durdur() }
+        }
+        .fullScreenCover(item: $ekran) { e in
+            switch e {
+            case .masa: MasaEkran { ekran = nil }
+            case .wifi: WifiKameraEkran { ekran = nil }
+            }
         }
     }
 
@@ -82,6 +95,8 @@ struct AnaEkran: View {
                     .background(Circle().fill(yardim ? Tema.vurgu : Color.black.opacity(0.45)))
             }
             .accessibilityLabel("Düğmelerin açıklaması")
+            ustDugme("Wi-Fi kamera", sistem: "wifi") { ekran = .wifi }
+            ustDugme("Masa", sistem: "rectangle.split.2x2") { ekran = .masa }
         }
         .font(Tema.mono)
         .foregroundStyle(.white)
@@ -89,6 +104,17 @@ struct AnaEkran: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 18)
+    }
+
+    private func ustDugme(_ yazi: String, sistem: String, eylem: @escaping () -> Void) -> some View {
+        Button(action: eylem) {
+            Image(systemName: sistem)
+                .font(.system(size: 13, weight: .bold))
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+        }
+        .accessibilityLabel(yazi)
+        .disabled(kamera.kayitta)
     }
 
     private var isoYazi: String {

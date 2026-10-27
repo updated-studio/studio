@@ -6,7 +6,7 @@ options:
   deploymentTarget: { iOS: "17.0" }
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.2.0"
     # İlk TestFlight yüklemesi: 27 Ekim 2026
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
@@ -32,6 +32,8 @@ targets:
         NSCameraUsageDescription: Fotoğraf ve video çekmek için kamera gerekiyor.
         NSMicrophoneUsageDescription: Videoya ses kaydetmek için mikrofon gerekiyor.
         NSPhotoLibraryAddUsageDescription: Çekimleri Fotoğraflar'a kaydetmek için.
+        NSLocalNetworkUsageDescription: Masa ile Wi-Fi kameralar aynı ağda birbirini bulsun diye.
+        NSBonjourServices: [_updatedkam._tcp]
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UIStatusBarHidden: true
