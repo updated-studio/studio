@@ -30,20 +30,29 @@ KURALLAR:
 Yanıtı YALNIZ şu JSON olarak ver:
 {"yarismalar":[{"ad":"...","duzenleyen":"...","tur":"fotograf","kapsam":"turkiye","sonTarih":"2026-12-01","sonucTarihi":null,"ucretsiz":true,"ucret":null,"odul":"...","konu":"...","baglanti":"https://...","kaynak":"https://...","aciklama":"..."}]}`;
 
-async function ara(bilinen: string[]) {
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) throw new Error("GEMINI_API_KEY yok");
+/** Gemini anahtarları: önce sunucudaki ana anahtar; kotası dolunca Stüdyo → Bağlantı anahtarları'ndaki yedek (27 Ekim 2026).
+ *  Kota proje başına sayılır: yedek anahtar başka bir Google hesabının ya da projesinin olmalı. */
+async function geminiAnahtarlari(sb: ReturnType<typeof createClient>): Promise<string[]> {
+  const l = [Deno.env.get("GEMINI_API_KEY") ?? ""];
+  const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "gemini_yedek").maybeSingle();
+  if (data?.deger) l.push(String(data.deger));
+  return l.filter(Boolean);
+}
+
+async function ara(sb: ReturnType<typeof createClient>, bilinen: string[]) {
+  const anahtarlar = await geminiAnahtarlari(sb);
+  if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
   const bugun = new Date().toISOString().slice(0, 10);
   const istem = `BUGÜN: ${bugun}\nZATEN BİLİNENLER:\n${bilinen.slice(0, 120).map((x) => "- " + x).join("\n") || "(yok)"}`;
   let son = "";
-  for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+  for (const [ai, key] of anahtarlar.entries()) for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST", signal: AbortSignal.timeout(120_000), headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: SISTEM }] }, contents: [{ role: "user", parts: [{ text: istem }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.2 } }),
       });
       const g = await r.text();
-      if (!r.ok) { son = `${model} ${r.status} ${g.slice(0, 120)}`; continue; }
+      if (!r.ok) { son = `${ai ? "yedek anahtar · " : ""}${model} ${r.status} ${g.slice(0, 120)}`; continue; }
       const c = JSON.parse(g)?.candidates?.[0];
       const v = jsonOku((c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join(""));
       if (!v?.yarismalar) { son = `${model} geçersiz yanıt`; continue; }
@@ -81,7 +90,7 @@ async function tara(sb: ReturnType<typeof createClient>, id?: number) {
   try {
     const r = await fetch(`${PANEL}/api/yarismalar?limit=300&depth=0&where[sonTarih][greater_than]=${new Date().toISOString()}`);
     const bilinen: string[] = r.ok ? (await r.json()).docs.map((d: { ad: string; sonTarih: string }) => `${d.ad} (${String(d.sonTarih).slice(0, 10)})`) : [];
-    const bulunan = await ara(bilinen);
+    const bulunan = await ara(sb, bilinen);
     const p = await fetch(`${PANEL}/api/yarisma/oneri`, { method: "POST", headers: { "Content-Type": "application/json", "x-studio-key": Deno.env.get("STUDIO_IMPORT_KEY") ?? "" }, body: JSON.stringify({ yarismalar: bulunan }) });
     if (!p.ok) throw new Error(`Panel ${p.status}`);
     const s = await p.json();

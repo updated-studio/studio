@@ -29,20 +29,29 @@ KURALLAR:
 Yanıtı YALNIZ şu JSON olarak ver, başka metin yazma:
 {"ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
 
-async function ara(urun: Urun) {
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) throw new Error("GEMINI_API_KEY yok");
+/** Gemini anahtarları: önce sunucudaki ana anahtar; kotası dolunca Stüdyo → Bağlantı anahtarları'ndaki yedek (27 Ekim 2026).
+ *  Kota proje başına sayılır: yedek anahtar başka bir Google hesabının ya da projesinin olmalı. */
+async function geminiAnahtarlari(sb: ReturnType<typeof createClient>): Promise<string[]> {
+  const l = [Deno.env.get("GEMINI_API_KEY") ?? ""];
+  const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "gemini_yedek").maybeSingle();
+  if (data?.deger) l.push(String(data.deger));
+  return l.filter(Boolean);
+}
+
+async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
+  const anahtarlar = await geminiAnahtarlari(sb);
+  if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
   const ozellikler = (urun.specs ?? []).map((s) => `- ${s.key}${s.unit ? " · " + s.unit : ""}`).join("\n");
   const istem = `ÜRÜN: ${urun.brand} ${urun.name}\nDOLDURULACAK ÖZELLİKLER (ad · birim):\n${ozellikler}`;
   let son = "";
-  for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+  for (const [ai, key] of anahtarlar.entries()) for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: SISTEM }] }, contents: [{ role: "user", parts: [{ text: istem }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1 } }),
       });
       const g = await r.text();
-      if (!r.ok) { son = `${model} ${r.status} ${g.slice(0, 120)}`; continue; }
+      if (!r.ok) { son = `${ai ? "yedek anahtar · " : ""}${model} ${r.status} ${g.slice(0, 120)}`; continue; }
       const j = JSON.parse(g), c = j?.candidates?.[0];
       const metin = (c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
       const v = jsonOku(metin);
@@ -80,7 +89,7 @@ Deno.serve(async (req) => {
   const sonuc: { urun: string; durum: string; sayi?: number }[] = [];
   for (const u of urunler.slice(0, adet)) {
     try {
-      const { v, kaynaklar } = await ara(u);
+      const { v, kaynaklar } = await ara(sb, u);
       const adlar = new Set((u.specs ?? []).map((s) => s.key));
       const oz = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).filter((o: { key?: string; value?: string }) => o?.key && adlar.has(o.key) && o.value)
         .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string }) => ({ key: o.key, value: String(o.value).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160) }));
