@@ -67,6 +67,24 @@ class EkranTest {
         }
     }
 
+    /** PRO MODLAR: mod kartları ve Özelleştir paneli (orta boy dikey) */
+    @Test fun proModlar() {
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        KameraActivity.girisSoruldu = true
+        tercih("kamera").edit().clear().putString("mod", "PRO").commit()
+        Robolectric.buildActivity(KameraActivity::class.java).setup().use { c ->
+            val a = c.get(); ornekGoruntu(a)
+            a.window.decorView.findViewWithText("PRO MODLAR")?.performClick(); kaydet(a, "kamera-promod-kartlar")
+            a.window.decorView.findViewWithText("Yıldız izi")?.performClick(); kaydet(a, "kamera-promod-uyari")
+            a.window.decorView.findViewWithText("Açıklamalar")?.performClick(); kaydet(a, "kamera-promod-yardim")
+            a.window.decorView.findViewWithText("Açıklamalar")?.performClick()
+            KameraActivity.ornekBazIso = 50
+            a.window.decorView.findViewWithText("PRO MODLAR")?.performClick(); a.window.decorView.findViewWithText("İpeksi su")?.performClick()
+            a.window.decorView.findViewWithText("PRO mod ayarları")?.performClick(); kaydet(a, "kamera-promod-ozellestir")
+            KameraActivity.ornekBazIso = null
+        }
+    }
+
     /** Kompozisyon katmanı: konu, ok, ibre, ufuk, öncü çizgiler ve yön tarifi gri bir görüntünün üstünde */
     @Test fun katman() {
         RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))

@@ -115,6 +115,12 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     private val sahneModlari: IntArray by lazy { oz.get(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES) ?: IntArray(0) }
     fun sahneModuVar(m: Int) = m in sahneModlari
     /** Telefon tek çekimde en az 4 sn pozlama verebiliyor mu (Samanyolu için) */
+    /**
+     * Baz (en temiz) ISO: Android bunu doğrudan vermiyor. Sensörün en düşük duyarlılığı (SENSOR_INFO_SENSITIVITY_RANGE alt sınırı)
+     * pratikte baz ISO'dur; kumlanma en az, dinamik aralık en geniş. (SENSOR_MAX_ANALOG_SENSITIVITY de var: onun üstü dijital kazanç;
+     * şimdilik gösterilmiyor.)
+     */
+    val bazIso: Int? get() = yetenek.isoAralik?.lower
     val uzunPozlamaVar: Boolean get() = yetenek.elleKontrol && (yetenek.pozlamaAralik?.upper ?: 0L) >= 4_000_000_000L
 
     /** Fotoğraf modu: oturuma JPEG (ve istenirse RAW/DNG) okuyucusu eklenir, önizleme fotoğrafın en/boy oranına geçer */
