@@ -314,8 +314,8 @@ final class Masa: NSObject, ObservableObject {
                 self.kilit.unlock()
                 guard let bag, let s = self.oturum else { return }
                 s.beginConfiguration()
-                s.removeOutput(bag.cikti)
-                s.removeInput(bag.girdi)
+                s.removeOutput(bag.value.cikti)
+                s.removeInput(bag.value.girdi)
                 s.commitConfiguration()
             }
         }
