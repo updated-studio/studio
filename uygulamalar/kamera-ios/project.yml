@@ -7,6 +7,7 @@ options:
 settings:
   base:
     MARKETING_VERSION: "0.1.0"
+    # İlk TestFlight yüklemesi: 27 Ekim 2026
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic
