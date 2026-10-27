@@ -182,7 +182,7 @@ class KameraActivity : Activity() {
     /* ================= iskelet ================= */
     private fun cam(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(CAM); setStroke(1, Color.argb(26, 255, 255, 255)) }
     /** Açılır paneller: arkadaki düğmeler karışmasın diye neredeyse opak */
-    private fun pano(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(Color.argb(244, 30, 33, 38)); setStroke(1, Color.argb(26, 255, 255, 255)) }
+    private fun pano(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(Color.rgb(30, 33, 38)); setStroke(1, Color.argb(26, 255, 255, 255)) }
 
     private fun ikon(res: Int, aciklama: String, is_: () -> Unit) = ImageView(this).apply {
         setImageResource(res); contentDescription = aciklama; scaleType = ImageView.ScaleType.CENTER
