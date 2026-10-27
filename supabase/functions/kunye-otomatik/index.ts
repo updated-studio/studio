@@ -30,24 +30,49 @@ KURALLAR:
 - Fiyatı yalnız Türkiye fiyatı (TL) resmî kaynakta yazıyorsa doldur.
 - "Boyutlar": genişlik × yükseklik × derinlik, milimetre (ör. "131 × 96 × 80 mm"); lensse çap × uzunluk (ör. "Ø 81 × 128 mm"). num: null.
 - "urunSayfasi": üreticinin bu ürüne ait resmî ürün sayfasının TAM adresi (yoksa null).
+- "gorselAdresi": üreticinin sitesindeki ya da basın kitindeki ürün fotoğrafının DOĞRUDAN adresi (.jpg/.png/.webp; tercihen düz zeminli, önden ya da 3/4 açı); bulamazsan null. Uydurma.
 Yanıtı YALNIZ şu JSON olarak ver, başka metin yazma:
-{"urunSayfasi":"https://...","ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
+{"urunSayfasi":"https://...","gorselAdresi":null,"ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
 
 /** Künye görseli (27 Ekim 2026): üreticinin resmî ürün sayfasındaki paylaşım görseli (og:image / JSON-LD image).
  *  Yalnız marka alan adındaki sayfalardan alınır; arka planı sunucudaki işçi siler (scripts/kunye-gorsel), editör onaylar. */
 const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; kunye gorseli)";
 const sade = (x: string) => x.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]/g, "");
 const hostAl = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
-async function resmiGorsel(marka: string, adaylar: (string | null | undefined)[]): Promise<{ url: string; sayfa: string } | null> {
+type Gorsel = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string };
+/** Adres gerçekten büyükçe bir görsel mi (içerik türü ve boyutu) */
+async function gorselMi(url: string) {
+  const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+  if (!r?.ok || !/^image\/(jpe?g|png|webp)/i.test(r.headers.get("content-type") ?? "")) { await r?.body?.cancel().catch(() => {}); return false; }
+  const uzunluk = Number(r.headers.get("content-length") ?? 0);
+  if (uzunluk) { await r.body?.cancel().catch(() => {}); return uzunluk > 25_000; }
+  return (await r.arrayBuffer()).byteLength > 25_000;
+}
+const duz = (x: string) => String(x ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+async function gorselBul(marka: string, ad: string, gemini: string | null | undefined, adaylar: (string | null | undefined)[]): Promise<Gorsel | null> {
   const m = sade(marka).slice(0, 5);
+  // 1) Üreticinin resmî sayfalarındaki paylaşım görseli
   const sayfalar = [...new Set(adaylar.filter((u): u is string => !!u && /^https?:\/\//.test(u) && !!m && sade(hostAl(u)).includes(m)))].slice(0, 4);
   for (const sayfa of sayfalar) {
     const h = await fetch(sayfa, { headers: { "User-Agent": UA, "Accept-Language": "tr,en" }, signal: AbortSignal.timeout(15_000) }).then((r) => (r.ok ? r.text() : "")).catch(() => "");
     if (!h) continue;
-    const meta = (ad: string) => h.match(new RegExp(`<meta[^>]+(?:property|name)=["']${ad}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1] ?? h.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${ad}["']`, "i"))?.[1];
+    const meta = (k: string) => h.match(new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1] ?? h.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${k}["']`, "i"))?.[1];
     const ham = meta("og:image(?::secure_url)?") ?? meta("twitter:image(?::src)?") ?? h.match(/"image"\s*:\s*(?:\[\s*)?"(https?:[^"]+\.(?:jpe?g|png|webp)[^"]*)"/i)?.[1];
     if (!ham || /logo|favicon|default|placeholder|avatar|share-image|og-default/i.test(ham)) continue;
-    try { return { url: new URL(ham.replace(/&amp;/g, "&"), sayfa).href, sayfa }; } catch { /* sonraki */ }
+    let url = ""; try { url = new URL(ham.replace(/&amp;/g, "&"), sayfa).href; } catch { continue; }
+    if (await gorselMi(url)) return { url, sayfa, kaynak: "Üretici", yazar: marka, lisans: "Basın görseli" };
+  }
+  // 2) Yapay zekânın bulduğu doğrudan görsel adresi (indirilip doğrulanır)
+  if (gemini && /^https?:\/\//.test(gemini) && await gorselMi(gemini)) return { url: gemini, sayfa: gemini, kaynak: "Üretici", yazar: marka, lisans: "Basın görseli" };
+  // 3) Wikimedia Commons: serbest lisanslı (CC0, kamu malı, CC BY, CC BY-SA) gerçek fotoğraf
+  const q = `${marka} ${ad}`;
+  const j = await fetch("https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=1600&iiextmetadatafilter=LicenseShortName|Artist&gsrsearch=" + encodeURIComponent(q + " filetype:bitmap"),
+    { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(10_000) }).then((r) => r.json()).catch(() => null);
+  const ilk = sade(ad).slice(0, 6);
+  for (const p of Object.values((j?.query?.pages ?? {}) as Record<string, { title: string; index?: number; imageinfo?: Record<string, any>[] }>).sort((a, b) => (a.index ?? 0) - (b.index ?? 0))) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const i = p.imageinfo?.[0], lisans = duz(i?.extmetadata?.LicenseShortName?.value ?? "");
+    if (!i || !/jpe?g|png|webp/i.test(i.mime ?? "") || (i.width ?? 0) < 800 || !/^(cc0|public domain|pd|cc[- ]by(-sa)?[- ]\d)/i.test(lisans) || !sade(p.title).includes(ilk)) continue;
+    return { url: i.thumburl ?? i.url, sayfa: i.descriptionurl, kaynak: "Wikimedia Commons", yazar: duz(i.extmetadata?.Artist?.value ?? "").slice(0, 80) || "Bilinmiyor", lisans };
   }
   return null;
 }
@@ -124,7 +149,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       const adlar = new Set([...(u.specs ?? []).map((s) => s.key), "Boyutlar"]);
       const oz = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).filter((o: { key?: string; value?: string }) => o?.key && adlar.has(o.key) && o.value)
         .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string }) => ({ key: o.key, value: String(o.value).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160) }));
-      const gorsel = await resmiGorsel(u.brand, [v?.urunSayfasi, ...oz.map((o: { kaynak: string | null }) => o.kaynak)]).catch(() => null);
+      const gorsel = await gorselBul(u.brand, u.name, v?.gorselAdresi, [v?.urunSayfasi, ...oz.map((o: { kaynak: string | null }) => o.kaynak)]).catch(() => null);
       const kayit = { urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length ? "bekliyor" : "hata", hata: oz.length ? null : "Kaynaklarda değer bulunamadı" };
       // Görsel sütunları göç 0043 ile geldi; uygulanmamışsa kayıt görselsiz yazılır
       const { error } = await sb.from("kunye_oneriler").insert({ ...kayit, gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" });
