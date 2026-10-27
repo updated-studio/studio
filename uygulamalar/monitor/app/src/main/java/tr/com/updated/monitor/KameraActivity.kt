@@ -46,14 +46,13 @@ import kotlin.math.atan2
 /**
  * UPDATED Kamera: telefonun normal kamerası (iPhone kamerası sadeliğinde, Final Cut Camera'nın araç şeridiyle). Üstte yuvarlak düğmeler ve
  * biçim etiketi, altta araç şeridi (dokununca cetvel açılır), mod şeridi ve deklanşör. Ekran dikey sabit; telefon döndükçe yalnız ikonlar döner.
- * Modlar altta kaydırılır (Timelapse · Video · Foto · Portre · Gece · Işık izi · Samanyolu · Monitör). PRO düğmesi Blackmagic düzenini
+ * Modlar altta kaydırılır (Timelapse · Video · Foto · PRO modlar · Portre · Monitör); gece, ışık izi ve Samanyolu PRO MODLAR'ın içinde (ProModlar.kt). PRO düğmesi Blackmagic düzenini
  * (MainActivity, mod=pro), Monitör dış kamera izlemeyi (MainActivity, mod=monitor) açar. Uygulama baştan açılınca hangisi
  * olacağı sorulur; alta alınıp geri gelince sorulmaz.
  */
 class KameraActivity : Activity() {
     enum class KMod(val ad: String, val foto: Boolean, val sahne: Sahne) {
         TIMELAPSE("TIMELAPSE", false, Sahne.KAPALI), VIDEO("VİDEO", false, Sahne.KAPALI), FOTO("FOTO", true, Sahne.KAPALI), PRO("PRO MODLAR", true, Sahne.KAPALI), PORTRE("PORTRE", true, Sahne.PORTRE),
-        GECE("GECE", true, Sahne.GECE), ISIK_IZI("IŞIK İZİ", true, Sahne.ISIK_IZI), SAMANYOLU("SAMANYOLU", true, Sahne.SAMANYOLU),
         MONITOR("MONİTÖR", false, Sahne.KAPALI)
     }
 
@@ -122,7 +121,9 @@ class KameraActivity : Activity() {
     private var sonOneri: Pair<KompTur, Int>? = null
     private var sahneOnerisi: Sahne? = null
     @Volatile private var renkOrt = floatArrayOf(0f, 0f, 0f); @Volatile private var yercekimZ = 0f
-    private var zamanlayici = 0; private var deklansorSesi = true; private var izSure = 10
+    private var zamanlayici = 0; private var deklansorSesi = true
+    /** PRO MODLAR seri çekimi: deklanşör basılı tutuldukça */
+    private var seriSuruyor = false; private var seriSayi = 0
     // Timelapse (Timelapse.kt): kare aralığı, çekim süresi sınırı (dk, 0 = sınırsız), pozlama kilidi
     private var tlAralik = 2000L; private var tlSure = 0; private var tlPozSabit = true
     private var tlKaydedici: Kaydedici? = null; private var tlUri: Uri? = null
@@ -191,6 +192,8 @@ class KameraActivity : Activity() {
     private fun cam(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(CAM); setStroke(1, Color.argb(26, 255, 255, 255)) }
     /** Açılır paneller: arkadaki düğmeler karışmasın diye neredeyse opak */
     private fun pano(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(Color.rgb(30, 33, 38)); setStroke(1, Color.argb(26, 255, 255, 255)) }
+    /** PRO MODLAR panelleri: koyu yarı saydam, görüntü arkadan sezilir */
+    private fun saydamPano(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(Color.argb(176, 12, 14, 18)); setStroke(1, Color.argb(36, 255, 255, 255)) }
 
     private fun ikon(res: Int, aciklama: String, is_: () -> Unit) = ImageView(this).apply {
         setImageResource(res); contentDescription = aciklama; scaleType = ImageView.ScaleType.CENTER
@@ -227,6 +230,7 @@ class KameraActivity : Activity() {
         Tema.simge(sahneCip, R.drawable.ic_sahne, MAVI_ACIK, 16f)
         kutu.addView(sahneCip, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply { bottomMargin = dp(64f); marginStart = dp(12f) })
         proCip = cip(TURUNCU).apply { contentDescription = "PRO mod ayarları"; setOnClickListener { proOzellestir() } }
+        aciklamalar.add(proCip to "Dokun: ISO, S, WB")
         Tema.simge(proCip, R.drawable.ic_ayar, TURUNCU, 15f)
         kutu.addView(proCip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(12f) })
         bilgiCip = TextView(this).apply { textSize = 12f; typeface = mono; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setPadding(dp(12f), dp(6f), dp(12f), dp(6f)); background = cam(dp(14f).toFloat()); setOnClickListener { ayarlarAc() }; contentDescription = "Biçim" }
@@ -244,27 +248,27 @@ class KameraActivity : Activity() {
         ustSerit = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4f), 0, dp(4f), 0) }
         fun ekle(v: View, w: Int = dp(40f)) = ustSerit.addView(v, LinearLayout.LayoutParams(w, dp(40f)).apply { marginEnd = dp(8f) })
         fun bosluk() = ustSerit.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        ekle(ikon(R.drawable.ic_monitor, "Monitör") { monitoreGec() }.apply { setColorFilter(MAVI_ACIK); background = Tema.kapsul(CAM); aciklamalar.add(this to "Harici kamera / USB görüntüsü") })
+        ekle(ikon(R.drawable.ic_monitor, "Monitör") { monitoreGec() }.apply { setColorFilter(MAVI_ACIK); background = Tema.kapsul(CAM); aciklamalar.add(this to "Harici kamera (USB)") })
         val flasKutu = FrameLayout(this).apply { setOnClickListener { flasDegistir() }; contentDescription = "Flaş"; background = Tema.kapsul(CAM) }
         flasIkon = ImageView(this).apply { setImageResource(R.drawable.ic_flas_yok); scaleType = ImageView.ScaleType.CENTER }
         flasHarf = TextView(this).apply { text = "A"; textSize = 9f; typeface = kosulKalin; setTextColor(Color.WHITE); visibility = View.GONE }
         flasKutu.addView(flasIkon, FrameLayout.LayoutParams(-1, -1)); flasKutu.addView(flasHarf, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { marginEnd = dp(8f); bottomMargin = dp(6f) })
-        donenler.add(flasKutu); ekle(flasKutu); bosluk(); aciklamalar.add(flasKutu to "Flaş: kapalı, oto, açık, fener")
+        donenler.add(flasKutu); ekle(flasKutu); bosluk(); aciklamalar.add(flasKutu to "Flaş")
         val orta = FrameLayout(this)
         orta.addView(bilgiCip, FrameLayout.LayoutParams(-2, dp(30f), Gravity.CENTER)); orta.addView(kayitCip, FrameLayout.LayoutParams(-2, dp(30f), Gravity.CENTER))
         ustSerit.addView(orta, LinearLayout.LayoutParams(-2, dp(40f))); bosluk(); aciklamalar.add(orta to "Çözünürlük ve biçim")
         val pro = etiket("PRO", 14f).apply { background = Tema.kapsul(CAM); setOnClickListener { proyaGec() }; contentDescription = "PRO" }
-        donenler.add(pro); ustSerit.addView(pro, LinearLayout.LayoutParams(dp(56f), dp(40f)).apply { marginEnd = dp(8f) }); aciklamalar.add(pro to "Elle ayarlı PRO kamera")
+        donenler.add(pro); ustSerit.addView(pro, LinearLayout.LayoutParams(dp(56f), dp(40f)).apply { marginEnd = dp(8f) }); aciklamalar.add(pro to "Elle ayar ekranı")
         val yardim = etiket("?", 17f).apply { typeface = kosulKalin; background = Tema.kapsul(CAM); contentDescription = "Açıklamalar"; setOnClickListener { yardimAcKapat() } }
-        donenler.add(yardim); ustSerit.addView(yardim, LinearLayout.LayoutParams(dp(40f), dp(40f)).apply { marginEnd = dp(8f) }); aciklamalar.add(yardim to "Bu açıklamaları aç/kapat")
-        ustSerit.addView(ikon(R.drawable.ic_ayar, "Ayarlar") { ayarlarAc() }.apply { background = Tema.kapsul(CAM); aciklamalar.add(this to "Bütün ayarlar") }, LinearLayout.LayoutParams(dp(40f), dp(40f)))
+        donenler.add(yardim); ustSerit.addView(yardim, LinearLayout.LayoutParams(dp(40f), dp(40f)).apply { marginEnd = dp(8f) }); aciklamalar.add(yardim to "Açıklamalar")
+        ustSerit.addView(ikon(R.drawable.ic_ayar, "Ayarlar") { ayarlarAc() }.apply { background = Tema.kapsul(CAM); aciklamalar.add(this to "Ayarlar") }, LinearLayout.LayoutParams(dp(40f), dp(40f)))
         kok.addView(ustSerit)
 
         // Araç şeridi (Final Cut Camera gibi): simge + kısa yazı; pozlama, beyaz denge ve odakta cetvel açılır
         aracSerit = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(8f), 0, dp(8f), 0) }
         fun arac(res: Int, ad: String, etiketi: String, is_: () -> Unit) {
-            val k = LinearLayout(this).apply { aciklamalar.add(this to when (etiketi) { "poz" -> "Parlaklık"; "bd" -> "Renk sıcaklığı"; "odak" -> "Elle / oto odak"
-                    "kilavuz" -> "Kadraj çizgileri"; "yardimci" -> "Kadraj önerisi"; else -> "Telefonun eğimi" })
+            val k = LinearLayout(this).apply { aciklamalar.add(this to when (etiketi) { "poz" -> "Parlaklık"; "bd" -> "Renk sıcaklığı"; "odak" -> "Odak"
+                    "kilavuz" -> "Kadraj çizgileri"; "yardimci" -> "Kadraj önerisi"; else -> "Eğim" })
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; contentDescription = ad; tag = etiketi; setOnClickListener { is_() } }
             k.addView(ImageView(this).apply { setImageResource(res); donenler.add(this) }, LinearLayout.LayoutParams(dp(22f), dp(22f)))
             k.addView(TextView(this).apply { textSize = 11f; typeface = kosul; setTextColor(Color.WHITE); gravity = Gravity.CENTER; isSingleLine = true; setPadding(0, dp(3f), 0, 0) })
@@ -288,11 +292,13 @@ class KameraActivity : Activity() {
         altSira = FrameLayout(this)
         sonResim = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; background = GradientDrawable().apply { cornerRadius = dp(12f).toFloat(); setColor(Color.rgb(74, 81, 92)); setStroke(1, Color.argb(50, 255, 255, 255)) }; clipToOutline = true
             contentDescription = "Son çekim"; setOnClickListener { sonuAc() } }
-        donenler.add(sonResim); aciklamalar.add(sonResim to "Son çekimi aç")
+        donenler.add(sonResim); aciklamalar.add(sonResim to "Son çekim")
         altSira.addView(sonResim, FrameLayout.LayoutParams(dp(52f), dp(52f), Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = dp(34f) })
-        deklansorDugme = KayitDugmesi(this).apply { setOnClickListener { deklansorBasildi() }; contentDescription = "Çek" }; aciklamalar.add(deklansorDugme to "Çek / kaydet")
+        deklansorDugme = KayitDugmesi(this).apply { setOnClickListener { deklansorBasildi() }; contentDescription = "Çek"
+            setOnLongClickListener { seriBasla() }
+            setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) seriBitir(); false } }; aciklamalar.add(deklansorDugme to "Çek")
         altSira.addView(deklansorDugme, FrameLayout.LayoutParams(dp(82f), dp(82f), Gravity.CENTER))
-        val cevir = ikon(R.drawable.ic_cevir, "Kamerayı çevir") { kameraCevir() }.apply { background = Tema.kapsul(CAM) }; aciklamalar.add(cevir to "Ön / arka kamera")
+        val cevir = ikon(R.drawable.ic_cevir, "Kamerayı çevir") { kameraCevir() }.apply { background = Tema.kapsul(CAM) }; aciklamalar.add(cevir to "Ön / arka")
         altSira.addView(cevir, FrameLayout.LayoutParams(dp(52f), dp(52f), Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = dp(34f) })
         kok.addView(altSira)
 
@@ -328,30 +334,41 @@ class KameraActivity : Activity() {
         modKaydir.post { (0 until modSerit.childCount).map { modSerit.getChildAt(it) }.firstOrNull { it.tag == mod }?.let { v -> modKaydir.smoothScrollTo(v.left + v.width / 2 - modKaydir.width / 2, 0) } }
     }
 
-    private fun modSec(m: KMod) {
-        if (m == mod) { if (m == KMod.PRO) proKartlar(); return }
+    private fun modSec(m: KMod, kartlar: Boolean = true) {
+        if (m == mod) { if (m == KMod.PRO && kartlar) proKartlar(); return }
         if (kayitSuruyor()) return tost("Kayıt sürerken mod değişmez.")
         if (m == KMod.MONITOR) { monitoreGec(); return }
         mod = m; tercih.edit().putString("mod", m.name).apply()
         modlariCiz(); modUygula()
-        if (m == KMod.PRO) proKartlar()
+        if (m == KMod.PRO && kartlar) proKartlar()
     }
 
     private fun modUygula(ilk: Boolean = false) {
         val k = kaynak
         deklansorDugme.foto = mod.foto; deklansorDugme.kayitta = kayitSuruyor()
-        sureSira.visibility = if (mod == KMod.ISIK_IZI || mod == KMod.TIMELAPSE) View.VISIBLE else View.GONE
-        if (mod == KMod.ISIK_IZI || mod == KMod.TIMELAPSE) sureCiz()
+        sureSira.visibility = if (mod == KMod.TIMELAPSE) View.VISIBLE else View.GONE
+        if (mod == KMod.TIMELAPSE) sureCiz()
         sahneOnerisi = null; sahneCip.visibility = View.GONE
         proCiz()
         if (!ilk && k != null) {
-            k.sahne = mod.sahne
+            k.sahne = mod.sahne; k.pro = proIstek()
             if (k.fotoModu != mod.foto) k.modDegistir(mod.foto) { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); komp.invalidate() } } else k.ayarDegisti()
         }
         bilgiCiz(); flasCiz()
     }
 
     /* ================= PRO MODLAR: hazır çekim modları ================= */
+    private fun proIstek() = if (mod == KMod.PRO) proMod to proMod.oku(tercih) else null
+    /** Seçili PRO modun ayarları kameraya gider */
+    private fun proGonder() { kaynak?.let { it.pro = proIstek(); it.ayarDegisti() } }
+    /** Başka yerden (sahne önerisi) bir PRO mod seçilir */
+    private fun proSec(m: ProMod) {
+        proMod = m; tercih.edit().putString("proMod", m.name).apply()
+        if (mod != KMod.PRO) modSec(KMod.PRO, kartlar = false) else { proCiz(); proGonder() }
+        if (m.tele) kaynak?.zoomAralik?.let { zoomAyarla(minOf(it.upper, 3f)) } // kuş/uçak: en uzun objektif (3× ve üstü telefoto)
+        proUyari(m)
+    }
+
     private fun proCiz() {
         val acik = mod == KMod.PRO
         proCip.visibility = if (acik) View.VISIBLE else View.GONE
@@ -361,15 +378,15 @@ class KameraActivity : Activity() {
 
     /** 3×3 kart: simge, ad, tek satır ipucu; seçili kart turuncu çerçeveli */
     private fun proKartlar() {
-        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = pano(dp(26f).toFloat()); setPadding(dp(14f), dp(16f), dp(14f), dp(14f)); isClickable = true }
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = saydamPano(dp(26f).toFloat()); setPadding(dp(14f), dp(16f), dp(14f), dp(14f)); isClickable = true }
         p.addView(etiket("PRO MODLAR", 18f).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; typeface = kosulKalin; setPadding(dp(4f), 0, 0, dp(12f)); Tema.simge(this, R.drawable.ic_sahne, Color.WHITE, 20f) })
         ProMod.values().toList().chunked(3).forEach { sira ->
             val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             sira.forEach { m ->
                 val secili = m == proMod
                 val k = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(6f), dp(12f), dp(6f), dp(10f)); contentDescription = m.ad
-                    background = GradientDrawable().apply { cornerRadius = dp(16f).toFloat(); setColor(if (secili) Color.argb(46, 255, 107, 26) else Color.argb(20, 255, 255, 255)); if (secili) setStroke(dp(1.5f), TURUNCU) }
-                    setOnClickListener { proMod = m; tercih.edit().putString("proMod", m.name).apply(); acilirKapat(); proCiz(); kaynak?.ayarDegisti(); proUyari(m) } }
+                    background = GradientDrawable().apply { cornerRadius = dp(16f).toFloat(); setColor(if (secili) Color.argb(60, 255, 107, 26) else Color.argb(26, 255, 255, 255)); if (secili) setStroke(dp(1.5f), TURUNCU) }
+                    setOnClickListener { acilirKapat(); proSec(m) } }
                 k.addView(ImageView(this).apply { setImageResource(m.simge); setColorFilter(if (secili) TURUNCU else Color.WHITE) }, LinearLayout.LayoutParams(dp(26f), dp(26f)))
                 k.addView(etiket(m.ad, 14f, if (secili) TURUNCU else Color.WHITE).apply { setPadding(0, dp(6f), 0, dp(2f)) })
                 k.addView(TextView(this).apply { text = m.ipucu; textSize = 10.5f; setTextColor(GRI); gravity = Gravity.CENTER; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
@@ -378,14 +395,14 @@ class KameraActivity : Activity() {
             p.addView(s, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8f) })
         }
         p.addView(TextView(this).apply { text = "Seçtikten sonra üstteki etikete dokunarak ayarları değiştirebilirsin."; textSize = 12f; setTextColor(GRI); gravity = Gravity.CENTER; setPadding(0, dp(4f), 0, 0) })
-        acilirAc(p, ustTan = false)
+        acilirAc(p, ustTan = false); altGizle(true)
     }
 
     /** Mod seçilince kısa uyarı (tripod, sabitleme…); pencerenin dışına dokununca kapanır */
     private fun proUyari(m: ProMod) {
         acilirKapat()
         val perde = FrameLayout(this).apply { setBackgroundColor(Color.argb(110, 0, 0, 0)); setOnClickListener { acilirKapat() } }
-        val k = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; background = pano(dp(24f).toFloat()); setPadding(dp(22f), dp(20f), dp(22f), dp(16f)); isClickable = true }
+        val k = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; background = saydamPano(dp(24f).toFloat()); setPadding(dp(22f), dp(20f), dp(22f), dp(16f)); isClickable = true }
         k.addView(ImageView(this).apply { setImageResource(m.simge); setColorFilter(TURUNCU) }, LinearLayout.LayoutParams(dp(30f), dp(30f)))
         k.addView(etiket(m.ad, 18f).apply { typeface = kosulKalin; setPadding(0, dp(8f), 0, dp(6f)) })
         k.addView(TextView(this).apply { text = m.uyari; textSize = 15f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setLineSpacing(0f, 1.15f) })
@@ -395,9 +412,9 @@ class KameraActivity : Activity() {
     }
 
     /**
-     * "?": her düğmeye ince bir çizgiyle bağlı tek cümlelik açıklama; tekrar "?" ya da boşluğa dokununca kapanır.
-     * Açıklamalar görüntünün boş ortasına sıra sıra dizilir (üstteki düğmeler aşağı, alttakiler yukarı). Kenardaki düğmeden başlanır;
-     * her kutu kendi düğmesinden kenara doğru uzanır ve kutuların ne birbirine ne de başka düğmelerin çizgilerine değmediği ilk sıraya konur.
+     * "?": her düğmenin hemen yanında kısa açıklama; tekrar "?" ya da boşluğa dokununca kapanır.
+     * Kutu düğmenin ortasına hizalı ve komşu düğmeye taşmayacak kadar dar; üstteki düğmelerinki altında, araç şeridininki üstünde,
+     * deklanşör sırasınınki altında durur. Yer yoksa bir sıra öteye geçer; düğmeye kısa bir çizgi bağlar. Mod şeridinin ipucu ortada.
      */
     private fun yardimAcKapat() {
         yardimKatman?.let { kok.removeView(it); yardimKatman = null; return }
@@ -405,39 +422,49 @@ class KameraActivity : Activity() {
         val kat = FrameLayout(this).apply { setBackgroundColor(Color.argb(130, 0, 0, 0)); setOnClickListener { yardimAcKapat() } }
         val kokYer = IntArray(2).also { kok.getLocationInWindow(it) }
         fun yer(v: View) = IntArray(2).also { v.getLocationInWindow(it); it[0] -= kokYer[0]; it[1] -= kokYer[1] }
-        val g = kok.width; val orta = g / 2; val sira = dp(46f); val pay = dp(6f)
-        // Çizgi düğmenin ortasından çıkar; ekran genişliğindeki şeritte (mod şeridi) soldan üçte birden (ortadaki deklanşörle çakışmasın)
-        class Yer(val v: View, val metin: String, val x: Int, val y: Int) { val cx get() = x + if (v.width > g / 2) v.width / 3 else v.width / 2 }
-        val gorunen = aciklamalar.filter { it.first.isShown }.map { (v, m) -> yer(v).let { Yer(v, m, it[0], it[1]) } }
-        val (ustler, altlar) = gorunen.partition { it.y + it.v.height / 2 < kok.height / 2 }
+        val g = kok.width; val pay = dp(6f)
+        class Yer(val v: View, val metin: String, val x: Int, val y: Int) { val cx get() = x + v.width / 2; val cy get() = y + v.height / 2; val alt get() = y + v.height
+            fun degerMi(l: Int, t: Int, r: Int, b: Int) = l < x + v.width && x < r && t < alt && y < b }
+        // PRO etiketi biçim yazısının tam altında: ikisinin kutusu üst üste gelmesin diye o varken biçimin açıklaması yok
+        val gorunen = aciklamalar.filter { it.first.isShown && it.first !== modKaydir && !(it.first === bilgiCip.parent && proCip.isShown) }.map { (v, m) -> yer(v).let { Yer(v, m, it[0], it[1]) } }
+        val altSiradakiler = gorunen.filter { it.v.parent === altSira }
+        val (ustler, altlar) = (gorunen - altSiradakiler.toSet()).partition { it.cy < kok.height / 2 }
         class Kutu(val cx: Int, val sol: Int, val sag: Int, val r: Int)
-        val kutular = ArrayList<Pair<View, FrameLayout.LayoutParams>>() // çizgilerden sonra eklenir: kesişen çizgi kutunun arkasından geçer
+        val kutular = ArrayList<Pair<View, FrameLayout.LayoutParams>>() // çizgilerden sonra eklenir: çizgi kutunun arkasından geçer
         fun diz(grup: List<Yer>, asagi: Boolean) {
-            val taban = if (asagi) grup.maxOf { it.y + it.v.height } + dp(12f) else grup.minOf { it.y } - dp(12f)
-            val konan = ArrayList<Kutu>()
-            grup.sortedByDescending { abs(it.cx - orta) }.forEach { o ->
-                val b = TextView(this).apply { text = o.metin; textSize = 12f; setTextColor(Color.WHITE); maxLines = 2
-                    setPadding(dp(9f), dp(5f), dp(9f), dp(5f)); background = Tema.kapsul(Color.rgb(30, 33, 38), dp(9f).toFloat(), TURUNCU) }
-                b.measure(View.MeasureSpec.makeMeasureSpec(g * 2 / 3, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
+            if (grup.isEmpty()) return
+            val taban = if (asagi) grup.maxOf { it.alt } + pay else grup.minOf { it.y } - pay
+            val konan = ArrayList<Pair<Kutu, IntArray>>()
+            grup.sortedBy { it.cx }.forEach { o ->
+                // Aynı sıradaki komşu düğmeye kadar olan yer: kutu ona taşmasın
+                val komsu = grup.filter { it !== o && abs(it.cy - o.cy) < dp(30f) }.minOfOrNull { abs(it.cx - o.cx) } ?: g
+                val en = minOf((g - pay * 4) / 3, maxOf(komsu - pay, dp(92f)))
+                val b = TextView(this).apply { text = o.metin; textSize = 11.5f; setTextColor(Color.WHITE); maxLines = 3; gravity = Gravity.CENTER
+                    setPadding(dp(7f), dp(4f), dp(7f), dp(4f)); background = Tema.kapsul(Color.rgb(30, 33, 38), dp(9f).toFloat(), TURUNCU) }
+                b.measure(View.MeasureSpec.makeMeasureSpec(en, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
                 val bw = b.measuredWidth; val bh = b.measuredHeight
-                // Kutu kenara doğru uzanır (sol yarıda sola, sağ yarıda sağa); kenardakiler önce, ortaya yakın olan sonra ve daha uzak sıraya
-                val bx = (if (o.cx <= orta) o.cx + dp(16f) - bw else o.cx - dp(16f)).coerceIn(pay, g - pay - bw)
-                val r = (0 until 30).firstOrNull { r -> konan.none { k ->
-                    (k.r == r && bx < k.sag + pay && k.sol < bx + bw + pay) ||   // aynı sırada kutu var
-                    (k.r > r && k.cx in (bx - pay)..(bx + bw + pay)) ||          // başka düğmenin çizgisi bu kutudan geçer
-                    (k.r < r && o.cx in (k.sol - pay)..(k.sag + pay)) } } ?: (konan.maxOfOrNull { it.r + 1 } ?: 0) // bu düğmenin çizgisi önceki kutudan geçer
-                konan.add(Kutu(o.cx, bx, bx + bw, r))
-                val by = if (asagi) taban + r * sira else taban - r * sira - bh
-                val cizgiUst = if (asagi) o.y + o.v.height else by + bh
-                val cizgiAlt = if (asagi) by else o.y
-                kat.addView(View(this).apply { setBackgroundColor(Color.argb(200, 255, 107, 26)) },
-                    FrameLayout.LayoutParams(dp(1.5f), (cizgiAlt - cizgiUst).coerceAtLeast(0)).apply { leftMargin = o.cx; topMargin = cizgiUst })
-                kutular.add(b to FrameLayout.LayoutParams(bw, bh).apply { leftMargin = bx; topMargin = by })
+                val bx = (o.cx - bw / 2).coerceIn(pay, g - pay - bw)
+                fun by(r: Int) = if (asagi) taban + r * (bh + pay) else taban - r * (bh + pay) - bh
+                fun bos(r: Int, cizgiyeBak: Boolean): Boolean { val t = by(r)
+                    return konan.none { (k, d) -> bx < k.sag + pay && k.sol < bx + bw + pay && t < d[1] + pay && d[0] < t + bh + pay } &&  // başka kutu
+                        gorunen.none { it !== o && it.degerMi(bx, t, bx + bw, t + bh) } &&                                                 // başka düğme
+                        (!cizgiyeBak || konan.none { (k, _) -> k.r < r && o.cx in (k.sol - pay)..(k.sag + pay) }) }                         // çizgisi önceki kutudan geçmesin
+                val r = (0 until 12).firstOrNull { bos(it, true) } ?: (0 until 12).firstOrNull { bos(it, false) } ?: 0
+                val t = by(r); konan.add(Kutu(o.cx, bx, bx + bw, r) to intArrayOf(t, t + bh))
+                val cizgiUst = if (asagi) o.alt else t + bh; val cizgiAlt = if (asagi) t else o.y
+                if (cizgiAlt > cizgiUst) kat.addView(View(this).apply { setBackgroundColor(Color.argb(170, 255, 107, 26)) },
+                    FrameLayout.LayoutParams(dp(1f), cizgiAlt - cizgiUst).apply { leftMargin = o.cx; topMargin = cizgiUst })
+                kutular.add(b to FrameLayout.LayoutParams(bw, bh).apply { leftMargin = bx; topMargin = t })
             }
         }
-        if (ustler.isNotEmpty()) diz(ustler, asagi = true)
-        if (altlar.isNotEmpty()) diz(altlar, asagi = false)
+        diz(ustler, asagi = true); diz(altlar, asagi = false)
+        // Deklanşör sırası: altında yer varsa altına, yoksa üstüne
+        val altBos = altSiradakiler.maxOfOrNull { kok.height - it.alt } ?: 0
+        diz(altSiradakiler, asagi = altBos >= dp(30f))
         kutular.forEach { (b, lp) -> kat.addView(b, lp) }
+        if (modKaydir.isShown) kat.addView(TextView(this).apply { text = "Mod değiştirmek için alttaki şeridi ya da görüntüyü yana kaydır.\nKapatmak için herhangi bir yere dokun."
+            textSize = 13f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setLineSpacing(0f, 1.2f); setShadowLayer(dp(3f).toFloat(), 0f, dp(1f).toFloat(), Color.BLACK) },
+            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER).apply { marginStart = dp(32f); marginEnd = dp(32f) })
         kok.addView(kat, FrameLayout.LayoutParams(-1, -1)); yardimKatman = kat
     }
 
@@ -447,9 +474,13 @@ class KameraActivity : Activity() {
         val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18f), dp(16f), dp(18f), dp(14f)) }
         ic.addView(etiket(m.ad.uppercase(Locale("tr")), 18f).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; typeface = kosulKalin; Tema.simge(this, m.simge, TURUNCU, 20f) })
         ic.addView(TextView(this).apply { text = m.ipucu; textSize = 12f; setTextColor(GRI); setPadding(0, dp(4f), 0, dp(4f)) })
-        fun degistir(y: ProAyar) { m.yaz(tercih, y); proCiz(); kaynak?.ayarDegisti(); proOzellestir() }
-        fun <T> satir(ad: String, simge: Int, secenekler: List<T>, secili: T, yazi: (T) -> String, vurgu: T? = null, sec: (T) -> ProAyar) {
-            ic.addView(TextView(this).apply { text = ad; textSize = 13f; setTextColor(Color.WHITE); setPadding(0, dp(12f), 0, dp(6f)); Tema.simge(this, simge, GRI, 16f) })
+        fun degistir(y: ProAyar) { m.yaz(tercih, y); proCiz(); proGonder(); proOzellestir() }
+        // Başlık: Pro modlardaki kısaltma (ISO, S, EV, WB, AF/MF) ve yanında tek kelime Türkçe karşılığı
+        fun <T> satir(kisa: String, ad: String, secenekler: List<T>, secili: T, yazi: (T) -> String, vurgu: T? = null, sec: (T) -> ProAyar) {
+            ic.addView(TextView(this).apply { textSize = 13f; setTextColor(Color.WHITE); setPadding(0, dp(12f), 0, dp(6f)); contentDescription = ad
+                text = android.text.SpannableString("$kisa  $ad").apply {
+                    setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, kisa.length, 0); setSpan(android.text.style.RelativeSizeSpan(1.15f), 0, kisa.length, 0)
+                    setSpan(android.text.style.ForegroundColorSpan(GRI), kisa.length, length, 0) } })
             val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             var seciliGorunum: View? = null
             secenekler.forEach { o -> val ac = o == secili
@@ -464,37 +495,30 @@ class KameraActivity : Activity() {
         val baz = kaynak?.bazIso ?: ornekBazIso
         val isolar = if (baz == null || baz in ProMod.ISOLAR) ProMod.ISOLAR else (ProMod.ISOLAR + baz).sortedBy { it ?: 0 }
         // Baz ISO (en temiz): seçeneklerde sarı renkte ve yanında "baz" yazısıyla
-        satir("ISO", R.drawable.ic_parlak, isolar, a.iso, { if (it != null && it == baz) "$it baz" else ProMod.isoYazi(it) }, vurgu = baz) { a.copy(iso = it) }
-        if (m != ProMod.GECE_SEHIR) satir("Enstantane", R.drawable.ic_zaman, ProMod.ENSTLER, a.enstNs, ProMod::enstYazi) { a.copy(enstNs = it) }
-        satir("Odak", R.drawable.ic_odak, ProMod.ODAKLAR, a.odak, ProMod::odakYazi) { a.copy(odak = it) }
-        satir("Beyaz denge", R.drawable.ic_beyaz, ProMod.BDLER, a.bd, ProMod::bdYazi) { a.copy(bd = it) }
-        if (a.iso == null || a.enstNs == null) satir("Pozlama", R.drawable.ic_pozlama, ProMod.EVLER, a.ev, ProMod::evYazi) { a.copy(ev = it) }
-        if (m.sureVar) satir("Birleştirme süresi", R.drawable.ic_iz, ProMod.SURELER, a.sureSn, ProMod::sureYazi) { a.copy(sureSn = it) }
-        satir("Zamanlayıcı", R.drawable.ic_zaman, ProMod.ZAMANLAR, a.zamanlayici, ProMod::zamanYazi) { a.copy(zamanlayici = it) }
+        satir("ISO", "Duyarlılık", isolar, a.iso, { if (it != null && it == baz) "$it baz" else ProMod.isoYazi(it) }, vurgu = baz) { a.copy(iso = it) }
+        if (m != ProMod.GECE_SEHIR) satir("S", "Enstantane", ProMod.ENSTLER, a.enstNs, ProMod::enstYazi) { a.copy(enstNs = it) }
+        if (a.iso == null || a.enstNs == null) satir("EV", "Pozlama telafisi", ProMod.EVLER, a.ev, ProMod::evYazi) { a.copy(ev = it) }
+        satir("WB", "Beyaz dengesi", ProMod.BDLER, a.bd, ProMod::bdYazi) { a.copy(bd = it) }
+        satir("AF/MF", "Odak", ProMod.ODAKLAR, a.odak, ProMod::odakYazi) { a.copy(odak = it) }
+        if (m.sureVar) satir("T", "Toplam süre", ProMod.SURELER, a.sureSn, ProMod::sureYazi) { a.copy(sureSn = it) }
+        satir("⏱", "Zamanlayıcı", ProMod.ZAMANLAR, a.zamanlayici, ProMod::zamanYazi) { a.copy(zamanlayici = it) }
         val alt = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(16f), 0, 0) }
         alt.addView(TextView(this).apply { text = "Varsayılana dön"; textSize = 15f; setTextColor(if (a == m.varsayilan) GRI else MAVI_ACIK); gravity = Gravity.CENTER_VERTICAL; minHeight = dp(44f)
             Tema.simge(this, R.drawable.ic_geri, currentTextColor, 16f); setOnClickListener { if (a != m.varsayilan) degistir(m.varsayilan) } }, LinearLayout.LayoutParams(0, -2, 1f))
         alt.addView(etiket("Tamam", 15f, Color.BLACK).apply { background = Tema.kapsul(Color.WHITE, dp(12f).toFloat()); setPadding(dp(22f), 0, dp(22f), 0); setOnClickListener { acilirKapat() } }, LinearLayout.LayoutParams(-2, dp(44f)))
         ic.addView(alt)
-        val p = ScrollView(this).apply { background = pano(dp(26f).toFloat()); addView(ic); isClickable = true; clipToOutline = true }
-        acilirAc(p, ustTan = false)
+        val p = ScrollView(this).apply { background = saydamPano(dp(26f).toFloat()); addView(ic); isClickable = true; clipToOutline = true }
+        acilirAc(p, ustTan = false); altGizle(true)
         p.post { val en = (resources.displayMetrics.heightPixels * 0.7f).toInt(); if (p.height > en) p.layoutParams = (p.layoutParams as FrameLayout.LayoutParams).apply { height = en } }
     }
 
-    /** Mod şeridinin üstündeki hızlı seçim: ışık izinde süre, timelapse'te kare aralığı */
+    /** Mod şeridinin üstündeki hızlı seçim: timelapse'te kare aralığı */
     private fun sureCiz() {
         sureSira.removeAllViews()
-        if (mod == KMod.TIMELAPSE) {
-            Timelapse.HIZLI.forEach { ms -> sureSira.addView(TextView(this).apply {
-                text = Timelapse.aralikYazi(ms); textSize = 13f; typeface = kosul; gravity = Gravity.CENTER; setTextColor(if (tlAralik == ms) Color.BLACK else Color.WHITE)
-                background = Tema.kapsul(if (tlAralik == ms) TURUNCU else CAM, dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0); contentDescription = "Kare aralığı ${text}"
-                setOnClickListener { if (tlKaydedici != null) return@setOnClickListener; tlAralik = ms; tercih.edit().putLong("tlAralik", ms).apply(); sureCiz(); bilgiCiz() } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
-            return
-        }
-        intArrayOf(5, 10, 20, 30, 60).forEach { sn -> sureSira.addView(TextView(this).apply {
-            text = "$sn sn"; textSize = 13f; typeface = kosul; gravity = Gravity.CENTER; setTextColor(if (izSure == sn) Color.BLACK else Color.WHITE)
-            background = Tema.kapsul(if (izSure == sn) TURUNCU else CAM, dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
-            setOnClickListener { izSure = sn; tercih.edit().putInt("izSure", sn).apply(); sureCiz() } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
+        Timelapse.HIZLI.forEach { ms -> sureSira.addView(TextView(this).apply {
+            text = Timelapse.aralikYazi(ms); textSize = 13f; typeface = kosul; gravity = Gravity.CENTER; setTextColor(if (tlAralik == ms) Color.BLACK else Color.WHITE)
+            background = Tema.kapsul(if (tlAralik == ms) TURUNCU else CAM, dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0); contentDescription = "Kare aralığı ${text}"
+            setOnClickListener { if (tlKaydedici != null) return@setOnClickListener; tlAralik = ms; tercih.edit().putLong("tlAralik", ms).apply(); sureCiz(); bilgiCiz() } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
     }
 
     /* ================= dokunma: odak, kaydırma (mod), iki parmak (yakınlaştırma) ================= */
@@ -657,7 +681,9 @@ class KameraActivity : Activity() {
         perde.addView(v, lp)
         kok.addView(perde, FrameLayout.LayoutParams(-1, -1)); acilir = perde
     }
-    private fun acilirKapat() { acilir?.let { kok.removeView(it) }; acilir = null; if (this::aracSerit.isInitialized) aracCiz() }
+    private fun acilirKapat() { acilir?.let { kok.removeView(it) }; acilir = null; if (this::aracSerit.isInitialized) { aracCiz(); altGizle(false) } }
+    /** Yarı saydam PRO panelleri açıkken arkadaki alt düğmeler görünmesin (yazılar birbirine karışmasın) */
+    private fun altGizle(gizle: Boolean) = listOf(aracSerit, modKaydir, altSira).forEach { it.visibility = if (gizle) View.INVISIBLE else View.VISIBLE }
 
     /* ================= cetvel: pozlama, beyaz denge, odak (Final Cut Camera gibi alttan) ================= */
     enum class Cetvel { POZ, BD, ODAK }
@@ -668,6 +694,7 @@ class KameraActivity : Activity() {
     private fun evYazi(ev: Int, adim: Float) = if (ev == 0) "±0" else "%+.1f".format(ev * adim).replace('.', ',')
 
     private fun cetvelAc(c: Cetvel) {
+        if (mod == KMod.PRO) return proOzellestir() // PRO MODLAR'da pozlama, beyaz denge ve odak modun ayarlarında
         val k = kaynak ?: return tost("Kamera hazır değil.")
         val y = k.yetenek
         val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = pano(dp(22f).toFloat()); setPadding(dp(16f), dp(12f), dp(16f), dp(12f)); isClickable = true }
@@ -814,7 +841,7 @@ class KameraActivity : Activity() {
         val (id, ad) = kamListe.getOrNull(kamIndex) ?: return tost("Telefonda kamera bulunamadı.")
         ayar = ayarOku(id)
         val k = runCatching { KameraKaynak(this, id, ad, ayar) }.getOrElse { e -> tost("Kamera açılamadı: ${e.message}"); HataKaydi.not("kamera", e.stackTraceToString()); return }
-        k.fotoModu = mod.foto; k.sahne = mod.sahne; k.ekranYonu = (360 - fizikselYon) % 360
+        k.fotoModu = mod.foto; k.sahne = mod.sahne; k.pro = proIstek(); k.ekranYonu = (360 - fizikselYon) % 360
         @Suppress("DEPRECATION") monitor.otoDondur = windowManager.defaultDisplay.rotation * 90
         kaynak = k
         k.baslat(y, { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); zoomCiz(); flasCiz(); aracCiz() } }, { hata -> runOnUiThread { if (hata == "POLITIKA") engelli() else tost(hata) } })
@@ -861,8 +888,9 @@ class KameraActivity : Activity() {
         if (!mod.foto) return videoDugmesi(k)
         if (monitor.birlestiriyor) { monitor.birlestirmeIptal(); return }
         if (geriSayiliyor) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; return }
-        if (zamanlayici == 0) return cek(k)
-        geriSayiliyor = true; var kalan = zamanlayici
+        val gecikme = if (mod == KMod.PRO) proMod.oku(tercih).zamanlayici else zamanlayici
+        if (gecikme == 0) return cek(k)
+        geriSayiliyor = true; var kalan = gecikme
         fun adim() {
             if (!geriSayiliyor) return
             if (kalan == 0) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; cek(k); return }
@@ -872,40 +900,58 @@ class KameraActivity : Activity() {
         adim()
     }
 
-    private fun birlestirmeTuru(k: KameraKaynak): Sahne.Birlestir? = when (mod) {
-        KMod.ISIK_IZI -> Sahne.Birlestir.MAX
-        KMod.SAMANYOLU -> if (k.uzunPozlamaVar) null else Sahne.Birlestir.ORT
-        KMod.GECE -> if (k.sahneModuVar(CameraMetadata.CONTROL_SCENE_MODE_NIGHT)) null else Sahne.Birlestir.ORT
-        else -> null
-    }
-
     private fun cek(k: KameraKaynak) {
         k.ekranYonu = (360 - fizikselYon) % 360
-        birlestirmeTuru(k)?.let { return birlestirCek(it) }
+        var uzunNs = 0L
+        if (mod == KMod.PRO) {
+            val a = proMod.oku(tercih)
+            proMod.birlestirme(a, k.yetenek.elleKontrol, k.yetenek.pozlamaAralik?.upper ?: 0L)?.let { return birlestirCek(it, proMod.kareSayisi(a), a.sureSn * 1000L, proMod.ad) }
+            if (a.iso != null && a.enstNs != null && a.enstNs >= 1_000_000_000L) uzunNs = a.enstNs
+        }
         deklansorDugme.basili = true
+        // Uzun pozlama: süre ekranda geri sayar
+        if (uzunNs > 0) { val bit = System.currentTimeMillis() + uzunNs / 1_000_000L; ortaYazi.textSize = 34f; ortaYazi.visibility = View.VISIBLE
+            fun say() { val kalan = bit - System.currentTimeMillis(); if (kalan <= 0 || !deklansorDugme.basili) return; ortaYazi.text = "Pozlama  ${(kalan + 999) / 1000} sn"; dongu.postDelayed({ say() }, 250) }
+            say() }
         if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.SHUTTER_CLICK) }
         monitor.animate().alpha(0.2f).setDuration(60).withEndAction { monitor.animate().alpha(1f).setDuration(160) }
         var ilk: Uri? = null
         k.fotoCek({ ad, mime, yaz -> galeriyeYaz(ad, mime, yaz)?.also { if (mime == "image/jpeg") ilk = it } != null }) { hata -> runOnUiThread {
-            deklansorDugme.basili = false
-            if (hata != null) { tost(hata); return@runOnUiThread }
+            deklansorDugme.basili = false; if (uzunNs > 0) ortaYazi.visibility = View.GONE
+            if (hata != null) { seriSuruyor = false; tost(hata); return@runOnUiThread }
             ilk?.let { u -> sonUri = u; sonMime = "image/jpeg"; kucukResim(u) }
+            if (seriSuruyor) { seriSayi++; ortaYazi.textSize = 34f; ortaYazi.text = "$seriSayi"; ortaYazi.visibility = View.VISIBLE; cek(k) }
         } }
     }
 
-    private fun birlestirCek(tur: Sahne.Birlestir) {
+    /** Seri çekim (PRO MODLAR: Spor, Kuş ve uçak): deklanşör basılı tutuldukça art arda; bırakınca durur */
+    private fun seriBasla(): Boolean {
+        val k = kaynak ?: return false
+        if (mod != KMod.PRO || !proMod.seri || seriSuruyor || geriSayiliyor) return false
+        acilirKapat(); seriSuruyor = true; seriSayi = 0; cek(k); return true
+    }
+    private fun seriBitir() {
+        if (!seriSuruyor) return
+        seriSuruyor = false; dongu.postDelayed({ if (!seriSuruyor) ortaYazi.visibility = View.GONE }, 600)
+        if (seriSayi > 0) tost("$seriSayi kare çekildi")
+    }
+
+    private fun birlestirCek(tur: Sahne.Birlestir, n: Int, sureMs: Long, adSahne: String) {
         deklansorDugme.basili = true
         if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.START_VIDEO_RECORDING) }
         ortaYazi.textSize = 34f; ortaYazi.text = "0%"; ortaYazi.visibility = View.VISIBLE
-        val n = if (mod == KMod.SAMANYOLU) 16 else 8; val yon = fizikselYon; val adSahne = mod.ad
-        monitor.birlestir(MonitorGorunum.BirlestirmeIstegi(tur, n, izSure * 1000L, 1f, { o -> ortaYazi.text = "$adSahne  ${(o * 100).toInt()}%" }) { bmp ->
+        val yon = fizikselYon
+        // Uzun birleştirmede (yıldız izi dakikalarca) ekran kapanmasın
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        monitor.birlestir(MonitorGorunum.BirlestirmeIstegi(tur, n, sureMs, 1f, { o -> ortaYazi.text = "$adSahne  ${(o * 100).toInt()}%" }) { bmp ->
             ortaYazi.visibility = View.GONE; deklansorDugme.basili = false
+            if (tlKaydedici == null) window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             if (bmp == null) return@BirlestirmeIstegi tost("Birleştirme durdu.")
             if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.SHUTTER_CLICK) }
             Thread {
                 // Ekran dikey sabit: telefon yan tutulduysa sonuç dik çevrilir
                 val dik = if (yon == 0) bmp else Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, android.graphics.Matrix().apply { postRotate(yon.toFloat()) }, true)
-                val ad = "UPDATED_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + "_" + mod.name.lowercase(Locale.US) + ".jpg"
+                val ad = "UPDATED_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + "_" + (if (mod == KMod.PRO) proMod.name else mod.name).lowercase(Locale.US) + ".jpg"
                 val u = galeriyeYaz(ad, "image/jpeg") { dik.compress(Bitmap.CompressFormat.JPEG, 95, it) }
                 runOnUiThread { if (u == null) tost("Fotoğraf kaydedilemedi.") else { sonUri = u; sonMime = "image/jpeg"; kucukResim(u) } }
             }.start()
@@ -1019,7 +1065,7 @@ class KameraActivity : Activity() {
     }
     private fun sahneUygula() {
         val o = sahneOnerisi ?: return
-        when (o) { Sahne.GECE -> modSec(KMod.GECE); Sahne.SAMANYOLU -> modSec(KMod.SAMANYOLU); Sahne.PORTRE -> modSec(KMod.PORTRE); else -> { kaynak?.sahne = o; kaynak?.ayarDegisti(); tost("${o.ad} ayarları uygulandı") } }
+        when (o) { Sahne.GECE -> proSec(ProMod.GECE_SEHIR); Sahne.SAMANYOLU -> proSec(ProMod.SAMANYOLU); Sahne.PORTRE -> modSec(KMod.PORTRE); else -> { kaynak?.sahne = o; kaynak?.ayarDegisti(); tost("${o.ad} ayarları uygulandı") } }
     }
 
     /* ================= döngü ================= */
@@ -1073,7 +1119,7 @@ class KameraActivity : Activity() {
             addView(TextView(this@KameraActivity).apply { text = aciklama; textSize = 14f; setTextColor(Color.rgb(201, 205, 211)) })
             setOnClickListener { sec() }
         }
-        ic.addView(kart(R.drawable.ic_kamera, TURUNCU, "Kamera", "Fotoğraf, video, gece, ışık izi. PRO ile tam el ile kontrol.") {
+        ic.addView(kart(R.drawable.ic_kamera, TURUNCU, "Kamera", "Fotoğraf, video, timelapse; gece, ışık izi, Samanyolu PRO modlarda.") {
             girisSoruldu = true; secimYapildi = true; if (hatirla.isChecked) tercih.edit().putString("giris", "kamera").apply(); kok.removeView(p); kameraAc()
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16f) })
         ic.addView(kart(R.drawable.ic_monitor, MAVI_ACIK, "Monitör", "Dış kamerayı izle: HDMI/USB ya da ağ yayını. Ölçümler, LUT, iki kaynak.") {
@@ -1086,13 +1132,16 @@ class KameraActivity : Activity() {
 
     /* ================= ayarların saklanması ================= */
     private fun ayarlariOku() {
+        // 0.11'e kadar ayrı olan Gece / Işık izi / Samanyolu modları artık PRO MODLAR'ın içinde
+        val eski = mapOf("GECE" to ProMod.GECE_SEHIR, "ISIK_IZI" to ProMod.ARAC_IZI, "SAMANYOLU" to ProMod.SAMANYOLU)[tercih.getString("mod", null)]
+        if (eski != null) tercih.edit().putString("mod", KMod.PRO.name).putString("proMod", eski.name).apply()
         mod = runCatching { KMod.valueOf(tercih.getString("mod", "FOTO")!!) }.getOrDefault(KMod.FOTO).let { if (it == KMod.MONITOR) KMod.FOTO else it }
         kamIndex = tercih.getInt("kamIndex", 0)
         kompTur = runCatching { KompTur.valueOf(tercih.getString("komp", "KAPALI")!!) }.getOrDefault(KompTur.KAPALI); kompYon = tercih.getInt("kompYon", 0)
         sonKomp = runCatching { KompTur.valueOf(tercih.getString("sonKomp", "SPIRAL")!!) }.getOrDefault(KompTur.SPIRAL)
         asistanAcik = tercih.getBoolean("asistan", false); teraziAcik = tercih.getBoolean("terazi", false); oneriAcik = tercih.getBoolean("oneri", true); sahneOto = tercih.getBoolean("sahneOto", true)
         proMod = runCatching { ProMod.valueOf(tercih.getString("proMod", "SAMANYOLU")!!) }.getOrDefault(ProMod.SAMANYOLU)
-        zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true); izSure = tercih.getInt("izSure", 10)
+        zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true)
         tlAralik = tercih.getLong("tlAralik", 2000L); tlSure = tercih.getInt("tlSure", 0); tlPozSabit = tercih.getBoolean("tlPozSabit", true)
     }
     private fun ayarOku(id: String): KameraAyari {
@@ -1117,7 +1166,7 @@ class KameraActivity : Activity() {
     }
     override fun onPause() {
         super.onPause(); onde = false; yonDinle.disable(); sensorler.unregisterListener(yercekimDinle)
-        geriSayiliyor = false; ortaYazi.visibility = View.GONE
+        geriSayiliyor = false; seriSuruyor = false; ortaYazi.visibility = View.GONE
         if (monitor.birlestiriyor) monitor.birlestirmeIptal()
         kaynak?.let { k -> if (k.kayitta) videoDugmesi(k) }
         tlKaydedici?.let { timelapseBitir(it) } // alta alınınca kamera kapanır: o ana kadarki kareler kaydedilir

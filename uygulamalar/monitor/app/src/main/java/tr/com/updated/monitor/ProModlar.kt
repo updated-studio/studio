@@ -42,7 +42,7 @@ enum class ProMod(val ad: String, val simge: Int, val ipucu: String, val uyari: 
     YILDIZ_IZI("Yıldız izi", R.drawable.ic_dondur, "Tripod; yıldızlar çember çizer",
         "Tripod kullanın ya da telefonu sabitleyin. Çekim uzun sürer; telefonu şarja takın.",
         ProAyar(800, 20 * SN, ProAyar.ODAK_SONSUZ, BD_4000, 0f, 30 * 60, 3), Sahne.Birlestir.MAX, herZamanBirlestir = true),
-    ISIK_BOYAMA("Işık boyama", R.drawable.ic_parlak, "Karanlıkta fenerle havaya çiz; tripod",
+    ISIK_BOYAMA("Işık grafiti", R.drawable.ic_parlak, "Karanlıkta fenerle havaya çiz; tripod",
         "Tripod kullanın. Zamanlayıcı bitince ışıkla çizmeye başlayın.",
         ProAyar(100, 10 * SN, ProAyar.ODAK_2M, BD_3200, 0f, 10, 3), Sahne.Birlestir.MAX, herZamanBirlestir = true),
     ARAC_IZI("Araç ışık izi", R.drawable.ic_iz, "Yol ya da köprü; farlar çizgi olur",
@@ -80,15 +80,25 @@ enum class ProMod(val ad: String, val simge: Int, val ipucu: String, val uyari: 
         val SURELER = listOf(2, 4, 8, 10, 30, 60, 5 * 60, 15 * 60, 30 * 60, 60 * 60)
         val ZAMANLAR = listOf(0, 2, 3, 10)
 
-        fun isoYazi(i: Int?) = i?.toString() ?: "Oto"
-        fun enstYazi(n: Long?) = when { n == null -> "Oto"; n >= SN -> "${n / SN} sn"; else -> "1/${SN / n}" }
-        fun odakYazi(o: Int) = when (o) { ProAyar.ODAK_SUREKLI -> "Sürekli"; ProAyar.ODAK_SONSUZ -> "Sonsuz"; ProAyar.ODAK_2M -> "2 m"; else -> "Oto" }
-        fun bdYazi(b: Int) = when (b) { BD_3200 -> "3200K"; BD_4000 -> "4000K"; CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT -> "5600K"; CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT -> "6500K"; else -> "Oto" }
+        // Amiral gemisi telefonların Pro modundaki yazım: AUTO, 1/1000, 20", AF-S / AF-C / MF, AWB
+        fun isoYazi(i: Int?) = i?.toString() ?: "AUTO"
+        fun enstYazi(n: Long?) = when { n == null -> "AUTO"; n >= SN -> "${n / SN}\""; else -> "1/${SN / n}" }
+        fun odakYazi(o: Int) = when (o) { ProAyar.ODAK_SUREKLI -> "AF-C"; ProAyar.ODAK_SONSUZ -> "MF ∞"; ProAyar.ODAK_2M -> "MF 2 m"; else -> "AF-S" }
+        fun bdYazi(b: Int) = when (b) { BD_3200 -> "3200K"; BD_4000 -> "4000K"; CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT -> "5600K"; CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT -> "6500K"; else -> "AWB" }
         fun evYazi(e: Float) = if (e == 0f) "0" else "%+.1f".format(e).replace('.', ',')
         fun sureYazi(s: Int) = when { s >= 3600 -> "${s / 3600} sa"; s >= 60 -> "${s / 60} dk"; else -> "$s sn" }
         fun zamanYazi(z: Int) = if (z == 0) "Kapalı" else "$z sn"
     }
 
-    /** Üstteki etiket: "Samanyolu · ISO 3200 · 20 sn" */
-    fun ozet(a: ProAyar): String = listOfNotNull(ad, "ISO ${isoYazi(a.iso)}", a.enstNs?.let { enstYazi(it) }, if (sureVar) "${sureYazi(a.sureSn)} birleşim" else null).joinToString(" · ")
+    /** Üstteki etiket: "Samanyolu · ISO 3200 · S 20\" · T 30 dk" */
+    fun ozet(a: ProAyar): String = listOfNotNull(ad, "ISO ${isoYazi(a.iso)}", a.enstNs?.let { "S ${enstYazi(it)}" }, if (sureVar) "T ${sureYazi(a.sureSn)}" else null).joinToString(" · ")
+
+    /** Telefon istenen enstantaneyi tek karede veremiyorsa (ya da iz modlarında her zaman) kareler birleştirilir; null: tek çekim */
+    fun birlestirme(a: ProAyar, elleKontrol: Boolean, enUzunNs: Long): Sahne.Birlestir? {
+        val b = birlestir ?: return null
+        if (herZamanBirlestir) return b
+        return if (elleKontrol && a.enstNs != null && enUzunNs >= a.enstNs) null else b
+    }
+    /** Ortalama birleştirmede kare sayısı (önizleme ≈ 15 kare/sn) */
+    fun kareSayisi(a: ProAyar) = when (this) { GECE_SEHIR -> 8; SAMANYOLU -> 16; else -> (a.sureSn * 15).coerceIn(8, 90) }
 }

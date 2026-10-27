@@ -74,6 +74,9 @@ class KameraYetenek(val boyutlar: List<Size>, val fpsler: List<Range<Int>>, val 
                     val awbModlari: IntArray, val minOdak: Float, val elleKontrol: Boolean, val diyafram: Float?)
 
 /** Camera2 kaynağı: telefon kameraları ve UVC çevirici (Android'de "harici kamera"). Kayıt: MediaRecorder (H.264/H.265, AAC). */
+/** PRO MODLAR uzun pozlamasında önizlemenin en uzun kare süresi (1/10 sn) */
+private const val ONIZLEME_EN_UZUN = 100_000_000L
+
 class KameraKaynak(private val ctx: Context, val id: String, override val ad: String, val ayar: KameraAyari = KameraAyari()) : Kaynak {
     private var cihaz: CameraDevice? = null
     private var oturum: CameraCaptureSession? = null
@@ -96,6 +99,10 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     @Volatile var pozKilit = false
     /** Seçili sahne (Sahne.kt); ayarların üstüne uygulanır */
     @Volatile var sahne = Sahne.KAPALI
+    /** PRO MODLAR (ProModlar.kt): seçiliyse el ile ayarların ve sahnenin yerine geçer */
+    @Volatile var pro: Pair<ProMod, ProAyar>? = null
+    /** Son otomatik pozlama ölçümü (ISO × ns): enstantane/ISO öncelikli modlarda çekimdeki karşılığı bundan hesaplanır */
+    @Volatile private var otoIsoNs = 0.0
     /** Otomatik pozlamanın son ölçümü (sahne önerisi için): ISO ve pozlama süresi */
     @Volatile var sonIso = 0; private set
     @Volatile var sonPozNs = 0L; private set
@@ -110,6 +117,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             olcumBekleyen?.invoke(t.get(android.hardware.camera2.CaptureResult.CONTROL_AE_STATE))
             t.get(android.hardware.camera2.CaptureResult.SENSOR_SENSITIVITY)?.let { sonIso = it }
             t.get(android.hardware.camera2.CaptureResult.SENSOR_EXPOSURE_TIME)?.let { sonPozNs = it }
+            if (t.get(android.hardware.camera2.CaptureResult.CONTROL_AE_MODE) != CameraMetadata.CONTROL_AE_MODE_OFF && sonIso > 0 && sonPozNs > 0) otoIsoNs = sonIso.toDouble() * sonPozNs
         }
     }
     private val sahneModlari: IntArray by lazy { oz.get(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES) ?: IntArray(0) }
@@ -253,6 +261,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
 
     /** Ayarları (pozlama, ISO, beyaz dengesi, odak, sabitleme) bir isteğe uygular */
     private fun ayarUygula(r: CaptureRequest.Builder, foto: Boolean) {
+        pro?.let { (m, a) -> return proUygula(r, foto, m, a) }
         ayar.fps?.let { if (!foto) r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
         val elle = ayar.iso != null || ayar.pozlamaNs != null
         if (elle && yetenek.elleKontrol) {
@@ -288,6 +297,55 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         }
         r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (ayar.sabitleme && !foto) CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON else CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
         sahneUygula(r, foto)
+    }
+
+    /**
+     * PRO MODLAR: ISO ve enstantane ikisi de seçiliyse tam el ile; biri AUTO ise önizleme otomatik pozlamada kalır, çekimde son ölçümden
+     * öteki hesaplanır (enstantane/ISO önceliği; modun ISO ve enstantane üst sınırıyla). Uzun pozlamada önizleme donmasın diye
+     * önizleme 1/10 sn'de, aynı parlaklık için ISO artırılarak gösterilir.
+     */
+    private fun proUygula(r: CaptureRequest.Builder, foto: Boolean, m: ProMod, a: ProAyar) {
+        val y = yetenek; val isoA = y.isoAralik; val pozA = y.pozlamaAralik
+        if (android.os.Build.VERSION.SDK_INT >= 30) zoomAralik?.let { z -> r.set(CaptureRequest.CONTROL_ZOOM_RATIO, ayar.zoomOrani.coerceIn(z.lower, z.upper)) }
+        if (flasVar) r.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_OFF)
+        r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
+        var iso: Int? = null; var ns: Long? = null
+        if (y.elleKontrol && isoA != null && pozA != null) {
+            val olcum = otoIsoNs
+            when {
+                a.iso != null && a.enstNs != null -> { iso = a.iso; ns = a.enstNs }
+                foto && olcum > 0 && a.enstNs != null -> { ns = a.enstNs.coerceIn(pozA.lower, pozA.upper); iso = minOf((olcum / ns).toInt(), m.isoUst ?: Int.MAX_VALUE) }
+                foto && olcum > 0 && a.iso != null -> { iso = a.iso.coerceIn(isoA.lower, isoA.upper); ns = minOf((olcum / iso).toLong(), m.enstUstNs ?: Long.MAX_VALUE) }
+            }
+            if (iso != null && ns != null) {
+                ns = ns.coerceIn(pozA.lower, pozA.upper)
+                if (!foto && ns > ONIZLEME_EN_UZUN) { iso = (iso.toDouble() * ns / ONIZLEME_EN_UZUN).toInt(); ns = ONIZLEME_EN_UZUN }
+                iso = iso.coerceIn(isoA.lower, isoA.upper)
+            }
+        }
+        if (iso != null && ns != null) {
+            r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
+            r.set(CaptureRequest.SENSOR_SENSITIVITY, iso); r.set(CaptureRequest.SENSOR_EXPOSURE_TIME, ns)
+            r.set(CaptureRequest.SENSOR_FRAME_DURATION, if (foto) ns else maxOf(ns, 1_000_000_000L / 30))
+        } else {
+            r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
+            r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, evAdimi(a.ev)); r.set(CaptureRequest.CONTROL_AE_LOCK, false)
+            // Otomatik pozlamada en uzun enstantane: kare hızının alt sınırı (gece şehirde 1/15 sn, sporda en yüksek sabit kare hızı)
+            val fps = when {
+                m.seri -> y.fpsler.filter { it.lower == it.upper }.maxByOrNull { it.upper }
+                m.enstUstNs != null -> y.fpsler.filter { it.lower >= 1_000_000_000L / m.enstUstNs }.minByOrNull { it.lower }
+                else -> null
+            }
+            fps?.let { r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+        }
+        r.set(CaptureRequest.CONTROL_AWB_MODE, if (a.bd in y.awbModlari) a.bd else CameraMetadata.CONTROL_AWB_MODE_AUTO)
+        val mesafe = when (a.odak) { ProAyar.ODAK_SONSUZ -> 0f; ProAyar.ODAK_2M -> 0.5f; else -> null } // diyoptri (1/m)
+        if (mesafe != null && y.minOdak >= mesafe && y.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, mesafe) }
+        else if (a.odak == ProAyar.ODAK_OTO && odakNoktasi != null) {
+            r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_AUTO)
+            if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AF_REGIONS, bolge(odakNoktasi!!))
+        }
+        else r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
     }
 
     private fun evAdimi(ev: Float): Int { val adim = yetenek.evAdim.takeIf { it > 0f } ?: return 0; val a = yetenek.evAralik ?: return 0; return Math.round(ev / adim).coerceIn(a.lower, a.upper) }
@@ -362,7 +420,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                 }, h)
             } catch (e: Exception) { cekiliyor = false; sonuc(e.message ?: "Çekim başarısız."); HataKaydi.not("foto", e.stackTraceToString()) }
             // Flaş açık/otomatik: önce pozlama ölçümü (ön flaş), ölçüm bitince ya da 1,5 sn sonra çekim
-            val flasli = flasVar && ayar.flas in 1..2 && ayar.iso == null && ayar.pozlamaNs == null
+            val flasli = flasVar && ayar.flas in 1..2 && ayar.iso == null && ayar.pozlamaNs == null && pro == null
             if (!flasli) cek()
             else runCatching {
                 var bitti = false
