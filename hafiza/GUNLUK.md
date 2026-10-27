@@ -66,6 +66,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 27 Ekim 2026
+- Instagram anahtarı iki kez yanlış türde girildi (Meta'nın 32 karakterlik uygulama gizli anahtarı; doğrusu "Generate token" ile çıkan, IG ile başlayan uzun anahtar). Bağlantı anahtarları sayfası artık App Secret / kimlik / biçimsiz değeri kaydetmeden yakalıyor; aynı kontrol sunucuda göç **0041** (yazıldı, gönderildi; **henüz uygulanmadı**, onay bekliyor: `sudo updated-studyo-goc 0041_anahtar_bicim.sql`). Fatih'e adım adım tarif verildi. Ayrıca: ürün künyelerinin özellik değerleri boş, `kunye_oneriler` hiç çalıştırılmamış (Kıyaslamalar bunu bekliyor).
 - Güvenlik: dışarıdan kimliksiz çağrılan fonksiyonlar (triyaj-topla, yarisma-bul, notify-email) artık Stüdyo girişi istiyor; zamanlayıcı sunucu içinden (functions:9000, X-Forwarded-For'suz) çağırmaya devam ediyor. **Bağlantı anahtarları** (profil menüsü, yalnız yönetici; göç 0040, `anahtar_durum`/`anahtar_kaydet`, değer geri okunmaz): yedek Gemini anahtarı (yarisma-bul ve kunye-otomatik ana anahtarın kotası dolunca kullanır; Fatih kendi Google hesabından verecek) ve Instagram anahtarı (yeni fonksiyon `instagram-reels`: 6 saatte bir son Reels, kapaklar `instagram` kovasında, anahtarı 7 günde bir yeniler; GET herkese açık liste, site derlemesi okur). Kullanıcı: "bir işi bitirip diğerine geçelim, dallanmayalım".
 
 ### 26 Ekim 2026
