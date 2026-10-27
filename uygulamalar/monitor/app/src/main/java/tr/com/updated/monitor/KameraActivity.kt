@@ -128,6 +128,11 @@ class KameraActivity : Activity() {
     private var tlAralik = 2000L; private var tlSure = 0; private var tlPozSabit = true
     private var tlKaydedici: Kaydedici? = null; private var tlUri: Uri? = null
     private fun kayitSuruyor() = kaynak?.kayitta == true || tlKaydedici != null
+    /** Wi-Fi kamera (MasaActivity'ye görüntü gönderir; AgYayin.kt). Açıkken ekrandaki görüntü kodlayıcıya da çizilir */
+    private var verici: YayinVerici? = null
+    private var wifiKamera = false
+    private lateinit var tallyCerceve: View
+    private lateinit var masaCip: TextView
     private val deklansor by lazy { android.media.MediaActionSound().also { it.load(android.media.MediaActionSound.SHUTTER_CLICK) } }
 
     // Yön: telefonun fiziksel dönüşü (0/90/180/270, saat yönünde); ikonlar ters yönde döner
@@ -301,6 +306,12 @@ class KameraActivity : Activity() {
         val cevir = ikon(R.drawable.ic_cevir, "Kamerayı çevir") { kameraCevir() }.apply { background = Tema.kapsul(CAM) }; aciklamalar.add(cevir to "Ön / arka")
         altSira.addView(cevir, FrameLayout.LayoutParams(dp(52f), dp(52f), Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = dp(34f) })
         kok.addView(altSira)
+        // Wi-Fi kamera: canlıdayken kırmızı çerçeve (tally), üstte bağlantı durumu
+        tallyCerceve = View(this).apply { background = GradientDrawable().apply { setStroke(dp(6f), Color.rgb(229, 57, 53)) }; visibility = View.GONE; isClickable = false }
+        kok.addView(tallyCerceve, FrameLayout.LayoutParams(-1, -1))
+        masaCip = cip(YESIL).apply { visibility = View.GONE; setOnClickListener { ayarlarAc() } }
+        Tema.simge(masaCip, R.drawable.ic_ag, YESIL, 15f)
+        kutu.addView(masaCip, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply { bottomMargin = dp(64f); marginStart = dp(12f) })
 
         setContentView(kok)
         yerlestir(); kompUygula(); modUygula(ilk = true); sonCekimiBul()
@@ -818,6 +829,12 @@ class KameraActivity : Activity() {
             ic.addView(TextView(this).apply { textSize = 12f; setTextColor(GRI); setPadding(0, dp(4f), 0, 0)
                 text = "Açıkken parlaklık kareden kareye oynamaz (titreme olmaz). Gün batımı gibi ışığın değiştiği çekimlerde kapat. Tripod kullan; ekran açık kalır." })
         }
+        baslik("MASA (ÇOK KAMERA)", R.drawable.ic_ag)
+        ic.addView(anahtar("Wi-Fi kamera ol", wifiKamera) { wifiKamera = it; tercih.edit().putBoolean("wifiKamera", it).apply(); yayinAyarla() })
+        ic.addView(TextView(this).apply { textSize = 12f; setTextColor(GRI); setPadding(0, dp(4f), 0, dp(6f))
+            text = "Açıkken bu telefonun görüntüsü aynı Wi-Fi'daki masaya gider; masa kendiliğinden bulur. Masada bulunmazsa adres: ${ipAdresi() ?: "Wi-Fi'a bağlı değil"}" })
+        ic.addView(TextView(this).apply { text = "Bu telefonu masa yap"; textSize = 15f; setTextColor(MAVI_ACIK); setPadding(0, dp(8f), 0, dp(8f)); Tema.simge(this, R.drawable.ic_monitor, MAVI_ACIK)
+            setOnClickListener { acilirKapat(); masayaGec() } })
         baslik("YARDIMCILAR", R.drawable.ic_yardimci)
         ic.addView(anahtar("Otomatik sahne önerisi", sahneOto) { sahneOto = it; kompUygula() })
         baslik("UYGULAMA", R.drawable.ic_bilgi)
@@ -988,6 +1005,7 @@ class KameraActivity : Activity() {
      */
     private fun timelapseDugmesi(k: KameraKaynak) {
         tlKaydedici?.let { y -> timelapseBitir(y); return }
+        if (verici != null) return tost("Wi-Fi kamera açıkken timelapse çekilmez (Ayarlar → Wi-Fi kamera ol).")
         val ad = "UPDATED_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}_timelapse.mp4"
         val d = ContentValues().apply { put(MediaStore.Video.Media.DISPLAY_NAME, ad); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4"); put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/UPDATED Kamera"); put(MediaStore.Video.Media.IS_PENDING, 1) }
         val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, d) ?: return tost("Kayıt dosyası açılamadı.")
@@ -1006,7 +1024,7 @@ class KameraActivity : Activity() {
     }
 
     private fun timelapseBitir(y: Kaydedici) {
-        tlKaydedici = null; monitor.kayitYuzeyi = null; monitor.kayitAraligiNs = 0L; monitor.yenile()
+        tlKaydedici = null; monitor.kayitYuzeyi = verici?.yuzey; monitor.kayitAraligiNs = 0L; monitor.yenile()
         kaynak?.let { it.pozKilit = false; it.ayarDegisti() }
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val u = tlUri; tlUri = null; deklansorDugme.kayitta = false; kayitCip.visibility = View.GONE; bilgiCiz()
@@ -1092,6 +1110,7 @@ class KameraActivity : Activity() {
             v.animate().rotation(simdi + fark).setDuration(220).start()
         }
         kaynak?.ekranYonu = (360 - fizikselYon) % 360
+        verici?.yon = fizikselYon
     }
 
     /* ================= PRO ve Monitör ================= */
@@ -1099,6 +1118,36 @@ class KameraActivity : Activity() {
         if (kayitSuruyor()) return tost("Önce kaydı durdur.")
         startActivity(Intent(this, MainActivity::class.java).putExtra("mod", "pro").putExtra("kamera", kamListe.getOrNull(kamIndex)?.first))
     }
+    private fun masayaGec() {
+        if (kayitSuruyor()) return tost("Önce kaydı durdur.")
+        startActivity(Intent(this, MasaActivity::class.java))
+    }
+
+    /**
+     * Wi-Fi kamera: ekrandaki görüntü (en çok 1080p) H.264'e sıkıştırılıp masaya gider. Kodlayıcı boyutu açılışta sabitlenir;
+     * sonradan oran değişirse (foto ↔ video) MonitorGorunum sığdırarak çizer.
+     */
+    private fun yayinAyarla() {
+        val iste = wifiKamera && onde && tlKaydedici == null
+        if (!iste) { verici?.let { it.durdur(); verici = null; if (tlKaydedici == null) monitor.kayitYuzeyi = null }; tallyCerceve.visibility = View.GONE; masaCip.visibility = View.GONE; return }
+        if (verici != null) return
+        val (kw, kh) = monitor.kayitBoyutu()
+        val olcek = minOf(1f, 1920f / maxOf(kw, kh)); val w = (kw * olcek).toInt() and 15.inv(); val h = (kh * olcek).toInt() and 15.inv()
+        val ad = "UPDATED · ${android.os.Build.MODEL}"
+        val v = runCatching { YayinVerici(this, ad, w, h, tally = { acik -> runOnUiThread { tallyCerceve.visibility = if (acik) View.VISIBLE else View.GONE } },
+            durum = { d -> runOnUiThread { masaCip.text = d; masaCip.setTextColor(if (d == "Masaya bağlı") YESIL else GRI) } }).also { it.baslat() } }
+            .getOrElse { e -> HataKaydi.not("yayin", e.stackTraceToString()); return tost("Wi-Fi kamera başlamadı: ${e.message}") }
+        verici = v; v.yon = fizikselYon
+        monitor.kayitYuzeyi = v.yuzey; monitor.yenile()
+        masaCip.visibility = View.VISIBLE
+    }
+
+    /** Telefonun yerel ağ adresi (masada elle bağlanmak için) */
+    private fun ipAdresi(): String? = runCatching {
+        java.net.NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp && !it.isLoopback }.flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is java.net.Inet4Address && it.isSiteLocalAddress }?.hostAddress
+    }.getOrNull()
+
     private fun monitoreGec() {
         if (kayitSuruyor()) return tost("Önce kaydı durdur.")
         startActivity(Intent(this, MainActivity::class.java).putExtra("mod", "monitor"))
@@ -1125,6 +1174,9 @@ class KameraActivity : Activity() {
         ic.addView(kart(R.drawable.ic_monitor, MAVI_ACIK, "Monitör", "Dış kamerayı izle: HDMI/USB ya da ağ yayını. Ölçümler, LUT, iki kaynak.") {
             girisSoruldu = true; secimYapildi = true; if (hatirla.isChecked) tercih.edit().putString("giris", "monitor").apply(); kok.removeView(p); monitoreGec()
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
+        ic.addView(kart(R.drawable.ic_ag, YESIL, "Masa", "Çok kamera: Wi-Fi'daki telefonlar ve USB'den takılan kameralar tek ekranda; dokununca geçiş, kayıt.") {
+            girisSoruldu = true; secimYapildi = true; kok.removeView(p); masayaGec()
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
         ic.addView(hatirla)
         p.addView(ScrollView(this).apply { isFillViewport = true; addView(ic, FrameLayout.LayoutParams(-1, -1)) }, FrameLayout.LayoutParams(-1, -1))
         kok.addView(p, FrameLayout.LayoutParams(-1, -1))
@@ -1140,6 +1192,7 @@ class KameraActivity : Activity() {
         kompTur = runCatching { KompTur.valueOf(tercih.getString("komp", "KAPALI")!!) }.getOrDefault(KompTur.KAPALI); kompYon = tercih.getInt("kompYon", 0)
         sonKomp = runCatching { KompTur.valueOf(tercih.getString("sonKomp", "SPIRAL")!!) }.getOrDefault(KompTur.SPIRAL)
         asistanAcik = tercih.getBoolean("asistan", false); teraziAcik = tercih.getBoolean("terazi", false); oneriAcik = tercih.getBoolean("oneri", true); sahneOto = tercih.getBoolean("sahneOto", true)
+        wifiKamera = tercih.getBoolean("wifiKamera", false)
         proMod = runCatching { ProMod.valueOf(tercih.getString("proMod", "SAMANYOLU")!!) }.getOrDefault(ProMod.SAMANYOLU)
         zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true)
         tlAralik = tercih.getLong("tlAralik", 2000L); tlSure = tercih.getInt("tlSure", 0); tlPozSabit = tercih.getBoolean("tlPozSabit", true)
@@ -1162,7 +1215,7 @@ class KameraActivity : Activity() {
         super.onResume(); onde = true; tamEkran(); monitor.onResume(); sensorKaydi()
         if (yonDinle.canDetectOrientation()) yonDinle.enable()
         if (acilir == null) modlariCiz()
-        kameraAc()
+        kameraAc(); yayinAyarla()
     }
     override fun onPause() {
         super.onPause(); onde = false; yonDinle.disable(); sensorler.unregisterListener(yercekimDinle)
@@ -1170,6 +1223,7 @@ class KameraActivity : Activity() {
         if (monitor.birlestiriyor) monitor.birlestirmeIptal()
         kaynak?.let { k -> if (k.kayitta) videoDugmesi(k) }
         tlKaydedici?.let { timelapseBitir(it) } // alta alınınca kamera kapanır: o ana kadarki kareler kaydedilir
+        yayinAyarla() // onde = false: Wi-Fi kamera durur, geri gelince yeniden açılır
         dongu.postDelayed({ if (!onde) { kaynak?.durdur(); kaynak = null } }, if (kaynak?.kayitta == true) 600 else 0)
         monitor.onPause()
     }

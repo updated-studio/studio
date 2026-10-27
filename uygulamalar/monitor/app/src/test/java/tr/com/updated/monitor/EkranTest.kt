@@ -86,6 +86,13 @@ class EkranTest {
     }
 
     /** Kompozisyon katmanı: konu, ok, ibre, ufuk, öncü çizgiler ve yön tarifi gri bir görüntünün üstünde */
+    @Test fun masa() {
+        for (yatay in listOf(false, true)) {
+            RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, yatay))
+            Robolectric.buildActivity(MasaActivity::class.java).setup().use { c -> val a = c.get(); kaydet(a, "masa-${if (yatay) "land" else "port"}"); a.ornekDoldur(); kaydet(a, "masa-${if (yatay) "land" else "port"}") }
+        }
+    }
+
     @Test fun katman() {
         RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
         val c = ApplicationProvider.getApplicationContext<Context>()

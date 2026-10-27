@@ -296,9 +296,12 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             val ciz = android.opengl.EGL14.eglGetCurrentSurface(android.opengl.EGL14.EGL_DRAW); val oku = android.opengl.EGL14.eglGetCurrentSurface(android.opengl.EGL14.EGL_READ)
             val bag = android.opengl.EGL14.eglGetCurrentContext()
             if (!android.opengl.EGL14.eglMakeCurrent(dpy, es, es, bag)) return
-            val (w, h) = kayitBoyutu()
+            // Yüzeyin kendi boyutu (Wi-Fi kamera yayınında kaynak oranı sonradan değişebilir: sığdırılır, kenarlar siyah)
+            val w = IntArray(1).also { android.opengl.EGL14.eglQuerySurface(dpy, es, android.opengl.EGL14.EGL_WIDTH, it, 0) }[0]
+            val h = IntArray(1).also { android.opengl.EGL14.eglQuerySurface(dpy, es, android.opengl.EGL14.EGL_HEIGHT, it, 0) }[0]
+            val (kw, kh) = kayitBoyutu()
             GLES30.glViewport(0, 0, w, h); GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-            ciz(0, 0, w, h, w.toFloat(), h.toFloat(), ham = true, olcum = true, tam = true)
+            ciz(0, 0, w, h, kw.toFloat(), kh.toFloat(), ham = true, olcum = true, sigdir = true)
             android.opengl.EGLExt.eglPresentationTimeANDROID(dpy, es, if (aralik > 0) kayitIlkNs + Timelapse.kareZamaniNs(kayitKareSayisi) else simdi)
             android.opengl.EGL14.eglSwapBuffers(dpy, es)
             kayitKareSayisi++
@@ -307,11 +310,11 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
         }
 
         /** Görüntüyü (kw:kh oranıyla) verilen alana sığdırarak çizer; ham = araçsız, olcum = kılavuz/vurgu yok */
-        private fun ciz(x: Int, y: Int, w: Int, h: Int, kw: Float, kh: Float, ham: Boolean, olcum: Boolean = false, tam: Boolean = false) {
+        private fun ciz(x: Int, y: Int, w: Int, h: Int, kw: Float, kh: Float, ham: Boolean, olcum: Boolean = false, tam: Boolean = false, sigdir: Boolean = false) {
             var vx = x; var vy = y; var vw = w; var vh = h
             if (!tam) {
                 val oran = kw / kh
-                if ((w.toFloat() / h > oran) != doldur) { vw = (h * oran).toInt(); vx = x + (w - vw) / 2 } else { vh = (w / oran).toInt(); vy = y + (h - vh) / 2 }
+                if ((w.toFloat() / h > oran) != (doldur && !sigdir)) { vw = (h * oran).toInt(); vx = x + (w - vw) / 2 } else { vh = (w / oran).toInt(); vy = y + (h - vh) / 2 }
             }
             GLES30.glViewport(vx, vy, vw, vh)
             val a = ayarlar
