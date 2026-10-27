@@ -1,9 +1,15 @@
+import AVFoundation
 import SwiftUI
+
+enum ProPanelTuru { case mod, ayar }
 
 /// Tam ekran görüntü, üstünde okunaklı katmanlar (Android 0.11.0 düzeni): üstte bilgi, altta mod + deklanşör.
 struct AnaEkran: View {
     @StateObject private var kamera = Kamera()
     @State private var isoAcik = false
+    @State private var proPanel: ProPanelTuru?
+    @State private var uyariMod: ProMod?
+    @State private var yardim = false
     @Environment(\.scenePhase) private var evre
 
     var body: some View {
@@ -20,11 +26,30 @@ struct AnaEkran: View {
                         .background(LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
                     Spacer()
                     if let b = kamera.bildirim { bildirimKutusu(b) }
-                    if isoAcik { isoSerit }
+                    if kamera.mod == .pro {
+                        switch proPanel {
+                        case .mod: ProModSecici(kamera: kamera) { m in
+                            kamera.proModSec(m)
+                            proPanel = nil
+                            uyariMod = m
+                        }.padding(.bottom, 8)
+                        case .ayar: ProOzellestir(kamera: kamera).padding(.bottom, 8)
+                        case nil: EmptyView()
+                        }
+                    } else if isoAcik { isoSerit }
                     altCubuk
                         .background(LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
                 }
                 .frame(width: g.size.width)
+                if let p = kamera.proIlerleme {
+                    Text(p)
+                        .font(p.count <= 2 ? .system(size: 72, weight: .bold, design: .rounded) : Tema.mono)
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(Capsule().fill(Color.black.opacity(p.count <= 2 ? 0 : 0.55)))
+                        .shadow(color: .black.opacity(0.6), radius: 4)
+                        .allowsHitTesting(false)
+                }
+                if let m = uyariMod { ProUyari(mod: m) { uyariMod = nil } }
             }
         }
         .onAppear { kamera.baslat() }
@@ -41,10 +66,22 @@ struct AnaEkran: View {
                         .foregroundStyle(.red)
                 }
             }
-            Text(kamera.cozunurluk)
-            Text(isoYazi)
-                .foregroundStyle(kamera.secilenIso != nil && kamera.secilenIso == kamera.bazIso ? Tema.baz : .white)
+            if kamera.mod == .pro {
+                Text(kamera.proMod.ozet(kamera.proAyar)).lineLimit(1).minimumScaleFactor(0.7)
+            } else {
+                Text(kamera.cozunurluk)
+                Text(isoYazi)
+                    .foregroundStyle(kamera.secilenIso != nil && kamera.secilenIso == kamera.bazIso ? Tema.baz : .white)
+            }
             Spacer()
+            Button { withAnimation(.easeOut(duration: 0.15)) { yardim.toggle() } } label: {
+                Image(systemName: "questionmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(yardim ? .black : .white)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(yardim ? Tema.vurgu : Color.black.opacity(0.45)))
+            }
+            .accessibilityLabel("Düğmelerin açıklaması")
         }
         .font(Tema.mono)
         .foregroundStyle(.white)
@@ -90,21 +127,27 @@ struct AnaEkran: View {
         VStack(spacing: 14) {
             HStack(spacing: 22) {
                 ForEach(Kamera.Mod.allCases, id: \.self) { m in
-                    Button(m.rawValue) { kamera.modDegistir(m) }
+                    Button(m.rawValue) { kamera.modDegistir(m); proPanel = nil; isoAcik = false }
                         .font(.footnote.weight(.bold))
                         .foregroundStyle(kamera.mod == m ? Tema.vurgu : .white)
-                        .disabled(kamera.kayitta)
+                        .disabled(kamera.kayitta || kamera.proCalisiyor)
                 }
             }
             HStack {
-                yuvarlakDugme("ISO", sistem: nil, secili: isoAcik) { withAnimation(.easeOut(duration: 0.15)) { isoAcik.toggle() } }
+                if kamera.mod == .pro {
+                    yuvarlakDugme(nil, sistem: "square.grid.3x3", secili: proPanel == .mod, yardimYazi: "Hazır mod") { panelAc(.mod) }
+                    yuvarlakDugme(nil, sistem: "slider.horizontal.3", secili: proPanel == .ayar, yardimYazi: "Özelleştir") { panelAc(.ayar) }
+                } else {
+                    yuvarlakDugme("ISO", sistem: nil, secili: isoAcik, yardimYazi: "Elle ISO") { withAnimation(.easeOut(duration: 0.15)) { isoAcik.toggle() } }
+                }
                 Spacer()
                 deklansor
+                    .overlay(alignment: .top) { if yardim { yardimBalon(kamera.mod == .pro && kamera.proMod.seri ? "Basılı tut: seri" : "Çek").offset(y: -30) } }
                 Spacer()
-                yuvarlakDugme(nil, sistem: "arrow.triangle.2.circlepath.camera", secili: false) { kamera.cevir() }
-                    .disabled(kamera.kayitta)
+                yuvarlakDugme(nil, sistem: "arrow.triangle.2.circlepath.camera", secili: false, yardimYazi: "Ön / arka") { kamera.cevir() }
+                    .disabled(kamera.kayitta || kamera.proCalisiyor)
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 24)
         }
         .padding(.top, 24)
         .padding(.bottom, 12)
@@ -112,12 +155,14 @@ struct AnaEkran: View {
 
     private var deklansor: some View {
         Button {
-            let yon = Onizleme.yon(UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.interfaceOrientation }.first ?? .portrait)
-            kamera.deklansor(yon: yon)
+            proPanel = nil
+            kamera.deklansor(yon: ekranYonu)
         } label: {
             ZStack {
                 Circle().stroke(.white, lineWidth: 4).frame(width: 76, height: 76)
-                if kamera.mod == .video {
+                if kamera.mod == .pro && kamera.proCalisiyor {
+                    RoundedRectangle(cornerRadius: 6).fill(.red).frame(width: 30, height: 30)
+                } else if kamera.mod == .video {
                     RoundedRectangle(cornerRadius: kamera.kayitta ? 6 : 31)
                         .fill(.red)
                         .frame(width: kamera.kayitta ? 30 : 62, height: kamera.kayitta ? 30 : 62)
@@ -127,10 +172,30 @@ struct AnaEkran: View {
             }
             .animation(.easeOut(duration: 0.15), value: kamera.kayitta)
         }
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in kamera.seriBasla(yon: ekranYonu) })
+        .simultaneousGesture(DragGesture(minimumDistance: 0).onEnded { _ in kamera.seriBitir() })
         .accessibilityLabel(kamera.mod == .video ? (kamera.kayitta ? "Kaydı durdur" : "Kaydı başlat") : "Fotoğraf çek")
     }
 
-    private func yuvarlakDugme(_ yazi: String?, sistem: String?, secili: Bool, eylem: @escaping () -> Void) -> some View {
+    private var ekranYonu: AVCaptureVideoOrientation {
+        Onizleme.yon(UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.interfaceOrientation }.first ?? .portrait)
+    }
+
+    private func panelAc(_ p: ProPanelTuru) {
+        withAnimation(.easeOut(duration: 0.15)) { proPanel = proPanel == p ? nil : p }
+    }
+
+    private func yardimBalon(_ yazi: String) -> some View {
+        Text(yazi)
+            .font(.caption2.weight(.semibold))
+            .fixedSize()
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Capsule().fill(Tema.vurgu))
+            .foregroundStyle(.black)
+            .allowsHitTesting(false)
+    }
+
+    private func yuvarlakDugme(_ yazi: String?, sistem: String?, secili: Bool, yardimYazi: String? = nil, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
             Group {
                 if let sistem { Image(systemName: sistem).font(.system(size: 20, weight: .semibold)) }
@@ -140,6 +205,7 @@ struct AnaEkran: View {
             .frame(width: 52, height: 52)
             .background(Circle().fill(secili ? Tema.vurgu : Color.black.opacity(0.45)))
         }
+        .overlay(alignment: .top) { if yardim, let y = yardimYazi { yardimBalon(y).offset(y: -28) } }
     }
 
     private func bildirimKutusu(_ yazi: String) -> some View {

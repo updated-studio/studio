@@ -2,10 +2,10 @@ import AVFoundation
 import Photos
 import UIKit
 
-/// Kamera oturumu: önizleme, fotoğraf, video (4K varsa 4K), elle ISO.
+/// Kamera oturumu: önizleme, fotoğraf, video (4K varsa 4K), elle ISO, hazır Pro modlar (KameraPro.swift).
 /// Baz ISO: etkin biçimin en düşük ISO'su (Android'de SENSOR_INFO_SENSITIVITY_RANGE alt sınırı ile aynı mantık).
 final class Kamera: NSObject, ObservableObject {
-    enum Mod: String, CaseIterable { case foto = "FOTOĞRAF", video = "VİDEO" }
+    enum Mod: String, CaseIterable { case foto = "FOTOĞRAF", video = "VİDEO", pro = "PRO" }
 
     @Published var izinVar = true
     @Published var mod: Mod = .foto
@@ -17,13 +17,29 @@ final class Kamera: NSObject, ObservableObject {
     @Published var secilenIso: Float?
     @Published var cozunurluk = ""
     @Published var bildirim: String?
+    // Pro modlar
+    @Published var proMod: ProMod = ProMod(rawValue: UserDefaults.standard.string(forKey: "proMod") ?? "") ?? .samanyolu
+    @Published var proAyar: ProAyar = (ProMod(rawValue: UserDefaults.standard.string(forKey: "proMod") ?? "") ?? .samanyolu).oku()
+    /// Geri sayım ya da birleştirme ilerlemesi ("3", "Birleştiriliyor 12/90")
+    @Published var proIlerleme: String?
+    @Published var proCalisiyor = false
+    /// Telefonun tek karede verebildiği en uzun enstantane (sn)
+    @Published var enUzunEnst: Double = 1
 
     let oturum = AVCaptureSession()
-    private let kuyruk = DispatchQueue(label: "tr.com.updated.kamera")
-    private var cihaz: AVCaptureDevice?
+    let kuyruk = DispatchQueue(label: "tr.com.updated.kamera")
+    var cihaz: AVCaptureDevice?
     private var girdi: AVCaptureDeviceInput?
-    private let fotoCikti = AVCapturePhotoOutput()
+    let fotoCikti = AVCapturePhotoOutput()
     private let videoCikti = AVCaptureMovieFileOutput()
+    /// Kare kare görüntü (Pro birleştirme; Wi-Fi kamera da `kareDinleyiciler` ile bağlanabilir). Yalnız gerektiğinde oturumda.
+    let kareCikti = AVCaptureVideoDataOutput()
+    let kareKuyruk = DispatchQueue(label: "tr.com.updated.kamera.kare")
+    var kareDinleyiciler: [(CMSampleBuffer) -> Void] = []
+    var birlestirici: Birlestirici?
+    var birlestirmeHedef = 0
+    var birlestirmeBitis: Date?
+    var seriZamanlayici: Timer?
     private var konum: AVCaptureDevice.Position = .back
     private var kuruldu = false
 
@@ -59,6 +75,9 @@ final class Kamera: NSObject, ObservableObject {
         }
         if oturum.canAddOutput(fotoCikti) { oturum.addOutput(fotoCikti); fotoCikti.maxPhotoQualityPrioritization = .quality }
         if oturum.canAddOutput(videoCikti) { oturum.addOutput(videoCikti) }
+        kareCikti.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        kareCikti.alwaysDiscardsLateVideoFrames = true
+        kareCikti.setSampleBufferDelegate(self, queue: kareKuyruk)
         oturum.commitConfiguration()
         cihazSec(konum)
         oturum.startRunning()
@@ -81,6 +100,10 @@ final class Kamera: NSObject, ObservableObject {
         } else {
             oturum.sessionPreset = .photo
         }
+        // Kare çıkışı video kaydıyla birlikte açık tutulmaz (iOS'ta ikisi aynı anda güvenilir değil)
+        let kareGerekli = mod == .pro || (!kareDinleyiciler.isEmpty && mod != .video)
+        if kareGerekli, !oturum.outputs.contains(kareCikti), oturum.canAddOutput(kareCikti) { oturum.addOutput(kareCikti) }
+        if !kareGerekli, oturum.outputs.contains(kareCikti) { oturum.removeOutput(kareCikti) }
         let boyut = cihaz.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         let yazi: String
         switch oturum.sessionPreset {
@@ -95,16 +118,18 @@ final class Kamera: NSObject, ObservableObject {
         guard let d = cihaz else { return }
         let liste = Kamera.isoListesi(min: d.activeFormat.minISO, max: d.activeFormat.maxISO)
         let iso = secilenIso
+        let enUzun = d.activeFormat.maxExposureDuration.seconds
         DispatchQueue.main.async {
             self.isoDegerleri = liste
             self.bazIso = liste.first ?? 0
+            self.enUzunEnst = enUzun
             if let iso, !liste.contains(iso) { self.secilenIso = nil }
         }
-        if let iso { isoUygula(iso) }
+        if mod == .pro { proUygula() } else { proBirak(); if let iso { isoUygula(iso) } }
     }
 
     func modDegistir(_ yeni: Mod) {
-        guard !kayitta, yeni != mod else { return }
+        guard !kayitta, !proCalisiyor, yeni != mod else { return }
         mod = yeni
         kuyruk.async {
             self.oturum.beginConfiguration()
@@ -138,8 +163,13 @@ final class Kamera: NSObject, ObservableObject {
     func odakla(_ nokta: CGPoint) {
         kuyruk.async {
             guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
-            if d.isFocusPointOfInterestSupported { d.focusPointOfInterest = nokta; d.focusMode = .autoFocus }
-            if self.secilenIso == nil, d.isExposurePointOfInterestSupported { d.exposurePointOfInterest = nokta; d.exposureMode = .continuousAutoExposure }
+            let pro = self.mod == .pro
+            let elleOdak = pro && (self.proAyar.odak == .sonsuz || self.proAyar.odak == .iki)
+            if !elleOdak, d.isFocusPointOfInterestSupported {
+                d.focusPointOfInterest = nokta
+                d.focusMode = pro && self.proAyar.odak == .afc ? .continuousAutoFocus : .autoFocus
+            }
+            if !pro, self.secilenIso == nil, d.isExposurePointOfInterestSupported { d.exposurePointOfInterest = nokta; d.exposureMode = .continuousAutoExposure }
             d.unlockForConfiguration()
         }
     }
@@ -149,10 +179,10 @@ final class Kamera: NSObject, ObservableObject {
         case .foto:
             kuyruk.async {
                 self.fotoCikti.connection(with: .video)?.videoOrientation = yon
-                let ayar = AVCapturePhotoSettings()
-                ayar.photoQualityPrioritization = .quality
-                self.fotoCikti.capturePhoto(with: ayar, delegate: self)
+                self.fotoCek(hizli: false)
             }
+        case .pro:
+            proCek(yon: yon)
         case .video:
             if kayitta { kuyruk.async { self.videoCikti.stopRecording() }; return }
             kayitta = true
@@ -165,7 +195,14 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
-    private func kaydet(_ degisiklik: @escaping () -> Void, mesaj: String) {
+    /// Tek fotoğraf (seri çekimde hızlı)
+    func fotoCek(hizli: Bool) {
+        let ayar = AVCapturePhotoSettings()
+        ayar.photoQualityPrioritization = hizli ? .speed : .quality
+        fotoCikti.capturePhoto(with: ayar, delegate: self)
+    }
+
+    func kaydet(_ degisiklik: @escaping () -> Void, mesaj: String) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { durum in
             guard durum == .authorized || durum == .limited else {
                 DispatchQueue.main.async { self.bildirim = "Fotoğraflar izni yok, Ayarlar'dan açılabilir." }
