@@ -9,6 +9,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
 const PANEL = Deno.env.get("PANEL_URL") || "https://panel.updated.com.tr";
+const ADRES = Deno.env.get("PUBLIC_SUPABASE_URL") || "https://panel.updated.com.tr";
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (legacy) return legacy;
@@ -126,9 +127,44 @@ Deno.serve(async (req) => {
   return yanit(await isle(sb, b, adet));
 });
 
+/** Arka plan silme Cloudflare'de (göç 0044, public/cloudflare/gorsel-worker.js): görsel indirilir, programa gönderilir,
+ *  dönen 1600×900 şeffaf WebP "kunye" kovasına konur. Program kurulmamışsa satır "isleniyor" bekler; kurulunca sonraki turda işlenir. */
+async function cfAyar(sb: ReturnType<typeof createClient>) {
+  const { data } = await sb.from("baglanti_anahtarlari").select("ad,deger").in("ad", ["cloudflare_adres", "cloudflare_anahtar"]);
+  const m = Object.fromEntries((data ?? []).map((x: { ad: string; deger: string }) => [x.ad, x.deger]));
+  return m.cloudflare_adres && m.cloudflare_anahtar ? { adres: String(m.cloudflare_adres).replace(/\/$/, ""), anahtar: String(m.cloudflare_anahtar) } : null;
+}
+async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, s: { id: number; urun_id: number; gorsel_aday: { url: string } | null }) {
+  const yaz = (x: Record<string, unknown>) => sb.from("kunye_oneriler").update(x).eq("id", s.id);
+  try {
+    if (!s.gorsel_aday?.url) { await yaz({ gorsel_durum: "yok" }); return; }
+    const g = await fetch(s.gorsel_aday.url, { headers: { "User-Agent": UA, Accept: "image/*" }, signal: AbortSignal.timeout(30_000) });
+    if (!g.ok) throw new Error(`görsel indirilemedi (${g.status})`);
+    const veri = new Uint8Array(await g.arrayBuffer());
+    if (veri.byteLength > 20e6) throw new Error("görsel 20 MB üstü");
+    const r = await fetch(cf.adres, { method: "POST", headers: { "x-anahtar": cf.anahtar, "Content-Type": g.headers.get("content-type") || "image/jpeg" }, body: veri, signal: AbortSignal.timeout(60_000) });
+    if (!r.ok) {
+      const h = `Cloudflare ${r.status}: ${(await r.text()).slice(0, 140)}`;
+      if (r.status === 401 || r.status === 500) await sb.from("baglanti_anahtarlari").update({ ek: { hata: h } }).eq("ad", "cloudflare_adres");
+      throw new Error(h);
+    }
+    const yol = `${s.urun_id}-${s.id}.webp`;
+    const { error } = await sb.storage.from("kunye").upload(yol, new Uint8Array(await r.arrayBuffer()), { contentType: "image/webp", upsert: true });
+    if (error) throw new Error("yükleme: " + error.message);
+    await yaz({ gorsel: `${ADRES}/storage/v1/object/public/kunye/${yol}`, gorsel_durum: "hazir", gorsel_hata: null });
+    await sb.from("baglanti_anahtarlari").update({ ek: { son_islem: new Date().toISOString(), hata: "" } }).eq("ad", "cloudflare_adres");
+  } catch (e) { await yaz({ gorsel_durum: "hata", gorsel_hata: String((e as Error).message).slice(0, 200) }); }
+}
+
 const kotaDolu = (m: string) => /\b429\b|RESOURCE_EXHAUSTED|quota/i.test(m);
 
 async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown }, adet: number) {
+  // Önce bekleyen görseller (program sonradan kurulduysa ya da önceki tur yarım kaldıysa)
+  const cf = await cfAyar(sb).catch(() => null);
+  if (cf) {
+    const { data: bekleyen } = await sb.from("kunye_oneriler").select("id,urun_id,gorsel_aday").eq("gorsel_durum", "isleniyor").order("id").limit(6);
+    for (const x of bekleyen ?? []) await gorselIsle(sb, cf, x as { id: number; urun_id: number; gorsel_aday: { url: string } | null });
+  }
   // Aday ürünler: tek ürün istendiyse o; yoksa değerlerinin yarısından azı dolu ve bekleyen önerisi olmayanlar
   let urunler: Urun[] = [];
   if (Number.isInteger(b.urun_id)) {
@@ -152,8 +188,9 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       const gorsel = await gorselBul(u.brand, u.name, v?.gorselAdresi, [v?.urunSayfasi, ...oz.map((o: { kaynak: string | null }) => o.kaynak)]).catch(() => null);
       const kayit = { urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length ? "bekliyor" : "hata", hata: oz.length ? null : "Kaynaklarda değer bulunamadı" };
       // Görsel sütunları göç 0043 ile geldi; uygulanmamışsa kayıt görselsiz yazılır
-      const { error } = await sb.from("kunye_oneriler").insert({ ...kayit, gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" });
+      const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" }).select("id").single();
       if (error) await sb.from("kunye_oneriler").insert(kayit);
+      else if (gorsel && cf && yeni) await gorselIsle(sb, cf, { id: yeni.id as number, urun_id: u.id, gorsel_aday: gorsel });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length });
     } catch (e) {
       // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda

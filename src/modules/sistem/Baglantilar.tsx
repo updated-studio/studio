@@ -2,6 +2,7 @@
 // Girilen değer bir daha ekrana gelmez (veritabanında okuma izni yok; yalnız sunucu fonksiyonları okur). Göç 0040.
 // - Yedek Google (Gemini) anahtarı: yarışma tarama ve künye bulma, ana anahtarın kotası dolunca bunu kullanır.
 // - Instagram erişim anahtarı: instagram-reels fonksiyonu son Reels'leri çeker, anahtarı 60 günü dolmadan kendisi yeniler.
+// - Cloudflare görsel programı (adres + ortak anahtar, göç 0044): künye görsellerinin arka planını siler (public/cloudflare/gorsel-worker.js).
 import { useCallback, useEffect, useState } from "react";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
@@ -15,9 +16,12 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ad: "gemini_yedek", baslik: "Yedek Google (Gemini) anahtarı", ikon: "triyaj",
     aciklama: "Yarışma tarama ve künye bulma internette arama yapabilen tek model olan Gemini'yi kullanır. Ana anahtarın günlük kotası dolunca bu anahtarla devam eder. Kota proje başına sayılır: anahtar başka bir Google hesabından alınmalı.",
     adimlar: [
-      { metin: "Google AI Studio'yu aç (yedek anahtarın sahibi olacak Google hesabıyla gir)", link: "https://aistudio.google.com/apikey" },
-      { metin: "\"Create API key\" (API anahtarı oluştur) düğmesine bas, yeni bir proje seçilmesini iste" },
-      { metin: "Çıkan anahtarı kopyala, aşağıya yapıştır, Kaydet" },
+      { metin: "Bilgisayardan Google AI Studio'nun anahtar sayfasını aç; sağ üstte YEDEK anahtarın sahibi olacak Google hesabı (ana anahtarınkinden farklı) açık olsun", link: "https://aistudio.google.com/apikey" },
+      { metin: "İlk girişse kullanım şartlarını onayla (Terms of Service kutusunu işaretle → Continue)" },
+      { metin: "Sağ üstteki \"Create API key\" (API anahtarı oluştur) düğmesine bas" },
+      { metin: "Proje sorulursa \"Create API key in new project\" (yeni projede oluştur) seç. Var olan bir projeyi seçme: kota proje başına sayılır" },
+      { metin: "Çıkan anahtar AIza ile başlar. Yanındaki kopyala simgesine bas, aşağıdaki kutuya yapıştır → Kaydet" },
+      { metin: "Fatura (billing) ekleme; anahtar ücretsiz katmanda çalışır. Kaydettikten sonra durum \"Bağlı\" olur" },
     ],
   },
   {
@@ -33,6 +37,23 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
       { metin: "\"Add account\" hata verirse: Instagram'da Ayarlar → Hesap türü ve araçlar → Profesyonel hesaba geç; ya da Meta'da App roles → Roles → \"Instagram Tester\" olarak updated.tr'yi ekle, Instagram'da Ayarlar → Uygulamalar ve web siteleri → Test kullanıcısı davetleri'nden kabul et" },
     ],
   },
+  {
+    ad: "cloudflare_adres", baslik: "Cloudflare görsel programı: adres", ikon: "foto",
+    aciklama: "Künye görsellerinin arka planını Cloudflare siler; ürün hep aynı zeminde, aynı boyda durur. Ücretsiz: ayda 5.000 görsele kadar, aşılırsa ücret çıkmaz. Sunucumuzu yormaz.",
+    adimlar: [
+      { metin: "Cloudflare'e kendi hesabınla gir", link: "https://dash.cloudflare.com" },
+      { metin: "Sol menüde \"Compute (Workers)\" → \"Workers & Pages\" → \"Create\" (Oluştur) → \"Start with Hello World!\" → ad: updated-gorsel → \"Deploy\"" },
+      { metin: "Açılan sayfada \"Edit code\" (Kodu düzenle). Soldaki kodun tamamını sil. Aşağıdaki bağlantıdaki kodu aç, tümünü seç (Ctrl+A / Cmd+A), kopyala, oraya yapıştır → sağ üstte \"Deploy\"", link: "/cloudflare/gorsel-worker.js" },
+      { metin: "Programın sayfasına dön → \"Settings\" (Ayarlar) → \"Bindings\" → \"Add binding\" → \"Images\" → Variable name: IMAGES → \"Add Binding\"" },
+      { metin: "Yine \"Settings\" → \"Variables and Secrets\" → \"Add\" → Type: Secret, Variable name: ANAHTAR, Value: en az 32 karakterlik rastgele bir şifre (şifre yöneticisinin önerdiğini kullan) → \"Deploy\". Aynı şifreyi aşağıdaki \"Cloudflare görsel programı: anahtar\" kutusuna gir" },
+      { metin: "\"Settings\" → \"Domains & Routes\" altında workers.dev ile biten adresi kopyala (ör. https://updated-gorsel.ad.workers.dev), bu kutuya yapıştır → Kaydet" },
+    ],
+  },
+  {
+    ad: "cloudflare_anahtar", baslik: "Cloudflare görsel programı: anahtar", ikon: "yonetim",
+    aciklama: "Programa yalnız bizim sistemimizin erişebilmesi için ortak şifre. Cloudflare'de ANAHTAR adıyla girdiğin şifrenin aynısı.",
+    adimlar: [{ metin: "Yukarıdaki 5. adımda oluşturduğun şifreyi buraya yapıştır → Kaydet" }],
+  },
 ];
 
 // Sık karışan değerler kaydetmeden yakalanır: Meta'nın "Uygulama gizli anahtarı" (App Secret) 32 karakterlik 0-9/a-f metnidir,
@@ -44,6 +65,8 @@ function bicimHatasi(ad: string, v: string): string {
     if (!/^(IG|EAA)/.test(v) || v.length < 100) return "Bu Instagram erişim anahtarına benzemiyor: anahtar IG ile başlar ve çok uzundur. \"Generate token\" ile çıkanı eksiksiz kopyala.";
   }
   if (ad === "gemini_yedek" && !/^AIza/.test(v)) return "Bu Google (Gemini) anahtarına benzemiyor: anahtar AIza ile başlar.";
+  if (ad === "cloudflare_adres" && !/^https:\/\/[A-Za-z0-9.-]+\/?$/.test(v)) return "Programın adresi https:// ile başlamalı (ör. https://updated-gorsel.ad.workers.dev).";
+  if (ad === "cloudflare_anahtar" && v.length < 24) return "Anahtar en az 24 karakter olmalı.";
   return "";
 }
 
