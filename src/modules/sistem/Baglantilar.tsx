@@ -24,10 +24,13 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ad: "instagram", baslik: "Instagram erişim anahtarı (@updated.tr)", ikon: "kamera",
     aciklama: "Sitedeki \"Son videolar\" sütunu bu anahtarla Instagram'daki son Reels'leri çeker. Anahtar yalnız okuma izni taşır, hesaptan paylaşım yapamaz. Süresi 60 gün; sistem dolmadan kendisi yeniler.",
     adimlar: [
-      { metin: "Instagram'da @updated.tr profesyonel hesap olmalı (Ayarlar → Hesap türü ve araçlar → Profesyonel hesaba geç)" },
-      { metin: "Meta geliştirici sayfasında yeni uygulama oluştur (tür: İşletme)", link: "https://developers.facebook.com/apps" },
-      { metin: "Uygulamaya \"Instagram\" ürününü ekle → \"Instagram girişiyle API kurulumu\" → \"Hesap ekle\" ile @updated.tr'ye gir" },
-      { metin: "\"Erişim anahtarı oluştur\" (Generate token) → IG ile başlayan uzun anahtarı kopyala, aşağıya yapıştır, Kaydet. Uygulama gizli anahtarı (App Secret) değil." },
+      { metin: "Bilgisayardan Meta geliştirici sayfasını aç, UPDATED uygulamasına tıkla", link: "https://developers.facebook.com/apps" },
+      { metin: "Sol menüde \"Use cases\" (Kullanım alanları) → \"Instagram API\" satırında \"Customize\" (Özelleştir)" },
+      { metin: "\"API setup with Instagram login\" sekmesi. Üstteki App ID ve App Secret kutularına dokunma, onlar gerekmiyor" },
+      { metin: "\"1. Generate access tokens\" bölümünde \"Add account\" → @updated.tr kullanıcı adı ve şifresiyle gir, izinleri onayla" },
+      { metin: "Listede updated.tr satırının yanındaki \"Generate token\" düğmesine bas, açılan pencerede yeniden gir" },
+      { metin: "Çıkan uzun metin IG ile başlar. \"I understand\" kutusunu işaretle → \"Copy\" → aşağıya yapıştır → Kaydet" },
+      { metin: "\"Add account\" hata verirse: Instagram'da Ayarlar → Hesap türü ve araçlar → Profesyonel hesaba geç; ya da Meta'da App roles → Roles → \"Instagram Tester\" olarak updated.tr'yi ekle, Instagram'da Ayarlar → Uygulamalar ve web siteleri → Test kullanıcısı davetleri'nden kabul et" },
     ],
   },
 ];
@@ -98,7 +101,7 @@ export default function Baglantilar() {
             {d && <div className="muted">Son 4 karakter: <b>…{d.son4}</b> · kaydedildi {tarih(d.updated_at)}
               {d.ek?.hesap ? ` · hesap @${d.ek.hesap}` : ""}{d.ek?.bitis ? ` · geçerli: ${tarih(d.ek.bitis)}` : ""}{d.ek?.son_cekim ? ` · son çekim ${tarih(d.ek.son_cekim)}` : ""}
               {d.ek?.hata ? <div className="msg err" style={{ marginTop: 6 }}>{d.ek.hata}</div> : null}</div>}
-            {!d && <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
+            {(!d || d.ek?.hata) && <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
               {a.adimlar.map((s) => <li key={s.metin}>{s.metin}{s.link && <> · <a href={s.link} target="_blank" rel="noopener noreferrer">aç</a></>}</li>)}
             </ol>}
             <label>{d ? "Yeni anahtar (eskisinin yerine geçer)" : "Anahtar"}
