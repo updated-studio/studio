@@ -27,10 +27,22 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
       { metin: "Instagram'da @updated.tr profesyonel hesap olmalı (Ayarlar → Hesap türü ve araçlar → Profesyonel hesaba geç)" },
       { metin: "Meta geliştirici sayfasında yeni uygulama oluştur (tür: İşletme)", link: "https://developers.facebook.com/apps" },
       { metin: "Uygulamaya \"Instagram\" ürününü ekle → \"Instagram girişiyle API kurulumu\" → \"Hesap ekle\" ile @updated.tr'ye gir" },
-      { metin: "\"Erişim anahtarı oluştur\" (Generate token) → kopyala, aşağıya yapıştır, Kaydet" },
+      { metin: "\"Erişim anahtarı oluştur\" (Generate token) → IG ile başlayan uzun anahtarı kopyala, aşağıya yapıştır, Kaydet. Uygulama gizli anahtarı (App Secret) değil." },
     ],
   },
 ];
+
+// Sık karışan değerler kaydetmeden yakalanır: Meta'nın "Uygulama gizli anahtarı" (App Secret) 32 karakterlik 0-9/a-f metnidir,
+// Uygulama Kimliği yalnız rakamdır; Instagram erişim anahtarı "IG" ile başlar ve çok daha uzundur. Gemini anahtarı "AIza" ile başlar.
+function bicimHatasi(ad: string, v: string): string {
+  if (ad === "instagram") {
+    if (/^[0-9a-f]{32}$/i.test(v)) return "Bu, uygulamanın gizli anahtarı (App Secret) gibi görünüyor; o gerekmiyor. \"Generate token\" ile çıkan, IG ile başlayan uzun anahtarı yapıştır.";
+    if (/^\d+$/.test(v)) return "Bu, uygulama ya da hesap kimliği (ID) gibi görünüyor. \"Generate token\" ile çıkan, IG ile başlayan uzun anahtarı yapıştır.";
+    if (!/^(IG|EAA)/.test(v) || v.length < 100) return "Bu Instagram erişim anahtarına benzemiyor: anahtar IG ile başlar ve çok uzundur. \"Generate token\" ile çıkanı eksiksiz kopyala.";
+  }
+  if (ad === "gemini_yedek" && !/^AIza/.test(v)) return "Bu Google (Gemini) anahtarına benzemiyor: anahtar AIza ile başlar.";
+  return "";
+}
 
 export default function Baglantilar() {
   const toast = useToast();
@@ -48,6 +60,8 @@ export default function Baglantilar() {
 
   async function kaydet(ad: string, sil = false) {
     if (sil && !confirm("Anahtar silinsin mi? Bu bağlantıyı kullanan iş çalışmaz olur.")) return;
+    const yanlis = !sil && bicimHatasi(ad, (deger[ad] ?? "").trim());
+    if (yanlis) { toast(yanlis); return; }
     setMesgul(ad);
     const { error } = await sb.rpc("anahtar_kaydet", { p_ad: ad, p_deger: sil ? "" : (deger[ad] ?? "") });
     setMesgul("");
