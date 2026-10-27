@@ -32,8 +32,14 @@ jobs:
       - run: xcodegen generate
       - name: Derleme denetimi (imzasız, simülatör)
         run: |
+          # Derleme hataları en sonda ayrıca listelenir (uzun günlükte kaybolmasın)
           xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -n 60
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > derleme.log 2>&1 || {
+            grep -E "error:" derleme.log | sort -u | head -n 40
+            grep -E "error:" derleme.log | sort -u | head -n 10 | sed 's/^/::error::/'
+            exit 1
+          }
+          tail -n 5 derleme.log
       - name: TestFlight'a yükle
         if: github.event_name != 'pull_request' && env.ASC_KEY_P8 != ''
         run: |
