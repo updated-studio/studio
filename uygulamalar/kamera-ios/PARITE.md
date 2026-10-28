@@ -9,20 +9,22 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 
 | Özellik | Android | iOS | Not |
 |---|---|---|---|
-| Tam ekran görüntü, saydam katmanlar, simgeli düğmeler (0.11 düzeni) | ✓ | ✱ | |
-| Mod şeridi: TIMELAPSE · VİDEO · FOTO · PRO MODLAR · PORTRE · MONİTÖR | ✓ | ✱ | iOS'ta şimdi FOTO/VİDEO/PRO |
-| Fotoğraf: çözünürlük seçimi, RAW (DNG), zamanlayıcı, deklanşör sesi | ✓ | ✱ | iOS'ta ProRAW/Bayer RAW cihaza göre |
-| Video: 720p/1080p/4K, 30/60 fps | ✓ | ✱ | |
-| Timelapse: aralık, süre sınırı, pozlamayı sabitle | ✓ | ✱ | |
+| Tam ekran görüntü, saydam katmanlar, simgeli düğmeler (0.11 düzeni): üst şerit, araç şeridi, yakınlaştırma, son çekim | ✓ | ✓ | iOS'ta ekran dönünce düzen de döner |
+| Mod şeridi: TIMELAPSE · VİDEO · FOTO · PRO MODLAR · PORTRE · MONİTÖR | ✓ | ✓ | |
+| Fotoğraf: çözünürlük seçimi, RAW (DNG), zamanlayıcı, deklanşör sesi | ✓ | ✓ | ProRAW/Bayer RAW cihaza göre; deklanşör sesi iOS 18+ |
+| Video: 720p/1080p/4K, 30/60 fps | ✓ | ✓ | |
+| Mercekler 0,5× / 1× / 2× / tele, iki parmakla yakınlaştırma, flaş ve fener | ✓ | ✓ | |
+| Araç şeridi: pozlama (EV + elle ISO), beyaz denge, odak cetvelleri | ✓ | ✓ | |
+| Timelapse: aralık, süre sınırı, pozlamayı sabitle | ✓ | ✓ | |
 | PRO MODLAR (9 mod, Özelleştir, uyarı, "?" açıklamaları, baz ISO) | ✓ | ✓ | |
-| Portre (pozlama/odak yüze göre) | ✓ | ✱ | iOS'ta Vision yüz bulma |
-| Kompozisyon kılavuzları (üçte bir, phi, spiral, köşegen, üçgen, simetri, öncü çizgi) | ✓ | ✱ | |
-| Otomatik sahne önerisi / akıllı yardımcı | ✓ | ✱ | Android ML Kit, iOS Vision |
-| Terazi (ufuk) | ✓ | ✱ | |
-| Ses göstergesi (çizgili, sol alt) | ✓ | ✱ | |
+| Portre (pozlama/odak yüze göre) | ✓ | ✓ | |
+| Kompozisyon kılavuzları (üçte bir, phi, spiral, köşegen, üçgen, simetri, öncü çizgi) | ✓ | ✓ | Kompozisyon.swift (`KompozisyonKatman`), Monitör'e de bağlanabilir |
+| Otomatik sahne önerisi / akıllı yardımcı (ibre, yön tarifi, kılavuz önerisi) | ✓ | ✓ | Android ML Kit, iOS Vision (Asistan.swift, Analiz.swift) |
+| Terazi (ufuk) | ✓ | ✓ | |
 | Elle ISO + baz ISO işareti | ✓ | ✓ | |
 | Wi-Fi kamera ol (Masa'ya) | ✓ | ✓ | |
-| Açılışta Kamera / Monitör sor | ✓ | ✱ | |
+| Ayarlar paneli (Fotoğraf, Video, Timelapse, Masa, Yardımcılar, Uygulama) | ✓ | ✓ | KameraAyarlar.swift |
+| Açılış ekranı (Kamera / Monitör / Masa) ve "Açılışta sor" | ✓ | ✓ | `GirisEkran`, UserDefaults "giris" (Android ile aynı anahtar) |
 
 ## Monitör ekranı (Android: MainActivity + MonitorGorunum)
 
