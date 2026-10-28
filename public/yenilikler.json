@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-28-c",
+    "tarih": "28 Ekim 2026",
+    "baslik": "İmza, fotoğraf ve ikonlar",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Herkesin yazar profili var; haberlerde imzanın yanında profil fotoğrafın çıkar.",
+          "Otomatik haberi yayına alan editörün imzası habere geçer.",
+          "Haber bilgi satırında tarih, saat ve okuma süresi ikonlu."
+        ]
+      },
+      {
+        "ad": "Marka Kiti",
+        "maddeler": [
+          "Marka Kiti'ne İkonlar bölümü eklendi; Stüdyo ve site aynı seti kullanır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-28-b",
     "tarih": "28 Ekim 2026",
     "baslik": "Kapak önizleme ve odak noktası",

@@ -1,6 +1,7 @@
 // Marka Kiti sayfası: kit 1.2 (public/marka/). Değerler marka/makine/tokens.json'dan; burada sadece gösterim.
 import { useState } from "react";
 import "./marka-kiti.css";
+import { Ikon, IKONLAR } from "../../shared/Ikon";
 
 const K = "marka/";
 const RENKLER = [
@@ -58,7 +59,7 @@ export default function MarkaKiti() {
     <div className="stack" style={{ gap: 20 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
         <h2>Marka Kiti</h2>
-        <span className="muted mono">Sürüm 1.2 · 21 Ekim 2026</span>
+        <span className="muted mono">Sürüm 1.4 · 28 Ekim 2026</span>
       </div>
 
       <h3>Renkler</h3>
@@ -93,6 +94,12 @@ export default function MarkaKiti() {
             </div>
           </div>
         ))}
+      </div>
+
+      <h3>İkonlar</h3>
+      <p className="muted" style={{ margin: 0 }}>Tek set: Stüdyo, panel ve site aynı çizimleri kullanır. 24 px tuval, 2 px çizgi, düz uç, dolgu yok, tek renk (yazının rengini alır). Arayüzde etiketle birlikte; sosyal medya görselinde ikon yok.</p>
+      <div className="panel mk-ikonlar">
+        {Object.keys(IKONLAR).map((ad) => <span key={ad} className="mk-ikon" title={ad}><Ikon ad={ad} /><span className="muted mono">{ad}</span></span>)}
       </div>
 
       <h3>Logolar</h3>

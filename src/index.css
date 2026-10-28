@@ -30,7 +30,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--b
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: butt; stroke-linejoin: miter; flex: none; } /* kit §8 İkon (1.4): 2 px, düz uç */
 
 .wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 48px; display: flex; flex-direction: column; gap: 16px; }
 .brand { font-family: var(--body); font-weight: 600; font-size: 24px; }

@@ -1,5 +1,5 @@
 # UPDATED Marka Kiti — Makine Sürümü
-Sürüm: 1.3 · Tarih: 2026-10-25 · Dil: tr
+Sürüm: 1.4 · Tarih: 2026-10-28 · Dil: tr
 Marka: UPDATED (updated.com.tr) — teknoloji haber ve içerik markası. Kanallar: web sitesi, Instagram, YouTube, bülten, stüdyo/yönetim paneli.
 
 Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel sayfalar ile çelişirse bu dosya ve `tokens.json` geçerlidir. Değerler `tokens.json` içinde makine okunur halde de vardır.
@@ -89,7 +89,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 - Fotoğraf: ürün tek, düz zemin, kadrajın ≥%60'ı · haber gerçek olay ya da resmî basın görseli · insan doğal ışık, gözler üst üçte bir · ekran görüntüsü düzenlenmemiş, kişisel bilgi bulanık, cihaz çerçevesi yok.
 - Kullanılmaz: stok klişe, haber gibi sunulan yapay zekâ görseli, filtre/gölge/dekupe, görsel üstüne ok/daire/emoji, 1920 px altı görsel, kaynaksız görsel.
 - Veri grafiği: konu ürün mavi, diğerleri gri, turuncu tek uyarı değeri · sayılar Plex Mono, ondalık virgül · karşılaştırma yatay çubuk, zaman çizgi; pasta/3B yok · büyükten küçüğe, eksen sıfırdan · altta kaynak ve tarih.
-- İkon: çizgi, 2 px, düz uç, dolgu yok, tek renk · 24 px tuval (panel 20, web 24) · tek set (öneri: Lucide) · arayüzde etiketle; yalnız ikonlu düğmede tooltip · sosyal medya görselinde ikon yok.
+- İkon: çizgi, 2 px, düz uç, dolgu yok, tek renk (yazının rengini alır) · 24 px tuval (panel 20, web 24; künye satırında 16) · tek set: UPDATED ikon seti (Stüdyo `src/shared/Ikon.tsx`, site `apps/web/src/lib/ui.ts`; aynı çizimler, Stüdyo → Marka Kiti → İkonlar'da görülür) · yeni ikon önce sete eklenir, sayfada elle çizilmez · arayüzde etiketle; yalnız ikonlu düğmede tooltip · bilgi satırlarında (tarih, saat, okuma süresi, güncelleme, yorum) nokta ayraç yerine ikon · sosyal medya görselinde ikon yok.
 - Künye: "Görsel: Apple", "Fotoğraf: Ad Soyad / UPDATED". Yapay zekâ görseli yalnızca temsili ve "Temsili görsel · Yapay zekâ ile üretildi" künyesiyle.
 
 ## 9. Instagram
@@ -179,7 +179,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 ## 15. Dosyalar
 - Logo: logo/ana-palet/{svg,png,sosyal,app-ikon,favicon,banner}/ · baskı: UPDATED Logo Baskı Dosyası · fontlar: Google Fonts (SIL OFL) · kurallar: makine/marka-kiti.md · değerler: makine/tokens.json · şablonlar: stüdyo panelinin düzenleyicisinde hazır kalıp (Figma/Canva kullanılmaz).
 - Dosya adı kuralı: küçük harf, Türkçe karakter ve boşluk yok, kelimeler tire ile: yyyy-aa-gg-konu-kanal.uzantı. Örnek: 2026-10-19-pixel-11-pro-thumbnail.jpg
-- Sürüm geçmişi: 1.2 — 21.10.2026 — alan adı updated.com.tr (sayfalar, makine sürümü, alan adlı logo SVG/PNG), panel koyu modu (12b), tam yayın öncesi kontrol listesi (16), yapay zekâ paketine şablon örnek görselleri · 1.1 — 20.10.2026 — tutarlılık düzeltmeleri: başlık satır yüksekliği 1,2, Instagram başlık sınırı ve logo, YouTube video içi yazı ölçüsü, grid boşlukları ölçeğe çekildi, görsel oranları, hitap, dosya adı kuralı, imla. · 1.0 — 19.10.2026 — ilk sürüm, 19 sayfa + makine sürümü.
+- Sürüm geçmişi: 1.4 — 28.10.2026 — ikon seti tekleşti (§8): Stüdyo ve site aynı çizimler, 2 px düz uç; bilgi satırlarında ikon · 1.2 — 21.10.2026 — alan adı updated.com.tr (sayfalar, makine sürümü, alan adlı logo SVG/PNG), panel koyu modu (12b), tam yayın öncesi kontrol listesi (16), yapay zekâ paketine şablon örnek görselleri · 1.1 — 20.10.2026 — tutarlılık düzeltmeleri: başlık satır yüksekliği 1,2, Instagram başlık sınırı ve logo, YouTube video içi yazı ölçüsü, grid boşlukları ölçeğe çekildi, görsel oranları, hitap, dosya adı kuralı, imla. · 1.0 — 19.10.2026 — ilk sürüm, 19 sayfa + makine sürümü.
 
 ## 16. Yayın öncesi kontrol
 Her madde işaretlenmeden yayın yapılmaz. Önce Ortak, sonra kanal listesi.

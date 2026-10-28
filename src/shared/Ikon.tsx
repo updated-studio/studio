@@ -1,4 +1,5 @@
-// Ortak ikon seti. Yeni ikon gerekirse buraya eklenir, modüller kendi ikonunu çizmez.
+// Ortak ikon seti (marka kiti §8 İkon, 1.4): 24 px tuval, çizgi 2 px, düz uç, dolgu yok, tek renk.
+// Yeni ikon gerekirse buraya eklenir, modüller kendi ikonunu çizmez. Sitedeki karşılığı apps/web/src/lib/ui.ts (aynı çizimler).
 const P: Record<string, string> = {
   hafta: "M3 5h18v16H3zM3 10h18M8 3v4M16 3v4M8 15l2 2 4-4",
   takvim: "M3 5h18v16H3zM3 10h18M8 3v4M16 3v4",
@@ -25,7 +26,11 @@ const P: Record<string, string> = {
   cikis: "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10",
   sohbet: "M4 5h16v11H9l-5 4z",
   site: "M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z",
+  okuma: "M3 5h6a3 3 0 013 3v12a2 2 0 00-2-2H3zM21 5h-6a3 3 0 00-3 3v12a2 2 0 012-2h7z",
+  guncel: "M20 12a8 8 0 11-2.34-5.66M20 4v5h-5",
+  ara: "M11 18a7 7 0 100-14 7 7 0 000 14zM20 20l-4-4",
 };
+export const IKONLAR = P;
 
 export function Ikon({ ad }: { ad: string }) {
   return (
