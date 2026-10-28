@@ -67,6 +67,11 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ### 28 Ekim 2026
 
+- (Fatih, sunucudaki Claude) Fatih'in istekleri: yan tutuşta deklanşör sağda ortada; zoom kalksın, yalnız gerçek mercekler, PRO mod ayarlarında mercek; iPhone'da 1 sn'den uzun pozlama. Sonra Apple Kamera'nın (iOS 26) 4 ekran görüntüsünü gönderdi: "arayüz bu görüntüleri baz alacaksın".
+  - iOS kamera ekranı bu görünüme göre yeniden yazıldı (yapı 41 ve sonrası). Yan tutuşta sağda dikey sütun var.
+  - iPhone tek kareyi ~1 sn'den uzun açamıyor. Çözüm: FOTO'da 2–30 sn ve BULB seçilince kareler art arda alınıp birleştiriliyor (İpeksi / Aydınlat / Işık izi). Android'de de aynısı var; telefon izin veriyorsa gerçek uzun pozlama yapılıyor.
+  - Android'de iki parmakla yakınlaştırma kalktı, PRO'ya mercek geldi. Android 0.12.0'da, Fatih'in "Yayınla"sını bekliyor.
+  - Android'in görünümü henüz Apple tarzına çevrilmedi; Fatih'e soruldu.
 - (Fatih, Monitör ekranı Claude'u, sunucu) **iOS Monitör** Android monitörle aynı yapıldı ve TestFlight'a gitti:
   - Metal araçlar: odak yardımı, zebra, false color, LUT ve karşılaştırma, kılavuz/ızgara/güvenli alan/merkez, büyütme, ayna/çevir/döndür, anamorfik, siyah-beyaz, temiz görüntü.
   - Ölçümler, dört kip ve el ile kamera ayarları.

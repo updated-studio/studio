@@ -164,6 +164,10 @@ class KameraActivity : Activity() {
     private var kayitUri: Uri? = null; private var kayitBas = 0L
     private var sonUri: Uri? = null; private var sonMime = "image/jpeg"
     private var geriSayiliyor = false
+    /** FOTO'da elle uzun enstantane: BULB (deklanşöre yeniden basılana kadar) ve kareleri birleştirme yolu (ort: ipeksi, top: aydınlat, max: ışık izi) */
+    private var bulb = false
+    private var uzunYol = "ort"
+    private var birlestirmeIstegi: MonitorGorunum.BirlestirmeIstegi? = null
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
@@ -350,7 +354,9 @@ class KameraActivity : Activity() {
         if (kayitSuruyor()) return tost("Kayıt sürerken mod değişmez.")
         if (m == KMod.MONITOR) { monitoreGec(); return }
         mod = m; tercih.edit().putString("mod", m.name).apply()
+        if (m != KMod.FOTO && (ayar.pozlamaNs != null || bulb)) { ayar.pozlamaNs = null; ayar.uzunOnizleme = 0; bulb = false; ayarKaydet() }
         modlariCiz(); modUygula()
+        if (m == KMod.PRO) mercekUygula()
         if (m == KMod.PRO && kartlar) proKartlar()
     }
 
@@ -376,8 +382,17 @@ class KameraActivity : Activity() {
     private fun proSec(m: ProMod) {
         proMod = m; tercih.edit().putString("proMod", m.name).apply()
         if (mod != KMod.PRO) modSec(KMod.PRO, kartlar = false) else { proCiz(); proGonder() }
-        if (m.tele) kaynak?.zoomAralik?.let { zoomAyarla(minOf(it.upper, 3f)) } // kuş/uçak: en uzun objektif (3× ve üstü telefoto)
+        mercekUygula()
         proUyari(m)
+    }
+
+    /** PRO modun merceği: kayıtlıysa o, yoksa kuş ve uçakta en uzun mercek, diğerlerinde 1× */
+    private fun mercekUygula() {
+        val d = mercekDuraklari(); if (d.isEmpty() || onde) return
+        val a = proMod.oku(tercih)
+        val istenen = a.mercek ?: if (proMod.tele) d.last() else 1f
+        val z = d.minByOrNull { abs(it - istenen) } ?: return
+        if (abs(z - ayar.zoomOrani) > 0.01f) zoomAyarla(z, modaYaz = false)
     }
 
     private fun proCiz() {
@@ -485,7 +500,7 @@ class KameraActivity : Activity() {
         val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18f), dp(16f), dp(18f), dp(14f)) }
         ic.addView(etiket(m.ad.uppercase(Locale("tr")), 18f).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; typeface = kosulKalin; Tema.simge(this, m.simge, TURUNCU, 20f) })
         ic.addView(TextView(this).apply { text = m.ipucu; textSize = 12f; setTextColor(GRI); setPadding(0, dp(4f), 0, dp(4f)) })
-        fun degistir(y: ProAyar) { m.yaz(tercih, y); proCiz(); proGonder(); proOzellestir() }
+        fun degistir(y: ProAyar) { val mercekDegisti = y.mercek != m.oku(tercih).mercek; m.yaz(tercih, y); proCiz(); proGonder(); if (mercekDegisti) mercekUygula(); proOzellestir() }
         // Başlık: Pro modlardaki kısaltma (ISO, S, EV, WB, AF/MF) ve yanında tek kelime Türkçe karşılığı
         fun <T> satir(kisa: String, ad: String, secenekler: List<T>, secili: T, yazi: (T) -> String, vurgu: T? = null, sec: (T) -> ProAyar) {
             ic.addView(TextView(this).apply { textSize = 13f; setTextColor(Color.WHITE); setPadding(0, dp(12f), 0, dp(6f)); contentDescription = ad
@@ -511,6 +526,8 @@ class KameraActivity : Activity() {
         if (a.iso == null || a.enstNs == null) satir("EV", "Pozlama telafisi", ProMod.EVLER, a.ev, ProMod::evYazi) { a.copy(ev = it) }
         satir("WB", "Beyaz dengesi", ProMod.BDLER, a.bd, ProMod::bdYazi) { a.copy(bd = it) }
         satir("AF/MF", "Odak", ProMod.ODAKLAR, a.odak, ProMod::odakYazi) { a.copy(odak = it) }
+        val duraklar = mercekDuraklari()
+        if (!onde && duraklar.size > 1) satir("LENS", "Mercek", duraklar, a.mercek ?: if (m.tele) duraklar.last() else 1f, { fmt(it) + "×" }) { a.copy(mercek = it) }
         if (m.sureVar) satir("T", "Toplam süre", ProMod.SURELER, a.sureSn, ProMod::sureYazi) { a.copy(sureSn = it) }
         satir("⏱", "Zamanlayıcı", ProMod.ZAMANLAR, a.zamanlayici, ProMod::zamanYazi) { a.copy(zamanlayici = it) }
         val alt = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(16f), 0, 0) }
@@ -532,11 +549,8 @@ class KameraActivity : Activity() {
             setOnClickListener { if (tlKaydedici != null) return@setOnClickListener; tlAralik = ms; tercih.edit().putLong("tlAralik", ms).apply(); sureCiz(); bilgiCiz() } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
     }
 
-    /* ================= dokunma: odak, kaydırma (mod), iki parmak (yakınlaştırma) ================= */
+    /* ================= dokunma: odak, kaydırma (mod); yakınlaştırma yok, yalnız gerçek mercekler ================= */
     private fun dokunmaKur() {
-        val olcek = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(d: ScaleGestureDetector): Boolean { zoomAyarla(ayar.zoomOrani * d.scaleFactor); return true }
-        })
         val jest = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
             override fun onSingleTapUp(e: MotionEvent): Boolean { odakDokun(e.x, e.y); return true }
@@ -548,7 +562,7 @@ class KameraActivity : Activity() {
                 if (j in modlar.indices) modSec(modlar[j]); return true
             }
         })
-        monitor.setOnTouchListener { _, e -> olcek.onTouchEvent(e); if (!olcek.isInProgress) jest.onTouchEvent(e); true }
+        monitor.setOnTouchListener { _, e -> jest.onTouchEvent(e); true }
     }
 
     private fun odakDokun(x: Float, y: Float) {
@@ -561,29 +575,37 @@ class KameraActivity : Activity() {
     }
 
     /* ================= yakınlaştırma ================= */
-    private fun zoomAyarla(v: Float) {
+    private fun zoomAyarla(v: Float, modaYaz: Boolean = true) {
         val z = kaynak?.zoomAralik ?: return
         ayar.zoomOrani = v.coerceIn(z.lower, minOf(z.upper, 10f)); kaynak?.ayarDegisti(); zoomCiz()
+        // PRO MODLAR'da seçilen mercek o moda kaydedilir
+        if (modaYaz && mod == KMod.PRO) { val a = proMod.oku(tercih); if (a.mercek != ayar.zoomOrani) proMod.yaz(tercih, a.copy(mercek = ayar.zoomOrani)) }
+    }
+
+    /** Telefonun mercek durakları: ultra geniş (varsa), 1×, 2× ve 5× (tele varsa) */
+    private fun mercekDuraklari(): List<Float> {
+        val z = kaynak?.zoomAralik ?: return emptyList()
+        val d = ArrayList<Float>()
+        if (z.lower < 0.95f) d.add(z.lower)
+        d.add(1f); if (z.upper >= 2f) d.add(2f); if (z.upper >= 5f) d.add(5f)
+        return d
     }
 
     private fun zoomCiz() {
         (0 until zoomSira.childCount).forEach { donenler.remove(zoomSira.getChildAt(it)) }
         zoomSira.removeAllViews()
-        val z = kaynak?.zoomAralik ?: return
-        val duraklar = ArrayList<Float>()
-        if (z.lower < 0.95f) duraklar.add(z.lower)
-        duraklar.add(1f); if (z.upper >= 2f) duraklar.add(2f); if (z.upper >= 5f) duraklar.add(5f)
+        val duraklar = mercekDuraklari()
         val yakin = duraklar.minByOrNull { abs(it - ayar.zoomOrani) }
         duraklar.forEach { d ->
             val secili = d == yakin
-            val yazi = if (secili) (if (abs(ayar.zoomOrani - d) < 0.05f) fmt(d) + "×" else fmt(ayar.zoomOrani) + "×") else fmt(d)
+            val yazi = if (secili) fmt(d) + "×" else fmt(d)
             zoomSira.addView(TextView(this).apply {
                 text = yazi; textSize = if (secili) 14f else 13f; typeface = kosulKalin; gravity = Gravity.CENTER; setTextColor(if (secili) TURUNCU else Color.WHITE)
                 background = Tema.kapsul(Color.argb(158, 20, 22, 26)); setOnClickListener { zoomAyarla(d) }; donenler.add(this); rotation = -fizikselYon.toFloat()
             }, LinearLayout.LayoutParams(dp(if (secili) 44f else 38f), dp(if (secili) 44f else 38f)).apply { marginStart = dp(5f); marginEnd = dp(5f) })
         }
     }
-    private fun fmt(v: Float) = if (v < 1f) ".${(v * 10).toInt()}" else if (v % 1f == 0f) "${v.toInt()}" else "%.1f".format(v).replace('.', ',')
+    private fun fmt(v: Float) = if (v < 1f) "0,${(v * 10).toInt()}" else if (v % 1f == 0f) "${v.toInt()}" else "%.1f".format(v).replace('.', ',')
 
     /* ================= flaş ================= */
     private fun flasDegistir() {
@@ -738,6 +760,7 @@ class KameraActivity : Activity() {
                     oto.setOnClickListener { ayar.ev = 0; k.ayarDegisti(); ayarKaydet(); cetvelAc(c) }
                     not("Sola: daha karanlık · sağa: daha aydınlık")
                 }
+                if (mod == KMod.FOTO && y.elleKontrol) uzunSatirlari(p, y)
             }
             Cetvel.BD -> {
                 Tema.simge(baslik, R.drawable.ic_beyaz, Color.WHITE); baslik.text = "Beyaz denge"
@@ -770,6 +793,42 @@ class KameraActivity : Activity() {
         aracCiz(c)
     }
 
+    /** FOTO'da elle enstantane (1/1000 – 30 sn ve BULB): telefonun tek karede veremediği süre önizleme karelerinin birleştirilmesiyle çekilir */
+    private fun uzunSatirlari(p: LinearLayout, y: KameraYetenek) {
+        val k = kaynak ?: return
+        val enUzun = y.pozlamaAralik?.upper ?: SN_
+        fun baslikYaz(t: String) = p.addView(TextView(this).apply { text = t; textSize = 12f; typeface = kosulKalin; setTextColor(GRI); setPadding(0, dp(12f), 0, dp(6f)) })
+        fun sira(ogeler: List<Triple<String, String?, Boolean>>, sec: (Int) -> Unit) {
+            val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            ogeler.forEachIndexed { i, (yazi, alt, secili) ->
+                s.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(12f), dp(4f), dp(12f), dp(4f)); minimumWidth = dp(48f)
+                    background = Tema.kapsul(if (secili) TURUNCU else Color.argb(30, 255, 255, 255), dp(12f).toFloat())
+                    addView(etiket(yazi, 13f, if (secili) Color.BLACK else Color.WHITE))
+                    alt?.let { addView(etiket(it, 10f, if (secili) Color.DKGRAY else GRI)) }
+                    setOnClickListener { sec(i) }
+                }, LinearLayout.LayoutParams(-2, dp(46f)).apply { marginEnd = dp(6f) })
+            }
+            p.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(s) })
+        }
+        val enstler: List<Long?> = listOf(null, SN_ / 1000, SN_ / 250, SN_ / 60, SN_ / 15, SN_ / 4, SN_ / 2, SN_, 2 * SN_, 4 * SN_, 8 * SN_, 15 * SN_, 30 * SN_, -1L)
+        fun secili(e: Long?) = if (e == -1L) bulb else !bulb && ayar.pozlamaNs == e
+        fun uygula() { ayar.uzunOnizleme = if (ayar.pozlamaNs == null && !bulb) 0 else if (uzunYol == "ort" && !bulb) 1 else 2; k.ayarDegisti(); ayarKaydet(); cetvelAc(Cetvel.POZ) }
+        baslikYaz("ENSTANTANE")
+        sira(enstler.map { e -> Triple(when (e) { null -> "AUTO"; -1L -> "BULB"; else -> ProMod.enstYazi(e) }, if (e != null && (e == -1L || e > enUzun)) "birleşik" else null, secili(e)) }) { i ->
+            val e = enstler[i]
+            bulb = e == -1L; ayar.pozlamaNs = if (bulb) ONIZLEME_KARE else e; uygula()
+        }
+        val uzun = bulb || (ayar.pozlamaNs ?: 0L) > enUzun
+        if (uzun) {
+            baslikYaz("BİRLEŞTİRME")
+            val yollar = listOf(Triple("ort", "İpeksi", "su, bulut akar"), Triple("top", "Aydınlat", "karanlık sahne"), Triple("max", "Işık izi", "far, yıldız"))
+            sira(yollar.map { Triple(it.second, it.third, uzunYol == it.first) }) { i -> uzunYol = yollar[i].first; tercih.edit().putString("uzunYol", uzunYol).apply(); uygula() }
+            p.addView(TextView(this).apply { textSize = 12f; setTextColor(GRI); setPadding(0, dp(6f), 0, 0)
+                text = "Telefon tek kareyi en fazla ${ProMod.enstYazi(enUzun)} açabiliyor. Seçtiğin süre boyunca kareler alınıp tek fotoğrafta birleşir; BULB'da deklanşöre yeniden basınca biter. Telefonu sabitle (tripod)." })
+        }
+    }
+
     /** Araç şeridinin yazıları ve renkleri: ayar değişmişse değeri turuncu yazar */
     private fun aracCiz(acik: Cetvel? = null) {
         val k = kaynak; val evAdim = k?.yetenek?.evAdim?.takeIf { it > 0 } ?: 1f
@@ -777,7 +836,8 @@ class KameraActivity : Activity() {
             val v = aracSerit.getChildAt(i) as LinearLayout
             val ikon = v.getChildAt(0) as ImageView; val yazi = v.getChildAt(1) as TextView
             val (metin, etkin) = when (v.tag) {
-                "poz" -> (if (ayar.ev == 0) "Pozlama" else evYazi(ayar.ev, evAdim)) to (ayar.ev != 0 || acik == Cetvel.POZ)
+                "poz" -> (when { bulb -> "BULB"; ayar.pozlamaNs != null -> ProMod.enstYazi(ayar.pozlamaNs); ayar.ev == 0 -> "Pozlama"; else -> evYazi(ayar.ev, evAdim) }) to
+                    (ayar.ev != 0 || ayar.pozlamaNs != null || acik == Cetvel.POZ)
                 "bd" -> (if (ayar.awb == CameraMetadata.CONTROL_AWB_MODE_AUTO) "Beyaz" else BD_ADLARI[ayar.awb] ?: "Beyaz") to (ayar.awb != CameraMetadata.CONTROL_AWB_MODE_AUTO || acik == Cetvel.BD)
                 "odak" -> (if (ayar.odakMesafe == null) "Odak" else "MF") to (ayar.odakMesafe != null || acik == Cetvel.ODAK)
                 "kilavuz" -> (if (kompTur == KompTur.KAPALI) "Kılavuz" else kompTur.ad) to (kompTur != KompTur.KAPALI)
@@ -903,7 +963,7 @@ class KameraActivity : Activity() {
         val k = kaynak ?: return tost("Kamera hazır değil.")
         if (mod == KMod.TIMELAPSE) return timelapseDugmesi(k)
         if (!mod.foto) return videoDugmesi(k)
-        if (monitor.birlestiriyor) { monitor.birlestirmeIptal(); return }
+        if (monitor.birlestiriyor) { birlestirmeIstegi?.takeIf { bulb && mod == KMod.FOTO }?.let { it.bitir = true } ?: monitor.birlestirmeIptal(); return }
         if (geriSayiliyor) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; return }
         val gecikme = if (mod == KMod.PRO) proMod.oku(tercih).zamanlayici else zamanlayici
         if (gecikme == 0) return cek(k)
@@ -924,6 +984,15 @@ class KameraActivity : Activity() {
             val a = proMod.oku(tercih)
             proMod.birlestirme(a, k.yetenek.elleKontrol, k.yetenek.pozlamaAralik?.upper ?: 0L)?.let { return birlestirCek(it, proMod.kareSayisi(a), a.sureSn * 1000L, proMod.ad) }
             if (a.iso != null && a.enstNs != null && a.enstNs >= 1_000_000_000L) uzunNs = a.enstNs
+        }
+        if (mod == KMod.FOTO) {
+            val p = ayar.pozlamaNs
+            if (p == null) bulb = false
+            // Telefonun tek karede veremediği süre ya da BULB: önizleme kareleri birleştirilir
+            if (bulb || (p != null && p > (k.yetenek.pozlamaAralik?.upper ?: Long.MAX_VALUE)))
+                return birlestirCek(if (uzunYol == "max") Sahne.Birlestir.MAX else Sahne.Birlestir.ORT, 0, if (bulb) Long.MAX_VALUE else p!! / 1_000_000L,
+                    if (bulb) "BULB" else "Uzun pozlama", toplam = uzunYol == "top" || (bulb && uzunYol == "ort"))
+            if (p != null && p >= 1_000_000_000L) uzunNs = p
         }
         deklansorDugme.basili = true
         // Uzun pozlama: süre ekranda geri sayar
@@ -953,15 +1022,17 @@ class KameraActivity : Activity() {
         if (seriSayi > 0) tost("$seriSayi kare çekildi")
     }
 
-    private fun birlestirCek(tur: Sahne.Birlestir, n: Int, sureMs: Long, adSahne: String) {
+    private fun birlestirCek(tur: Sahne.Birlestir, n: Int, sureMs: Long, adSahne: String, toplam: Boolean = false) {
         deklansorDugme.basili = true
         if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.START_VIDEO_RECORDING) }
         ortaYazi.textSize = 34f; ortaYazi.text = "0%"; ortaYazi.visibility = View.VISIBLE
         val yon = fizikselYon
         // Uzun birleştirmede (yıldız izi dakikalarca) ekran kapanmasın
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        monitor.birlestir(MonitorGorunum.BirlestirmeIstegi(tur, n, sureMs, 1f, { o -> ortaYazi.text = "$adSahne  ${(o * 100).toInt()}%" }) { bmp ->
-            ortaYazi.visibility = View.GONE; deklansorDugme.basili = false
+        val bas = System.currentTimeMillis()
+        val istek = MonitorGorunum.BirlestirmeIstegi(tur, n, sureMs, 1f, { o ->
+            ortaYazi.text = if (sureMs == Long.MAX_VALUE) "$adSahne  ${(System.currentTimeMillis() - bas) / 1000} sn" else "$adSahne  ${(o * 100).toInt()}%" }) { bmp ->
+            ortaYazi.visibility = View.GONE; deklansorDugme.basili = false; birlestirmeIstegi = null
             if (tlKaydedici == null) window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             if (bmp == null) return@BirlestirmeIstegi tost("Birleştirme durdu.")
             if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.SHUTTER_CLICK) }
@@ -972,7 +1043,10 @@ class KameraActivity : Activity() {
                 val u = galeriyeYaz(ad, "image/jpeg") { dik.compress(Bitmap.CompressFormat.JPEG, 95, it) }
                 runOnUiThread { if (u == null) tost("Fotoğraf kaydedilemedi.") else { sonUri = u; sonMime = "image/jpeg"; kucukResim(u) } }
             }.start()
-        })
+        }
+        istek.toplam = toplam
+        birlestirmeIstegi = istek
+        monitor.birlestir(istek)
     }
 
     private fun videoDugmesi(k: KameraKaynak) {
@@ -1194,6 +1268,7 @@ class KameraActivity : Activity() {
         asistanAcik = tercih.getBoolean("asistan", false); teraziAcik = tercih.getBoolean("terazi", false); oneriAcik = tercih.getBoolean("oneri", true); sahneOto = tercih.getBoolean("sahneOto", true)
         wifiKamera = tercih.getBoolean("wifiKamera", false)
         proMod = runCatching { ProMod.valueOf(tercih.getString("proMod", "SAMANYOLU")!!) }.getOrDefault(ProMod.SAMANYOLU)
+        uzunYol = tercih.getString("uzunYol", "ort") ?: "ort"
         zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true)
         tlAralik = tercih.getLong("tlAralik", 2000L); tlSure = tercih.getInt("tlSure", 0); tlPozSabit = tercih.getBoolean("tlPozSabit", true)
     }
@@ -1236,3 +1311,7 @@ class KameraActivity : Activity() {
     override fun onBackPressed() { if (acilir != null) acilirKapat() else @Suppress("DEPRECATION") super.onBackPressed() }
     override fun onDestroy() { super.onDestroy(); asistan?.kapat(); analiz.kapat(); dongu.removeCallbacksAndMessages(null); kaynak?.durdur() }
 }
+
+private const val SN_ = 1_000_000_000L
+/** BULB'da önizleme karesinin süresi (Kaynaklar.kt'deki ONIZLEME_EN_UZUN ile aynı) */
+private const val ONIZLEME_KARE = 100_000_000L

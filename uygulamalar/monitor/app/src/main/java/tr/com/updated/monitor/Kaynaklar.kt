@@ -65,6 +65,8 @@ data class KameraAyari(
     var awb: Int = CameraMetadata.CONTROL_AWB_MODE_AUTO, var odakMesafe: Float? = null, var sabitleme: Boolean = true,
     var fotoBoyut: Size? = null, var raw: Boolean = false,
     var zoomOrani: Float = 1f,
+    /** Kamera ekranında 1/10 sn'den uzun elle enstantane: önizleme kareleri 1/10 sn'de tutulur (0 kapalı, 1 ISO aradaki fark kadar artar, 2 artmaz) */
+    var uzunOnizleme: Int = 0,
     /** Flaş: 0 kapalı, 1 otomatik, 2 açık, 3 fener (sürekli ışık) */
     var flas: Int = 0,
 )
@@ -266,8 +268,16 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         val elle = ayar.iso != null || ayar.pozlamaNs != null
         if (elle && yetenek.elleKontrol) {
             r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
-            r.set(CaptureRequest.SENSOR_SENSITIVITY, ayar.iso ?: yetenek.isoAralik?.lower?.coerceAtLeast(100) ?: 100)
-            val poz = ayar.pozlamaNs ?: 1_000_000_000L / 50
+            val istenen = ayar.pozlamaNs ?: 1_000_000_000L / 50
+            var poz = yetenek.pozlamaAralik?.let { istenen.coerceIn(it.lower, it.upper) } ?: istenen
+            // ISO otomatikse son otomatik ölçümün ışığı korunur
+            var iso = ayar.iso ?: (if (ayar.uzunOnizleme > 0 && otoIsoNs > 0) (otoIsoNs / istenen).toInt() else null) ?: yetenek.isoAralik?.lower?.coerceAtLeast(100) ?: 100
+            if (!foto && ayar.uzunOnizleme > 0 && poz > ONIZLEME_EN_UZUN) {
+                if (ayar.uzunOnizleme == 1) iso = (iso.toDouble() * istenen / ONIZLEME_EN_UZUN).toInt()
+                poz = ONIZLEME_EN_UZUN
+            }
+            yetenek.isoAralik?.let { iso = iso.coerceIn(it.lower, it.upper) }
+            r.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
             r.set(CaptureRequest.SENSOR_EXPOSURE_TIME, poz)
             if (foto) r.set(CaptureRequest.SENSOR_FRAME_DURATION, poz) // uzun pozlama: kare süresi pozlama kadar
             else ayar.fps?.let { r.set(CaptureRequest.SENSOR_FRAME_DURATION, maxOf(poz, 1_000_000_000L / it.upper)) }

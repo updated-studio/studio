@@ -16,13 +16,15 @@ data class ProAyar(
     val ev: Float,              // pozlama telafisi (yalnız otomatik pozlamada)
     val sureSn: Int,            // kare birleştirme süresi (0: tek kare / sabit kare sayısı)
     val zamanlayici: Int,       // sn
+    val mercek: Float? = null,  // yakınlaştırma durağı (0,5 / 1 / 2 / 5); null: modun varsayılanı
 ) {
-    fun json() = JSONObject().put("iso", iso ?: 0).put("enst", enstNs ?: 0L).put("odak", odak).put("bd", bd).put("ev", ev.toDouble()).put("sure", sureSn).put("zaman", zamanlayici).toString()
+    fun json() = JSONObject().put("iso", iso ?: 0).put("enst", enstNs ?: 0L).put("odak", odak).put("bd", bd).put("ev", ev.toDouble()).put("sure", sureSn).put("zaman", zamanlayici)
+        .put("mercek", (mercek ?: 0f).toDouble()).toString()
     companion object {
         const val ODAK_OTO = 0; const val ODAK_SUREKLI = 1; const val ODAK_SONSUZ = 2; const val ODAK_2M = 3
         fun json(s: String, v: ProAyar): ProAyar = runCatching { JSONObject(s).let { j ->
             ProAyar(j.optInt("iso").takeIf { it > 0 }, j.optLong("enst").takeIf { it > 0 }, j.optInt("odak", v.odak), j.optInt("bd", v.bd), j.optDouble("ev", v.ev.toDouble()).toFloat(),
-                j.optInt("sure", v.sureSn), j.optInt("zaman", v.zamanlayici)) } }.getOrDefault(v)
+                j.optInt("sure", v.sureSn), j.optInt("zaman", v.zamanlayici), j.optDouble("mercek", 0.0).toFloat().takeIf { it > 0f }) } }.getOrDefault(v)
     }
 }
 

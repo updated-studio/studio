@@ -13,7 +13,11 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | Mod şeridi: TIMELAPSE · VİDEO · FOTO · PRO MODLAR · PORTRE · MONİTÖR | ✓ | ✓ | |
 | Fotoğraf: çözünürlük seçimi, RAW (DNG), zamanlayıcı, deklanşör sesi | ✓ | ✓ | ProRAW/Bayer RAW cihaza göre; deklanşör sesi iOS 18+ |
 | Video: 720p/1080p/4K, 30/60 fps | ✓ | ✓ | |
-| Mercekler 0,5× / 1× / 2× / tele, iki parmakla yakınlaştırma, flaş ve fener | ✓ | ✓ | |
+| Mercekler 0,5× / 1× / 2× / tele (yalnız gerçek mercek durakları; iki parmakla yakınlaştırma 28 Ekim'de kalktı), flaş ve fener | ✓ | ✓ | |
+| PRO modlarda mercek (Özelleştir'de LENS; ekranda seçilen mercek moda kaydedilir) | ✓ | ✓ | 28 Ekim |
+| FOTO'da elle enstantane 1/1000–30 sn + BULB; telefonun tek karede veremediği süre kareler birleştirilerek (İpeksi / Aydınlat / Işık izi) | ✓ | ✓ | 28 Ekim. iPhone tek kareyi ~1 sn'den uzun açamıyor |
+| Apple Kamera (iOS 26) görünümü: siyah bantlar, biçim bilgisi, ⋯ kontroller, kapsül mod seçici, cam panolar | ○ | ✓ | Fatih'in ekran görüntüleri; Android'e de istenirse yapılacak |
+| Yan tutuşta deklanşör sağ kenarda ortada | ✓ | ✓ | Android'de düzen dik sabit, simgeler döner |
 | Araç şeridi: pozlama (EV + elle ISO), beyaz denge, odak cetvelleri | ✓ | ✓ | |
 | Timelapse: aralık, süre sınırı, pozlamayı sabitle | ✓ | ✓ | |
 | PRO MODLAR (9 mod, Özelleştir, uyarı, "?" açıklamaları, baz ISO) | ✓ | ✓ | |

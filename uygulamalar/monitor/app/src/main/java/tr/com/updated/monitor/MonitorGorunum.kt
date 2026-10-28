@@ -61,7 +61,11 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     fun yenile() = requestRender()
 
     /** Kare birleştirme isteği: `n` kare (ORT) ya da `sureMs` boyunca (MAX); sonuç ekrandaki gibi dik, araçsız ve LUT'suz */
-    class BirlestirmeIstegi(val tur: Sahne.Birlestir, val n: Int, val sureMs: Long, val kazanc: Float, val ilerleme: (Float) -> Unit, val bitti: (Bitmap?) -> Unit)
+    /** n > 0: ortalamada sabit kare sayısı; n = 0: süre boyunca yürüyen ortalama. toplam: sonuç kare sayısıyla çarpılır (ışık birikir). bitir: BULB'da hemen bitir */
+    class BirlestirmeIstegi(val tur: Sahne.Birlestir, val n: Int, val sureMs: Long, val kazanc: Float, val ilerleme: (Float) -> Unit, val bitti: (Bitmap?) -> Unit) {
+        var toplam = false
+        @Volatile var bitir = false
+    }
     @Volatile private var birlestirme: BirlestirmeIstegi? = null
     fun birlestir(b: BirlestirmeIstegi) { birlestirme = b; requestRender() }
     fun birlestirmeIptal() { birlestirme?.let { birlestirme = null; it.bitti(null) } }
@@ -183,13 +187,15 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             GLES30.glUseProgram(program)
             GLES30.glEnable(GLES30.GL_BLEND)
             if (b.tur == Sahne.Birlestir.MAX) { GLES30.glBlendEquation(GLES30.GL_MAX); GLES30.glBlendFunc(GLES30.GL_ONE, GLES30.GL_ONE) }
-            else { GLES30.glBlendEquation(GLES30.GL_FUNC_ADD); GLES30.glBlendColor(0f, 0f, 0f, 1f / b.n); GLES30.glBlendFunc(GLES30.GL_CONSTANT_ALPHA, GLES30.GL_ONE) }
+            else if (b.n > 0) { GLES30.glBlendEquation(GLES30.GL_FUNC_ADD); GLES30.glBlendColor(0f, 0f, 0f, 1f / b.n); GLES30.glBlendFunc(GLES30.GL_CONSTANT_ALPHA, GLES30.GL_ONE) }
+            else { GLES30.glBlendEquation(GLES30.GL_FUNC_ADD); GLES30.glBlendColor(0f, 0f, 0f, 1f / (bKare + 1)); GLES30.glBlendFunc(GLES30.GL_CONSTANT_ALPHA, GLES30.GL_ONE_MINUS_CONSTANT_ALPHA) }
             ciz(0, 0, w, h, w.toFloat(), h.toFloat(), ham = true, olcum = true, tam = true)
             GLES30.glDisable(GLES30.GL_BLEND); GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
             bKare++
             val gecen = System.currentTimeMillis() - bBas
-            val bitti = if (b.tur == Sahne.Birlestir.ORT) bKare >= b.n else gecen >= b.sureMs
-            val oran = if (b.tur == Sahne.Birlestir.ORT) bKare.toFloat() / b.n else gecen.toFloat() / b.sureMs
+            val sayili = b.tur == Sahne.Birlestir.ORT && b.n > 0
+            val bitti = b.bitir || if (sayili) bKare >= b.n else gecen >= b.sureMs
+            val oran = if (sayili) bKare.toFloat() / b.n else gecen.toFloat() / b.sureMs
             post { b.ilerleme(oran.coerceIn(0f, 1f)) }
             if (!bitti) { GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); return }
             // Sonuç: 8 bitlik tampona kopya (kazanç uygulanır), oku, alt-üst çevir
@@ -201,7 +207,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             GLES30.glUseProgram(kopyaProgram)
             GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, bTex)
             GLES30.glUniform1i(GLES30.glGetUniformLocation(kopyaProgram, "uDoku"), 0)
-            GLES30.glUniform1f(GLES30.glGetUniformLocation(kopyaProgram, "uKazanc"), b.kazanc)
+            GLES30.glUniform1f(GLES30.glGetUniformLocation(kopyaProgram, "uKazanc"), if (b.toplam) b.kazanc * bKare else b.kazanc)
             val k = GLES30.glGetAttribLocation(kopyaProgram, "aKonum")
             GLES30.glEnableVertexAttribArray(k); GLES30.glVertexAttribPointer(k, 2, GLES30.GL_FLOAT, false, 0, dortgen)
             GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
