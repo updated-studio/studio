@@ -139,7 +139,7 @@ async function gemini(sistem: string, kullanici: string, modeller: string[], bit
 }
 
 // Groq (OpenAI uyumlu). Modeller sırayla denenir; her modelin kotası ayrıdır. Model kalkmışsa (404/400) sonrakine geçer.
-const GROQ_MODELLER = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "qwen/qwen3-32b", "llama-3.1-8b-instant"];
+const GROQ_MODELLER = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]; // 28 Ekim 2026: Groq'un güncel listesi (llama ve qwen3-32b kalktı)
 async function groq(sistem: string, kullanici: string, bitis: number) {
   let son = "";
   for (const model of GROQ_MODELLER) {

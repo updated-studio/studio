@@ -43,7 +43,7 @@ async function yz(sistem: string, kullanici: string) {
     } catch { son = `${model} yanıt vermedi`; }
   }
   const gk = Deno.env.get("GROQ_API_KEY");
-  if (gk) for (const model of ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"]) {
+  if (gk) for (const model of ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]) {
     try {
       const r = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", signal: AbortSignal.timeout(45_000), headers: { "Content-Type": "application/json", Authorization: "Bearer " + gk },
         body: JSON.stringify({ model, temperature: 0.1, response_format: { type: "json_object" }, messages: [{ role: "system", content: sistem }, { role: "user", content: kullanici.slice(0, 24_000) }] }) });

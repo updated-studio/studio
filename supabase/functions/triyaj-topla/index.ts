@@ -190,7 +190,7 @@ function jsonOku(ham: string): unknown {
 
 // Eski tr_gemini_: 3 deneme, ilk sıcaklık 0; 429/500/503'te 5 sn bekleyip tekrar
 // Yoğunlukta ya da kota dolunca (429/500/503) sıradaki yedek modele, Gemini tamamen tıkanırsa ücretsiz yedek servise (Groq) geçer.
-let YEDEK_MODEL = "llama-3.3-70b-versatile"; // tr_settings.model_yedek ile değiştirilebilir
+let YEDEK_MODEL = "openai/gpt-oss-120b"; // tr_settings.model_yedek ile değiştirilebilir (28 Ekim 2026: llama-3.3-70b Groq listesinden kalktı)
 async function gemini(model: string, kullanici: string, sistem = SISTEM): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
   let son: unknown = GEMINI_TIKALI;
   // Bu çalıştırmada Gemini kotası dolduysa her partide yeniden denenmez (zaman sınırı için), doğrudan yedeğe geçilir
