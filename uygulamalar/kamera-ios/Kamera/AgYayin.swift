@@ -326,8 +326,11 @@ final class WifiAlici {
     var yonDegisti: (Int) -> Void = { _ in }
     var durum: (Bool) -> Void = { _ in }
 
-    init(ad: String, hedef: NWEndpoint) {
-        self.ad = ad; self.hedef = hedef
+    /// Çözülen karenin biçimi (masa 420f, monitör BGRA)
+    private let bicimTuru: OSType
+
+    init(ad: String, hedef: NWEndpoint, bicim: OSType = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) {
+        self.ad = ad; self.hedef = hedef; bicimTuru = bicim
         kuyruk = DispatchQueue(label: "tr.com.updated.masa.wifi")
     }
 
@@ -458,7 +461,7 @@ final class WifiAlici {
 
     private func cozucuKur(_ f: CMVideoFormatDescription) {
         let nitelik: [CFString: Any] = [
-            kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+            kCVPixelBufferPixelFormatTypeKey: bicimTuru,
             kCVPixelBufferIOSurfacePropertiesKey: [String: Any](),
         ]
         var s: VTDecompressionSession?

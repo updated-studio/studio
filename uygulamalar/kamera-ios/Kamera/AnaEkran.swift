@@ -12,7 +12,7 @@ struct AnaEkran: View {
     @State private var yardim = false
     /// Masa (çok kamera) ya da Wi-Fi kamera açıkken ana kamera durur
     @State private var ekran: Ekran?
-    enum Ekran: String, Identifiable { case masa, wifi; var id: String { rawValue } }
+    enum Ekran: String, Identifiable { case masa, wifi, monitor; var id: String { rawValue } }
     @Environment(\.scenePhase) private var evre
 
     var body: some View {
@@ -67,6 +67,7 @@ struct AnaEkran: View {
             switch e {
             case .masa: MasaEkran { ekran = nil }
             case .wifi: WifiKameraEkran { ekran = nil }
+            case .monitor: MonitorEkran { ekran = nil }
             }
         }
     }
@@ -95,6 +96,7 @@ struct AnaEkran: View {
                     .background(Circle().fill(yardim ? Tema.vurgu : Color.black.opacity(0.45)))
             }
             .accessibilityLabel("Düğmelerin açıklaması")
+            ustDugme("Monitör", sistem: "display") { ekran = .monitor }
             ustDugme("Wi-Fi kamera", sistem: "wifi") { ekran = .wifi }
             ustDugme("Masa", sistem: "rectangle.split.2x2") { ekran = .masa }
         }
