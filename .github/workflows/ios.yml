@@ -11,7 +11,8 @@ on:
 permissions: { contents: read }
 concurrency:
   group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  # İki Claude aynı dala sık gönderiyor: TestFlight yüklemesi yarıda kesilmesin, yalnız PR denetimi iptal edilir
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   derle:
     runs-on: macos-15
