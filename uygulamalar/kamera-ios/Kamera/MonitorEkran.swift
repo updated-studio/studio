@@ -599,15 +599,20 @@ struct MonitorEkran: View {
                 aciklama("iPhone USB kamera kabul etmiyor (Apple sınırı). USB/HDMI kaynak için iPad kullan; iPhone'da telefon kamerası ve Wi-Fi kamera var.")
             }
             HStack {
-                TextField("Wi-Fi kamera adresi (ör. 192.168.1.20)", text: $adres)
+                TextField("Wi-Fi kamera (192.168.1.20) ya da ağ yayını (https://…/index.m3u8)", text: $adres)
                     .keyboardType(.numbersAndPunctuation).autocorrectionDisabled().textInputAutocapitalization(.never)
                     .padding(.horizontal, 12).frame(height: 44)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Self.koyu2))
-                Button("Bağlan") { m.wifiSec(adres, adres: adres); adres = "" }
+                Button("Bağlan") {
+                    let y = adres.trimmingCharacters(in: .whitespaces)
+                    if y.contains("://") { m.agSec(y) } else { m.wifiSec(y, adres: y) }
+                    adres = ""
+                }
                     .disabled(adres.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(.vertical, 8)
-            aciklama("Wi-Fi kamera: başka bir iPhone'da UPDATED Kamera → Wi-Fi kamera, Android'de Ayarlar → Wi-Fi kamera ol. Aynı ağdaysa burada kendiliğinden listelenir.")
+            if case .ag(let u) = m.kaynaklar[m.etkin] { satir("Ağ yayını: \(u)", secili: true) {} }
+            aciklama("Ağ yayını: HLS (…/index.m3u8) ya da http(s) video; iOS RTSP/RTMP açmaz. Wi-Fi kamera: başka bir iPhone'da UPDATED Kamera → Wi-Fi kamera, Android'de Ayarlar → Wi-Fi kamera ol. Aynı ağdaysa burada kendiliğinden listelenir.")
             let ana: [Float] = [1, 1.33, 1.5, 1.6, 1.8, 2]
             secenek("ANAMORFİK AÇMA", ["Kapalı", "1,33x", "1,5x", "1,6x", "1,8x", "2x"], ana.firstIndex { abs($0 - a.desqueeze) < 0.01 } ?? 0) { m.ayarlar[m.etkin].desqueeze = ana[$0] }
             secenek("DÖNDÜR", ["0°", "90°", "180°", "270°"], a.dondur / 90) { m.ayarlar[m.etkin].dondur = $0 * 90 }

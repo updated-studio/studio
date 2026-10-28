@@ -32,6 +32,7 @@ final class Monitor: NSObject, ObservableObject {
     enum Kaynak: Codable, Equatable {
         case cihaz(String)          // AVCaptureDevice.uniqueID
         case wifi(String, String?)  // ad, elle adres
+        case ag(String)             // HLS / http(s) adresi
     }
     struct WifiBulunan: Identifiable { let ad: String; let hedef: NWEndpoint; var id: String { ad } }
 
@@ -78,6 +79,7 @@ final class Monitor: NSObject, ObservableObject {
     private var donusGozleri: [NSKeyValueObservation?] = [nil, nil]
     private var baglantilar: [AVCaptureConnection?] = [nil, nil]
     private var wifi: [WifiAlici?] = [nil, nil]
+    private var akis: [AgAkis?] = [nil, nil]
     private let bulucu = KameraBulucu()
     private var sesBicimi: AudioStreamBasicDescription?
     private var kaydedici: MonitorKaydedici?
@@ -125,7 +127,7 @@ final class Monitor: NSObject, ObservableObject {
         bulucu.durdur()
         zamanlayici?.invalidate(); zamanlayici = nil
         hareket.stopDeviceMotionUpdates()
-        for i in 0..<2 { wifi[i]?.durdur(); wifi[i] = nil; donusGozleri[i] = nil; donusler[i] = nil }
+        for i in 0..<2 { wifi[i]?.durdur(); wifi[i] = nil; akis[i]?.durdur(); akis[i] = nil; donusGozleri[i] = nil; donusler[i] = nil }
         oturumKuyrugu.async { self.oturum?.stopRunning(); self.oturum = nil }
         UIApplication.shared.isIdleTimerDisabled = false
         if let e = eskiParlaklik { UIScreen.main.brightness = e; eskiParlaklik = nil }
@@ -144,7 +146,7 @@ final class Monitor: NSObject, ObservableObject {
     /// Kaynakları baştan kurar (Android kur())
     func kur() {
         guard acik else { return }
-        for i in 0..<2 { wifi[i]?.durdur(); wifi[i] = nil; bagli[i] = false; ciziciler[i].temizle(); ciziciler[i].kaynakDondur = 0 }
+        for i in 0..<2 { wifi[i]?.durdur(); wifi[i] = nil; akis[i]?.durdur(); akis[i] = nil; bagli[i] = false; ciziciler[i].temizle(); ciziciler[i].kaynakDondur = 0 }
         ciziciler[0].karsilastir = kip == .karsilastir
         ciziciler[1].karsilastir = false
         var istenen: [Int: AVCaptureDevice] = [:]
@@ -154,6 +156,8 @@ final class Monitor: NSObject, ObservableObject {
                 if let adres { wifiAc(i, ad: ad, hedef: Monitor.adresHedef(adres)) }
                 else if let b = bulunanWifi.first(where: { $0.ad == ad }) { wifiAc(i, ad: ad, hedef: b.hedef) }
                 else { kaynakAdi[i] = ad + " (aranıyor)" }
+            case .ag(let adres):
+                agAc(i, adres)
             case .cihaz(let id):
                 if let d = AVCaptureDevice(uniqueID: id) { istenen[i] = d } else if i == 0, let d = Monitor.varsayilanCihaz() { istenen[i] = d }
             case nil:
@@ -209,6 +213,27 @@ final class Monitor: NSObject, ObservableObject {
         kaynaklar[etkin] = .wifi(ad, adres)
         Saklama.yaz("m.kaynak\(etkin)", kaynaklar[etkin])
         kur()
+    }
+
+    func agSec(_ adres: String) {
+        guard !kayitta else { bildirim = "Önce kaydı durdur."; return }
+        kaynaklar[etkin] = .ag(adres)
+        Saklama.yaz("m.kaynak\(etkin)", kaynaklar[etkin])
+        kur()
+    }
+
+    private func agAc(_ i: Int, _ adres: String) {
+        let k = AgAkis(adres: adres)
+        let c = ciziciler[i]
+        var ilk = true
+        k.kare = { [weak self] pb in
+            c.kare(pb)
+            if ilk { ilk = false; self?.bagli[i] = true }
+        }
+        k.hata = { [weak self] h in self?.bildirim = h; self?.kaynakAdi[i] = "" }
+        akis[i] = k
+        kaynakAdi[i] = "Ağ: \(adres)"
+        k.baslat()
     }
 
     private func wifiAc(_ i: Int, ad: String, hedef: NWEndpoint) {
@@ -574,5 +599,51 @@ enum MonitorEkranResmi {
         u.maximumSize = CGSize(width: 240, height: 160)
         guard let cg = try? u.copyCGImage(at: .zero, actualTime: nil) else { return nil }
         return UIImage(cgImage: cg)
+    }
+}
+
+/// Ağ yayını (Android AgKaynak karşılığı): HLS (…/index.m3u8) ya da http(s) video. iOS RTSP/RTMP açmaz.
+final class AgAkis: NSObject {
+    let adres: String
+    var kare: (CVPixelBuffer) -> Void = { _ in }
+    var hata: (String) -> Void = { _ in }
+    private var oynatici: AVPlayer?
+    private var cikti: AVPlayerItemVideoOutput?
+    private var bag: CADisplayLink?
+    private var gozlem: NSKeyValueObservation?
+
+    init(adres: String) { self.adres = adres }
+
+    func baslat() {
+        guard let u = URL(string: adres), let s = u.scheme?.lowercased(), s == "http" || s == "https" else {
+            hata("iPhone/iPad'de ağ yayını olarak HLS (https://…/index.m3u8) ve http(s) video açılır; RTSP/RTMP açılmaz. Telefon kameraları için Wi-Fi kamerayı kullan.")
+            return
+        }
+        let c = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        let oge = AVPlayerItem(url: u)
+        oge.preferredForwardBufferDuration = 1
+        oge.add(c)
+        let o = AVPlayer(playerItem: oge)
+        o.automaticallyWaitsToMinimizeStalling = false
+        gozlem = oge.observe(\.status, options: [.new]) { [weak self] g, _ in
+            if g.status == .failed { DispatchQueue.main.async { self?.hata("Ağ yayını açılamadı: \(g.error?.localizedDescription ?? "")") } }
+        }
+        cikti = c; oynatici = o
+        o.play()
+        let b = CADisplayLink(target: self, selector: #selector(tik(_:)))
+        b.add(to: .main, forMode: .common)
+        bag = b
+    }
+
+    @objc private func tik(_ b: CADisplayLink) {
+        guard let c = cikti else { return }
+        let t = c.itemTime(forHostTime: CACurrentMediaTime())
+        if c.hasNewPixelBuffer(forItemTime: t), let pb = c.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: nil) { kare(pb) }
+    }
+
+    func durdur() {
+        bag?.invalidate(); bag = nil
+        oynatici?.pause(); oynatici = nil
+        gozlem = nil; cikti = nil
     }
 }

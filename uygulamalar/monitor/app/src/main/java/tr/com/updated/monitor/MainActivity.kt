@@ -75,6 +75,10 @@ class MainActivity : Activity() {
     private val monitorler = arrayOfNulls<MonitorGorunum>(2)
     private val kaynaklar = arrayOfNulls<Kaynak>(2)
     private val kaynakAdi = arrayOf("", "")
+    /** Ağdaki Wi-Fi kameraları (Masa ile aynı yayın): ad → adres, kapı */
+    private val wifiKameralar = LinkedHashMap<String, Pair<String, Int>>()
+    private var wifiBulucu: KameraBulucu? = null
+    private var cokluYayin: android.net.wifi.WifiManager.MulticastLock? = null
     private val ayarlar = arrayOf(Ayarlar(), Ayarlar())
     private val kamAyar = arrayOf(KameraAyari(), KameraAyari())
     private val sonYuzey = arrayOfNulls<android.view.Surface>(2)
@@ -264,6 +268,8 @@ class MainActivity : Activity() {
                     if (k != null) kameraAc(i, k) else if (uvc != null) uvcAc(i, uvc) else if (!proMod && i == 0) dongu.postDelayed({ usbTani() }, 600)
                 }
                 "ag" -> tercih.getString("ag$i", null)?.let { agAc(i, it) }
+                "wifi" -> { val ad = tercih.getString("wifiAd$i", null); val h = tercih.getString("wifi$i", null)?.split(":")
+                    if (ad != null && h != null && h.size == 2) wifiAc(i, ad, h[0], h[1].toIntOrNull() ?: AgYayin.KAPI) }
                 "uvc" -> UvcKaynak.aygitlar(this).firstOrNull { "%04x:%04x".format(it.vendorId, it.productId) == tercih.getString("uvc$i", null) }?.let { uvcAc(i, it) }
                     ?: if (i == 0) UvcKaynak.aygitlar(this).firstOrNull()?.let { uvcAc(i, it) } else null
             }
@@ -383,7 +389,7 @@ class MainActivity : Activity() {
     private fun ustCiz() {
         ust.removeAllViews()
         val k = kamera(); val a = kamAyar[etkin]
-        val ag = kaynaklar[etkin] is AgKaynak || kaynaklar[etkin] is UvcKaynak
+        val ag = kaynaklar[etkin] is AgKaynak || kaynaklar[etkin] is UvcKaynak || kaynaklar[etkin] is WifiKameraKaynak
         val fps = when { ag -> "—"; a.fps != null -> if (a.fps!!.lower == a.fps!!.upper) "${a.fps!!.upper}" else "${a.fps!!.lower}–${a.fps!!.upper}"; else -> "OTO" }
         val fpsSayi = a.fps?.upper ?: 30
         val ens = when { ag || k == null -> "—"; a.pozlamaNs == null -> "OTO"; else -> { val t = a.pozlamaNs!! / 1e9; val aci = 360.0 * fpsSayi * t; if (abs(aci - 180) < 6 && !fotoMod) "180°" else if (t >= 1) "${t.toInt()} sn" else "1/${(1 / t).toInt()}" } }
@@ -842,6 +848,8 @@ class MainActivity : Activity() {
                 if (!proMod) UvcKaynak.aygitlar(this).forEach { d -> val ad = "USB görüntü (doğrudan): " + (d.productName ?: d.manufacturerName ?: "aygıt")
                     satir(ic, ad, (kaynaklar[etkin] as? UvcKaynak)?.aygit?.deviceName == d.deviceName) { uvcAc(etkin, d); panelCiz() } }
                 if (!proMod) satir(ic, "Ağ yayını (RTSP · RTMP · HLS)…", kaynaklar[etkin] is AgKaynak) { agSor() }
+                if (!proMod) wifiKameralar.forEach { (ad, h) -> satir(ic, "Wi-Fi kamera: $ad", (kaynaklar[etkin] as? WifiKameraKaynak)?.ad == ad) { wifiAc(etkin, ad, h.first, h.second); panelCiz() } }
+                if (!proMod) aciklama(ic, "Wi-Fi kamera: başka telefonda UPDATED Kamera → Ayarlar → Wi-Fi kamera ol (iPhone'da üstteki Wi-Fi simgesi). Aynı ağdaysa burada kendiliğinden listelenir.")
                 if (!proMod && kamlar.none { it.second.startsWith("USB") } && UvcKaynak.aygitlar(this).isEmpty()) { aciklama(ic, "USB görüntü kaynağı yok. HDMI→USB çeviriciyi ya da kamerayı USB-C ile tak; fotoğraf makinesini \"USB yayını\" (USB Streaming) moduna al."); satir(ic, "Takılı USB aygıtını denetle", false) { taniGosterildi = false; usbTani() } }
                 val ana = floatArrayOf(1f, 1.33f, 1.5f, 1.6f, 1.8f, 2f)
                 secenek(ic, "ANAMORFİK AÇMA", listOf("Kapalı", "1,33x", "1,5x", "1,6x", "1,8x", "2x"), ana.indexOfFirst { abs(it - a.desqueeze) < 0.01f }.coerceAtLeast(0)) { a.desqueeze = ana[it] }
@@ -971,6 +979,33 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Wi-Fi kamera (Masa'daki gibi): telefonun duruşu görüntüye kendiliğinden uygulanır */
+    private fun wifiAc(i: Int, ad: String, host: String, kapi: Int) {
+        val m = monitorler[i] ?: return
+        tercih.edit().putString("kaynak$i", "wifi").putString("wifiAd$i", ad).putString("wifi$i", "$host:$kapi").apply()
+        kaynakAdi[i] = "Wi-Fi: $ad"; m.ayarlar.dondur = 0; m.otoDondur = 0
+        acici[i] = {
+            kaynaklar[i]?.durdur()
+            val k = WifiKameraKaynak(host, kapi, ad); kaynaklar[i] = k
+            // Wi-Fi kamera saat yönünde derece gönderir; monitör çizicisi ters yönde sayar
+            k.yonDegisti = { d -> m.otoDondur = (360 - d) % 360; m.post { m.tampon(m.kaynakBoyut[0], m.kaynakBoyut[1]) } }
+            k.baslat(sonYuzey[i]!!, { w, h -> m.tampon(w, h); runOnUiThread { ustCiz() } }, { hata -> runOnUiThread { tost(hata) } })
+        }
+        if (sonYuzey[i] != null) acici[i]?.invoke()
+        ustCiz()
+    }
+
+    private fun wifiAramaBaslat() {
+        if (proMod || wifiBulucu != null) return
+        cokluYayin = runCatching { (applicationContext.getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager).createMulticastLock("monitor").apply { setReferenceCounted(false); acquire() } }.getOrNull()
+        wifiBulucu = KameraBulucu(this) { ad, adres, kapi -> runOnUiThread {
+            val yeni = wifiKameralar.put(ad, adres to kapi) == null
+            if (yeni && panel.visibility == View.VISIBLE && sekme == Sekme.KAYNAK) panelCiz()
+        } }.also { it.baslat() }
+    }
+
+    private fun wifiAramaDurdur() { wifiBulucu?.durdur(); wifiBulucu = null; runCatching { cokluYayin?.release() }; cokluYayin = null }
+
     private fun agAc(i: Int, adres: String) {
         val m = monitorler[i] ?: return
         tercih.edit().putString("kaynak$i", "ag").putString("ag$i", adres).apply()
@@ -1089,7 +1124,8 @@ class MainActivity : Activity() {
         @Suppress("DEPRECATION") val ekran = windowManager.defaultDisplay.rotation * 90
         for (i in 0..1) {
             val m = monitorler[i] ?: continue; val k = kaynaklar[i] as? KameraKaynak
-            m.otoDondur = if (k != null && !k.haricimi) ekran else 0
+            val w = kaynaklar[i] as? WifiKameraKaynak
+            m.otoDondur = if (k != null && !k.haricimi) ekran else if (w != null) (360 - w.yon) % 360 else 0
             k?.ekranYonu = ekran
             m.tampon(m.kaynakBoyut[0], m.kaynakBoyut[1])
         }
@@ -1106,14 +1142,14 @@ class MainActivity : Activity() {
         when { panel.visibility == View.VISIBLE -> panelKapat(); serit.visibility == View.VISIBLE -> seritKapat(); else -> @Suppress("DEPRECATION") super.onBackPressed() }
     }
     override fun onResume() {
-        super.onResume(); onde = true; teraziKaydi(); yonuAyarla()
+        super.onResume(); onde = true; teraziKaydi(); yonuAyarla(); wifiAramaBaslat()
         if (!proMod) { val f = IntentFilter().apply { addAction(android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED); addAction(android.hardware.usb.UsbManager.ACTION_USB_DEVICE_DETACHED) }
             if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(usbDinle, f, RECEIVER_EXPORTED) else registerReceiver(usbDinle, f) }
         (getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).registerDisplayListener(ekranDinle, null); tamEkran(); monitorler.forEach { it?.onResume() }; if (sesGosterge) sesOlcerBaslat()
         for (i in 0..1) if (bekleyenAcma[i]) { bekleyenAcma[i] = false; if (sonYuzey[i] != null) acici[i]?.invoke() }
     }
     override fun onPause() {
-        super.onPause(); onde = false; sensorler.unregisterListener(teraziDinle)
+        super.onPause(); onde = false; sensorler.unregisterListener(teraziDinle); wifiAramaDurdur()
         if (!proMod) runCatching { unregisterReceiver(usbDinle) }
         (getSystemService(DISPLAY_SERVICE) as android.hardware.display.DisplayManager).unregisterDisplayListener(ekranDinle)
         if (kayitSuruyor()) kayitDugmesi() // arka plana geçerken kayıt güvenle kapanır
