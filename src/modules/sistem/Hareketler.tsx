@@ -94,7 +94,7 @@ export default function Hareketler() {
         <h2 style={{ margin: 0 }}>Hareket geçmişi</h2>
         <button className="btn ghost sm" disabled={yukleniyor} onClick={() => yukle()}>Yenile</button>
       </div>
-      <div className="muted">Panelde ve Stüdyo'da kim ne yaptı: oluşturma, değişiklik, yayın, silme, giriş, anahtar ve yetki işlemleri. Kayıtlar yalnız eklenir, kimse silemez. Silinen içerik buradan geri getirilir.</div>
+      <div className="muted">Panelde ve Stüdyo'da kim ne yaptı: oluşturma, değişiklik, yayın, silme, giriş, anahtar ve yetki işlemleri. Kayıtlar yalnız eklenir, kimse silemez. Silinen içerik buradan geri getirilir. Kayıt 28 Ekim 2026'da başladı; öncesi için elimizdeki izler "geçmiş kayıt" etiketiyle eklendi (kişi tahmini; o dönemde silinenlerin izi yok).</div>
       <div className="segment" role="group" aria-label="Dönem">
         {DONEM.map(([k, ad]) => <button key={k} className="chip" aria-pressed={donem === k} onClick={() => setDonem(k)}>{ad}</button>)}
       </div>
@@ -117,10 +117,11 @@ export default function Hareketler() {
               <span className="muted mono" title={tam(h.zaman)} style={{ flex: "0 0 92px", fontSize: 12, paddingTop: 3 }}>{once(h.zaman)}</span>
               <div className="ana">
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                  <b>{h.kim_ad || h.kim_eposta || "Sistem"}</b>
+                  <b>{h.kim_ad || h.kim_eposta || (h.ayrinti?.geriye_donuk ? "Bilinmiyor" : "Sistem")}</b>
                   <span className={"pill " + renk}>{islemAd}</span>
                   <span className="muted">{TUR[h.tur] ?? h.tur}{h.nesne_id && h.islem !== "giris" ? ` #${h.nesne_id}` : ""}</span>
                   <span className="muted" style={{ fontSize: 12 }}>· {KAYNAK[h.kaynak] ?? h.kaynak}</span>
+                  {h.ayrinti?.geriye_donuk ? <span className="pill off" title="Kayıt tutulmaya başlamadan önceki iz; kişi bilgisi tahmini">geçmiş kayıt</span> : null}
                 </div>
                 {h.baslik && h.islem !== "giris" && <div style={{ marginTop: 2 }}>{h.baslik}</div>}
                 {ac && <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
