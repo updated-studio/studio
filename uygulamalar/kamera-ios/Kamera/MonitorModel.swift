@@ -13,12 +13,13 @@ final class Monitor: NSObject, ObservableObject {
     }
     enum Param: String { case fps, enstantane, diyafram, iso, wb, ev, odak }
     enum Sekme: String, CaseIterable, Identifiable {
-        case kayit = "KAYIT", monitor = "MONİTÖR", kilavuz = "KILAVUZ", lut = "LUT", olcum = "ÖLÇÜM", ses = "SES", kaynak = "KAYNAK", kurulum = "KURULUM"
+        case kayit = "KAYIT", monitor = "MONİTÖR", kompozisyon = "KOMPOZİSYON", kilavuz = "KILAVUZ", lut = "LUT", olcum = "ÖLÇÜM", ses = "SES", kaynak = "KAYNAK", kurulum = "KURULUM"
         var id: String { rawValue }
         var simge: String {
             switch self {
             case .kayit: return "record.circle"
             case .monitor: return "display"
+            case .kompozisyon: return "squareshape.split.3x3"
             case .kilavuz: return "crop"
             case .lut: return "square.stack.3d.up"
             case .olcum: return "waveform.path.ecg"
@@ -61,6 +62,18 @@ final class Monitor: NSObject, ObservableObject {
     @Published var koseHisto = UserDefaults.standard.bool(forKey: "m.koseHisto") { didSet { UserDefaults.standard.set(koseHisto, forKey: "m.koseHisto"); olcumBagla() } }
     @Published var parlaklikTam = UserDefaults.standard.bool(forKey: "m.parlaklik") { didSet { UserDefaults.standard.set(parlaklikTam, forKey: "m.parlaklik"); parlaklik() } }
     @Published var teraziAcik = UserDefaults.standard.bool(forKey: "m.terazi") { didSet { UserDefaults.standard.set(teraziAcik, forKey: "m.terazi"); teraziKur() } }
+    // Kompozisyon ve akıllı yardımcı (Android monitördeki KOMPOZİSYON / YARDIMCI)
+    @Published var kompTur = KompTur(rawValue: UserDefaults.standard.string(forKey: "m.komp") ?? "") ?? .kapali {
+        didSet { UserDefaults.standard.set(kompTur.rawValue, forKey: "m.komp"); if kompTur != .kapali { sonKomp = kompTur } }
+    }
+    @Published var kompYon = UserDefaults.standard.integer(forKey: "m.kompYon") { didSet { UserDefaults.standard.set(kompYon, forKey: "m.kompYon") } }
+    @Published var asistanAcik = UserDefaults.standard.bool(forKey: "m.asistan") { didSet { UserDefaults.standard.set(asistanAcik, forKey: "m.asistan"); yardimciKur() } }
+    @Published var oneriAcik = (UserDefaults.standard.object(forKey: "m.oneri") as? Bool) ?? true { didSet { UserDefaults.standard.set(oneriAcik, forKey: "m.oneri") } }
+    @Published var konu: CGRect?
+    @Published var konuAdi = ""
+    @Published var analiz: AnalizSonuc?
+    @Published var ipucu: String?
+    @Published var kompOneri: (tur: KompTur, yon: Int)?
 
     let ciziciler = [MonitorCizici(), MonitorCizici()]
     let olcum = OlcumHesap()
@@ -87,6 +100,12 @@ final class Monitor: NSObject, ObservableObject {
     private let hareket = CMMotionManager()
     private var eskiParlaklik: CGFloat?
     private var acik = false
+    private let asistan = Asistan()
+    private let ipucuSabit = IpucuSabitle()
+    private var sonYuz: YuzBilgi?
+    private var sonKomp = KompTur(rawValue: UserDefaults.standard.string(forKey: "m.sonKomp") ?? "") ?? .ucteBir {
+        didSet { UserDefaults.standard.set(sonKomp.rawValue, forKey: "m.sonKomp") }
+    }
 
     override init() {
         super.init()
@@ -113,6 +132,7 @@ final class Monitor: NSObject, ObservableObject {
         bulucu.baslat()
         zamanlayici = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.tik() }
         teraziKur()
+        yardimciKur()
         Task {
             _ = await AVCaptureDevice.requestAccess(for: .video)
             _ = await AVCaptureDevice.requestAccess(for: .audio)
@@ -443,17 +463,80 @@ final class Monitor: NSObject, ObservableObject {
             if ciziciler[i].ayar != ayarlar[i] { ciziciler[i].ayar = ayarlar[i] }
             Saklama.yaz("m.ayar\(i)", ayarlar[i])
         }
+        olcumBagla()
     }
 
     func olcumBagla() {
         for (i, c) in ciziciler.enumerated() {
-            if i == etkin && (kip == .olcum || koseHisto) {
+            if i == etkin && (kip == .olcum || koseHisto || asistanAcik) {
                 let o = kip == .olcum ? olcum : nil, k = koseHisto ? kose : nil
-                c.olcumGeri = { d, w, h in o?.kare(d, w, h); k?.kare(d, w, h) }
+                // Yardımcı büyütmesiz görüntüye bakar (Android'deki gibi)
+                let y = asistanAcik && ayarlar[i].zoom == 1 ? asistan : nil
+                c.olcumGeri = { d, w, h in
+                    o?.kare(d, w, h); k?.kare(d, w, h)
+                    if let y, let pb = Monitor.tampon(d, w, h) { y.kare(pb) }
+                }
             } else {
                 c.olcumGeri = nil
             }
         }
+    }
+
+    /// Ölçüm kopyasından (BGRA) yardımcının istediği kare
+    private static func tampon(_ d: Data, _ w: Int, _ h: Int) -> CVPixelBuffer? {
+        var pb: CVPixelBuffer?
+        guard CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_32BGRA, nil, &pb) == kCVReturnSuccess, let pb else { return nil }
+        CVPixelBufferLockBaseAddress(pb, [])
+        defer { CVPixelBufferUnlockBaseAddress(pb, []) }
+        guard let hedef = CVPixelBufferGetBaseAddress(pb) else { return nil }
+        let satir = CVPixelBufferGetBytesPerRow(pb)
+        d.withUnsafeBytes { k in
+            guard let kb = k.baseAddress else { return }
+            for y in 0..<h { memcpy(hedef + y * satir, kb + y * w * 4, w * 4) }
+        }
+        return pb
+    }
+
+    /// Görüntünün en/boy oranı (kompozisyon hesapları için)
+    var goruntuOrani: CGFloat {
+        let g = ciziciler[etkin].gorunenBoyut()
+        return g.height > 0 ? g.width / g.height : 16 / 9
+    }
+
+    func kompAcKapa() {
+        if kompTur == .kapali { kompTur = sonKomp } else { kompTur = .kapali }
+    }
+
+    private func yardimciKur() {
+        asistan.konuAcik = asistanAcik
+        asistan.analizAcik = asistanAcik
+        asistan.konuSonuc = { [weak self] k in self?.konuGeldi(k) }
+        asistan.analizSonuc = { [weak self] a in self?.analiz = a; self?.ipucuGuncelle() }
+        if !asistanAcik { konu = nil; konuAdi = ""; analiz = nil; ipucu = nil; kompOneri = nil }
+        olcumBagla()
+    }
+
+    private func konuGeldi(_ k: Asistan.Konu?) {
+        guard asistanAcik else { return }
+        konu = k?.kutu
+        konuAdi = k?.ad ?? ""
+        sonYuz = k?.yuz
+        if kompTur == .kapali, k != nil { kompTur = sonKomp }
+        let o = oneriAcik ? Kompozisyon.oner(konu: konu, mevcut: kompTur, oran: goruntuOrani, analiz: analiz) : nil
+        let h = Kompozisyon.hedef(kompTur, yon: kompYon, oran: goruntuOrani, konu: konu, analiz: analiz)
+        if let o, (h?.hizalama ?? 0) <= 0.85, !kayitta { kompOneri = (tur: o.0, yon: o.1) } else { kompOneri = nil }
+        ipucuGuncelle()
+    }
+
+    private func ipucuGuncelle() {
+        guard asistanAcik, !kayitta else { ipucu = nil; return }
+        let h = Kompozisyon.hedef(kompTur, yon: kompYon, oran: goruntuOrani, konu: konu, analiz: analiz)
+        ipucu = ipucuSabit.ver(ipucuUret(konu: konu, konuAdi: konuAdi, yuz: konuAdi == "Yüz" ? sonYuz : nil, a: analiz, hedef: h?.nokta, hizalama: h?.hizalama ?? 0))
+    }
+
+    func kompOneriUygula() {
+        guard let o = kompOneri else { return }
+        kompTur = o.tur; kompYon = o.yon; kompOneri = nil
     }
 
     func etkinYap(_ i: Int) {

@@ -72,6 +72,7 @@ struct MonitorEkran: View {
                 }
                 .multilineTextAlignment(.center).padding(24)
             }
+            if i == m.etkin { kompozisyon(i) }
             if i == m.etkin, let e = m.egim { Terazi(egim: e) }
             if m.kip == .iki && i == m.etkin { Rectangle().strokeBorder(Self.sari, lineWidth: 2) }
         }
@@ -80,6 +81,46 @@ struct MonitorEkran: View {
             if acikParam != nil { withAnimation(.easeOut(duration: 0.15)) { acikParam = nil } }
             else if m.kip == .iki && m.etkin != i { m.etkinYap(i) }
             else { withAnimation(.easeOut(duration: 0.15)) { arayuzAcik.toggle() } }
+        }
+    }
+
+    /// Kompozisyon kılavuzu, konu kutusu, yön tarifi ve öneri (görüntünün ekrandaki dikdörtgenine çizilir)
+    @ViewBuilder private func kompozisyon(_ i: Int) -> some View {
+        if m.bagli[i], m.kompTur != .kapali || m.asistanAcik {
+            GeometryReader { g in
+                let oran = m.goruntuOrani
+                let alan: CGRect = {
+                    // Görüntü bölmeyi doldurur (kenarlar kırpılır)
+                    if g.size.width / max(g.size.height, 1) > oran {
+                        let h = g.size.width / oran; return CGRect(x: 0, y: (g.size.height - h) / 2, width: g.size.width, height: h)
+                    }
+                    let w = g.size.height * oran; return CGRect(x: (g.size.width - w) / 2, y: 0, width: w, height: g.size.height)
+                }()
+                ZStack {
+                    KompozisyonKatman(tur: m.kompTur, yon: m.kompYon, alan: alan, asistan: m.asistanAcik, konu: m.konu, konuAdi: m.konuAdi, analiz: m.analiz)
+                    if let t = m.ipucu {
+                        Text(t)
+                            .font(.subheadline.weight(.bold))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(Capsule().fill(Self.koyu.opacity(0.72)))
+                            .position(x: g.size.width / 2, y: g.size.height * 0.72)
+                            .allowsHitTesting(false)
+                    }
+                    if let o = m.kompOneri {
+                        Button { m.kompOneriUygula() } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "lightbulb").foregroundStyle(Self.sari)
+                                Text("Öneri: \(o.tur.ad)  ›  Uygula").lineLimit(1)
+                            }
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 7)
+                            .background(Capsule().fill(Self.koyu.opacity(0.8)))
+                        }
+                        .position(x: g.size.width / 2, y: g.size.height * 0.2)
+                    }
+                }
+            }
+            .clipped()
         }
     }
 
@@ -362,6 +403,8 @@ struct MonitorEkran: View {
                 arac("KILAVUZ", "crop", a.kilavuz > 0 || a.izgara) {
                     if a.kilavuz > 0 || a.izgara { m.ayarlar[m.etkin].kilavuz = 0; m.ayarlar[m.etkin].izgara = false } else { m.ayarlar[m.etkin].kilavuz = 2.39 }
                 }
+                arac(m.kompTur == .kapali ? "KOMPOZİSYON" : m.kompTur.ad.uppercased(with: Locale(identifier: "tr")), "squareshape.split.3x3", m.kompTur != .kapali) { m.kompAcKapa() }
+                arac("YARDIMCI", "person.crop.square", m.asistanAcik) { m.asistanAcik.toggle() }
                 arac("TERAZİ", "level", m.teraziAcik) { m.teraziAcik.toggle() }
             }
         }
@@ -539,6 +582,16 @@ struct MonitorEkran: View {
             anahtar("TEMİZ GÖRÜNTÜ", bag(\.temiz))
             let zum: [Float] = [1, 2, 4]
             secenek("BÜYÜTME", ["1x", "2x", "4x"], zum.firstIndex(of: a.zoom) ?? 0) { m.ayarlar[m.etkin].zoom = zum[$0] }
+        case .kompozisyon:
+            secenek("KOMPOZİSYON KILAVUZU", KompTur.allCases.map(\.ad), KompTur.allCases.firstIndex(of: m.kompTur) ?? 0) { m.kompTur = KompTur.allCases[$0] }
+            if m.kompTur == .spiral || m.kompTur == .ucgen {
+                secenek("YÖN", ["Sağ alt", "Sol alt", "Sağ üst", "Sol üst"], m.kompYon) { m.kompYon = $0 }
+            }
+            anahtar("AKILLI YARDIMCI", $m.asistanAcik)
+            aciklama("Yardımcı yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca ibre yeşile döner. Telefonun içinde çalışır, internet gerekmez. Büyütme açıkken durur.")
+            anahtar("KOMPOZİSYON ÖNERİSİ", $m.oneriAcik)
+            aciklama("Konuya en az hareketle uyan kılavuzu üstte önerir; dokununca uygulanır.")
+            anahtar("TERAZİ (UFUK)", $m.teraziAcik)
         case .kilavuz:
             let oran: [Float] = [0, 2.39, 2.35, 2, 1.85, 16 / 9, 4 / 3, 0.8, 9 / 16, 1]
             secenek("KADRAJ KILAVUZU", ["Kapalı", "2,39:1", "2,35:1", "2:1", "1,85:1", "16:9", "4:3", "4:5", "9:16", "1:1"], oran.firstIndex { abs($0 - a.kilavuz) < 0.01 } ?? 0) {
