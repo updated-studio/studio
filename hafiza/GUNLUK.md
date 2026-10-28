@@ -67,6 +67,14 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ### 28 Ekim 2026
 
+- (Fatih, Monitör ekranı Claude'u, sunucu) **iOS Monitör** Android monitörle aynı yapıldı ve TestFlight'a gitti:
+  - Metal araçlar: odak yardımı, zebra, false color, LUT ve karşılaştırma, kılavuz/ızgara/güvenli alan/merkez, büyütme, ayna/çevir/döndür, anamorfik, siyah-beyaz, temiz görüntü.
+  - Ölçümler, dört kip ve el ile kamera ayarları.
+  - Temiz kayıt (H.264/H.265, bit hızı, ses), ses göstergesi, terazi.
+  - KOMPOZİSYON + YARDIMCI: Kamera ekranıyla aynı kod.
+  - Kaynaklar: telefon kamerası, iPad'de USB, Wi-Fi kamera, HLS/http ağ yayını.
+  - Android monitöre Wi-Fi kamera kaynağı eklendi; duruş kendiliğinden ayarlanıyor. Android 0.12.0'da, yayın Fatih'in kendi "Yayınla"sını bekliyor.
+  - Gerçek cihazda denenmedi: dönüş yönleri, USB ile iki kaynak, HLS.
 - (Fatih, Kamera ekranı Claude'u) Fatih: "iPhone sürümü Android'in birebir aynısı olsun, yeni özellikler (çekim masası gibi) iki tarafa birden eklensin." İş ikiye bölündü (`uygulamalar/kamera-ios/PARITE.md`). Monitör ekranını sunucudaki Claude yazdı. Kamera ekranı iOS 0.3.0'da Android 0.11 düzenine geçti: TIMELAPSE, PORTRE, mercekler, flaş/fener, pozlama/beyaz/odak cetvelleri, fotoğraf çözünürlüğü + RAW, video 720p–4K 30/60, 8 kompozisyon kılavuzu, akıllı yardımcı (Vision), sahne önerisi, terazi, Ayarlar paneli, açılış ekranı. Gerçek cihazda denenmedi.
 
 ### 27 Ekim 2026

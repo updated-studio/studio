@@ -30,17 +30,24 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 
 | Özellik | Android | iOS | Not |
 |---|---|---|---|
-| Kaynak: USB (Sony USB yayını, HDMI→USB çevirici) | ✓ | ○ | iPad'de var; iPhone'da Apple izin vermiyor (—) |
-| Kaynak: telefon kamerası, ağ (Wi-Fi kamera) | ✓ | ○ | |
-| LUT (.cube), LUT karşılaştırma | ✓ | ○ | |
-| False color, zebra (seviye), odak yardımı (peaking, renk, hassasiyet) | ✓ | ○ | |
-| Anamorfik açma, büyütme, ayna / ters çevir / döndür, siyah-beyaz, temiz görüntü | ✓ | ○ | |
-| Kadraj kılavuzu, güvenli alan, merkez işareti | ✓ | ○ | |
-| Ölçüm: dalga formu, RGB parade, vektörskop, histogram | ✓ | ○ | |
-| Kipler: tek ekran, görüntü + ölçüm, LUT karşılaştırma, iki kaynak | ✓ | ○ | |
-| Kayıt: kodek (H.264/H.265), bit hızı, ses kaydı | ✓ | ○ | |
-| Ses göstergesi (iki kanal) | ✓ | ○ | |
-| Ekran parlaklığı en yüksek | ✓ | ○ | |
+| Kaynak: USB (Sony USB yayını, HDMI→USB çevirici) | ✓ | ✓ | iOS'ta yalnız iPad (USB-C, iPadOS 17); iPhone'da Apple izin vermiyor |
+| Kaynak: telefon kamerası | ✓ | ✓ | |
+| Kaynak: Wi-Fi kamera (UPDATED Kamera'nın "Wi-Fi kamera ol"u) | ✓ | ✓ | Android'e 28 Ekim'de eklendi (0.12.0) |
+| Kaynak: ağ yayını | ✓ (RTSP/RTMP/HLS) | ✓ (HLS / http) | iOS'ta RTSP/RTMP için hazır oynatıcı yok, açıklama gösterilir |
+| LUT (.cube) kitaplığı, LUT karşılaştırma | ✓ | ✓ | |
+| False color, zebra (seviye), odak yardımı (peaking, renk, hassasiyet) | ✓ | ✓ | Metal (Monitor.metal), Android GLSL'in karşılığı |
+| Anamorfik açma, büyütme, ayna / ters çevir / döndür, siyah-beyaz, temiz görüntü | ✓ | ✓ | |
+| Kadraj kılavuzu, ızgara, güvenli alan, merkez işareti | ✓ | ✓ | |
+| Kompozisyon kılavuzları, akıllı yardımcı, kompozisyon önerisi | ✓ | ✓ | Kamera ekranıyla aynı kod (Kompozisyon.swift, Asistan.swift) |
+| Terazi (ufuk) | ✓ | ✓ | |
+| Ölçüm: dalga formu, RGB parade, vektörskop, histogram, köşe histogramı | ✓ | ✓ | |
+| Kipler: tek ekran, görüntü + ölçüm, LUT karşılaştırma, iki kaynak | ✓ | ✓ | İki cihaz kamerası AVCaptureMultiCamSession ister (destekleyen cihazlarda) |
+| El ile kamera ayarları (fps, enstantane, ISO, beyaz denge, EV, odak, çözünürlük, sabitleme) | ✓ | ✓ | |
+| Kayıt: kodek (H.264/H.265), bit hızı, ses kaydı, temiz kayıt, ekran görüntüsü | ✓ | ✓ | |
+| Ses göstergesi (iki kanal) | ✓ | ✓ | |
+| Ekran parlaklığı en yüksek | ✓ | ✓ | |
+
+Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki kaynak, HLS kaynağı.
 
 ## Masa (çok kamera)
 
