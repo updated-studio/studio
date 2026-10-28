@@ -13,6 +13,8 @@ extension Kamera {
         proAyar = m.oku()
         UserDefaults.standard.set(m.rawValue, forKey: "proMod")
         kuyruk.async { self.proUygula() }
+        // Kuş ve uçak: en uzun mercek (tele yoksa 3×)
+        if m.tele { yakinlastir(zoomDuraklari.last.map { max($0, 3) } ?? 3) }
     }
 
     func proAyarDegistir(_ a: ProAyar) {
@@ -34,8 +36,6 @@ extension Kamera {
         let m = proMod, a = proAyar
         let bicim = d.activeFormat
         let enKisa = bicim.minExposureDuration.seconds, enUzun = bicim.maxExposureDuration.seconds
-
-        d.videoZoomFactor = m.tele ? min(3, d.maxAvailableVideoZoomFactor) : 1
 
         // Pozlama
         d.activeMaxExposureDuration = .invalid
@@ -79,18 +79,6 @@ extension Kamera {
         }
     }
 
-    /// Pro moddan çıkınca kamera otomatiğe döner
-    func proBirak() {
-        guard let d = cihaz, (try? d.lockForConfiguration()) != nil else { return }
-        defer { d.unlockForConfiguration() }
-        d.videoZoomFactor = 1
-        d.activeMaxExposureDuration = .invalid
-        if d.isExposureModeSupported(.continuousAutoExposure) { d.exposureMode = .continuousAutoExposure }
-        d.setExposureTargetBias(0)
-        if d.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { d.whiteBalanceMode = .continuousAutoWhiteBalance }
-        if d.isFocusModeSupported(.continuousAutoFocus) { d.focusMode = .continuousAutoFocus }
-    }
-
     // MARK: çekim
 
     func proCek(yon: AVCaptureVideoOrientation) {
@@ -129,13 +117,21 @@ extension Kamera {
     /// Spor / Kuş: deklanşör basılı tutulunca seri çekim
     func seriBasla(yon: AVCaptureVideoOrientation) {
         guard mod == .pro, proMod.seri, seriZamanlayici == nil else { return }
+        seriSayi = 0
         kuyruk.async { self.fotoCikti.connection(with: .video)?.videoOrientation = yon }
         seriZamanlayici = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
-            self?.kuyruk.async { self?.fotoCek(hizli: true) }
+            guard let self else { return }
+            self.seriSayi += 1
+            self.proIlerleme = "\(self.seriSayi)"
+            self.kuyruk.async { self.fotoCek(hizli: true) }
         }
     }
 
-    func seriBitir() { seriZamanlayici?.invalidate(); seriZamanlayici = nil }
+    func seriBitir() {
+        guard seriZamanlayici != nil else { return }
+        seriZamanlayici?.invalidate(); seriZamanlayici = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { if self.seriZamanlayici == nil, !self.proCalisiyor { self.proIlerleme = nil } }
+    }
 
     /// kareKuyruk'ta: biriken kareler tek fotoğraf olur
     func birlestirmeBitir() {
@@ -148,7 +144,8 @@ extension Kamera {
             self.proCalisiyor = false
             self.proIlerleme = nil
             guard let veri = resim?.jpegData(compressionQuality: 0.95) else { self.bildirim = "Birleştirilemedi."; return }
-            self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .photo, data: veri, options: nil) }, mesaj: "Fotoğraf kaydedildi (\(b.sayi) kare)")
+            self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .photo, data: veri, options: nil) }, mesaj: "Fotoğraf kaydedildi (\(b.sayi) kare)",
+                        kucuk: resim?.preparingThumbnail(of: CGSize(width: 160, height: 160)))
         }
     }
 
@@ -158,10 +155,10 @@ extension Kamera {
     }
 }
 
-extension Kamera: AVCaptureVideoDataOutputSampleBufferDelegate {
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        for d in kareDinleyiciler { d(sampleBuffer) }
-        guard let b = birlestirici, let kare = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+extension Kamera {
+    /// Kare kuyruğunda: birleştirme sürüyorsa kare eklenir
+    func birlestirmeKaresi(_ kare: CVPixelBuffer) {
+        guard let b = birlestirici else { return }
         b.ekle(kare)
         let bitti: Bool
         let yazi: String
