@@ -19,10 +19,11 @@ import kotlin.math.max
 /**
  * Ekrandaki kaynağın (USB görüntü, ağ yayını) MP4 kaydı: MonitorGorunum her yeni kareyi araçsız ve LUT'suz olarak `yuzey`e çizer,
  * görüntü kodlayıcı (H.264/H.265) bunu sıkıştırır; ses varsa USB ses girişinden (fotoğraf makinesinin kendi sesi), yoksa telefonun
- * mikrofonundan AAC olarak eklenir. Zaman damgaları System.nanoTime'dan: görüntü ve ses aynı saatte.
+ * mikrofonundan AAC olarak eklenir. Zaman damgaları System.nanoTime'dan: görüntü ve ses aynı saatte (timelapse'te ses yok, damgalar kare sırasından).
+ * `yon`: oynatıcının videoyu kaç derece (saat yönünde) çevirip göstereceği; telefon yan tutulduysa video yine dik açılır.
  */
 class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescriptor, val genislik: Int, val yukseklik: Int, private val fps: Int,
-                private val mbps: Int, private val hevc: Boolean, private val sesIste: Boolean) {
+                private val mbps: Int, private val hevc: Boolean, private val sesIste: Boolean, private val yon: Int = 0) {
     lateinit var yuzey: Surface; private set
     /** Sesin geldiği yer (ekranda bildirmek için): "makineden (USB)", "telefon mikrofonu" ya da null (sessiz) */
     var sesKaynagi: String? = null; private set
@@ -53,6 +54,7 @@ class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescripto
             MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).also { it.configure(f2, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE) }
         }
         yuzey = goruntu.createInputSurface()
+        if (yon != 0) muxer.setOrientationHint(yon)
         goruntu.start()
         if (sesIste) sesKur()
         gIs = Thread({ bosalt(goruntu, true) }, "kayit-goruntu").also { it.start() }

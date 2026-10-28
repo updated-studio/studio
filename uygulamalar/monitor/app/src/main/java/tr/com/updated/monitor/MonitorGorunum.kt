@@ -49,6 +49,10 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
 
     /** Kayıt: her yeni kare araçsız (LUT, odak, zebra, kılavuz yok) bu yüzeye de çizilir; null = kayıt yok */
     @Volatile var kayitYuzeyi: Surface? = null
+    /** Timelapse: kayda yalnız her `kayitAraligiNs`'de bir kare girer, zaman damgası kare sırasından (Timelapse.kt); 0 = her kare, gerçek saat */
+    @Volatile var kayitAraligiNs = 0L
+    /** Bu kayıtta kodlayıcıya giden kare sayısı (yeni kayıt yüzeyinde sıfırlanır) */
+    @Volatile var kayitKareSayisi = 0L; private set
     /** Kayıt boyutu: ekrandaki yönüyle kaynak boyutu (kodlayıcı için çift sayı) */
     fun kayitBoyutu(): Pair<Int, Int> { val d = yanDurur(); val w = if (d) kaynakBoyut[1] else kaynakBoyut[0]; val h = if (d) kaynakBoyut[0] else kaynakBoyut[1]; return (w and 1.inv()) to (h and 1.inv()) }
 
@@ -62,13 +66,15 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     fun birlestir(b: BirlestirmeIstegi) { birlestirme = b; requestRender() }
     fun birlestirmeIptal() { birlestirme?.let { birlestirme = null; it.bitti(null) } }
     val birlestiriyor: Boolean get() = birlestirme != null
+    /** true: görüntü bölmeyi tam doldurur (taşan kenarlar ekranda kırpılır, kayıt yine tam kare); false: sığdırır (kenarda siyah pay) */
+    @Volatile var doldur = false
     /** Görüntünün bölme içindeki alanı (kenar boşlukları hariç; kompozisyon kılavuzu bunun üstüne çizilir) */
     fun goruntuAlani(): android.graphics.RectF {
         val a = ayarlar; val donuk = yanDurur()
         val kw = (if (donuk) kaynakBoyut[1] else kaynakBoyut[0]).toFloat() * a.desqueeze
         val kh = (if (donuk) kaynakBoyut[0] else kaynakBoyut[1]).toFloat()
         val w = width.toFloat(); val h = height.toFloat(); val oran = kw / kh
-        return if (w / h > oran) { val vw = h * oran; android.graphics.RectF((w - vw) / 2, 0f, (w + vw) / 2, h) } else { val vh = w / oran; android.graphics.RectF(0f, (h - vh) / 2, w, (h + vh) / 2) }
+        return if ((w / h > oran) != doldur) { val vw = h * oran; android.graphics.RectF((w - vw) / 2, 0f, (w + vw) / 2, h) } else { val vh = w / oran; android.graphics.RectF(0f, (h - vh) / 2, w, (h + vh) / 2) }
     }
 
     /** Kaynağın boyutu belli olunca: oran ve tampon boyutu (kamera bu boyutta yazar) */
@@ -262,12 +268,13 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
         }
 
         // Kayıt yüzeyi (kodlayıcının girişi): aynı EGL bağlamıyla ikinci bir pencere yüzeyi
-        private var kayitEgl: android.opengl.EGLSurface? = null; private var kayitHedef: Surface? = null
+        private var kayitEgl: android.opengl.EGLSurface? = null; private var kayitHedef: Surface? = null; private var kayitIlkNs = 0L; private var kayitSonrakiNs = 0L
         private fun kayitCiz() {
             val hedef = kayitYuzeyi
             val dpy = android.opengl.EGL14.eglGetCurrentDisplay()
             if (hedef !== kayitHedef) {
                 kayitEgl?.let { android.opengl.EGL14.eglDestroySurface(dpy, it) }; kayitEgl = null; kayitHedef = hedef
+                kayitKareSayisi = 0; kayitIlkNs = 0L; kayitSonrakiNs = 0L
                 if (hedef != null) runCatching {
                     val bag = android.opengl.EGL14.eglGetCurrentContext(); val no = IntArray(1)
                     android.opengl.EGL14.eglQueryContext(dpy, bag, android.opengl.EGL14.EGL_CONFIG_ID, no, 0)
@@ -278,24 +285,36 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
                 }.onFailure { HataKaydi.not("kayit", it.stackTraceToString()) }
             }
             val es = kayitEgl ?: return
+            val simdi = System.nanoTime(); val aralik = kayitAraligiNs
+            if (kayitIlkNs == 0L) { kayitIlkNs = simdi; kayitSonrakiNs = simdi }
+            // Timelapse: sıradaki karenin anı gelmediyse bu kare kayda girmez. Aralık sabit adımla ilerler (kayma birikmez);
+            // telefon bir süre kare veremediyse kaçan kareler art arda yazılmaz, sayaç o andan devam eder.
+            if (aralik > 0) {
+                if (simdi < kayitSonrakiNs) return
+                kayitSonrakiNs += aralik; if (kayitSonrakiNs <= simdi) kayitSonrakiNs = simdi + aralik
+            }
             val ciz = android.opengl.EGL14.eglGetCurrentSurface(android.opengl.EGL14.EGL_DRAW); val oku = android.opengl.EGL14.eglGetCurrentSurface(android.opengl.EGL14.EGL_READ)
             val bag = android.opengl.EGL14.eglGetCurrentContext()
             if (!android.opengl.EGL14.eglMakeCurrent(dpy, es, es, bag)) return
-            val (w, h) = kayitBoyutu()
+            // Yüzeyin kendi boyutu (Wi-Fi kamera yayınında kaynak oranı sonradan değişebilir: sığdırılır, kenarlar siyah)
+            val w = IntArray(1).also { android.opengl.EGL14.eglQuerySurface(dpy, es, android.opengl.EGL14.EGL_WIDTH, it, 0) }[0]
+            val h = IntArray(1).also { android.opengl.EGL14.eglQuerySurface(dpy, es, android.opengl.EGL14.EGL_HEIGHT, it, 0) }[0]
+            val (kw, kh) = kayitBoyutu()
             GLES30.glViewport(0, 0, w, h); GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-            ciz(0, 0, w, h, w.toFloat(), h.toFloat(), ham = true, olcum = true, tam = true)
-            android.opengl.EGLExt.eglPresentationTimeANDROID(dpy, es, System.nanoTime())
+            ciz(0, 0, w, h, kw.toFloat(), kh.toFloat(), ham = true, olcum = true, sigdir = true)
+            android.opengl.EGLExt.eglPresentationTimeANDROID(dpy, es, if (aralik > 0) kayitIlkNs + Timelapse.kareZamaniNs(kayitKareSayisi) else simdi)
             android.opengl.EGL14.eglSwapBuffers(dpy, es)
+            kayitKareSayisi++
             android.opengl.EGL14.eglMakeCurrent(dpy, ciz, oku, bag)
             GLES30.glViewport(0, 0, gw, gh)
         }
 
         /** Görüntüyü (kw:kh oranıyla) verilen alana sığdırarak çizer; ham = araçsız, olcum = kılavuz/vurgu yok */
-        private fun ciz(x: Int, y: Int, w: Int, h: Int, kw: Float, kh: Float, ham: Boolean, olcum: Boolean = false, tam: Boolean = false) {
+        private fun ciz(x: Int, y: Int, w: Int, h: Int, kw: Float, kh: Float, ham: Boolean, olcum: Boolean = false, tam: Boolean = false, sigdir: Boolean = false) {
             var vx = x; var vy = y; var vw = w; var vh = h
             if (!tam) {
                 val oran = kw / kh
-                if (w.toFloat() / h > oran) { vw = (h * oran).toInt(); vx = x + (w - vw) / 2 } else { vh = (w / oran).toInt(); vy = y + (h - vh) / 2 }
+                if ((w.toFloat() / h > oran) != (doldur && !sigdir)) { vw = (h * oran).toInt(); vx = x + (w - vw) / 2 } else { vh = (w / oran).toInt(); vy = y + (h - vh) / 2 }
             }
             GLES30.glViewport(vx, vy, vw, vh)
             val a = ayarlar

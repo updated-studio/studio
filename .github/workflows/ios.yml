@@ -1,0 +1,65 @@
+# UPDATED Kamera iPhone/iPad sürümü (uygulamalar/kamera-ios). GitHub'ın Mac makinesinde derlenir; Mac gerekmez.
+# Her değişiklikte imzasız derleme denetimi. TestFlight'a yükleme her gönderimde (push) ya da elle başlatınca (Actions → iOS → Run workflow),
+# PR'da değil, ve dört gizli bilgi girilmişse: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (.p8 dosyasının içi), APPLE_TEAM_ID.
+name: iOS
+on:
+  push:
+    paths: ['uygulamalar/kamera-ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['uygulamalar/kamera-ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency:
+  group: ios-${{ github.ref }}
+  # İki Claude aynı dala sık gönderiyor: TestFlight yüklemesi yarıda kesilmesin, yalnız PR denetimi iptal edilir
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  derle:
+    runs-on: macos-15
+    defaults:
+      run: { shell: bash, working-directory: uygulamalar/kamera-ios }
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: En yeni Xcode (App Store yüklemesi güncel SDK istiyor)
+        run: |
+          X=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          sudo xcode-select -s "$X" && xcodebuild -version
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Derleme denetimi (imzasız, simülatör)
+        run: |
+          # Derleme hataları en sonda ayrıca listelenir (uzun günlükte kaybolmasın)
+          xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > derleme.log 2>&1 || {
+            grep -E "error:" derleme.log | sort -u | head -n 40
+            grep -E "error:" derleme.log | sort -u | head -n 10 | sed 's/^/::error::/'
+            exit 1
+          }
+          tail -n 5 derleme.log
+      - name: TestFlight'a yükle
+        if: github.event_name != 'pull_request' && env.ASC_KEY_P8 != ''
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          ANAHTAR=~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
+          # Yapıştırırken satır sonları kaybolmuş ya da başlık satırları eksik olabilir: anahtarı PEM biçimine yeniden diz
+          GOVDE=$(printf '%s' "$ASC_KEY_P8" | tr -d '\r' | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \n\t')
+          { echo "-----BEGIN PRIVATE KEY-----"; printf '%s' "$GOVDE" | fold -w 64; echo; echo "-----END PRIVATE KEY-----"; } > "$ANAHTAR"
+          # Gizli değeri göstermeden kısa denetim
+          if ! printf '%s' "$GOVDE" | base64 -D > /dev/null 2>&1 || [ ${#GOVDE} -lt 150 ] || [ ${#GOVDE} -gt 400 ]; then
+            echo "::error title=ASC_KEY_P8::Anahtar .p8 dosyasının içine benzemiyor (uzunluk ${#GOVDE}; beklenen ~200). Dosyayı metin düzenleyiciyle açıp BEGIN'den END'e kadar tamamını yapıştırın."
+            exit 1
+          fi
+          YETKI=(-allowProvisioningUpdates -authenticationKeyPath "$ANAHTAR" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/UpdatedKamera.xcarchive archive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION=${{ github.run_number }} "${YETKI[@]}" | tail -n 60
+          plutil -replace teamID -string "$APPLE_TEAM_ID" ExportOptions.plist
+          xcodebuild -exportArchive -archivePath build/UpdatedKamera.xcarchive -exportOptionsPlist ExportOptions.plist \
+            -exportPath build/cikti "${YETKI[@]}" | tail -n 60
+          rm -f "$ANAHTAR"
+          echo "::notice title=TestFlight::Yapı ${{ github.run_number }} yüklendi; Apple işledikten sonra (10-30 dk) TestFlight'ta görünür."

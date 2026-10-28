@@ -1,0 +1,42 @@
+# UPDATED Kamera iPhone/iPad sürümü. Xcode projesi bu dosyadan üretilir (xcodegen generate); .xcodeproj depoya girmez.
+# Derleme ve TestFlight yüklemesi: .github/workflows/ios.yml (GitHub'ın Mac makinesi, Mac gerekmez).
+name: UpdatedKamera
+options:
+  bundleIdPrefix: tr.com.updated
+  deploymentTarget: { iOS: "17.0" }
+settings:
+  base:
+    MARKETING_VERSION: "0.3.0"
+    # İlk TestFlight yüklemesi: 27 Ekim 2026
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  UpdatedKamera:
+    type: application
+    platform: iOS
+    sources: [Kamera]
+    scheme: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tr.com.updated.monitor
+        PRODUCT_NAME: UpdatedKamera
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: Kamera/Info.plist
+      properties:
+        CFBundleDisplayName: UPDATED Kamera
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSCameraUsageDescription: Fotoğraf ve video çekmek için kamera gerekiyor.
+        NSMicrophoneUsageDescription: Videoya ses kaydetmek için mikrofon gerekiyor.
+        NSPhotoLibraryAddUsageDescription: Çekimleri Fotoğraflar'a kaydetmek için.
+        NSLocalNetworkUsageDescription: Masa ile Wi-Fi kameralar aynı ağda birbirini bulsun diye.
+        NSBonjourServices: [_updatedkam._tcp]
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations~iphone: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]

@@ -34,28 +34,42 @@ class KayitDugmesi(c: Context) : View(c) {
     }
 }
 
-/** İki kanal ses göstergesi (dBFS, −60…0); yeşil → sarı (−12) → kırmızı (−3), tepe tutma */
+/** İki kanal ses göstergesi (dBFS, −60…0): ekolayzer gibi ince dik çizgiler, zeminsiz (görüntünün üstünde durur).
+ *  Yanan çizgiler yeşil → sarı (−12) → kırmızı (−3), yanmayanlar çok soluk; tepe noktası kısa süre beyaz çizgiyle kalır. */
 class SesGostergesi(c: Context) : View(c) {
     private var duzey = floatArrayOf(-90f, -90f); private val tepe = floatArrayOf(-90f, -90f); private var tepeZaman = longArrayOf(0, 0)
-    private val p = Paint(Paint.ANTI_ALIAS_FLAG); private val yazi = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 255, 255, 255); textSize = 18f }
+    private val yog = resources.displayMetrics.density
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND; setShadowLayer(2f * yog, 0f, 0f, Color.argb(140, 0, 0, 0)) }
+    private val yazi = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(200, 255, 255, 255); textSize = 9f * yog; setShadowLayer(2f * yog, 0f, 1f * yog, Color.argb(200, 0, 0, 0)) }
+    private val YESIL = Color.rgb(70, 215, 100); private val SARI = Color.rgb(245, 205, 50); private val KIRMIZI = Color.rgb(235, 60, 45)
+    init { setLayerType(LAYER_TYPE_SOFTWARE, null) } // çizgi gölgesi için
     fun ayarla(sol: Float, sag: Float) {
         duzey = floatArrayOf(sol, sag); val s = System.currentTimeMillis()
         for (i in 0..1) if (duzey[i] > tepe[i] || s - tepeZaman[i] > 1500) { tepe[i] = duzey[i]; tepeZaman[i] = s }
         postInvalidate()
     }
     override fun onDraw(c: Canvas) {
-        val kanalH = (height - 22f) / 2f - 3f
+        val yaziVar = width > 140 * yog
+        val alan = height - (if (yaziVar) 12f * yog else 0f)
+        val ara = if (height < 24 * yog) 2.5f * yog else 4f * yog
+        val kanalH = (alan - ara) / 2f
+        val adim = 3f * yog; p.strokeWidth = 1.4f * yog
+        val n = max(8, ((width - p.strokeWidth) / adim).toInt()); val bas = p.strokeWidth / 2f
         for (i in 0..1) {
-            val y = i * (kanalH + 4f)
-            p.color = Color.argb(60, 255, 255, 255); c.drawRect(0f, y, width.toFloat(), y + kanalH, p)
-            val oran = ((duzey[i] + 60f) / 60f).coerceIn(0f, 1f); val w = width * oran
-            val sari = width * (48f / 60f); val krm = width * (57f / 60f)
-            p.color = Color.rgb(60, 200, 90); c.drawRect(0f, y, minOf(w, sari), y + kanalH, p)
-            if (w > sari) { p.color = Color.rgb(240, 200, 40); c.drawRect(sari, y, minOf(w, krm), y + kanalH, p) }
-            if (w > krm) { p.color = Color.rgb(230, 50, 40); c.drawRect(krm, y, w, y + kanalH, p) }
-            val tx = width * ((tepe[i] + 60f) / 60f).coerceIn(0f, 1f); p.color = Color.WHITE; c.drawRect(tx - 2f, y, tx, y + kanalH, p)
+            val y0 = i * (kanalH + ara) + p.strokeWidth / 2f; val y1 = y0 + kanalH - p.strokeWidth
+            val yanan = (((duzey[i] + 60f) / 60f).coerceIn(0f, 1f) * n).toInt()
+            val tepeCizgi = (((tepe[i] + 60f) / 60f).coerceIn(0f, 1f) * n).toInt() - 1
+            for (k in 0 until n) {
+                val db = -60f + 60f * (k + 1) / n
+                p.color = when {
+                    k == tepeCizgi && tepeCizgi >= yanan -> Color.WHITE
+                    k >= yanan -> Color.argb(46, 255, 255, 255)
+                    db > -3f -> KIRMIZI; db > -12f -> SARI; else -> YESIL
+                }
+                val x = bas + k * adim; c.drawLine(x, y0, x, y1, p)
+            }
         }
-        if (width > 300) for (db in intArrayOf(-48, -24, -12, -6, 0)) { val x = width * ((db + 60f) / 60f); c.drawText("$db", (x - 14f).coerceAtLeast(0f), height - 2f, yazi) }
+        if (yaziVar) for (db in intArrayOf(-48, -24, -12, -6, 0)) { val x = width * ((db + 60f) / 60f); val t = "$db"; c.drawText(t, (x - yazi.measureText(t)).coerceAtLeast(0f), height - 1f * yog, yazi) }
     }
 }
 
