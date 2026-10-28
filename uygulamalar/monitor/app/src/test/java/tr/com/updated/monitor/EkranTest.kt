@@ -30,12 +30,13 @@ class EkranTest {
     private val boyutlar = listOf("kucuk" to Triple(360, 740, "xhdpi"), "orta" to Triple(393, 852, "xxhdpi"), "buyuk" to Triple(430, 932, "xxhdpi"))
     private fun nitelik(b: Triple<Int, Int, String>, yatay: Boolean) = if (yatay) "w${b.second}dp-h${b.first}dp-land-${b.third}" else "w${b.first}dp-h${b.second}dp-port-${b.third}"
 
-    private fun kaydet(a: Activity, ad: String) {
+    private fun kaydet(a: Activity, ad: String, don: Int = 0) {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val v: View = a.window.decorView
         val w = v.width.takeIf { it > 0 } ?: a.resources.displayMetrics.widthPixels; val h = v.height.takeIf { it > 0 } ?: a.resources.displayMetrics.heightPixels
         v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)); v.layout(0, 0, w, h)
-        val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); v.draw(Canvas(b))
+        var b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); v.draw(Canvas(b))
+        if (don != 0) b = Bitmap.createBitmap(b, 0, 0, w, h, android.graphics.Matrix().apply { postRotate(don.toFloat()) }, true)
         File(klasor, "$ad.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
@@ -59,8 +60,14 @@ class EkranTest {
             KameraActivity.girisSoruldu = true
             Robolectric.buildActivity(KameraActivity::class.java).setup().use { c ->
                 val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-$ad")
-                a.window.decorView.findViewWithText("Kompozisyon kılavuzu")?.performClick(); kaydet(a, "kamera-kilavuz-$ad")
+                a.window.decorView.findViewWithText("Kontroller")?.performClick(); kaydet(a, "kamera-kontroller-$ad")
+                a.window.decorView.findViewWithText("Kılavuz")?.performClick(); kaydet(a, "kamera-kilavuz-$ad")
+                a.window.decorView.findViewWithText("Biçim")?.performClick(); kaydet(a, "kamera-bicim-$ad")
+                a.window.decorView.findViewWithText("Kapat")?.performClick()
                 a.window.decorView.findViewWithText("Ayarlar")?.performClick(); kaydet(a, "kamera-ayarlar-$ad")
+                a.window.decorView.findViewWithText("Kapat")?.performClick()
+                // Yan tutuş: ekran dikey sabit, ikonlar döner; görüntü telefonun tutulduğu gibi çevrilip kaydedilir
+                a.testYon(270); kaydet(a, "kamera-yan-$ad", don = 270)
             }
             tercih("kamera").edit().putString("mod", "TIMELAPSE").commit()
             Robolectric.buildActivity(KameraActivity::class.java).setup().use { c -> val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-timelapse-$ad") }
