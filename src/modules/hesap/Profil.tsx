@@ -93,6 +93,7 @@ export default function Profil() {
               {ben.avatar_url && <button className="btn ghost sm" onClick={fotoKaldir}>Kaldır</button>}
             </div>
             {!ben.avatar_url && <div className="muted" style={{ fontSize: 13 }}>Fotoğraf eklemezsen <a href="https://gravatar.com" target="_blank" rel="noreferrer">Gravatar</a>'daki fotoğrafın (WordPress'in kullandığı) görünür.</div>}
+            <div className="muted" style={{ fontSize: 13 }}>Bu fotoğraf sitede, yazdığın haberlerin yanında da görünür (28 Ekim 2026). Panelde yazar fotoğrafı ayrıca yüklendiyse o öne geçer.</div>
             <input ref={dosyaGir} type="file" accept="image/*" hidden onChange={fotoSec} />
           </div>
         </div>

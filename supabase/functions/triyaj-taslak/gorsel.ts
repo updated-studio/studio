@@ -239,6 +239,7 @@ KURALLAR:
 - Başka bir markanın ürününü öne çıkaran (logosu/adı belirgin) fotoğrafı temsili olarak bile seçme.
 - ÜZERİNDE YAZI OLAN GÖRSEL SEÇME (Fatih, 18 Ekim): başlık/slogan/fiyat yazılı banner, afiş, kampanya görseli, yazı bindirmeli tanıtım kartı, kolaj, filigranlı görsel, infografik, ekran görüntüsü seçilmez. Ürünün üzerindeki kendi küçük logosu sorun değil. Görseller sana resim olarak da verildiyse bunu görerek denetle; resmi verilmeyen adayda açıklamada "banner, poster, logo, text, infographic, screenshot" geçiyorsa seçme.
 - Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.
+- KONU ORTADA OLSUN (28 Ekim 2026): görsel sitede kart, manşet ve telefonda farklı oranlarda kenarlardan kırpılır. Konusu (ürün, nesne) kenarda ya da köşede kalan, önemli ayrıntısı kenara yakın olan, kenarlarında yazı/logo bulunan görseli seçme; konusu kadrajın ortasında ve etrafında pay olan görseli tercih et.
 - Hiçbiri uygun değilse -1 döndür. Uydurma yapma.
 Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe"}`;
 

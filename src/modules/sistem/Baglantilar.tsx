@@ -45,8 +45,8 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
       { metin: "Sol menüde \"Compute (Workers)\" → \"Workers & Pages\" → \"Create\" (Oluştur) → \"Start with Hello World!\" → ad: updated-gorsel → \"Deploy\"" },
       { metin: "Açılan sayfada \"Edit code\" (Kodu düzenle). Soldaki kodun tamamını sil. Aşağıdaki bağlantıdaki kodu aç, tümünü seç (Ctrl+A / Cmd+A), kopyala, oraya yapıştır → sağ üstte \"Deploy\"", link: "/cloudflare/gorsel-worker.js" },
       { metin: "Programın sayfasına dön → \"Settings\" (Ayarlar) → \"Bindings\" → \"Add binding\" → \"Images\" → Variable name: IMAGES → \"Add Binding\"" },
-      { metin: "Yine \"Settings\" → \"Variables and Secrets\" → \"Add\" → Type: Secret, Variable name: ANAHTAR, Value: en az 32 karakterlik rastgele bir şifre (şifre yöneticisinin önerdiğini kullan) → \"Deploy\". Aynı şifreyi aşağıdaki \"Cloudflare görsel programı: anahtar\" kutusuna gir" },
-      { metin: "\"Settings\" → \"Domains & Routes\" altında workers.dev ile biten adresi kopyala (ör. https://updated-gorsel.ad.workers.dev), bu kutuya yapıştır → Kaydet" },
+      { metin: "Yine \"Settings\" → \"Variables and Secrets\" bölümünde \"+ Add\" (ya da \"Add variable\"). Açılan satırda Type (tür) kutusunu \"Secret\" yap (bazı ekranlarda \"Encrypt\" kutusunu işaretle). Variable name: ANAHTAR (büyük harf). Value: en az 32 karakterlik rastgele bir şifre; şifre yöneticin yoksa aşağıdaki \"Şifre üret\" düğmesi üretir. Sonra sağ altta ya da sağ üstte \"Deploy\" (bazı ekranlarda \"Save and deploy\"); basmazsan şifre kaydolmaz" },
+      { metin: "\"Settings\" → \"Domains & Routes\" altında \"workers.dev\" satırı var; \"Disabled\" yazıyorsa \"Enable\" de. Yanındaki adres updated-gorsel.XXXX.workers.dev biçimindedir (başında https:// yazmaz, normal). Adresi olduğu gibi kopyala, bu kutuya yapıştır → Kaydet; https:// kısmını biz ekleriz" },
     ],
   },
   {
@@ -84,12 +84,16 @@ export default function Baglantilar() {
   }, []);
   useEffect(() => { yukle(); }, [yukle]);
 
+  // Cloudflare adresi https://'siz ya da sonunda / ile yapıştırılırsa düzeltilir (28 Ekim 2026: 6. adımda takılındı)
+  const duzelt = (ad: string, v: string) => { v = v.trim(); if (ad !== "cloudflare_adres") return v; const h = v.replace(/^https?:\/\//i, "").split("/")[0].trim(); return h ? "https://" + h : ""; };
+  const sifreUret = () => { const a = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const b = new Uint32Array(40); crypto.getRandomValues(b); return Array.from(b, (x) => a[x % a.length]).join(""); };
   async function kaydet(ad: string, sil = false) {
     if (sil && !confirm("Anahtar silinsin mi? Bu bağlantıyı kullanan iş çalışmaz olur.")) return;
-    const yanlis = !sil && bicimHatasi(ad, (deger[ad] ?? "").trim());
+    if (!sil) setDeger((d) => ({ ...d, [ad]: duzelt(ad, d[ad] ?? "") }));
+    const yanlis = !sil && bicimHatasi(ad, duzelt(ad, deger[ad] ?? ""));
     if (yanlis) { toast(yanlis); return; }
     setMesgul(ad);
-    const { error } = await sb.rpc("anahtar_kaydet", { p_ad: ad, p_deger: sil ? "" : (deger[ad] ?? "") });
+    const { error } = await sb.rpc("anahtar_kaydet", { p_ad: ad, p_deger: sil ? "" : duzelt(ad, deger[ad] ?? "") });
     setMesgul("");
     if (error) { toast(error.message); return; }
     setDeger((d) => ({ ...d, [ad]: "" }));
@@ -132,6 +136,7 @@ export default function Baglantilar() {
             </label>
             <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
               <button className="btn sm" disabled={!!mesgul || !(deger[a.ad] ?? "").trim()} onClick={() => kaydet(a.ad)}>{mesgul === a.ad ? "Kaydediliyor…" : "Kaydet"}</button>
+              {a.ad === "cloudflare_anahtar" && !d && <button className="btn ghost sm" type="button" onClick={async () => { const s = sifreUret(); setDeger((x) => ({ ...x, [a.ad]: s })); try { await navigator.clipboard.writeText(s); toast("Şifre üretildi ve panoya kopyalandı: Cloudflare'de ANAHTAR değerine yapıştır, burada Kaydet'e bas."); } catch { toast("Şifre üretildi; kutudan kopyalayıp Cloudflare'de ANAHTAR değerine yapıştır, burada Kaydet'e bas."); } }}>Şifre üret</button>}
               {d && a.ad === "instagram" && <button className="btn ghost sm" disabled={!!mesgul} onClick={instagramCek}>Reels'leri şimdi çek</button>}
               {d && <button className="btn ghost sm" disabled={!!mesgul} onClick={() => kaydet(a.ad, true)}>Sil</button>}
             </div>
