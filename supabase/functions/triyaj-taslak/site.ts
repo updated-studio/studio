@@ -128,7 +128,7 @@ function etiketTuru(tur: string): string {
 }
 
 const gorselGovde = (g: GorselAday, alt: string) => ({
-  url: g.buyuk, alt, ai: /flux|yapay/i.test(g.kaynak ?? ""),
+  url: g.buyuk, alt, ai: /flux|yapay/i.test(g.kaynak ?? ""), ...(g.odak ? { odak: g.odak } : {}),
   credit: altyazi(g) || (g.kaynak ? `Görsel: ${g.kaynak}` : "Görsel: kaynak"),
 });
 

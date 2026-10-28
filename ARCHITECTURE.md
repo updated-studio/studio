@@ -190,6 +190,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 ## 12. Karar günlüğü
 
+- **28 Ekim 2026:** Kapak görselleri: yapay zekâ seçerken konunun yerini (odak) de verir; editör Stüdyo'da kapağın altında sitedeki kırpmaları görür, odağı otomatik ya da elle ayarlar (`gorsel-odak` fonksiyonu, `KapakOnizleme`). Uygunsuz görsel (kenarda yazı, köşede konu) seçilmez; odak yalnız kırpma penceresini kaydırır, yakınlaştırmaz.
 - **28 Ekim 2026:** Hareket geçmişi: panel ve Stüdyo'daki her işlem `public.hareketler` tablosunda (yalnız ekleme, yöneticiler okur; göç 0045). Panel kancası site deposunda, Stüdyo tarafı tetikleyicilerle; silinen içerik Stüdyo'dan geri getirilir.
 - **8 Ekim 2026:** Ekip paneli için Supabase seçildi; giriş davet listesiyle.
 - **8 Ekim 2026:** E-posta bildirimi şimdilik Enes'in Gmail'inden; kurumsal adres gelince taşınacak.

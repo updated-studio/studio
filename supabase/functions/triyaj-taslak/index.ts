@@ -252,7 +252,10 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
       return { secilen: k, adaylar: adaylar.slice(0, 8), neden: k ? "Yapay zekâ yanıt vermedi; ürün adıyla birebir eşleşen serbest lisanslı fotoğraf seçildi." : "Yapay zekâ yanıt vermedi ve ürün adıyla eşleşen fotoğraf yok; görsel eklenmedi." };
     }
     const i = Number(veri.secim);
-    const secilen = Number.isInteger(i) && i >= 0 && i < adaylar.length ? adaylar[i] : null;
+    const o = veri.odak as { x?: unknown; y?: unknown } | undefined;
+    const yz = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50; };
+    const odak = o && typeof o === "object" ? { x: yz(o.x), y: yz(o.y) } : undefined;
+    const secilen = Number.isInteger(i) && i >= 0 && i < adaylar.length ? { ...adaylar[i], ...(odak ? { odak } : {}) } : null;
     return { secilen, adaylar: adaylar.slice(0, 8), neden: (String(veri.neden ?? "").slice(0, 200) || (secilen ? "" : "Uygun görsel yok.")) + (secilen ? "" : ` (${iz.join("; ")})`) };
   } catch (e) {
     return { ...bos, neden: "Görsel seçilemedi: " + String((e as Error).message ?? e).slice(0, 120) };

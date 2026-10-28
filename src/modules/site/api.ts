@@ -111,7 +111,7 @@ export type Sema = {
   states: { label: string; value: Durum }[];
   yasakKelimeler: string[];
 };
-export type Medya = { id: number; alt?: string; credit?: string; filename?: string; url?: string; width?: number; height?: number; sizes?: Record<string, { url?: string | null }> };
+export type Medya = { id: number; alt?: string; credit?: string; filename?: string; url?: string; width?: number; height?: number; focalX?: number; focalY?: number; updatedAt?: string; sizes?: Record<string, { url?: string | null }> };
 export type Secenek = { id: number; ad: string };
 export type TamIcerik = Icerik & {
   label?: string;

@@ -5,6 +5,7 @@ import type { Koleksiyon, Medya, PanelKullanici, Secenek, Sema, TamIcerik } from
 import { bilinmeyenTurler } from "./editor/dugumler";
 import MetinEditoru from "./editor/MetinEditoru";
 import MedyaSecici from "./MedyaSecici";
+import KapakOnizleme from "./KapakOnizleme";
 import { Alanlar } from "./Form";
 import { alanlar, veriAlanlari, type Alan, type SurumOzellik } from "./sema";
 import { kilitHatasi, otoMetni, useKilit, useOtoKayit } from "./kayit";
@@ -190,6 +191,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
             {kapak ? <img src={api.medyaAdres(kapak.sizes?.card?.url || kapak.url || "")} alt={kapak.alt ?? ""} /> : <div className="empty">Kapak yok</div>}
             {kapak && <span className="muted">{api.duzMetin(kapak.credit)}</span>}
             <button type="button" className="btn ghost sm" onClick={() => setKapakSec(true)}>{kapak ? "Kapağı değiştir" : "Kapak seç"}</button>
+            {kapak && <KapakOnizleme m={kapak} degisti={setKapak} />}
           </div>
           <label>Kısa cevap <span className="muted">(2–3 cümle; arama ve yapay zekâ yanıtları için)</span>
             <textarea rows={3} value={f.shortAnswer} onChange={(e) => set("shortAnswer", e.target.value)} />

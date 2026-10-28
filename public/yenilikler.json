@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-28-b",
+    "tarih": "28 Ekim 2026",
+    "baslik": "Kapak önizleme ve odak noktası",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Haber düzenlerken kapağın altında \"Sitede böyle görünecek\" şeridi: manşet, telefon ve kart kırpmaları.",
+          "\"Odağı otomatik bul\" konunun yerini bulur; \"Odağı elle ayarla\" panelin odak aracını açar.",
+          "Site kırpmaları artık odak noktasına göre; otomatik haberlerde odak kendiliğinden gelir."
+        ]
+      },
+      {
+        "ad": "Yönetim",
+        "maddeler": [
+          "Hareket geçmişine eski izler eklendi (\"geçmiş kayıt\" etiketi).",
+          "Cloudflare görsel programı bağlandı; ilk deneme başarılı."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-28-a",
     "tarih": "28 Ekim 2026",
     "baslik": "Hareket geçmişi",

@@ -22,6 +22,7 @@ export type GorselAday = {
   lisans: string;     // ör. "CC BY-SA 4.0", "Pexels Lisansı"
   aciklama: string;   // yapay zekânın seçerken okuyacağı metin
   w: number; h: number;
+  odak?: { x: number; y: number }; // konunun yeri (yüzde, soldan/üstten); yapay zekâ seçerken verir, panelde odak noktası olur (28 Ekim 2026)
 };
 
 const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; haber gorseli secimi)";
@@ -241,7 +242,8 @@ KURALLAR:
 - Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.
 - KONU ORTADA OLSUN (28 Ekim 2026): görsel sitede kart, manşet ve telefonda farklı oranlarda kenarlardan kırpılır. Konusu (ürün, nesne) kenarda ya da köşede kalan, önemli ayrıntısı kenara yakın olan, kenarlarında yazı/logo bulunan görseli seçme; konusu kadrajın ortasında ve etrafında pay olan görseli tercih et.
 - Hiçbiri uygun değilse -1 döndür. Uydurma yapma.
-Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe"}`;
+Seçtiğin görselde haberin konusunun (ürün, cihaz, nesne) MERKEZİNİN yerini de ver: "odak" = {"x": soldan yüzde 0-100, "y": üstten yüzde 0-100}. Site görseli kart, manşet ve telefonda kenarlardan kırpar; bu nokta hep görünür kalır. Emin değilsen 50/50.
+Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe", "odak": {"x": 50, "y": 50}}`;
 
 const kelimeler = (s: string) => (s ?? "").toLowerCase().replace(/ı/g, "i").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length >= 2);
 
