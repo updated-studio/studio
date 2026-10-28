@@ -16,9 +16,12 @@ struct ProAyar: Codable, Equatable {
     /// Kare birleştirme süresi (sn)
     var sure: Int
     var zamanlayici: Int
+    /// Mercek (görünen çarpan: 0,5 / 1 / 2 / tele); nil: modun varsayılanı
+    var mercek: Double? = nil
 }
 
-enum Birlestir { case ortalama, enParlak }
+/// ortalama: kumlanma azalır, su ipeksi akar · toplam: ışık birikir, karanlık sahne aydınlanır · enParlak: ışık izleri üst üste biner
+enum Birlestir: String { case ortalama, toplam, enParlak }
 
 enum ProMod: String, CaseIterable, Identifiable {
     case samanyolu, yildizIzi, isikGrafiti, aracIzi, ipeksiSu, havaiFisek, spor, kusUcak, geceSehir

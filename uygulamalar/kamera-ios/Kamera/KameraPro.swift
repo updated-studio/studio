@@ -13,14 +13,23 @@ extension Kamera {
         proAyar = m.oku()
         UserDefaults.standard.set(m.rawValue, forKey: "proMod")
         kuyruk.async { self.proUygula() }
-        // Kuş ve uçak: en uzun mercek (tele yoksa 3×)
-        if m.tele { yakinlastir(zoomDuraklari.last.map { max($0, 3) } ?? 3) }
+        mercekUygula()
+    }
+
+    /// Modun merceği: kayıtlıysa o, yoksa kuş ve uçakta en uzun mercek, diğerlerinde 1×
+    func mercekUygula() {
+        let varsayilan: CGFloat = proMod.tele ? (zoomDuraklari.last ?? 1) : 1
+        let istenen = proAyar.mercek.map { CGFloat($0) } ?? varsayilan
+        let z = zoomDuraklari.min { abs($0 - istenen) < abs($1 - istenen) } ?? 1
+        if abs(z - zoom) > 0.01 { yakinlastir(z, moda: false) }
     }
 
     func proAyarDegistir(_ a: ProAyar) {
+        let mercekDegisti = a.mercek != proAyar.mercek
         proAyar = a
         proMod.yaz(a)
         kuyruk.async { self.proUygula() }
+        if mercekDegisti { mercekUygula() }
     }
 
     func proVarsayilan() { proAyarDegistir(proMod.varsayilan) }
@@ -140,6 +149,7 @@ extension Kamera {
         birlestirmeBitis = nil
         let resim = b.sonuc(yon: .up)
         DispatchQueue.main.async {
+            self.uzunBitti()
             UIApplication.shared.isIdleTimerDisabled = false
             self.proCalisiyor = false
             self.proIlerleme = nil
@@ -165,6 +175,9 @@ extension Kamera {
         if birlestirmeHedef > 0 {
             bitti = b.sayi >= birlestirmeHedef
             yazi = "Birleştiriliyor \(b.sayi)/\(birlestirmeHedef)"
+        } else if birlestirmeBitis == .distantFuture {
+            bitti = false
+            yazi = "BULB · \(b.sayi) kare · \(Kamera.saat(-birlestirmeBas.timeIntervalSinceNow))"
         } else if let son = birlestirmeBitis {
             let kalan = son.timeIntervalSinceNow
             bitti = kalan <= 0

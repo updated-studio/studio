@@ -7,7 +7,6 @@ struct ProModSecici: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("PRO MODLAR").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                 ForEach(ProMod.allCases) { m in
                     Button { secildi(m) } label: {
@@ -15,17 +14,15 @@ struct ProModSecici: View {
                             Image(systemName: m.simge).font(.system(size: 22, weight: .semibold))
                             Text(m.ad).font(.caption.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.8)
                         }
-                        .foregroundStyle(kamera.proMod == m ? Tema.vurgu : .white)
+                        .foregroundStyle(kamera.proMod == m ? Tema.sari : .white)
                         .frame(maxWidth: .infinity, minHeight: 68)
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(kamera.proMod == m ? 0.14 : 0.06)))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(kamera.proMod == m ? Tema.vurgu : .clear, lineWidth: 1.5))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(kamera.proMod == m ? Tema.sari : .clear, lineWidth: 1.5))
                     }
                 }
             }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color.black.opacity(0.62)))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 4)
     }
 }
 
@@ -38,7 +35,7 @@ struct ProUyari: View {
         ZStack {
             Color.black.opacity(0.45).ignoresSafeArea().onTapGesture(perform: kapat)
             VStack(spacing: 10) {
-                Image(systemName: mod.simge).font(.system(size: 30, weight: .semibold)).foregroundStyle(Tema.vurgu)
+                Image(systemName: mod.simge).font(.system(size: 30, weight: .semibold)).foregroundStyle(Tema.sari)
                 Text(mod.ad).font(.headline)
                 Text(mod.uyari).font(.subheadline).multilineTextAlignment(.center).foregroundStyle(Tema.metin2)
                 Text("Kapatmak için boş bir yere dokunun").font(.caption2).foregroundStyle(Tema.metin2.opacity(0.7)).padding(.top, 4)
@@ -73,13 +70,18 @@ struct ProOzellestir: View {
                 Text(kamera.proMod.ad.uppercased()).font(.caption.weight(.bold)).foregroundStyle(Tema.metin2)
                 Spacer()
                 if a != kamera.proMod.varsayilan {
-                    Button("Varsayılana dön") { kamera.proVarsayilan() }.font(.caption.weight(.semibold)).foregroundStyle(Tema.vurgu)
+                    Button("Varsayılana dön") { kamera.proVarsayilan() }.font(.caption.weight(.semibold)).foregroundStyle(Tema.sari)
                 }
             }
             satir("ISO", "Duyarlılık", isolar, secili: a.iso, yazi: ProMod.isoYazi, baz: { $0 != nil && $0 == kamera.bazIso }) { v in degistir { $0.iso = v } }
             satir("S", "Enstantane", ProMod.ENSTLER, secili: a.enst, yazi: ProMod.enstYazi) { v in degistir { $0.enst = v } }
             if a.iso == nil && a.enst == nil {
                 satir("EV", "Telafi", ProMod.EVLER, secili: a.ev, yazi: ProMod.evYazi) { v in degistir { $0.ev = v } }
+            }
+            if !kamera.onde, kamera.zoomDuraklari.count > 1 {
+                let varsayilan = Double(kamera.proMod.tele ? (kamera.zoomDuraklari.last ?? 1) : 1)
+                satir("LENS", "Mercek", kamera.zoomDuraklari.map { Double($0) }, secili: a.mercek ?? varsayilan,
+                      yazi: { AnaEkran.fmt(CGFloat($0)) + "×" }) { v in degistir { $0.mercek = v } }
             }
             satir("WB", "Renk", ProMod.BDLER, secili: a.bd, yazi: ProMod.bdYazi) { v in degistir { $0.bd = v } }
             satir("AF/MF", "Odak", ProAyar.Odak.allCases, secili: a.odak, yazi: ProMod.odakYazi) { v in degistir { $0.odak = v } }
@@ -92,9 +94,7 @@ struct ProOzellestir: View {
                     .font(.caption2).foregroundStyle(Tema.metin2)
             }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color.black.opacity(0.62)))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 4)
     }
 
     private func satir<T: Equatable>(_ ad: String, _ tr: String, _ secenekler: [T], secili: T, yazi: @escaping (T) -> String,
@@ -117,7 +117,7 @@ struct ProOzellestir: View {
                             .foregroundStyle(s ? .black : (b ? Tema.baz : .white))
                             .padding(.horizontal, 10)
                             .frame(minHeight: 34)
-                            .background(Capsule().fill(s ? (b ? Tema.baz : Tema.vurgu) : Color.white.opacity(0.1)))
+                            .background(Capsule().fill(s ? (b ? Tema.baz : Tema.sari) : Color.white.opacity(0.1)))
                         }
                     }
                 }

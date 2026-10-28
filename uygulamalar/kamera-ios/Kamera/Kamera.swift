@@ -15,7 +15,9 @@ final class Kamera: NSObject, ObservableObject {
     enum Lens { case ultra, genis, tele }
     enum Flas: Int { case kapali, oto, acik, fener }
 
-    private static let ud = UserDefaults.standard
+    static let ud = UserDefaults.standard
+    /// Enstantane listesinde BULB (deklanşöre yeniden basılana kadar)
+    static let bulb: Double = 1e9
 
     @Published var izinVar = true
     @Published var mod: Mod = Mod(rawValue: Kamera.ud.string(forKey: "k.mod") ?? "") ?? .foto
@@ -25,6 +27,12 @@ final class Kamera: NSObject, ObservableObject {
     @Published var bazIso: Float = 0
     /// nil = otomatik
     @Published var secilenIso: Float?
+    /// Elle enstantane (sn); nil = otomatik. Telefonun tek karede verebildiğinden uzunsa (ya da BULB) kareler birleştirilir
+    @Published var secilenEnst: Double?
+    /// Uzun pozlamada kareler nasıl birleşir (ortalama: ipeksi, toplam: aydınlat, enParlak: ışık izi)
+    @Published var uzunYol = Birlestir(rawValue: Kamera.ud.string(forKey: "k.uzunYol") ?? "") ?? .ortalama {
+        didSet { Kamera.ud.set(uzunYol.rawValue, forKey: "k.uzunYol"); kuyruk.async { self.normalUygula() } }
+    }
     /// Üstteki biçim etiketi ("12 MP · JPEG", "4K · 30", "4K · 2 sn · 60× hızlı")
     @Published var cozunurluk = ""
     @Published var bildirim: String?
@@ -102,6 +110,9 @@ final class Kamera: NSObject, ObservableObject {
     var birlestirici: Birlestirici?
     var birlestirmeHedef = 0
     var birlestirmeBitis: Date?
+    var birlestirmeBas = Date()
+    /// FOTO'da uzun pozlama sürüyor (kare çıkışı gerekli)
+    var uzunSuruyor = false
     var seriZamanlayici: Timer?
     var seriSayi = 0
     var geriSayiyor = false
@@ -261,7 +272,7 @@ final class Kamera: NSObject, ObservableObject {
 
     /// Kare çıkışı yalnız gerektiğinde (her karenin dönüştürülmesi pil ve ısı demek)
     private func kareCiktiAyarla() {
-        let gerekli = mod != .video && (mod == .pro || mod == .timelapse || asistanAcik || (sahneOto && mod == .foto) || !kareDinleyiciler.isEmpty)
+        let gerekli = mod != .video && (mod == .pro || mod == .timelapse || uzunSuruyor || asistanAcik || (sahneOto && mod == .foto) || !kareDinleyiciler.isEmpty)
         if gerekli, !oturum.outputs.contains(kareCikti), oturum.canAddOutput(kareCikti) { oturum.addOutput(kareCikti) }
         if !gerekli, oturum.outputs.contains(kareCikti) { oturum.removeOutput(kareCikti) }
         if let b = kareCikti.connection(with: .video) {
@@ -339,6 +350,8 @@ final class Kamera: NSObject, ObservableObject {
         mod = yeni
         Kamera.ud.set(yeni.rawValue, forKey: "k.mod")
         sahneOnerisi = nil
+        if yeni == .pro && !onde { mercekUygula() }
+        if yeni != .foto, secilenEnst != nil { secilenEnst = nil }
         if yeni.foto, flas == .fener { flas = .kapali }
         if !yeni.foto, flas == .oto || flas == .acik { flas = .kapali }
         kuyruk.async {
@@ -374,15 +387,19 @@ final class Kamera: NSObject, ObservableObject {
         l.append(1)
         if let t = teleCarpani, !onde { if t > 2.5 { l.append(2) }; l.append(t) } else { l.append(2) }
         zoomDuraklari = l
+        if mod == .pro && !onde { mercekUygula() }
     }
 
     /// Görünen çarpana göre mercek seçilir (0,5× geniş açı, tele ve üstü tele mercek), aradaki kısım dijital
-    func yakinlastir(_ istenen: CGFloat) {
+    func yakinlastir(_ istenen: CGFloat, moda: Bool = true) {
         guard !kayitta, !proCalisiyor else { return }
         let ust = max(10, (teleCarpani ?? 2) * 2)
         let etkin = min(max(istenen, onde || !ultraVar ? 1 : 0.5), ust)
         let yeniLens: Lens = onde ? .genis : (etkin < 1 ? .ultra : (teleCarpani.map { etkin >= $0 } == true ? .tele : .genis))
         zoom = etkin
+        if moda, mod == .pro, proAyar.mercek.map({ abs(CGFloat($0) - etkin) > 0.01 }) ?? true {
+            var a = proAyar; a.mercek = Double(etkin); proAyar = a; proMod.yaz(a)
+        }
         kuyruk.async {
             if yeniLens != self.lens { self.cihazSec(yeniLens, onde: self.onde) }
             guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
@@ -394,6 +411,9 @@ final class Kamera: NSObject, ObservableObject {
     // MARK: pozlama, beyaz denge, odak (PRO dışındaki modlar)
 
     func isoSec(_ iso: Float?) { secilenIso = iso; kuyruk.async { self.normalUygula() } }
+    func enstSec(_ e: Double?) { secilenEnst = e; kuyruk.async { self.normalUygula() } }
+    /// Seçilen enstantane tek karede verilemiyor: kareler birleştirilecek
+    var uzunPozlama: Bool { secilenEnst.map { $0 > enUzunEnst + 0.01 } ?? false }
     func evSec(_ v: Float) { ev = v; kuyruk.async { self.normalUygula() } }
     func bdSec(_ k: Float?) { bd = k; kuyruk.async { self.normalUygula() } }
     func odakSec(_ o: Float?) { odakKonum = o; kuyruk.async { self.normalUygula() } }
@@ -417,9 +437,16 @@ final class Kamera: NSObject, ObservableObject {
         guard let d = cihaz, (try? d.lockForConfiguration()) != nil else { return }
         defer { d.unlockForConfiguration() }
         d.activeMaxExposureDuration = .invalid
-        if let iso = secilenIso {
+        if secilenIso != nil || secilenEnst != nil {
             d.setExposureTargetBias(0)
-            d.setExposureModeCustom(duration: AVCaptureDevice.currentExposureDuration, iso: min(max(iso, d.activeFormat.minISO), d.activeFormat.maxISO))
+            let bicim = d.activeFormat
+            let enUzun = bicim.maxExposureDuration.seconds
+            // Tek karenin süresi telefonun sınırında kalır; ortalama birleştirmede ISO aradaki fark kadar artar (parlaklık istenen süreninki olur)
+            let istenen = secilenEnst ?? d.exposureDuration.seconds
+            let sure = min(max(istenen, bicim.minExposureDuration.seconds), enUzun)
+            let kazanc = istenen < Kamera.bulb && uzunYol == .ortalama ? Float(max(1, istenen / sure)) : 1
+            let iso = (secilenIso ?? d.iso * Float(d.exposureDuration.seconds / sure)) * kazanc
+            d.setExposureModeCustom(duration: CMTime(seconds: sure, preferredTimescale: 1_000_000), iso: min(max(iso, bicim.minISO), bicim.maxISO))
         } else {
             if d.isExposureModeSupported(.continuousAutoExposure) { d.exposureMode = .continuousAutoExposure }
             d.setExposureTargetBias(min(max(ev, d.minExposureTargetBias), d.maxExposureTargetBias))
@@ -452,7 +479,7 @@ final class Kamera: NSObject, ObservableObject {
                 d.focusPointOfInterest = nokta
                 d.focusMode = pro && self.proAyar.odak == .afc ? .continuousAutoFocus : .autoFocus
             }
-            if !pro, self.secilenIso == nil, d.isExposurePointOfInterestSupported { d.exposurePointOfInterest = nokta; d.exposureMode = .continuousAutoExposure }
+            if !pro, self.secilenIso == nil, self.secilenEnst == nil, d.isExposurePointOfInterestSupported { d.exposurePointOfInterest = nokta; d.exposureMode = .continuousAutoExposure }
             d.unlockForConfiguration()
         }
     }
@@ -484,6 +511,7 @@ final class Kamera: NSObject, ObservableObject {
         switch mod {
         case .foto, .portre:
             if geriSayiyor { geriSayiyor = false; proIlerleme = nil; return }
+            if uzunSuruyor { kareKuyruk.async { self.birlestirmeBitir() }; return }
             guard zamanlayici > 0 else { tekCek(yon: yon); return }
             geriSayiyor = true
             Task { @MainActor in
@@ -516,6 +544,7 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     private func tekCek(yon: AVCaptureVideoOrientation) {
+        if mod == .foto, uzunPozlama, let e = secilenEnst { uzunCek(e, yon: yon); return }
         kuyruk.async {
             self.fotoCikti.connection(with: .video)?.videoOrientation = yon
             self.fotoCek(hizli: false)
@@ -538,6 +567,39 @@ final class Kamera: NSObject, ObservableObject {
         if mod != .pro, fotoCikti.supportedFlashModes.contains(f) { ayar.flashMode = f }
         if #available(iOS 18.0, *), !deklansorSesi, fotoCikti.isShutterSoundSuppressionSupported { ayar.isShutterSoundSuppressionEnabled = true }
         fotoCikti.capturePhoto(with: ayar, delegate: self)
+    }
+
+    /// FOTO'da 1 sn'yi aşan enstantane ya da BULB: telefonun en uzun pozlamasıyla art arda kareler alınıp tek fotoğrafta birleştirilir
+    private func uzunCek(_ e: Double, yon: AVCaptureVideoOrientation) {
+        uzunSuruyor = true
+        proCalisiyor = true
+        UIApplication.shared.isIdleTimerDisabled = true
+        let bulb = e >= Kamera.bulb
+        proIlerleme = bulb ? "BULB · bitirmek için deklanşör" : "0:00 / \(Kamera.saat(e))"
+        let yol = uzunYol
+        kuyruk.async {
+            self.oturum.beginConfiguration()
+            self.kareCiktiAyarla()
+            self.oturum.commitConfiguration()
+            self.kareKuyruk.async {
+                self.kareCikti.connection(with: .video)?.videoOrientation = yon
+                self.birlestirici = Birlestirici(yol)
+                self.birlestirmeHedef = 0
+                self.birlestirmeBas = Date()
+                self.birlestirmeBitis = bulb ? .distantFuture : Date().addingTimeInterval(e)
+            }
+        }
+    }
+
+    /// Birleştirme bitince (kare kuyruğundan çağrılır): uzun pozlamanın kare çıkışı kalkar
+    func uzunBitti() {
+        guard uzunSuruyor else { return }
+        uzunSuruyor = false
+        kuyruk.async {
+            self.oturum.beginConfiguration()
+            self.kareCiktiAyarla()
+            self.oturum.commitConfiguration()
+        }
     }
 
     func kaydet(_ degisiklik: @escaping () -> Void, mesaj: String, kucuk: UIImage? = nil) {

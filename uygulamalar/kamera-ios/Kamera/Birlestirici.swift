@@ -40,7 +40,7 @@ final class Birlestirici {
         gecici.withUnsafeBufferPointer { g in
             toplam.withUnsafeMutableBufferPointer { t in
                 switch yol {
-                case .ortalama: vDSP_vadd(t.baseAddress!, 1, g.baseAddress!, 1, t.baseAddress!, 1, n)
+                case .ortalama, .toplam: vDSP_vadd(t.baseAddress!, 1, g.baseAddress!, 1, t.baseAddress!, 1, n)
                 case .enParlak: vDSP_vmax(t.baseAddress!, 1, g.baseAddress!, 1, t.baseAddress!, 1, n)
                 }
             }
