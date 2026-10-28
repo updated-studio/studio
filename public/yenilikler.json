@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-28-a",
+    "tarih": "28 Ekim 2026",
+    "baslik": "Hareket geçmişi",
+    "bolumler": [
+      {
+        "ad": "Yönetim",
+        "maddeler": [
+          "Profil menüsünde \"Hareket geçmişi\": panelde ve Stüdyo'da kim ne yaptı, tek listede.",
+          "Silinen içerik \"Geri getir\" ile taslak olarak geri gelir.",
+          "Kayıtlar yalnız eklenir; kimse silemez. Yalnız yöneticiler görür."
+        ]
+      },
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Haberlerde editörün fotoğrafı görünür; fotoğraf Site → Ekip → Yazarlar'dan yüklenir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-27-b",
     "tarih": "27 Ekim 2026",
     "baslik": "Künye görselleri ve UPscore",

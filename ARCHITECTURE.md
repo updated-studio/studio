@@ -190,6 +190,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 ## 12. Karar günlüğü
 
+- **28 Ekim 2026:** Hareket geçmişi: panel ve Stüdyo'daki her işlem `public.hareketler` tablosunda (yalnız ekleme, yöneticiler okur; göç 0045). Panel kancası site deposunda, Stüdyo tarafı tetikleyicilerle; silinen içerik Stüdyo'dan geri getirilir.
 - **8 Ekim 2026:** Ekip paneli için Supabase seçildi; giriş davet listesiyle.
 - **8 Ekim 2026:** E-posta bildirimi şimdilik Enes'in Gmail'inden; kurumsal adres gelince taşınacak.
 - **12 Ekim 2026:** Tüm araçlar tek sistemde (Updated Stüdyo) toplanacak. Teknoloji: TypeScript + React + Vite + Supabase + Capacitor.

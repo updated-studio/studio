@@ -17,6 +17,7 @@ const MarkaKiti = lazy(yukle(() => import("./marka-kiti/MarkaKiti")));
 const Takvim = lazy(yukle(() => import("./takvim/Takvim")));
 const SistemDurumu = lazy(yukle(() => import("./sistem/SistemDurumu")));
 const Baglantilar = lazy(yukle(() => import("./sistem/Baglantilar")));
+const Hareketler = lazy(yukle(() => import("./sistem/Hareketler")));
 
 // Stüdyo'nun modül listesi. Yeni araç = buraya bir satır + src/modules/<ad>/ klasörü.
 // (ARCHITECTURE.md, kural 1: ayrı araç açılmaz, modül eklenir.)
@@ -41,5 +42,6 @@ export const MODULLER: Modul[] = [
   { id: "panel-giris", ad: "Site paneli (yedek)", ikon: "site", bilesen: PanelGiris, yer: "gizli" },
   { id: "sistem", ad: "Sistem durumu", ikon: "yonetim", bilesen: SistemDurumu, yer: "profil", sadeceYonetici: true },
   { id: "baglantilar", ad: "Bağlantı anahtarları", ikon: "yonetim", bilesen: Baglantilar, yer: "profil", sadeceYonetici: true },
+  { id: "hareketler", ad: "Hareket geçmişi", ikon: "saat", bilesen: Hareketler, yer: "profil", sadeceYonetici: true },
   { id: "yonetim", ad: "Yönetim", ikon: "yonetim", bilesen: YonetimSayfa, yer: "profil", sadeceYonetici: true },
 ];
