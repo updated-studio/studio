@@ -452,20 +452,30 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
      * Fotoğraf çeker: JPEG (ve RAW açıksa DNG). `kaydet(dosyaAdı, mime, yaz)` dosyayı galeriye yazar, başarıyı döndürür.
      * `sonuc` her dosya yazıldıktan sonra bir kez çağrılır: hata yoksa null.
      */
+    private var cekimNo = 0
     fun fotoCek(kaydet: (String, String, (OutputStream) -> Unit) -> Boolean, sonuc: (String?) -> Unit) {
         h.post {
             val c = cihaz; val s = oturum; val jr = jpegOkuyucu
             if (c == null || s == null || jr == null) { sonuc("Kamera fotoğrafa hazır değil."); return@post }
-            if (cekiliyor) return@post
+            // Önceki çekim bitmeden yeni basış sessizce yutulmasın (deklanşör "basmıyor" gibi görünüyordu)
+            if (cekiliyor) { sonuc("Önceki fotoğraf kaydediliyor, bir an bekle."); return@post }
             cekiliyor = true
+            val no = ++cekimNo
             val ad = "UPDATED_" + java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
             val rr = rawOkuyucu; val yon = cikisYonu()
             var bekleyen = if (rr != null) 2 else 1; var hata: String? = null
-            fun bitti(e: String?) { if (e != null && hata == null) hata = e; if (--bekleyen == 0) { cekiliyor = false; sonuc(hata) } }
+            var tamam = false
+            fun bitti(e: String?) { if (tamam) return; if (e != null && hata == null) hata = e; if (--bekleyen == 0) { tamam = true; cekiliyor = false; sonuc(hata) } }
+            // Güvenlik: kamera kareyi hiç vermezse (sürücü takılması) deklanşör kilitli kalmasın
+            val sure = 6000L + ((ayar.pozlamaNs ?: 0L) / 1_000_000L).coerceAtMost(60_000L)
+            h.postDelayed({ if (!tamam && cekimNo == no) { tamam = true; cekiliyor = false; HataKaydi.not("foto", "zaman aşımı"); sonuc("Fotoğraf alınamadı, tekrar dene.") } }, sure)
             jr.setOnImageAvailableListener({ r ->
                 val img = runCatching { r.acquireNextImage() }.getOrNull() ?: return@setOnImageAvailableListener
-                try { val buf = img.planes[0].buffer; val b0 = ByteArray(buf.remaining()); buf.get(b0); val b = jpegIsle?.invoke(b0) ?: b0; bitti(if (kaydet("$ad.jpg", "image/jpeg") { it.write(b) }) null else "JPEG kaydedilemedi.") }
-                catch (e: Exception) { bitti("JPEG: ${e.message}") } finally { img.close() }
+                val b0 = try { val buf = img.planes[0].buffer; ByteArray(buf.remaining()).also { buf.get(it) } } catch (e: Exception) { bitti("JPEG: ${e.message}"); null } finally { img.close() }
+                // Renk işleme ve kaydetme kamera iş parçacığının dışında: büyük fotoğrafta önizleme donmasın
+                if (b0 != null) { val isle = jpegIsle; Thread({
+                    val e = try { val b = isle?.invoke(b0) ?: b0; if (kaydet("$ad.jpg", "image/jpeg") { it.write(b) }) null else "JPEG kaydedilemedi." } catch (t: Throwable) { "JPEG: ${t.message}" }
+                    h.post { bitti(e) } }, "foto-kaydet").start() }
             }, h)
             var meta: TotalCaptureResult? = null; var rawImg: Image? = null
             fun dng() {
@@ -485,7 +495,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                     override fun onCaptureCompleted(ss: CameraCaptureSession, q: CaptureRequest, t: TotalCaptureResult) { meta = t; if (rr != null) dng() }
                     override fun onCaptureFailed(ss: CameraCaptureSession, q: CaptureRequest, f: android.hardware.camera2.CaptureFailure) { bekleyen = 1; bitti("Çekim başarısız oldu.") }
                 }, h)
-            } catch (e: Exception) { cekiliyor = false; sonuc(e.message ?: "Çekim başarısız."); HataKaydi.not("foto", e.stackTraceToString()) }
+            } catch (e: Exception) { tamam = true; cekiliyor = false; sonuc(e.message ?: "Çekim başarısız."); HataKaydi.not("foto", e.stackTraceToString()) }
             // Flaş açık/otomatik: önce pozlama ölçümü (ön flaş), ölçüm bitince ya da 1,5 sn sonra çekim
             val flasli = flasVar && ayar.flas in 1..2 && ayar.iso == null && ayar.pozlamaNs == null && pro == null
             if (!flasli) cek()

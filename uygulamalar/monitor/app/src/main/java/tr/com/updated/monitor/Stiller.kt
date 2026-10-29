@@ -17,13 +17,33 @@ import kotlin.math.min
  * dikey ton) + yoğunluk ve doygunluk. Stil, seçili LUT'la birleşip tek bir 33³ LUT olur: ekranda GL çizici bunu kullanır,
  * "Kayda göm" açıksa aynı LUT fotoğrafa (JPEG yeniden yazılır) ve videoya (kayıttan sonra Media3 Transformer ile) işlenir.
  */
-enum class HazirStil(val ad: String, val renkler: IntArray) {
+enum class HazirStil(val ad: String, val renkler: IntArray, val aciklama: String = "", val kimlik: String = "") {
     STANDART("Standart", intArrayOf(Color.rgb(201, 138, 89), Color.rgb(46, 59, 74))),
     SINEMATIK("Sinematik", intArrayOf(Color.rgb(217, 153, 89), Color.rgb(31, 64, 69))),
     SICAK("Sıcak", intArrayOf(Color.rgb(232, 168, 107), Color.rgb(89, 59, 41))),
     SOGUK("Soğuk", intArrayOf(Color.rgb(153, 176, 209), Color.rgb(31, 41, 59))),
     CANLI("Canlı", intArrayOf(Color.rgb(255, 153, 79), Color.rgb(33, 74, 122))),
     SIYAH_BEYAZ("S-B", intArrayOf(Color.rgb(171, 171, 171), Color.rgb(33, 33, 33))),
+    // Film reçeteleri (Fatih 29 Ekim): sevilen film ve fotoğraf makinesi görünümlerinden esinli; marka adı kullanılmaz.
+    // Kimlikler iPhone'daki HazirStil rawValue'larıyla aynı
+    LC_KLASIK("LC Klasik", intArrayOf(Color.rgb(219, 163, 115), Color.rgb(20, 26, 31)), "Doğal, derin siyahlar, hafif sıcak", "lcKlasik"),
+    LC_CANLI("LC Canlı", intArrayOf(Color.rgb(250, 140, 64), Color.rgb(13, 51, 107)), "Sert kontrast, dolgun renk", "lcCanli"),
+    LC_SB("LC S-B", intArrayOf(Color.rgb(217, 217, 217), Color.rgb(8, 8, 8)), "Yüksek kontrastlı siyah-beyaz", "lcSB"),
+    KLASIK_KROM("Klasik Krom", intArrayOf(Color.rgb(184, 168, 143), Color.rgb(41, 56, 61)), "Sakin renkler, sert gölgeler, belgesel", "klasikKrom"),
+    KLASIK_NEGATIF("Klasik Negatif", intArrayOf(Color.rgb(230, 158, 140), Color.rgb(26, 69, 74)), "Camgöbeği gölge, sıcak ışık, sert ton", "klasikNegatif"),
+    CANLI_SLAYT("Canlı Slayt", intArrayOf(Color.rgb(255, 107, 51), Color.rgb(0, 82, 140)), "Slayt film: çok doygun, parlak", "canliSlayt"),
+    SINEMA_YUMUSAK("Sinema Yumuşak", intArrayOf(Color.rgb(178, 166, 148), Color.rgb(56, 69, 74)), "Düşük kontrast, az doygun, sinema", "sinemaYumusak"),
+    GUMUS_SB("Gümüş S-B", intArrayOf(Color.rgb(199, 199, 199), Color.rgb(51, 51, 51)), "İnce tonlu, yumuşak siyah-beyaz", "gumusSB"),
+    FILM_GORUNUMU("Film Görünümü", intArrayOf(Color.rgb(242, 189, 153), Color.rgb(64, 56, 61)), "Sıcak ten, yumuşak, açık siyahlar", "filmGorunumu"),
+    RETRO("Retro", intArrayOf(Color.rgb(224, 194, 115), Color.rgb(61, 71, 51)), "70'ler: sarı-yeşil, soluk", "retro"),
+    VINTAGE("Vintage", intArrayOf(Color.rgb(219, 189, 158), Color.rgb(82, 69, 64)), "Solmuş baskı, sıcak, düşük doygunluk", "vintage"),
+    ;
+    val recete: Boolean get() = this in RECETELER
+
+    companion object {
+        val TEMEL = listOf(STANDART, SINEMATIK, SICAK, SOGUK, CANLI, SIYAH_BEYAZ)
+        val RECETELER = listOf(LC_KLASIK, LC_CANLI, LC_SB, KLASIK_KROM, KLASIK_NEGATIF, CANLI_SLAYT, SINEMA_YUMUSAK, GUMUS_SB, FILM_GORUNUMU, RETRO, VINTAGE)
+    }
 }
 
 data class Stil(
@@ -34,6 +54,7 @@ data class Stil(
     var yogunluk: Float = 1f,
     /** −1…+1 */
     var doygunluk: Float = 0f,
+    /** Eski "Kayda göm" seçimi; Kamera artık kullanmıyor (stil her zaman kayda girer), eski kayıtlar okunabilsin diye duruyor */
     var kaydaGom: Boolean = false,
 ) {
     /** Görüntüyü değiştiriyor mu */
@@ -61,6 +82,18 @@ data class Stil(
             r = f(r); g = f(g); b = f(b)
         }
         fun sicaklik(t: Float) { r *= 1 + 0.10f * t; g *= 1 + 0.02f * t; b *= 1 - 0.12f * t }
+        // Reçeteler için: siyahları kaldırma (solma), gölge/ışık renk kaydırma, S eğrisi
+        fun sol(f: Float) { r = f + r * (1 - f); g = f + g * (1 - f); b = f + b * (1 - f) }
+        fun ayir(gr: Float, gg: Float, gb: Float, ir: Float, ig: Float, ib: Float) {
+            val l = luma(); val gk = max(0f, 1 - l * 2); val ik = max(0f, l * 2 - 1)
+            r += gr * gk + ir * ik; g += gg * gk + ig * ik; b += gb * gk + ib * ik
+        }
+        fun sEgri(k: Float) {
+            // Yumuşak S: k > 0 kontrast artar (0,5 sabit kalır)
+            fun f(v: Float): Float { val c = v.coerceIn(0f, 1f); return c + k * 2 * (c - 0.5f) * c * (1 - c) }
+            r = f(r); g = f(g); b = f(b)
+        }
+        fun sb(kontrast: Float, kaldir: Float) { val l = luma(); r = l; g = l; b = l; egri(kontrast, kaldir) }
         when (hazir) {
             HazirStil.STANDART -> {}
             HazirStil.SINEMATIK -> {
@@ -74,6 +107,17 @@ data class Stil(
             HazirStil.SOGUK -> { sicaklik(-0.6f); doy(0.95f) }
             HazirStil.CANLI -> { egri(1.12f, 0f); doy(1.3f) }
             HazirStil.SIYAH_BEYAZ -> { val l = luma(); r = l; g = l; b = l; egri(1.15f, 0f) }
+            HazirStil.LC_KLASIK -> { sEgri(0.35f); sicaklik(0.15f); doy(0.92f) }
+            HazirStil.LC_CANLI -> { sEgri(0.55f); doy(1.28f); sicaklik(0.1f) }
+            HazirStil.LC_SB -> { r = 0.3f * r + 0.59f * g + 0.11f * b; g = r; b = r; sEgri(0.8f) }
+            HazirStil.KLASIK_KROM -> { doy(0.72f); egri(1.12f, 0f); ayir(-0.01f, 0.01f, 0.025f, 0.015f, 0.008f, -0.01f) }
+            HazirStil.KLASIK_NEGATIF -> { egri(1.16f, 0f); doy(0.82f); ayir(-0.03f, 0.015f, 0.035f, 0.04f, 0f, 0f) }
+            HazirStil.CANLI_SLAYT -> { sEgri(0.5f); doy(1.45f) }
+            HazirStil.SINEMA_YUMUSAK -> { egri(0.86f, 0.06f); doy(0.78f); ayir(-0.01f, 0.01f, 0.02f, 0.01f, 0.005f, -0.005f) }
+            HazirStil.GUMUS_SB -> { sb(1.06f, 0.08f); r += 0.008f; b -= 0.008f }
+            HazirStil.FILM_GORUNUMU -> { egri(0.92f, 0.04f); sol(0.035f); sicaklik(0.25f); doy(0.9f) }
+            HazirStil.RETRO -> { sicaklik(0.35f); g += 0.02f; ayir(-0.01f, 0.025f, -0.01f, 0.02f, 0.015f, -0.03f); sol(0.06f); doy(0.8f) }
+            HazirStil.VINTAGE -> { sol(0.09f); egri(0.88f, 0f); sicaklik(0.3f); doy(0.65f) }
         }
         if (abs(x) > 0.001f) sicaklik(x)
         if (abs(y) > 0.001f) egri(1 - 0.3f * y, max(0f, y) * 0.3f)

@@ -99,6 +99,11 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
         fun Y(y: Float) = r.top + y * r.height()
         fun yx(x: Float) = if (yon and 1 == 1) 1 - x else x
         fun yy(y: Float) = if (yon and 2 == 2) 1 - y else y
+        val noktalar = gucluNoktalar(tur, yon, r.width() / r.height()).let { if (tur == KompTur.ONCU) listOf(analiz?.kacis?.takeIf { k -> k.x in 0f..1f && k.y in 0f..1f }?.let { k -> PointF(k.x, k.y) } ?: it[0]) else if (tur == KompTur.UCGEN) { val (a1, a2) = ucgenAyaklari(r.width() / r.height()); listOf(PointF(yx(a1.x), yy(a1.y)), PointF(yx(a2.x), yy(a2.y))) } else it }
+        // AI Kadraj: konu güçlü noktadaysa kılavuz da yeşil (iyi kadraj gözden kaçmasın)
+        val iyi = asistan && konu?.let { k -> noktalar.minOfOrNull { hypot((it.x - k.centerX()) * r.width(), (it.y - k.centerY()) * r.height()) / r.height() }?.let { it < 0.045f } } == true
+        cizgi.color = if (iyi) Color.argb(242, 60, 220, 110) else Color.argb(200, 255, 255, 255)
+        ince.color = if (iyi) Color.argb(153, 60, 220, 110) else Color.argb(130, 255, 255, 255)
         when (tur) {
             KompTur.UCTE_BIR -> for (k in 1..2) { c.drawLine(X(k / 3f), r.top, X(k / 3f), r.bottom, cizgi); c.drawLine(r.left, Y(k / 3f), r.right, Y(k / 3f), cizgi) }
             KompTur.PHI -> for (k in floatArrayOf(1 - 1 / FI, 1 / FI)) { c.drawLine(X(k), r.top, X(k), r.bottom, cizgi); c.drawLine(r.left, Y(k), r.right, Y(k), cizgi) }
@@ -137,7 +142,6 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
             }
             KompTur.KAPALI -> {}
         }
-        val noktalar = gucluNoktalar(tur, yon, r.width() / r.height()).let { if (tur == KompTur.ONCU) listOf(analiz?.kacis?.takeIf { k -> k.x in 0f..1f && k.y in 0f..1f }?.let { k -> PointF(k.x, k.y) } ?: it[0]) else if (tur == KompTur.UCGEN) { val (a1, a2) = ucgenAyaklari(r.width() / r.height()); listOf(PointF(yx(a1.x), yy(a1.y)), PointF(yx(a2.x), yy(a2.y))) } else it }
         noktalar.forEach { c.drawCircle(X(it.x), Y(it.y), 7f, nokta) }
 
         // Akıllı yardımcı: konudan en yakın güçlü noktaya ok + ibre
