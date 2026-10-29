@@ -153,19 +153,15 @@ struct KameraAyarlar: View {
                 GostergeMenu(kamera: kamera).listRowBackground(Color.clear)
             } header: { Text("Görüntü araçları") }
             Section("Kompozisyon") {
-                Toggle("Otomatik kompozisyon (sahneye göre)", isOn: $kamera.kompOto)
-                if !kamera.kompOto {
-                    Picker("Kılavuz", selection: $kamera.kompTur) {
-                        ForEach(KompTur.allCases) { t in Text(t.ad).tag(t) }
-                    }
-                    Toggle("Elle seçerken öneri göster", isOn: $kamera.oneriAcik)
+                Picker("Kılavuz", selection: $kamera.kompTur) {
+                    ForEach(KompTur.allCases) { t in Text(t.ad).tag(t) }
                 }
-            }
-            Section("Yardımcılar") {
                 Toggle("Terazi", isOn: $kamera.teraziAcik)
-                Toggle("Akıllı yardımcı (ibre)", isOn: $kamera.asistanAcik)
-                Toggle("Otomatik sahne önerisi", isOn: $kamera.sahneOto)
             }
+            Section {
+                Toggle("AI Kadraj", isOn: $kamera.asistanAcik)
+                if kamera.asistanAcik { Toggle("Sahne önerileri (gece, portre…)", isOn: $kamera.sahneOto) }
+            } footer: { Text("Konuyu bulur, yön tarif eder; sahneyi birkaç saniye inceleyip tek öneri getirir, dokununca uygulanır. Kadraj iyiyse çizgiler yeşil olur. Kapalıyken ekranda hiçbiri görünmez.") }
         }
         .navigationTitle("Göstergeler")
     }

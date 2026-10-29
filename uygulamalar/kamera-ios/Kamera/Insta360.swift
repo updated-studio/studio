@@ -319,7 +319,8 @@ final class Insta360Alici: ObservableObject {
         if hamParca % 20 == 1 || ham.count >= 1_048_576 { try? ham.write(to: Insta360Alici.hamDosya) }
     }
 
-    func hamYaz() { kuyruk.sync { try? ham.write(to: Insta360Alici.hamDosya) } }
+    /// Boşsa (durdurulduysa) son dosya korunur
+    func hamYaz() { kuyruk.sync { if !ham.isEmpty { try? ham.write(to: Insta360Alici.hamDosya) } } }
 
     private func yaz(_ s: String) {
         let f = DateFormatter(); f.dateFormat = "HH:mm:ss"

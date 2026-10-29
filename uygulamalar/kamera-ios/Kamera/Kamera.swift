@@ -104,9 +104,11 @@ final class Kamera: NSObject, ObservableObject {
     @Published var favoriler: [Favori] = (try? JSONDecoder().decode([Favori].self, from: Kamera.ud.data(forKey: "k.favoriler") ?? Data())) ?? Favori.varsayilan {
         didSet { if let d = try? JSONEncoder().encode(favoriler) { Kamera.ud.set(d, forKey: "k.favoriler") } }
     }
-    /// Otomatik kompozisyon: kılavuzu sahneye göre kendisi seçer (elle seçince kapanır)
-    @Published var kompOto = Kamera.ud.object(forKey: "k.kompOto") as? Bool ?? true { didSet { Kamera.ud.set(kompOto, forKey: "k.kompOto"); yardimcilariAyarla() } }
-    var otoAday: (tur: KompTur, yon: Int, bas: Date)?
+    /// AI Kadraj düşünürken aday öneri ve sahne (aynı aday ~6 sn sürünce gösterilir; Fatih 29 Ekim: "saniyede 1 fikirle gelmesin")
+    var aiAday: (tur: KompTur, yon: Int, bas: Date)?
+    var sahneAday: (sahne: Sahne, bas: Date)?
+    static let aiBekleme: TimeInterval = 6
+    @Published var aiDusunuyor = false
     /// Çizici ekranda (kare çıkışı oturumda ve araç açık)
     @Published var gostergeGorunur = false
     /// Araç istendi ama iPhone bu modda kare çıkışına izin vermedi
@@ -126,9 +128,9 @@ final class Kamera: NSObject, ObservableObject {
     @Published var kompTur = KompTur(rawValue: Kamera.ud.string(forKey: "k.komp") ?? "") ?? .kapali { didSet { Kamera.ud.set(kompTur.rawValue, forKey: "k.komp"); if kompTur != .kapali { sonKomp = kompTur } } }
     @Published var kompYon = Kamera.ud.integer(forKey: "k.kompYon") { didSet { Kamera.ud.set(kompYon, forKey: "k.kompYon") } }
     var sonKomp = KompTur(rawValue: Kamera.ud.string(forKey: "k.sonKomp") ?? "") ?? .spiral { didSet { Kamera.ud.set(sonKomp.rawValue, forKey: "k.sonKomp") } }
-    @Published var asistanAcik = Kamera.ud.bool(forKey: "k.asistan") { didSet { Kamera.ud.set(asistanAcik, forKey: "k.asistan"); yardimcilariAyarla() } }
+    /// AI Kadraj (konu algılama, yön tarifi, kompozisyon ve sahne önerisi); kapalıyken ekranda hiçbiri görünmez
+    @Published var asistanAcik = Kamera.ud.bool(forKey: "k.aiKadraj") { didSet { Kamera.ud.set(asistanAcik, forKey: "k.aiKadraj"); yardimcilariAyarla() } }
     @Published var teraziAcik = Kamera.ud.bool(forKey: "k.terazi") { didSet { Kamera.ud.set(teraziAcik, forKey: "k.terazi"); yardimcilariAyarla() } }
-    @Published var oneriAcik = Kamera.ud.object(forKey: "k.oneri") as? Bool ?? true { didSet { Kamera.ud.set(oneriAcik, forKey: "k.oneri") } }
     @Published var sahneOto = Kamera.ud.object(forKey: "k.sahneOto") as? Bool ?? true { didSet { Kamera.ud.set(sahneOto, forKey: "k.sahneOto"); yardimcilariAyarla() } }
     @Published var konu: CGRect?
     @Published var konuAdi = ""
@@ -335,7 +337,7 @@ final class Kamera: NSObject, ObservableObject {
     /// Kare çıkışı yalnız gerektiğinde (her karenin dönüştürülmesi pil ve ısı demek)
     func kareCiktiAyarla() {
         let araclar = gostergeEtkin
-        let gerekli = araclar || mod != .video && (mod == .pro || mod == .timelapse || uzunSuruyor || asistanAcik || kompOto || (sahneOto && mod == .foto) || !kareDinleyiciler.isEmpty)
+        let gerekli = araclar || mod != .video && (mod == .pro || mod == .timelapse || uzunSuruyor || asistanAcik || !kareDinleyiciler.isEmpty)
         if gerekli, !oturum.outputs.contains(kareCikti), oturum.canAddOutput(kareCikti) { oturum.addOutput(kareCikti) }
         if !gerekli, oturum.outputs.contains(kareCikti) { oturum.removeOutput(kareCikti) }
         let var_ = oturum.outputs.contains(kareCikti)
@@ -771,12 +773,17 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     private func sahneDenetle() {
-        guard sahneOto, mod == .foto, !kayitta, let d = cihaz else { sahneOnerisi = nil; return }
+        guard sahneOto, asistanAcik, mod == .foto, !kayitta, let d = cihaz else { sahneOnerisi = nil; sahneAday = nil; return }
         let otoPoz = secilenIso == nil && d.exposureMode == .continuousAutoExposure
         let r = renkOrt
         let yuz = asistanAcik && konuAdi == "Yüz" && (konu.map { $0.width * $0.height } ?? 0) > 0.05
-        sahneOnerisi = Sahne.oner(isoSaniye: otoPoz ? d.iso * Float(d.exposureDuration.seconds) : nil, yukariBakiyor: yercekimZ > 0.5,
-                                  ortParlak: 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2], kirmiziMavi: r[2] > 0.01 ? r[0] / r[2] : 1, buyukYuz: yuz)
+        let aday = Sahne.oner(isoSaniye: otoPoz ? d.iso * Float(d.exposureDuration.seconds) : nil, yukariBakiyor: yercekimZ > 0.5,
+                              ortParlak: 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2], kirmiziMavi: r[2] > 0.01 ? r[0] / r[2] : 1, buyukYuz: yuz)
+        // Sahne de birkaç saniye aynı kalınca önerilir; gösterilen öneri yeni aday oturana kadar kalır
+        guard let aday else { sahneAday = nil; if sahneOnerisi != nil { sahneOnerisi = nil }; return }
+        if let a = sahneAday, a.sahne == aday {
+            if Date().timeIntervalSince(a.bas) >= Kamera.aiBekleme, sahneOnerisi != aday { sahneOnerisi = aday }
+        } else { sahneAday = (aday, Date()) }
     }
 
     func sahneUygula() {
@@ -793,16 +800,15 @@ final class Kamera: NSObject, ObservableObject {
     // MARK: kompozisyon yardımcıları
 
     func yardimcilariAyarla() {
-        asistan.konuAcik = asistanAcik || kompOto
-        asistan.analizAcik = asistanAcik || kompOto
-        asistan.renkAcik = sahneOto
+        asistan.konuAcik = asistanAcik
+        asistan.analizAcik = asistanAcik
+        asistan.renkAcik = sahneOto && asistanAcik
         asistan.konuSonuc = { [weak self] k in self?.konuGeldi(k) }
-        asistan.analizSonuc = { [weak self] a in self?.analiz = a; self?.ipucuGuncelle(); self?.otoKompozisyon() }
+        asistan.analizSonuc = { [weak self] a in self?.analiz = a; self?.ipucuGuncelle(); self?.aiDusun() }
         asistan.renkSonuc = { [weak self] r in self?.renkOrt = r }
-        if !asistanAcik { ipucu = nil; kompOneri = nil }
-        if !asistanAcik && !kompOto { konu = nil; konuAdi = ""; analiz = nil }
+        if !asistanAcik { ipucu = nil; kompOneri = nil; sahneOnerisi = nil; aiAday = nil; sahneAday = nil; aiDusunuyor = false; konu = nil; konuAdi = ""; analiz = nil }
         if !teraziAcik { egim = nil }
-        if (teraziAcik || sahneOto), hareket.isDeviceMotionAvailable {
+        if (teraziAcik || sahneOto && asistanAcik), hareket.isDeviceMotionAvailable {
             if !hareket.isDeviceMotionActive {
                 hareket.deviceMotionUpdateInterval = 1.0 / 20
                 hareket.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in if let m { self?.yercekim(m.gravity) } }
@@ -835,15 +841,11 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     private func konuGeldi(_ k: Asistan.Konu?) {
-        guard asistanAcik || kompOto else { return }
+        guard asistanAcik else { return }
         konu = k?.kutu
         konuAdi = k?.ad ?? ""
         sonYuz = k?.yuz
-        if kompOto { otoKompozisyon(); ipucuGuncelle(); return }
-        if kompTur == .kapali, k != nil { kompTur = sonKomp }
-        let o = oneriAcik ? Kompozisyon.oner(konu: konu, mevcut: kompTur, oran: goruntuOrani, analiz: analiz) : nil
-        let h = Kompozisyon.hedef(kompTur, yon: kompYon, oran: goruntuOrani, konu: konu, analiz: analiz)
-        if let o, (h?.hizalama ?? 0) <= 0.85, !kayitta { kompOneri = (tur: o.0, yon: o.1) } else { kompOneri = nil }
+        aiDusun()
         ipucuGuncelle()
     }
 
@@ -854,23 +856,29 @@ final class Kamera: NSObject, ObservableObject {
         ipucu = ipucuSabit.ver(ipucuUret(konu: konu, konuAdi: konuAdi, yuz: konuAdi == "Yüz" ? sonYuz : nil, a: analiz, hedef: h?.nokta, hizalama: h?.hizalama ?? 0))
     }
 
-    /// Otomatik kompozisyon: öneri 1,5 sn aynı kalınca kılavuz ona geçer (titremesin); konu ve çizgi yoksa üçte bir
-    func otoKompozisyon() {
-        guard kompOto, !kayitta, mod != .pro else { return }
-        kompOneri = nil
-        let o = Kompozisyon.oner(konu: konu, mevcut: kompTur, oran: goruntuOrani, analiz: analiz)
-            ?? (kompTur == .kapali ? (.ucteBir, 0) : nil)
-        guard let o else { otoAday = nil; return }
-        if let a = otoAday, a.tur == o.0, a.yon == o.1 {
-            if Date().timeIntervalSince(a.bas) >= 1.5 { kompTur = o.0; kompYon = o.1; otoAday = nil }
+    /// AI Kadraj: aynı kompozisyon önerisi ~6 sn sürünce tek öneri olarak gösterilir (dokununca uygulanır);
+    /// kadraj zaten iyiyse öneri kalkar. Konu ya da çizgi yokken kılavuz kapalıysa üçte bir önerilir.
+    func aiDusun() {
+        guard asistanAcik, !kayitta, mod != .pro else { kompOneri = nil; aiAday = nil; if aiDusunuyor { aiDusunuyor = false }; return }
+        let h = Kompozisyon.hedef(kompTur, yon: kompYon, oran: goruntuOrani, konu: konu, analiz: analiz)
+        let o = Kompozisyon.oner(konu: konu, mevcut: kompTur, oran: goruntuOrani, analiz: analiz) ?? (kompTur == .kapali ? (.ucteBir, 0) : nil)
+        if let o, (h?.hizalama ?? 0) <= 0.85, o.0 != kompTur || o.1 != kompYon {
+            if let a = aiAday, a.tur == o.0, a.yon == o.1 {
+                if Date().timeIntervalSince(a.bas) >= Kamera.aiBekleme, kompOneri?.tur != o.0 || kompOneri?.yon != o.1 { kompOneri = (tur: o.0, yon: o.1) }
+            } else {
+                aiAday = (o.0, o.1, Date())
+            }
         } else {
-            otoAday = (o.0, o.1, Date())
+            aiAday = nil
+            if h?.tamam == true, kompOneri != nil { kompOneri = nil }
         }
+        let d = aiAday != nil && kompOneri == nil
+        if d != aiDusunuyor { aiDusunuyor = d }
     }
 
     func kompOneriUygula() {
         guard let o = kompOneri else { return }
-        kompTur = o.tur; kompYon = o.yon; kompOneri = nil
+        kompTur = o.tur; kompYon = o.yon; kompOneri = nil; aiAday = nil; aiDusunuyor = false
     }
 }
 

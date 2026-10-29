@@ -106,7 +106,7 @@ final class Asistan {
 }
 
 /// Sahneler (Android Sahne.kt): otomatik sahne önerisi. Telefon uzun pozlamayı veremiyorsa PRO MODLAR'daki birleştirme kullanılır.
-enum Sahne: String {
+enum Sahne: String, Equatable {
     case samanyolu, gece, gunBatimi, portre
     var ad: String {
         switch self {

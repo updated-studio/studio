@@ -36,7 +36,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .zamanlayici: return "Zamanlayıcı"
         case .kilavuz: return "Kılavuz"
         case .terazi: return "Terazi"
-        case .yardimci: return "Akıllı yardımcı"
+        case .yardimci: return "AI Kadraj"
         case .ses: return "Ses girişi"
         }
     }
@@ -63,7 +63,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .zamanlayici: return "timer.circle"
         case .kilavuz: return "squareshape.split.3x3"
         case .terazi: return "level"
-        case .yardimci: return "wand.and.stars"
+        case .yardimci: return "sparkles"
         case .ses: return "mic"
         }
     }
@@ -120,7 +120,7 @@ extension Kamera {
         case .monokrom: return ("", gosterge.monokrom)
         case .flas: return (["Kapalı", "Oto", "Açık", "Fener"][flas.rawValue], flas != .kapali)
         case .zamanlayici: return (zamanlayici == 0 ? "Kapalı" : "\(zamanlayici) sn", zamanlayici > 0)
-        case .kilavuz: return (kompOto ? "Oto" : (kompTur == .kapali ? "Kapalı" : kompTur.ad), kompTur != .kapali || kompOto)
+        case .kilavuz: return (kompTur == .kapali ? "Kapalı" : kompTur.ad, kompTur != .kapali)
         case .terazi: return ("", teraziAcik)
         case .yardimci: return ("", asistanAcik)
         case .ses: return (etkinSesGirdi ?? "Mikrofon", harici)
@@ -243,7 +243,7 @@ struct FavoriSatir: View {
         case .peaking: kisa = "Odak vurgusu"
         case .flas: kisa = "Flaş"
         case .zamanlayici: kisa = "Sayaç"
-        case .yardimci: kisa = "Yardımcı"
+        case .yardimci: kisa = "AI Kadraj"
         case .ses: kisa = "Ses"
         case .stil: kisa = "Stiller"
         default: kisa = f.ad

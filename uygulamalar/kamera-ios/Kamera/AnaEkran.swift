@@ -420,11 +420,17 @@ struct AnaEkran: View {
                 cip(Text(kamera.proMod.ozet(kamera.proAyar) + "  ›"), simge: kamera.proMod.simge, renk: Tema.sari) { panelAc(.proAyar) }
                     .yardimBalonu(yardim, "Dokun: ISO, S, WB, mercek")
             }
-            if let o = kamera.kompOneri, !kamera.kayitta, !kamera.kompOto {
-                cip(Text("Öneri: \(o.tur.ad)  ›  Uygula"), simge: "lightbulb", renk: AnaEkran.mavi) { kamera.kompOneriUygula() }
-            }
-            if let s = kamera.sahneOnerisi {
-                cip(Text("Sahne: \(s.ad)  ›  Uygula"), simge: "sparkles", renk: AnaEkran.mavi) { kamera.sahneUygula() }
+            // AI Kadraj: düşünürken yalnız küçük bir işaret; öneri oturunca tek öneri, tetik kelimeye dokununca uygulanır
+            if kamera.asistanAcik && !kamera.kayitta {
+                if let o = kamera.kompOneri {
+                    cip(Text("Kadraj: ") + Text(o.tur.ad).bold().foregroundColor(AnaEkran.mavi), simge: "sparkles", renk: AnaEkran.mavi) { kamera.kompOneriUygula() }
+                } else if let s = kamera.sahneOnerisi {
+                    cip(Text("Sahne: ") + Text(s.ad).bold().foregroundColor(AnaEkran.mavi), simge: "sparkles", renk: AnaEkran.mavi) { kamera.sahneUygula() }
+                } else if kamera.aiDusunuyor {
+                    Label("AI Kadraj inceliyor", systemImage: "sparkles").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
+                        .padding(.horizontal, 10).padding(.vertical, 4).background(Capsule().fill(AnaEkran.cam.opacity(0.6)))
+                        .transition(.opacity)
+                }
             }
         }
     }
@@ -519,7 +525,7 @@ struct AnaEkran: View {
 
     private var degisik: Bool {
         abs(kamera.ev) >= 0.05 || kamera.secilenIso != nil || kamera.secilenEnst != nil || kamera.bd != nil || kamera.odakKonum != nil
-            || (kamera.kompTur != .kapali && !kamera.kompOto) || kamera.asistanAcik || kamera.teraziAcik || kamera.gostergeEtkin
+            || kamera.kompTur != .kapali || kamera.asistanAcik || kamera.teraziAcik || kamera.gostergeEtkin
     }
 
     private func yuvarlak(simge: String, etkin: Bool, aciklama: String, eylem: @escaping () -> Void) -> some View {
@@ -712,8 +718,10 @@ struct AnaEkran: View {
         switch p {
         case .proKartlar:
             ProModSecici(kamera: kamera) { m in
-                kamera.proModSec(m)
                 panel = nil
+                // Seçili moda bir kez daha dokununca normale (FOTO) dönülür
+                if m == kamera.proMod { kamera.modDegistir(.foto); kamera.bildirim = "Normal fotoğraf"; return }
+                kamera.proModSec(m)
                 uyariMod = m
             }
         case .proAyar: ProOzellestir(kamera: kamera)
@@ -805,8 +813,8 @@ struct AnaEkran: View {
             VStack(spacing: 12) {
                 GostergeMenu(kamera: kamera)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 14) {
-                    kontrol("squareshape.split.3x3", "Kılavuz", kamera.kompOto ? "Oto" : (kamera.kompTur == .kapali ? "Kapalı" : kamera.kompTur.ad),
-                            etkin: kamera.kompTur != .kapali || kamera.kompOto) { panelAc(.kilavuz) }
+                    kontrol("squareshape.split.3x3", "Kılavuz", kamera.kompTur == .kapali ? "Kapalı" : kamera.kompTur.ad,
+                            etkin: kamera.kompTur != .kapali) { panelAc(.kilavuz) }
                     kontrol("wand.and.stars", "Yardımcı", kamera.asistanAcik ? "Açık" : "Kapalı", etkin: kamera.asistanAcik) { kamera.asistanAcik.toggle() }
                     kontrol("level", "Terazi", kamera.teraziAcik ? "Açık" : "Kapalı", etkin: kamera.teraziAcik) { kamera.teraziAcik.toggle() }
                 }

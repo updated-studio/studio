@@ -140,7 +140,9 @@ struct KompozisyonKatman: View {
         func yx(_ x: CGFloat) -> CGFloat { yon & 1 == 1 ? 1 - x : x }
         func yy(_ y: CGFloat) -> CGFloat { yon & 2 == 2 ? 1 - y : y }
         let kalin: CGFloat = kucuk ? 1 : 1.3, inceK: CGFloat = kucuk ? 0.7 : 0.9
-        let beyaz = Color.white.opacity(0.8), soluk = Color.white.opacity(0.5)
+        // AI Kadraj: konu güçlü noktadaysa kılavuz da yeşil (iyi kadraj gözden kaçmasın)
+        let iyi = !kucuk && asistan && konu.flatMap { Kompozisyon.hedef(tur, yon: yon, oran: r.width / r.height, konu: $0, analiz: analiz) }?.tamam == true
+        let beyaz = iyi ? Self.yesil.opacity(0.95) : Color.white.opacity(0.8), soluk = iyi ? Self.yesil.opacity(0.6) : Color.white.opacity(0.5)
         var g = c
         if !kucuk { g.addFilter(.shadow(color: .black.opacity(0.6), radius: 1.5)) }
         func cizgi(_ a: CGPoint, _ b: CGPoint, ince: Bool = false, renk: Color? = nil, en: CGFloat? = nil, kesik: [CGFloat] = []) {

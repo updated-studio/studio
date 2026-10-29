@@ -21,6 +21,8 @@ struct ProModSecici: View {
                     }
                 }
             }
+            Text("Seçili moda tekrar dokun: normal fotoğrafa döner").font(.caption2).foregroundStyle(Tema.metin2)
+                .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 4)
     }

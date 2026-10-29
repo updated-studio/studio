@@ -193,24 +193,8 @@ struct KilavuzMenu: View {
         VStack(alignment: .leading, spacing: 10) {
             Label("KOMPOZİSYON KILAVUZU", systemImage: "squareshape.split.3x3").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 8) {
-                // Otomatik: sahneye göre kılavuzu kendisi seçer (basit kullanım); bir kılavuza dokununca elle seçime geçer
-                Button { kamera.kompOto = true; kamera.otoKompozisyon() } label: {
-                    VStack(spacing: 4) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10).fill(Color(red: 58 / 255, green: 64 / 255, blue: 73 / 255))
-                            VStack(spacing: 1) {
-                                Image(systemName: "sparkles").font(.system(size: 15, weight: .medium))
-                                Text("OTO").font(.system(size: 10, weight: .bold))
-                            }
-                            .foregroundStyle(kamera.kompOto ? Tema.sari : .white)
-                        }
-                        .frame(height: 50)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(kamera.kompOto ? Tema.sari : Color.white.opacity(0.12), lineWidth: kamera.kompOto ? 2 : 1))
-                        Text("Otomatik").font(.system(size: 11)).lineLimit(1).foregroundStyle(kamera.kompOto ? Tema.sari : .white)
-                    }
-                }
                 ForEach(KompTur.allCases) { t in
-                    Button { kamera.kompOto = false; kamera.kompTur = t } label: {
+                    Button { kamera.kompTur = t } label: {
                         VStack(spacing: 4) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 10).fill(Color(red: 58 / 255, green: 64 / 255, blue: 73 / 255))
@@ -222,9 +206,9 @@ struct KilavuzMenu: View {
                             }
                             .frame(height: 50)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(t == kamera.kompTur && !kamera.kompOto ? Tema.sari : Color.white.opacity(0.12), lineWidth: t == kamera.kompTur ? 2 : 1))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(t == kamera.kompTur ? Tema.sari : Color.white.opacity(0.12), lineWidth: t == kamera.kompTur ? 2 : 1))
                             Text(t.ad).font(.system(size: 11)).lineLimit(1).minimumScaleFactor(0.7)
-                                .foregroundStyle(t == kamera.kompTur && !kamera.kompOto ? Tema.sari : .white)
+                                .foregroundStyle(t == kamera.kompTur ? Tema.sari : .white)
                         }
                     }
                 }
@@ -238,13 +222,7 @@ struct KilavuzMenu: View {
                 }
             }
             Divider().overlay(Color.white.opacity(0.1))
-            Toggle("Akıllı yardımcı (ibre)", isOn: $kamera.asistanAcik)
-            if kamera.kompOto {
-                Text("Otomatik: kılavuz sahneye göre kendisi gelir\(kamera.kompTur == .kapali ? "" : " (şu an \(kamera.kompTur.ad))"). Elle seçmek için bir kılavuza dokun.")
-                    .font(.caption).foregroundStyle(Tema.metin2)
-            } else {
-                Toggle("Elle seçerken öneri göster", isOn: $kamera.oneriAcik)
-            }
+            Toggle(isOn: $kamera.asistanAcik) { Label("AI Kadraj", systemImage: "sparkles") }
             Toggle("Terazi", isOn: $kamera.teraziAcik)
         }
         .tint(Tema.sari)
