@@ -128,7 +128,7 @@ struct GirisEkran: View {
                     kart("display", Color(red: 106 / 255, green: 152 / 255, blue: 248 / 255), "Monitör",
                          "Kamerayı izle: iPhone kamerası, iPad'de USB, ağ yayını. Ölçümler, LUT, iki kaynak.") { bitir(.monitor, "monitor") }
                     kart("rectangle.split.2x2.fill", Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255), "Masa",
-                         "Çok kamera: Wi-Fi'daki telefonlar ve iPad'e takılan USB kameralar tek ekranda; dokununca geçiş, kayıt.") { bitir(.masa, nil) }
+                         "Çok kamera: Wi-Fi'daki telefonlar ve iPad'e takılan USB kameralar tek ekranda; dokununca geçiş, kayıt.") { bitir(.masa, "masa") }
                     Toggle("Seçimimi hatırla (ayarlardan değişir)", isOn: $hatirla).font(.subheadline).foregroundStyle(Tema.metin2).tint(Tema.vurgu)
                 }
                 .padding(24)

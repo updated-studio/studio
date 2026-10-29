@@ -49,7 +49,9 @@ struct AnaEkran: View {
             .onChange(of: g.size) { _, _ in yonBildir() }
         }
         .onAppear {
-            if !GirisEkran.soruldu, UserDefaults.standard.string(forKey: "giris") == "monitor" { GirisEkran.soruldu = true; ekran = .monitor }
+            if !GirisEkran.soruldu, let g = UserDefaults.standard.string(forKey: "giris"), g == "monitor" || g == "masa" {
+                GirisEkran.soruldu = true; ekran = g == "masa" ? .masa : .monitor
+            }
             if ekran == nil { kamera.baslat() }
         }
         .onChange(of: evre) { _, yeni in

@@ -59,6 +59,7 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 |---|---|---|---|
 | Masa: kaynakları bul, canlı geçiş, tally, 1080p kayıt | ✓ | ✓ | |
 | USB kameraları masaya ekle | ✓ | ✓ | iOS'ta yalnız iPad |
+| **Tablet masası (yönetmen masası):** ÖNİZLEME + PROGRAM monitörleri, numaralı kaynaklar, KES, hızlı geçiş, klavye (1–4, boşluk, R) | ○ (Android tablet, sunucudaki Claude) | ✓ | 29 Ekim; iOS MasaIpad.swift |
 
 ## Uygulama
 

@@ -10,6 +10,23 @@ struct MasaEkran: View {
     @State private var adres = ""
 
     var body: some View {
+        // iPad'de yönetmen masası (MasaIpad.swift); iPhone'da bu düzen
+        Group {
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                MasaIpad(m: m, kapat: kapat, kaynakAcik: $kaynakAcik)
+            } else {
+                telefon
+            }
+        }
+        .preferredColorScheme(.dark)
+        .statusBarHidden()
+        .onAppear { m.ac() }
+        .onDisappear { m.kapat() }
+        .onChange(of: evre) { _, yeni in if yeni == .active { m.usbTara() } }
+        .sheet(isPresented: $kaynakAcik) { kaynakSayfasi }
+    }
+
+    private var telefon: some View {
         GeometryReader { g in
             let yatay = g.size.width > g.size.height
             VStack(spacing: 8) {
@@ -30,12 +47,6 @@ struct MasaEkran: View {
         }
         .background(Tema.zemin.ignoresSafeArea())
         .foregroundStyle(.white)
-        .preferredColorScheme(.dark)
-        .statusBarHidden()
-        .onAppear { m.ac() }
-        .onDisappear { m.kapat() }
-        .onChange(of: evre) { _, yeni in if yeni == .active { m.usbTara() } }
-        .sheet(isPresented: $kaynakAcik) { kaynakSayfasi }
     }
 
     private var ustCubuk: some View {

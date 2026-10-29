@@ -75,6 +75,7 @@ final class Yuva: ObservableObject, Identifiable {
     private var son: CVPixelBuffer?
     private var _donus = 0
     private var _canlida = false
+    private var _sirada = false
 
     init(ad: String, alici: WifiAlici? = nil, usbKimlik: String? = nil) {
         self.ad = ad; self.alici = alici; self.usbKimlik = usbKimlik
@@ -88,6 +89,11 @@ final class Yuva: ObservableObject, Identifiable {
         get { kilit.lock(); defer { kilit.unlock() }; return _canlida }
         set { kilit.lock(); _canlida = newValue; kilit.unlock() }
     }
+    /// iPad masasında önizlemede (sıradaki) kaynak
+    var sirada: Bool {
+        get { kilit.lock(); defer { kilit.unlock() }; return _sirada }
+        set { kilit.lock(); _sirada = newValue; kilit.unlock() }
+    }
     func yeniKare(_ pb: CVPixelBuffer) { kilit.lock(); son = pb; kilit.unlock() }
 }
 
@@ -99,6 +105,9 @@ final class Masa: NSObject, ObservableObject {
 
     @Published var yuvalar: [Yuva] = []
     @Published var canli: UUID?
+    /// iPad masası: önizlemedeki (sıradaki) kaynak; KES ile canlıya geçer (ATEM'deki PREVIEW)
+    @Published var siradaki: UUID?
+    let onizleme = GoruntuGorunumu()
     @Published var kayitta = false
     @Published var kayitBasi: Date?
     @Published var bildirim: String?
@@ -337,9 +346,25 @@ final class Masa: NSObject, ObservableObject {
         programDonus()
     }
 
+    func siradakiYap(_ y: Yuva) {
+        siradaki = y.id
+        for k in yuvalar { k.sirada = k === y }
+        onizleme.temizle()
+        onizleme.dondur = y.dondur
+    }
+
+    /// KES: önizlemedeki kaynak canlıya, canlıdaki önizlemeye
+    func kes() {
+        guard let s = yuvalar.first(where: { $0.id == siradaki }) else { return }
+        let eski = yuvalar.first { $0.id == canli }
+        canliYap(s)
+        if let eski { siradakiYap(eski) } else { siradaki = nil; s.sirada = false; onizleme.temizle() }
+    }
+
     func dondur(_ y: Yuva) {
         y.dondur = (y.dondur + 90) % 360
         programDonus()
+        if y.id == siradaki { onizleme.dondur = y.dondur }
     }
 
     private func programDonus() {
@@ -351,6 +376,7 @@ final class Masa: NSObject, ObservableObject {
         guard let sb = AgYayin.ornek(pb) else { return }
         y.gorunum.goster(sb)
         if y.canlida { program.goster(sb) }
+        if y.sirada { onizleme.goster(sb) }
     }
 
     // MARK: kayıt
