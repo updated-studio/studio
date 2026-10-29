@@ -74,12 +74,12 @@ final class Kamera: NSObject, ObservableObject {
     @Published var fps60Var = false
     @Published var videoFpsler: [Int] = [30]
     // Genel ayarlar: kayıt biçimi, renk, sabitleme, enstantane gösterimi, ses (KayitAyarlari.swift)
-    @Published var kodek = Kodek(rawValue: Kamera.ud.string(forKey: "k.kodek") ?? "") ?? .hevc { didSet { Kamera.ud.set(kodek.rawValue, forKey: "k.kodek"); bicimYaz() } }
+    @Published var kodek = Kodek(rawValue: Kamera.ud.string(forKey: "k.kodek") ?? "") ?? .hevc { didSet { Kamera.ud.set(kodek.rawValue, forKey: "k.kodek"); bicimYaz(); kayitHazirla() } }
     @Published var renkModu = RenkModu(rawValue: Kamera.ud.string(forKey: "k.renk") ?? "") ?? .sdr { didSet { Kamera.ud.set(renkModu.rawValue, forKey: "k.renk"); yenidenKur() } }
-    @Published var sabitleme = Sabitleme(rawValue: Kamera.ud.string(forKey: "k.sabit") ?? "") ?? .standart { didSet { Kamera.ud.set(sabitleme.rawValue, forKey: "k.sabit") } }
+    @Published var sabitleme = Sabitleme(rawValue: Kamera.ud.string(forKey: "k.sabit") ?? "") ?? .standart { didSet { Kamera.ud.set(sabitleme.rawValue, forKey: "k.sabit"); kayitHazirla() } }
     /// Video enstantanesi açı (180°) olarak mı gösterilsin
     @Published var enstAci = Kamera.ud.bool(forKey: "k.enstAci") { didSet { Kamera.ud.set(enstAci, forKey: "k.enstAci") } }
-    @Published var sesBicimi = SesBicimi(rawValue: Kamera.ud.string(forKey: "k.ses") ?? "") ?? .oto { didSet { Kamera.ud.set(sesBicimi.rawValue, forKey: "k.ses") } }
+    @Published var sesBicimi = SesBicimi(rawValue: Kamera.ud.string(forKey: "k.ses") ?? "") ?? .oto { didSet { Kamera.ud.set(sesBicimi.rawValue, forKey: "k.ses"); kayitHazirla() } }
     /// Seçilen ses girişi (uid); nil = otomatik
     @Published var sesGirdi = Kamera.ud.string(forKey: "k.sesGirdi") { didSet { Kamera.ud.set(sesGirdi, forKey: "k.sesGirdi"); sesGirdisiUygula() } }
     @Published var sesGirdileri: [SesGirdi] = []
@@ -96,9 +96,9 @@ final class Kamera: NSObject, ObservableObject {
     }
     @Published var histogram = Kamera.ud.bool(forKey: "k.histogram") { didSet { Kamera.ud.set(histogram, forKey: "k.histogram"); gostergeUygula() } }
     @Published var logOnizleme = Kamera.ud.object(forKey: "k.logOnizleme") as? Bool ?? true { didSet { Kamera.ud.set(logOnizleme, forKey: "k.logOnizleme"); gostergeUygula() } }
-    /// Stil (Stiller.swift): ekranda çizici, "Kayda göm" ise kayıtta da
+    /// Stil (Stiller.swift): ekranda çizici, kayıtta da
     @Published var stil: Stil = (try? JSONDecoder().decode(Stil.self, from: Kamera.ud.data(forKey: "k.stil") ?? Data())) ?? Stil() {
-        didSet { if let d = try? JSONEncoder().encode(stil) { Kamera.ud.set(d, forKey: "k.stil") }; if stil.anahtar != oldValue.anahtar || stil.kaydaGom != oldValue.kaydaGom { gostergeUygula() } }
+        didSet { if let d = try? JSONEncoder().encode(stil) { Kamera.ud.set(d, forKey: "k.stil") }; if stil.anahtar != oldValue.anahtar { gostergeUygula() } }
     }
     /// Sabitlenen kısayollar (Favoriler.swift), sırasıyla; en çok 6
     @Published var favoriler: [Favori] = (try? JSONDecoder().decode([Favori].self, from: Kamera.ud.data(forKey: "k.favoriler") ?? Data())) ?? Favori.varsayilan {
@@ -119,6 +119,8 @@ final class Kamera: NSObject, ObservableObject {
     var araclarAcik = false
     var varsayilanSes: [String: Any]?
     var sonSesBicimi = ""
+    /// Son uygulanan kayıt biçimi; aynıysa kayıt başında oturuma dokunulmaz
+    var kayitImza = ""
     // Timelapse
     @Published var tlAralik = Kamera.ud.object(forKey: "k.tlAralik") as? Int ?? 2000 { didSet { Kamera.ud.set(tlAralik, forKey: "k.tlAralik"); bicimYaz() } }
     @Published var tlSure = Kamera.ud.integer(forKey: "k.tlSure") { didSet { Kamera.ud.set(tlSure, forKey: "k.tlSure") } }
@@ -166,7 +168,7 @@ final class Kamera: NSObject, ObservableObject {
     var seriSayi = 0
     var geriSayiyor = false
     private var lens: Lens = .genis
-    private var kuruldu = false
+    var kuruldu = false
     private var tlYazici: TimelapseYazici?
     private let asistan = Asistan()
     private var sonYuz: YuzBilgi?
@@ -306,6 +308,9 @@ final class Kamera: NSObject, ObservableObject {
         if mod == .video {
             if !oturum.outputs.contains(videoCikti), oturum.canAddOutput(videoCikti) { oturum.addOutput(videoCikti) }
         } else if oturum.outputs.contains(videoCikti) { oturum.removeOutput(videoCikti) }
+        // Kodek ve sabitleme şimdiden: kayıt başında oturum yeniden kurulursa ilk saniyede görüntü stilsiz/donuk kalıyordu
+        kayitImza = ""
+        if mod == .video { kayitBicimiUygula() }
         kareCiktiAyarla()
         yuzCikti.metadataObjectTypes = mod == .portre && yuzCikti.availableMetadataObjectTypes.contains(.face) ? [.face] : []
 
@@ -625,9 +630,13 @@ final class Kamera: NSObject, ObservableObject {
             kayitta = true
             kayitBasi = Date()
             kuyruk.async {
-                self.videoCikti.connection(with: .video)?.videoOrientation = yon
-                if let b = self.videoCikti.connection(with: .video), b.isVideoMirroringSupported {
-                    b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = self.cihaz?.position == .front
+                // Yalnız değişen ayar yazılır: bağlantıya her dokunuş oturumu kısa süre durdurabiliyor
+                if let b = self.videoCikti.connection(with: .video) {
+                    if b.videoOrientation != yon { b.videoOrientation = yon }
+                    let ayna = self.cihaz?.position == .front
+                    if b.isVideoMirroringSupported, b.automaticallyAdjustsVideoMirroring || b.isVideoMirrored != ayna {
+                        b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = ayna
+                    }
                 }
                 self.kayitBicimiUygula()
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-\(Int(Date().timeIntervalSince1970)).mov")

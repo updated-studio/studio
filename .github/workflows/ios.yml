@@ -66,3 +66,41 @@ jobs:
             -exportPath build/cikti "${YETKI[@]}" | tail -n 60
           rm -f "$ANAHTAR"
           echo "::notice title=TestFlight::Yapı ${{ github.run_number }} yüklendi; Apple işledikten sonra (10-30 dk) TestFlight'ta görünür."
+
+  # Simülatörde tüm ekranları gezer (uygulamalar/kamera-ios/Gezinti); her adımın ekran görüntüsü "gezinti" yapıtında.
+  # TestFlight yüklemesini beklemez ve durdurmaz; çökme olursa bu iş kırmızı olur ve günlükte "ÇÖKTÜ" satırı adımı gösterir.
+  gezinti:
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run: { shell: bash, working-directory: uygulamalar/kamera-ios }
+    steps:
+      - uses: actions/checkout@v4
+      - name: En yeni Xcode
+        run: |
+          X=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          sudo xcode-select -s "$X" && xcodebuild -version
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Simülatör (iPhone) hazırla, izinleri ver
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; l=[x for k in sorted(d, reverse=True) if 'iOS' in k for x in d[k] if x['name'].startswith('iPhone')]; p=[x for x in l if 'Pro' in x['name']] or l; print(p[0]['udid'])")
+          echo "UDID=$UDID" >> $GITHUB_ENV
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          for i in camera microphone photos-add photos; do xcrun simctl privacy "$UDID" grant $i tr.com.updated.monitor || true; done
+      - name: Gezinti testi
+        run: |
+          mkdir -p gezinti
+          set -o pipefail
+          xcodebuild test -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -destination "id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO TEST_RUNNER_EKRAN_KLASORU="$PWD/gezinti" > test.log 2>&1; DURUM=$?
+          grep -E "GEZINTI|error:|failed|ÇÖKTÜ|Crash|Test Case" test.log | head -n 400
+          ls gezinti | wc -l
+          exit $DURUM
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gezinti
+          path: uygulamalar/kamera-ios/gezinti/
+          retention-days: 7

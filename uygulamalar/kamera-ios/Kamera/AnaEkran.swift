@@ -399,7 +399,7 @@ struct AnaEkran: View {
             if kamera.kodek.prores { l.append((kamera.kodek.kisa, "PRORES", true)) }
             if kamera.renkModu != .sdr { l.append((kamera.renkModu.kisa, "", true)) }
         }
-        if kamera.stil.etkin { l.append((kamera.stil.hazir == .standart ? "Özel" : kamera.stil.hazir.ad, kamera.stil.kaydaGom ? "STİL ●" : "STİL", true)) }
+        if kamera.stil.etkin { l.append((kamera.stil.hazir == .standart ? "Özel" : kamera.stil.hazir.ad, "STİL", true)) }
         if kamera.mod.foto, kamera.zamanlayici > 0 { l.append(("\(kamera.zamanlayici)", "SN", true)) }
         return l
     }

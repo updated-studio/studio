@@ -159,13 +159,8 @@ struct Cetvel: View {
                 Slider(value: Binding(get: { kamera.bd ?? kamera.mevcutKelvin }, set: { kamera.bdSec(($0 / 50).rounded() * 50) }), in: 2500...10000)
                     .tint(LinearGradient(colors: [.orange, .white, .blue], startPoint: .leading, endPoint: .trailing))
             }
-            HStack(spacing: 10) {
-                Text("T").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).frame(width: 18)
-                Slider(value: Binding(get: { kamera.renkTon }, set: { kamera.tonSec(($0 / 2).rounded() * 2) }), in: -100...100)
-                    .tint(Tema.sari)
-                    .background(Capsule().fill(LinearGradient(colors: [.green.opacity(0.5), .clear, Color(red: 1, green: 0, blue: 1).opacity(0.5)], startPoint: .leading, endPoint: .trailing)).frame(height: 4))
-            }
-            not("K: ışığın sıcaklığı · T: sola yeşil, sağa macenta (floresan ve LED'deki yeşili giderir).")
+            TonCubugu(deger: kamera.renkTon) { kamera.tonSec($0) }
+            not("K: ışığın sıcaklığı · Ton: sola yeşil, sağa macenta (floresan ve LED'deki yeşili giderir). Ortaya çift dokun: sıfır.")
         }
     }
 
@@ -228,5 +223,61 @@ struct KilavuzMenu: View {
         .tint(Tema.sari)
         .font(.subheadline)
         .pano()
+    }
+}
+
+/// Beyaz denge tonu (Fatih 29 Ekim): yeşil ↔ macenta kaydırıcı, iki yanda − / +, ortada sıfır çentiği; çift dokunuş sıfırlar
+struct TonCubugu: View {
+    let deger: Float
+    let degistir: (Float) -> Void
+    private static let yesil = Color(red: 48/255, green: 209/255, blue: 88/255)
+    private static let macenta = Color(red: 1, green: 55/255, blue: 210/255)
+
+    var body: some View {
+        HStack(spacing: 10) {
+            adim("minus", -5)
+            GeometryReader { g in
+                let w = g.size.width, x = CGFloat((deger + 100) / 200) * w
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(LinearGradient(colors: [Self.yesil, .white.opacity(0.35), Self.macenta], startPoint: .leading, endPoint: .trailing))
+                        .frame(height: 5)
+                    Rectangle().fill(.white.opacity(0.8)).frame(width: 1.5, height: 12).offset(x: w / 2 - 0.75)
+                    Circle().fill(.white)
+                        .overlay(Circle().fill(renk).padding(7))
+                        .frame(width: 24, height: 24)
+                        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                        .offset(x: x - 12)
+                }
+                .frame(height: 28)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0).onChanged { d in
+                    let t = Float(min(max(d.location.x / w, 0), 1)) * 200 - 100
+                    ayarla(abs(t) < 3 ? 0 : (t / 2).rounded() * 2)
+                })
+                .onTapGesture(count: 2) { ayarla(0) }
+            }
+            .frame(height: 28)
+            adim("plus", 5)
+            Text(yazi).font(.system(size: 13, weight: .semibold).monospacedDigit())
+                .foregroundStyle(deger == 0 ? Tema.metin2 : .white).frame(width: 34, alignment: .trailing)
+        }
+    }
+
+    private var yazi: String { abs(deger) < 1 ? "0" : "\(deger < 0 ? "Y" : "M")\(Int(abs(deger)))" }
+    private var renk: Color { abs(deger) < 1 ? .white : (deger < 0 ? Self.yesil : Self.macenta).opacity(Double(min(abs(deger) / 60, 1))) }
+
+    private func adim(_ simge: String, _ d: Float) -> some View {
+        Button { ayarla(min(max(deger + d, -100), 100)) } label: {
+            Image(systemName: simge).font(.system(size: 12, weight: .bold))
+                .frame(width: 28, height: 28).background(Circle().fill(Color(white: 0.47).opacity(0.36)))
+        }
+        .buttonStyle(.plain).foregroundStyle(.white)
+    }
+
+    private func ayarla(_ t: Float) {
+        guard t != deger else { return }
+        if (t == 0) != (deger == 0) || abs(t).truncatingRemainder(dividingBy: 50) == 0 { UISelectionFeedbackGenerator().selectionChanged() }
+        degistir(t)
     }
 }

@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// Stiller (Fatih 29 Ekim: "zahmetsizce nasıl renklendirecek?"): hazır stil + iOS Stilleri gibi pad (yatay soğuk ↔ sıcak, dikey ton) +
 /// yoğunluk ve doygunluk. Stil, seçili LUT'la (ya da Log → Rec.709 ile) birleşip tek bir 3D LUT olur: ekranda çizici bunu kullanır,
-/// "Kayda göm" açıksa aynı LUT fotoğrafa ve videoya da işlenir (RAW ve Log kaydı dokunulmaz kalmaz; seçen kullanıcıdır).
+/// aynı LUT fotoğrafa ve videoya da işlenir (Fatih 29 Ekim: "Monitör değil burası"; RAW ve Apple Log kaydı özgün kalır).
 enum HazirStil: String, CaseIterable, Codable, Identifiable {
     case standart, sinematik, sicak, soguk, canli, siyahBeyaz
     // Film reçeteleri (Fatih 29 Ekim): sevilen film ve fotoğraf makinesi görünümlerinden esinli; marka adı kullanılmaz
@@ -85,7 +85,6 @@ struct Stil: Codable, Equatable {
     var yogunluk: Float = 1
     /// −1…+1
     var doygunluk: Float = 0
-    var kaydaGom = false
 
     /// Görüntüyü değiştiriyor mu
     var etkin: Bool {
@@ -199,7 +198,7 @@ extension Lut {
 }
 
 extension Kamera {
-    /// Ekrandaki ve (açıksa) kayda gömülen tek LUT: taban + stil. nil = renk değişmiyor
+    /// Ekrandaki ve kayda gömülen tek LUT: taban + stil. nil = renk değişmiyor
     func renkLutu() -> (anahtar: String, uret: () -> Lut)? {
         let g = gosterge, s = stil
         let tabanAdi = g.lutAcik ? g.lutAdi : (logDuzelt ? Lut.logAdi : "")
@@ -210,8 +209,8 @@ extension Kamera {
         })
     }
 
-    /// Kayda gömülecek mi (Stiller → "Kayda göm")
-    var gom: Bool { stil.kaydaGom && renkLutu() != nil }
+    /// Kayda gömülecek mi: renk değişiyorsa her zaman; Apple Log kaydı renklendirme için özgün kalır
+    var gom: Bool { renkLutu() != nil && !(mod == .video && renkModu == .log) }
 
     /// Fotoğrafa stil/LUT işler (HEIC ya da JPEG olarak yeniden yazar); olmazsa özgün veri
     func fotoyaGom(_ veri: Data) -> Data {
@@ -239,7 +238,7 @@ extension Kamera {
                     istek.finish(with: (s.outputImage ?? istek.sourceImage).cropped(to: istek.sourceImage.extent), context: nil)
                 }
             } catch { bitti(url); return }
-            // Yeniden kodlama HEVC (ProRes kaydı da HEVC'ye döner; özgün renkte ProRes için "Ekranda" seçilir)
+            // Yeniden kodlama HEVC (ProRes kaydı da HEVC'ye döner; özgün ProRes için stil Standart'a alınır)
             guard let disari = AVAssetExportSession(asset: varlik, presetName: AVAssetExportPresetHEVCHighestQuality) else { bitti(url); return }
             let hedef = FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-stil-\(Int(Date().timeIntervalSince1970)).mov")
             disari.videoComposition = kompozisyon
@@ -253,14 +252,17 @@ extension Kamera {
     }
 }
 
-/// Renk grubu → Stiller: hazır stiller, pad, yoğunluk, doygunluk, Ekranda / Kayda göm
+/// Renk grubu → Stiller: hazır stiller, pad, yoğunluk, doygunluk
 struct StilPedi: View {
     @ObservedObject var kamera: Kamera
+    @State private var lutAl = false
+    @State private var lutlar: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             sira("TEMEL", HazirStil.temel)
             sira("FİLM REÇETELERİ", HazirStil.receteler)
+            lutSirasi
             HStack(alignment: .top, spacing: 14) {
                 VStack(spacing: 4) {
                     pad.frame(width: 140, height: 140)
@@ -270,18 +272,69 @@ struct StilPedi: View {
                 VStack(alignment: .leading, spacing: 10) {
                     kaydirici("Yoğunluk", "\(Int(kamera.stil.yogunluk * 100))", deger: Binding(get: { kamera.stil.yogunluk }, set: { kamera.stil.yogunluk = $0 }), 0...1)
                     kaydirici("Doygunluk", String(format: "%+d", Int(kamera.stil.doygunluk * 100)), deger: Binding(get: { kamera.stil.doygunluk }, set: { kamera.stil.doygunluk = $0 }), -1...1)
-                    Text("Uygula").font(.system(size: 11)).foregroundStyle(.white.opacity(0.75))
-                    Picker("", selection: Binding(get: { kamera.stil.kaydaGom }, set: { kamera.stil.kaydaGom = $0 })) {
-                        Text("Ekranda").tag(false)
-                        Text("Kayda göm").tag(true)
-                    }
-                    .pickerStyle(.segmented)
                 }
             }
-            Text(kamera.stil.kaydaGom ? "Fotoğraf ve video bu renkle kaydedilir. Video kayıttan sonra işlenir ve HEVC olarak yazılır." : "Yalnız ekranda; kayıt özgün renkte kalır.")
+            Text(kamera.mod == .video && kamera.renkModu == .log ? "Apple Log kaydı özgün kalır; stil yalnız ekranda." : "Fotoğraf ve video bu renkle kaydedilir.")
                 .font(.caption).foregroundStyle(Tema.metin2)
         }
         .pano()
+        .onAppear { lutlar = Lut.kitaplik().map(\.lastPathComponent) }
+        .fileImporter(isPresented: $lutAl, allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data, .data, .text], allowsMultipleSelection: true) { s in
+            if case let .success(urller) = s { kamera.lutlariAl(urller); lutlar = Lut.kitaplik().map(\.lastPathComponent) }
+        }
+    }
+
+    /// Kendi LUT'ların (.cube): seçili olan stilin altına taban olarak girer; "+" Dosyalar'dan ekler, basılı tutunca siler
+    private var lutSirasi: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("LUT'LARIN").font(.system(size: 11, weight: .semibold)).tracking(0.6).foregroundStyle(.white.opacity(0.55))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(lutlar, id: \.self) { ad in
+                        let secili = kamera.gosterge.lutAcik && kamera.gosterge.lutAdi == ad
+                        Button {
+                            if secili { kamera.gosterge.lutAcik = false } else { kamera.gosterge.lutAdi = ad; kamera.gosterge.lutAcik = true }
+                        } label: {
+                            kutu(ad.replacingOccurrences(of: ".cube", with: ""), secili: secili) {
+                                ZStack {
+                                    LinearGradient(colors: [Color(white: 0.32), Color(white: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    Text("LUT").font(.system(size: 10, weight: .bold)).tracking(1).foregroundStyle(.white.opacity(0.7))
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                try? FileManager.default.removeItem(at: Lut.klasor.appendingPathComponent(ad))
+                                if kamera.gosterge.lutAdi == ad { kamera.gosterge.lutAcik = false }
+                                lutlar = Lut.kitaplik().map(\.lastPathComponent)
+                            } label: { Label("Sil", systemImage: "trash") }
+                        }
+                    }
+                    Button { lutAl = true } label: {
+                        kutu("Ekle", secili: false) {
+                            ZStack {
+                                Color.white.opacity(0.06)
+                                RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                                Image(systemName: "plus").font(.system(size: 16, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("LUT ekle")
+                }
+            }
+        }
+    }
+
+    private func kutu<V: View>(_ ad: String, secili: Bool, @ViewBuilder _ ic: () -> V) -> some View {
+        VStack(spacing: 4) {
+            ic().frame(width: 56, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(secili ? Tema.sari : .clear, lineWidth: 1.5))
+            Text(ad).font(.system(size: 11, weight: .medium)).lineLimit(1).frame(maxWidth: 64)
+                .foregroundStyle(secili ? Tema.sari : .white.opacity(0.85))
+        }
     }
 
     /// Bir sıra stil kutusu; reçeteye basılı tutunca üst şeride sabitlenir (tek dokunuşla açılır)

@@ -5,6 +5,25 @@ import UniformTypeIdentifiers
 /// Kamera ekranının görüntü araçları (Fatih 29 Ekim): false color, zebra, odak vurgusu, histogram, siyah-beyaz, LUT ve Log görüntüyü
 /// normal renkte gösterme. Çizim Monitör'ün çizicisiyle (MonitorCizici, Monitor.metal) yapılır; araçlar yalnız ekranda, kayıt temiz kalır.
 extension Kamera {
+    /// .cube dosyalarını kitaplığa alır; sonuncusu seçilir (Göstergeler → LUT ve Stiller → "+")
+    func lutlariAl(_ urller: [URL]) {
+        var son: String?
+        for u in urller {
+            let izin = u.startAccessingSecurityScopedResource()
+            defer { if izin { u.stopAccessingSecurityScopedResource() } }
+            guard let metin = try? String(contentsOf: u, encoding: .utf8) else { bildirim = "LUT okunamadı: \(u.lastPathComponent)"; continue }
+            do {
+                _ = try Lut.oku(ad: u.lastPathComponent, metin: metin)
+                let ad = u.deletingPathExtension().lastPathComponent + ".cube"
+                try metin.write(to: Lut.klasor.appendingPathComponent(ad), atomically: true, encoding: .utf8)
+                son = ad
+            } catch {
+                bildirim = "LUT okunamadı: \(error.localizedDescription)"
+            }
+        }
+        if let son { gosterge.lutAdi = son; gosterge.lutAcik = true }
+    }
+
     /// VİDEO'da Apple Log seçiliyken ekranda Rec.709'a çevrilmiş görüntü
     var logDuzelt: Bool { mod == .video && renkModu == .log && logOnizleme }
 
@@ -112,21 +131,7 @@ struct GostergeMenu: View {
     }
 
     private func lutlariAl(_ urller: [URL]) {
-        var son: String?
-        for u in urller {
-            let izin = u.startAccessingSecurityScopedResource()
-            defer { if izin { u.stopAccessingSecurityScopedResource() } }
-            guard let metin = try? String(contentsOf: u, encoding: .utf8) else { kamera.bildirim = "LUT okunamadı: \(u.lastPathComponent)"; continue }
-            do {
-                _ = try Lut.oku(ad: u.lastPathComponent, metin: metin)
-                let ad = u.deletingPathExtension().lastPathComponent + ".cube"
-                try metin.write(to: Lut.klasor.appendingPathComponent(ad), atomically: true, encoding: .utf8)
-                son = ad
-            } catch {
-                kamera.bildirim = "LUT okunamadı: \(error.localizedDescription)"
-            }
-        }
+        kamera.lutlariAl(urller)
         lutlar = Lut.kitaplik().map(\.lastPathComponent)
-        if let son { kamera.gosterge.lutAdi = son; kamera.gosterge.lutAcik = true }
     }
 }

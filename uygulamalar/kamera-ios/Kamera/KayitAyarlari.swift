@@ -235,8 +235,17 @@ extension Kamera {
 
     // MARK: kayıt
 
-    /// Kuyrukta, kayıt başlamadan hemen önce: kodek, sabitleme, ses biçimi
+    /// Ayar değişince (VİDEO'da, kayıt yokken) kayıt biçimi hemen uygulanır
+    func kayitHazirla() {
+        guard kuruldu, mod == .video, !kayitta else { return }
+        kuyruk.async { self.kayitBicimiUygula() }
+    }
+
+    /// Kuyrukta: kodek, sabitleme, ses biçimi. Değişmediyse dokunmaz (kayıt başında yeniden kurulum olmasın)
     func kayitBicimiUygula() {
+        let imza = "\(kodek.rawValue)|\(sabitleme.rawValue)|\(sesBicimi.rawValue)|\(harici)"
+        guard imza != kayitImza else { return }
+        kayitImza = imza
         if let b = videoCikti.connection(with: .video) {
             let var_ = videoCikti.availableVideoCodecTypes
             var k = kodek.tur
