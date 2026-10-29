@@ -191,6 +191,9 @@ struct KameraAyarlar: View {
                 Button { kapat(); wifiKamera() } label: { Label("Wi-Fi kamera ol", systemImage: "wifi") }
             } footer: { Text("Bu telefonun görüntüsü aynı Wi-Fi'daki masaya gider; masa kendiliğinden bulur.") }
             Section {
+                NavigationLink { Insta360Deneme() } label: { Label("Insta360 kamerayı dene (Wi-Fi)", systemImage: "camera.metering.center.weighted") }
+            } footer: { Text("Luna, X ve GO serisi: telefon kameranın kendi Wi-Fi'ına bağlıyken canlı görüntüyü doğrudan alır. Deneme aşamasında.") }
+            Section {
                 EkranGonderDugme()
             } footer: { Text("Ekranda ne varsa masaya kaynak olarak gider. Kendi görüntü çıkışı olmayan kameralar (ör. Insta360 Luna Ultra) için: kameranın uygulamasını açıp önizlemeyi tam ekran yap, sonra buradan başlat. Durdurmak için üstteki kırmızı göstergeye dokun.") }
             Button { kapat(); masa() } label: { Label("Bu cihazı masa yap", systemImage: "rectangle.split.2x2") }
