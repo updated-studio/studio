@@ -311,11 +311,22 @@ class MasaActivity : Activity() {
         bulunan.forEach { (ad, a) -> secenekler.add("Wi-Fi kamera: $ad" to { wifiEkle(ad, a.first, a.second) }) }
         UvcKaynak.aygitlar(this).filter { d -> kaynaklar.none { it is UvcKaynak && it.aygit.deviceName == d.deviceName } }
             .forEach { d -> secenekler.add("USB: ${d.productName ?: d.manufacturerName ?: "görüntü aygıtı"}" to { usbEkle(d) }) }
+        if (kaynaklar.none { it is LunaKaynak }) secenekler.add("Insta360 Luna (kameranın Wi-Fi'ı)" to { lunaEkle() })
         secenekler.add("Adresle bağlan (ör. 192.168.1.20)" to { adresSor() })
         AlertDialog.Builder(this).setTitle("Kaynak ekle")
             .setMessage(if (bulunan.isEmpty()) "Wi-Fi kamerası: öteki telefonda UPDATED Kamera → Ayarlar → \"Wi-Fi kamera ol\". Aynı Wi-Fi'da olunca burada kendiliğinden görünür.\nUSB: makineyi \"USB yayını\" moduna alıp tak." else null)
             .setItems(secenekler.map { it.first }.toTypedArray()) { _, i -> secenekler[i].second() }
             .setNegativeButton("Kapat", null).show()
+    }
+
+    /** Luna: telefon kameranın Wi-Fi'ına bağlıyken doğrudan kaynak (Insta360 uygulaması kapalı olmalı; kamera tek bağlantı kabul eder) */
+    private fun lunaEkle() {
+        if (LunaKaynak.ag(this) == null) AlertDialog.Builder(this).setTitle("Insta360 Luna")
+            .setMessage("Telefonu kameranın Wi-Fi'ına bağla: Ayarlar → Wi-Fi → \"Luna Ultra…\" (şifre kameranın ekranında ya da Insta360 uygulamasında yazar). " +
+                "Başka telefonda Insta360 uygulaması açıksa kapat. Bağlanınca kaynak kendiliğinden görüntü verir; ilk seferde kameranın ekranında onay istenebilir.")
+            .setPositiveButton("Wi-Fi ayarları") { _, _ -> runCatching { startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)) }; ekle(LunaKaynak(this), "Insta360 Luna") }
+            .setNegativeButton("Vazgeç", null).show()
+        else ekle(LunaKaynak(this), "Insta360 Luna")
     }
 
     private fun adresSor() {
