@@ -24,13 +24,13 @@ class KayitDugmesi(c: Context) : View(c) {
     private val kirmizi = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(230, 40, 40) }
     override fun onDraw(c: Canvas) {
         val r = minOf(width, height) / 2f; val cx = width / 2f; val cy = height / 2f
-        halka.strokeWidth = r * 0.1f
-        c.drawCircle(cx, cy, r * 0.92f, halka)
-        if (foto) { c.drawCircle(cx, cy, r * (if (basili) 0.62f else 0.72f), beyaz); return }
+        halka.strokeWidth = r * 0.075f
+        c.drawCircle(cx, cy, r * 0.94f, halka)
+        if (foto) { c.drawCircle(cx, cy, r * (if (basili) 0.68f else 0.78f), beyaz); return }
         if (kayitta) {
             val a = (System.currentTimeMillis() / 500 % 2 == 0L); kirmizi.alpha = if (a) 255 else 200
             val s = r * 0.42f; c.drawRoundRect(RectF(cx - s, cy - s, cx + s, cy + s), s * 0.25f, s * 0.25f, kirmizi); postInvalidateDelayed(500)
-        } else { kirmizi.alpha = 255; c.drawCircle(cx, cy, r * 0.7f, kirmizi) }
+        } else { kirmizi.alpha = 255; c.drawCircle(cx, cy, r * 0.76f, kirmizi) }
     }
 }
 
