@@ -414,6 +414,7 @@ class KameraActivity : Activity() {
         secimKapat()
         if (m == mod) { if (m == KMod.PRO && kartlar) proKartlar(); return }
         if (kayitSuruyor()) return tost("Kayıt sürerken mod değişmez.")
+        konuBirak()
         if (m == KMod.MONITOR) { monitoreGec(); return }
         mod = m; tercih.edit().putString("mod", m.name).apply()
         if (ayar.pozlamaNs != null || bulb) { ayar.pozlamaNs = null; ayar.uzunOnizleme = 0; bulb = false; ayarKaydet() }
@@ -617,7 +618,7 @@ class KameraActivity : Activity() {
         val jest = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
             override fun onSingleTapUp(e: MotionEvent): Boolean { odakDokun(e.x, e.y); return true }
-            override fun onLongPress(e: MotionEvent) { kaynak?.odakSerbest(); odakKare.visibility = View.GONE; tost("Otomatik odak") }
+            override fun onLongPress(e: MotionEvent) { konuBirak(); kaynak?.odakSerbest(); odakKare.visibility = View.GONE; tost("Otomatik odak") }
             override fun onFling(a: MotionEvent?, b: MotionEvent, vx: Float, vy: Float): Boolean {
                 if (a == null || abs(vx) < abs(vy) * 1.5f || abs(b.x - a.x) < dp(60f)) return false
                 val modlar = KMod.values().filter { it != KMod.MONITOR }; val i = modlar.indexOf(mod)
@@ -631,10 +632,40 @@ class KameraActivity : Activity() {
     private fun odakDokun(x: Float, y: Float) {
         val r = monitor.goruntuAlani(); if (!r.contains(x, y)) return
         val k = kaynak ?: return
-        k.odakla((x - r.left) / r.width(), (y - r.top) / r.height(), 0)
+        val u = (x - r.left) / r.width(); val v = (y - r.top) / r.height()
+        k.odakla(u, v, 0)
+        if (asistanAcik && asistan != null) konuSec(u, v)
         odakKare.translationX = x - dp(36f); odakKare.translationY = y - dp(36f)
         odakKare.visibility = View.VISIBLE; odakKare.alpha = 1f; odakKare.scaleX = 1.3f; odakKare.scaleY = 1.3f
         odakKare.animate().scaleX(1f).scaleY(1f).setDuration(180).withEndAction { odakKare.animate().alpha(0.5f).setStartDelay(1200).setDuration(400) }
+    }
+
+    /* ================= AI Kadraj: dokunarak konu seçimi (iPhone'daki Kamera.konuSec) ================= */
+    /** Kullanıcı dokunup konuyu seçti: odak ve pozlama konuyu izler; uzun basınca, mod değişince, AI Kadraj kapanınca ya da konu kaybolunca düşer */
+    private var konuSecili = false; private var secimBulundu = false
+    private var sonKonuOdak = 0L; private var sonKonuNokta = android.graphics.PointF(-1f, -1f)
+
+    private fun konuSec(u: Float, v: Float) {
+        val a = asistan ?: return
+        a.hedef = android.graphics.PointF(u, v)
+        konuSecili = true; secimBulundu = false; komp.konuSecili = true; sonKonuNokta = android.graphics.PointF(-1f, -1f)
+        // 1,5 sn içinde konu bulunmazsa seçim düşer (düz odak kalır)
+        val no = ++secimNo
+        monitor.postDelayed({ if (konuSecili && !secimBulundu && secimNo == no) { konuBirak(); tost("Orada konu bulunamadı") } }, 1500)
+    }
+    private var secimNo = 0
+
+    private fun konuBirak() {
+        if (!konuSecili) return
+        konuSecili = false; secimBulundu = false; asistan?.hedef = null; komp.konuSecili = false
+    }
+
+    /** Seçili konu hareket ettikçe odak ve pozlama noktası onu izler (0,3 sn'de bir, konu yerinden oynadıysa) */
+    private fun konuyuIzle(k: RectF) {
+        val m = android.graphics.PointF(k.centerX(), k.centerY()); val simdi = System.currentTimeMillis()
+        if (simdi - sonKonuOdak < 300 || kotlin.math.hypot(m.x - sonKonuNokta.x, m.y - sonKonuNokta.y) <= 0.02f) return
+        sonKonuOdak = simdi; sonKonuNokta = m
+        kaynak?.konuIzle(m.x, m.y, 0)
     }
 
     /* ================= yakınlaştırma ================= */
@@ -698,7 +729,9 @@ class KameraActivity : Activity() {
         komp.tur = kompTur; komp.yon = kompYon; komp.asistan = asistanAcik
         tercih.edit().putString("komp", kompTur.name).putInt("kompYon", kompYon).putString("sonKomp", sonKomp.name).putBoolean("k.aiKadraj", asistanAcik)
             .putBoolean("terazi", teraziAcik).putBoolean("sahneOto", sahneOto).apply()
-        if (asistanAcik && asistan == null) asistan = runCatching { Asistan { r, ad, yuz -> runOnUiThread { sonYuz = yuz; asistanSonuc(r, ad) } } }.getOrNull()
+        if (asistanAcik && asistan == null) asistan = runCatching { Asistan { r, ad, yuz -> runOnUiThread { sonYuz = yuz; asistanSonuc(r, ad) } }.also { a ->
+            a.konuKayboldu = { runOnUiThread { if (konuSecili) { konuBirak(); kaynak?.odakSerbest(); tost("Konu kayboldu; otomatik odak") } } } } }.getOrNull()
+        if (!asistanAcik) konuBirak()
         if (!asistanAcik) { asistan?.kapat(); asistan = null; komp.konu = null; komp.konuAdi = ""; oneriCip.visibility = View.GONE; sonOneri = null; aiAday = null; sahneAday = null
             sahneOnerisi = null; sahneCip.visibility = View.GONE }
         if (!teraziAcik) komp.egim = null
@@ -718,6 +751,7 @@ class KameraActivity : Activity() {
     private fun asistanSonuc(r: RectF?, ad: String) {
         if (!asistanAcik) return
         komp.konu = r; komp.konuAdi = ad
+        if (konuSecili && r != null) { secimBulundu = true; konuyuIzle(r) }
         aiDusun(); ipucuGuncelle()
     }
 

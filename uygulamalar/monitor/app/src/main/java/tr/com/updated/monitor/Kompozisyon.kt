@@ -76,6 +76,8 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
     /** Dikey kilitli kamerada telefon yan tutulunca: çizginin ekrandaki açısı = taban + eğim (taban 0/±90/180) */
     var egimTaban = 0f
     var asistan = false
+    /** Kullanıcı konuyu seçti: odak ve pozlama onu izliyor (sarı köşe çentikli kutu, "Yüz · AF") */
+    var konuSecili = false; set(v) { field = v; postInvalidate() }
     var hizalama = 0f; private set
     /** Görüntü analizi (ufuk, öncü çizgiler, kaçış noktası); yardımcı açıkken çizilir */
     var analiz: AnalizSonuc? = null; set(v) { field = v; postInvalidate() }
@@ -160,7 +162,14 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
             hizalama = (1f - mesafe / 0.35f).coerceIn(0f, 1f); hedefNokta = N(hedef.x, hedef.y)
             val tamam = mesafe < 0.045f
             val renk = if (tamam) yesil else if (hizalama > 0.6f) sari else Color.WHITE
-            c.drawRect(RectF(X(k.left), Y(k.top), X(k.right), Y(k.bottom)), Paint(ince).apply { color = renk; strokeWidth = 3f })
+            val kt = RectF(X(k.left), Y(k.top), X(k.right), Y(k.bottom))
+            if (konuSecili) {
+                // Seçili konu: köşe çentikleri (stüdyo kamerası izleme kutusu gibi)
+                val u = min(kt.width(), kt.height()) * 0.22f
+                val cp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND; color = sari; setShadowLayer(2f, 0f, 0f, Color.argb(160, 0, 0, 0)) }
+                for ((x, y, sx, sy) in listOf(floatArrayOf(kt.left, kt.top, 1f, 1f), floatArrayOf(kt.right, kt.top, -1f, 1f), floatArrayOf(kt.left, kt.bottom, 1f, -1f), floatArrayOf(kt.right, kt.bottom, -1f, -1f)))
+                    c.drawPath(Path().apply { moveTo(x, y + sy * u); lineTo(x, y); lineTo(x + sx * u, y) }, cp)
+            } else c.drawRect(kt, Paint(ince).apply { color = renk; strokeWidth = 3f })
             if (!tamam) {
                 ok.color = renk
                 val sx = X(kx); val sy = Y(ky); val hx = X(hedef.x); val hy = Y(hedef.y)
@@ -171,7 +180,7 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
             }
             c.drawCircle(X(hedef.x), Y(hedef.y), 16f, Paint(ok).apply { color = renk; strokeWidth = 4f })
             ibre(c, r, hizalama, tamam)
-            if (konuAdi.isNotEmpty()) c.drawText(konuAdi, X(k.left), Y(k.top) - 10f, yazi)
+            if (konuAdi.isNotEmpty()) { c.drawText(if (konuSecili) "$konuAdi · AF" else konuAdi, X(k.left), Y(k.top) - 10f, yazi.apply { color = if (konuSecili) sari else Color.WHITE }); yazi.color = Color.WHITE }
         }
         if (asistan) ipucuCiz(c, r)
         // Terazi: ufuk çizgisi, düzse yeşil

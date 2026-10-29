@@ -280,11 +280,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
      * Görüntü sensöre göre döndürülmüş gösterildiği için önce sensör koordinatına çevrilir; ön kamera aynalıdır.
      */
     fun odakla(u: Float, v: Float, ekranDonusu: Int) {
-        // Ekrandaki dönüş = sensör yönü + ekranın kendi dönüşü (dikey kilitli ekranda 0)
-        val d = ((if (onKamera) sensorYonu + ekranDonusu else sensorYonu - ekranDonusu) % 360 + 360) % 360
-        val uu = if (onKamera) 1f - u else u
-        val p = when (d) { 90 -> android.graphics.PointF(v, 1f - uu); 180 -> android.graphics.PointF(1f - uu, 1f - v); 270 -> android.graphics.PointF(1f - v, uu); else -> android.graphics.PointF(uu, v) }
-        odakNoktasi = p
+        odakNoktasi = sensorNoktasi(u, v, ekranDonusu); izliyor = false
         h.post {
             val c = cihaz ?: return@post; val s = oturum ?: return@post
             runCatching {
@@ -295,7 +291,21 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             istekGonder()
         }
     }
-    fun odakSerbest() { odakNoktasi = null; ayarDegisti() }
+    fun odakSerbest() { odakNoktasi = null; izliyor = false; ayarDegisti() }
+
+    /** Ekrandaki (u, v) → sensör koordinatı. Ekrandaki dönüş = sensör yönü + ekranın kendi dönüşü (dikey kilitli ekranda 0) */
+    private fun sensorNoktasi(u: Float, v: Float, ekranDonusu: Int): android.graphics.PointF {
+        val d = ((if (onKamera) sensorYonu + ekranDonusu else sensorYonu - ekranDonusu) % 360 + 360) % 360
+        val uu = if (onKamera) 1f - u else u
+        return when (d) { 90 -> android.graphics.PointF(v, 1f - uu); 180 -> android.graphics.PointF(1f - uu, 1f - v); 270 -> android.graphics.PointF(1f - v, uu); else -> android.graphics.PointF(uu, v) }
+    }
+
+    /** Seçili konuyu izle (AI Kadraj): odak ve pozlama bölgesi konuyla gider; sürekli odakta kalır, tetik yok (avlanmasın) */
+    @Volatile private var izliyor = false
+    fun konuIzle(u: Float, v: Float, ekranDonusu: Int) {
+        odakNoktasi = sensorNoktasi(u, v, ekranDonusu); izliyor = true
+        h.post { istekGonder() }
+    }
 
     private fun bolge(p: android.graphics.PointF): Array<android.hardware.camera2.params.MeteringRectangle> {
         val a = oz.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE) ?: return emptyArray()
@@ -342,7 +352,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         if (ayar.odakMesafe != null && yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, ayar.odakMesafe!!) }
         else if (odakNoktasi != null) {
             val b = bolge(odakNoktasi!!)
-            r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_AUTO)
+            r.set(CaptureRequest.CONTROL_AF_MODE, if (!izliyor) CameraMetadata.CONTROL_AF_MODE_AUTO else if (fotoModu) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
             if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AF_REGIONS, b)
             if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AE_REGIONS, b)
         }
@@ -409,7 +419,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         val mesafe = when (a.odak) { ProAyar.ODAK_SONSUZ -> 0f; ProAyar.ODAK_2M -> 0.5f; else -> null } // diyoptri (1/m)
         if (mesafe != null && y.minOdak >= mesafe && y.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, mesafe) }
         else if (a.odak == ProAyar.ODAK_OTO && odakNoktasi != null) {
-            r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_AUTO)
+            r.set(CaptureRequest.CONTROL_AF_MODE, if (izliyor) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_AUTO)
             if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AF_REGIONS, bolge(odakNoktasi!!))
         }
         else r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)

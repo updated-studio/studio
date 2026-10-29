@@ -126,10 +126,12 @@ class EkranTest {
         RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
         val c = ApplicationProvider.getApplicationContext<Context>()
         val w = 1179; val h = 1572
-        for ((ad, tur) in listOf("spiral" to KompTur.SPIRAL, "oncu" to KompTur.ONCU)) {
+        // "secili": AI Kadraj'da dokunarak seçilmiş konu güçlü noktada (sarı köşe çentikleri, "Yüz · AF", yeşil kılavuz)
+        for ((ad, tur) in listOf("spiral" to KompTur.SPIRAL, "oncu" to KompTur.ONCU, "secili" to KompTur.UCTE_BIR)) {
             val v = KompozisyonGorunum(c) { android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()) }
             v.tur = tur; v.asistan = true
-            v.konu = android.graphics.RectF(0.2f, 0.35f, 0.4f, 0.6f); v.konuAdi = "Yüz"; v.egim = 2.4f
+            v.konu = if (ad == "secili") android.graphics.RectF(0.25f, 0.23f, 0.42f, 0.44f) else android.graphics.RectF(0.2f, 0.35f, 0.4f, 0.6f); v.konuAdi = "Yüz"; v.egim = 2.4f
+            v.konuSecili = ad == "secili"
             v.analiz = AnalizSonuc(Cizgi(N(0f, 0.55f), N(1f, 0.52f), 2f, 0.2f), listOf(Cizgi(N(0f, 1f), N(0.5f, 0.4f), 50f, 0.1f), Cizgi(N(1f, 1f), N(0.5f, 0.4f), -50f, 0.1f)), N(0.5f, 0.4f), 0.4f, N(0.5f, 0.5f))
             v.ipucu = "Telefonu biraz sola çevir"
             v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)); v.layout(0, 0, w, h)
