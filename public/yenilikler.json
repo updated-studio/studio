@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-29-a",
+    "tarih": "29 Ekim 2026",
+    "baslik": "Tek kişi: Stüdyo ve Uper",
+    "bolumler": [
+      {
+        "ad": "Profil",
+        "maddeler": [
+          "Stüdyo profilin ile Uper üyeliğin artık aynı kişi: ad ve fotoğraf ikisinde birlikte değişir.",
+          "Haberlerdeki imzan da aynı ad ve fotoğrafı kullanır.",
+          "Stüdyo girişi değişmedi; yalnız davetli e-postalar girer."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-28-c",
     "tarih": "28 Ekim 2026",
     "baslik": "İmza, fotoğraf ve ikonlar",
