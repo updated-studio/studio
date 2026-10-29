@@ -25,11 +25,15 @@ final class GezintiTesti: XCTestCase {
         }
         app.launch()
         sleep(3)
+        // İlk açılış: "Ne yapmak istiyorsun?" → Kamera (ortaya rastgele dokunmak Monitör'e götürüyordu)
+        let kamera = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Kamera'")).firstMatch
+        if kamera.waitForExistence(timeout: 2) { kamera.tap(); sleep(2) }
         app.tap()
     }
 
     func testTumEkranlar() {
         ekran("ana-ekran")
+        XCTAssertTrue(app.buttons["FOTO"].waitForExistence(timeout: 5), "Kamera ekranı açılmadı (mod düğmeleri yok)")
         // Modlar
         for mod in ["FOTO", "VİDEO", "PORTRE", "PRO", "TİMELAPSE", "FOTO"] {
             dokun(app.buttons[mod], "mod-\(mod)")

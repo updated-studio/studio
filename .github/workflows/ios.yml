@@ -93,10 +93,13 @@ jobs:
         run: |
           mkdir -p gezinti
           set -o pipefail
+          rm -rf gezinti.xcresult
           xcodebuild test -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -destination "id=$UDID" \
-            CODE_SIGNING_ALLOWED=NO TEST_RUNNER_EKRAN_KLASORU="$PWD/gezinti" > test.log 2>&1; DURUM=$?
+            -resultBundlePath gezinti.xcresult CODE_SIGNING_ALLOWED=NO TEST_RUNNER_EKRAN_KLASORU="$PWD/gezinti" > test.log 2>&1; DURUM=$?
           grep -E "GEZINTI|error:|failed|ÇÖKTÜ|Crash|Test Case" test.log | head -n 400
-          ls gezinti | wc -l
+          # Ekran görüntüleri test sonucundan dışarı (doğrudan yazılanlar eksik kalabiliyor)
+          xcrun xcresulttool export attachments --path gezinti.xcresult --output-path gezinti 2>/dev/null || true
+          echo "Ekran görüntüsü: $(ls gezinti | wc -l)"
           exit $DURUM
       - uses: actions/upload-artifact@v4
         if: always()
