@@ -789,7 +789,7 @@ class MainActivity : Activity() {
                     val hizlar = listOf(10, 20, 35, 50, 80, 100, 150)
                     secenek(ic, "BİT HIZI", hizlar.map { "$it Mb/sn" }, hizlar.indexOf(mbps).coerceAtLeast(0)) { mbps = hizlar[it] }
                     anahtar(ic, "SES KAYDI", sesKayit) { sesKayit = it }
-                    anahtar(ic, "GÖRÜNTÜ SABİTLEME", ka.sabitleme) { ka.sabitleme = it; k.ayarDegisti() }
+                    anahtar(ic, "GÖRÜNTÜ SABİTLEME", ka.sabit > 0) { ka.sabit = if (it) 1 else 0; k.ayarDegisti() }
                     aciklama(ic, "Kayıtlar: Galeri → Movies/UPDATED Monitör. Kayıt temizdir (odak, zebra, kılavuz ve LUT kayda girmez). Kayıt düğmesine basılı tutunca ekran görüntüsü alınır.")
                 }
             }
@@ -1079,7 +1079,7 @@ class MainActivity : Activity() {
         val i = etkin; val id = (kaynaklar[i] as? KameraKaynak)?.id ?: return; val a = kamAyar[i]
         tercih.edit().putString("kam_$id", JSONObject().apply {
             a.boyut?.let { put("w", it.width); put("h", it.height) }; a.fps?.let { put("fl", it.lower); put("fu", it.upper) }
-            a.iso?.let { put("iso", it) }; a.pozlamaNs?.let { put("poz", it) }; put("ev", a.ev); put("awb", a.awb); a.odakMesafe?.let { put("odak", it.toDouble()) }; put("sab", a.sabitleme)
+            a.iso?.let { put("iso", it) }; a.pozlamaNs?.let { put("poz", it) }; put("ev", a.ev); put("awb", a.awb); a.odakMesafe?.let { put("odak", it.toDouble()) }; put("sab", a.sabit > 0)
             a.fotoBoyut?.let { put("fw", it.width); put("fh", it.height) }; put("raw", a.raw)
         }.toString()).putBoolean("hevc", hevc).putInt("mbps", mbps).putBoolean("sesKayit", sesKayit).apply()
     }
@@ -1089,7 +1089,7 @@ class MainActivity : Activity() {
         return KameraAyari(
             boyut = if (j.has("w")) Size(j.getInt("w"), j.getInt("h")) else null, fps = if (j.has("fl")) Range(j.getInt("fl"), j.getInt("fu")) else null,
             iso = if (j.has("iso")) j.getInt("iso") else null, pozlamaNs = if (j.has("poz")) j.getLong("poz") else null, ev = j.optInt("ev"),
-            awb = j.optInt("awb", CameraMetadata.CONTROL_AWB_MODE_AUTO), odakMesafe = if (j.has("odak")) j.getDouble("odak").toFloat() else null, sabitleme = j.optBoolean("sab", true),
+            awb = j.optInt("awb", CameraMetadata.CONTROL_AWB_MODE_AUTO), odakMesafe = if (j.has("odak")) j.getDouble("odak").toFloat() else null, sabit = if (j.optBoolean("sab", true)) 1 else 0,
             fotoBoyut = if (j.has("fw")) Size(j.getInt("fw"), j.getInt("fh")) else null, raw = j.optBoolean("raw"))
     }
 

@@ -65,7 +65,7 @@ class EkranTest {
                 a.window.decorView.findViewWithText("Biçim")?.performClick(); kaydet(a, "kamera-bicim-$ad")
                 a.window.decorView.findViewWithText("Kapat")?.performClick()
                 a.window.decorView.findViewWithText("Ayarlar")?.performClick(); kaydet(a, "kamera-ayarlar-$ad")
-                a.window.decorView.findViewWithText("Kapat")?.performClick()
+                a.window.decorView.findViewWithText("Bitti")?.performClick()
                 // Yan tutuş: ekran dikey sabit, ikonlar döner; görüntü telefonun tutulduğu gibi çevrilip kaydedilir
                 a.testYon(270); kaydet(a, "kamera-yan-$ad", don = 270)
             }

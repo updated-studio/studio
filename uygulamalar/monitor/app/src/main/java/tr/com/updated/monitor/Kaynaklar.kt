@@ -62,13 +62,21 @@ fun kameralar(ctx: Context): List<Pair<String, String>> {
 data class KameraAyari(
     var boyut: Size? = null, var fps: Range<Int>? = null,
     var iso: Int? = null, var pozlamaNs: Long? = null, var ev: Int = 0,
-    var awb: Int = CameraMetadata.CONTROL_AWB_MODE_AUTO, var odakMesafe: Float? = null, var sabitleme: Boolean = true,
+    var awb: Int = CameraMetadata.CONTROL_AWB_MODE_AUTO, var odakMesafe: Float? = null,
     var fotoBoyut: Size? = null, var raw: Boolean = false,
     var zoomOrani: Float = 1f,
     /** Kamera ekranında 1/10 sn'den uzun elle enstantane: önizleme kareleri 1/10 sn'de tutulur (0 kapalı, 1 ISO aradaki fark kadar artar, 2 artmaz) */
     var uzunOnizleme: Int = 0,
     /** Flaş: 0 kapalı, 1 otomatik, 2 açık, 3 fener (sürekli ışık) */
     var flas: Int = 0,
+    /** Genel Ayarlar: kodek (H.265 / H.264), renk (0 SDR, 1 HDR HLG10), sabitleme (0 kapalı, 1 standart, 2 sinematik = önizleme sabitlemesi) */
+    var hevc: Boolean = false, var renk: Int = 0, var sabit: Int = 1,
+    /** Elle beyaz denge: Kelvin (null = beyaz denge modu `awb`) ve ton (yeşil −100 … +100 macenta) */
+    var kelvin: Int? = null, var ton: Int = 0,
+    /** Ses girişi (AudioDeviceInfo.id; null = otomatik: takılı harici mikrofon varsa o) */
+    var sesGirdi: Int? = null,
+    /** Diyafram (f sayısı): yalnız değişken diyaframlı telefonda; null = telefonun varsayılanı */
+    var diyafram: Float? = null,
 )
 
 /** Kameranın yetenekleri (ayar listeleri buradan çizilir) */
@@ -114,9 +122,18 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     private var olcumBekleyen: ((Int?) -> Unit)? = null
     val zoomAralik: Range<Float>? by lazy { if (android.os.Build.VERSION.SDK_INT >= 30) oz.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE) else null }
     val flasVar: Boolean by lazy { oz.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true }
+    /** Otomatik beyaz dengenin son kazançları ve renk dönüşümü: elle Kelvin'de dönüşüm bundan alınır, başlangıç Kelvin'i bundan tahmin edilir */
+    @Volatile private var sonKazanc: android.hardware.camera2.params.RggbChannelVector? = null
+    @Volatile private var sonDonusum: android.hardware.camera2.params.ColorSpaceTransform? = null
     private val olcumGeri = object : CameraCaptureSession.CaptureCallback() {
         override fun onCaptureCompleted(ss: CameraCaptureSession, q: CaptureRequest, t: TotalCaptureResult) {
             olcumBekleyen?.invoke(t.get(android.hardware.camera2.CaptureResult.CONTROL_AE_STATE))
+            if (t.get(android.hardware.camera2.CaptureResult.CONTROL_AWB_MODE) != CameraMetadata.CONTROL_AWB_MODE_OFF) {
+                t.get(android.hardware.camera2.CaptureResult.COLOR_CORRECTION_GAINS)?.let { sonKazanc = it }
+                val ilk = sonDonusum == null
+                t.get(android.hardware.camera2.CaptureResult.COLOR_CORRECTION_TRANSFORM)?.let { sonDonusum = it }
+                if (ilk && sonDonusum != null && ayar.kelvin != null && elleBdVar) h.post { istekGonder() }
+            }
             t.get(android.hardware.camera2.CaptureResult.SENSOR_SENSITIVITY)?.let { sonIso = it }
             t.get(android.hardware.camera2.CaptureResult.SENSOR_EXPOSURE_TIME)?.let { sonPozNs = it }
             if (t.get(android.hardware.camera2.CaptureResult.CONTROL_AE_MODE) != CameraMetadata.CONTROL_AE_MODE_OFF && sonIso > 0 && sonPozNs > 0) otoIsoNs = sonIso.toDouble() * sonPozNs
@@ -146,6 +163,26 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             harita?.getOutputSizes(ImageFormat.RAW_SENSOR)?.isNotEmpty() == true
     }
     val rawAcik: Boolean get() = rawOkuyucu != null
+
+    private val yetenekler: IntArray by lazy { oz.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0) }
+    /** HDR (HLG, 10 bit): Android 13+ ve kamera 10 bit HLG10 veriyorsa */
+    val hdrVar: Boolean by lazy {
+        android.os.Build.VERSION.SDK_INT >= 33 && CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT in yetenekler &&
+            oz.get(CameraCharacteristics.REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES)?.supportedProfiles?.contains(android.hardware.camera2.params.DynamicRangeProfiles.HLG10) == true
+    }
+    /** Desteklenen sabitlemeler: 0 kapalı, 1 standart (EIS), 2 sinematik (önizleme sabitlemesi, Android 13+) */
+    val sabitlemeler: List<Int> by lazy {
+        val m = oz.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES) ?: IntArray(0)
+        listOfNotNull(0, 1.takeIf { CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON in m },
+            2.takeIf { android.os.Build.VERSION.SDK_INT >= 33 && CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION in m })
+    }
+    /** Elle Kelvin: beyaz denge kapatılıp renk kazançları verilebiliyorsa */
+    val elleBdVar: Boolean by lazy { CameraMetadata.CONTROL_AWB_MODE_OFF in yetenek.awbModlari && CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_POST_PROCESSING in yetenekler }
+    /** Beyaz denge şu an kaç Kelvin (otomatikse son kazançlardan tahmin) */
+    fun mevcutKelvin(): Int = ayar.kelvin ?: (BeyazDenge.tahmin(oz, sonKazanc) / BeyazDenge.ADIM * BeyazDenge.ADIM)
+    /** Diyafram: telefonun mercek açıklıkları (çoğu telefonda tek; değişken diyaframlı telefonda birden çok) */
+    val diyaframlar: FloatArray by lazy { oz.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES) ?: FloatArray(0) }
+    private val hdrAcik: Boolean get() = ayar.renk == 1 && hdrVar && !fotoModu
     fun secilenFotoBoyut(): Size? = ayar.fotoBoyut?.takeIf { it in fotoBoyutlari } ?: fotoBoyutlari.firstOrNull()
 
     val yetenek: KameraYetenek by lazy {
@@ -205,14 +242,18 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         runCatching { oturum?.close() }; oturum = null
         okuyuculariKur()
         val hedefler = listOfNotNull(onizleme, kaydedici?.surface, jpegOkuyucu?.surface, rawOkuyucu?.surface)
+        val hdr = hdrAcik; val kayitYuzeyi = kaydedici?.surface
+        val ciktilar = hedefler.map { y -> android.hardware.camera2.params.OutputConfiguration(y).apply {
+            if (hdr && android.os.Build.VERSION.SDK_INT >= 33 && (y === onizleme || y === kayitYuzeyi)) dynamicRangeProfile = android.hardware.camera2.params.DynamicRangeProfiles.HLG10 } }
         try {
-            @Suppress("DEPRECATION")
-            c.createCaptureSession(hedefler, object : CameraCaptureSession.StateCallback() {
+            c.createCaptureSession(android.hardware.camera2.params.SessionConfiguration(android.hardware.camera2.params.SessionConfiguration.SESSION_REGULAR, ciktilar,
+                java.util.concurrent.Executor { h.post(it) }, object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(s: CameraCaptureSession) { oturum = s; istekGonder(); if (kaydedici != null) runCatching { kaydedici?.start() }.onFailure { hataGeri("Kayıt başlatılamadı: ${it.message}"); HataKaydi.not("kayit", it.stackTraceToString()); kayitBirak() } }
                 override fun onConfigureFailed(s: CameraCaptureSession) {
                     if (rawOkuyucu != null) { rawDustu = true; runCatching { rawOkuyucu?.close() }; rawOkuyucu = null; hataGeri("Bu kamera RAW'ı önizlemeyle birlikte veremiyor; yalnız JPEG çekilecek."); oturumKur(); return }
+                    if (hdr) { ayar.renk = 0; hataGeri("Bu çözünürlük/kare hızında HDR kurulamadı; SDR'ye dönüldü."); oturumKur(); return }
                     hataGeri("Görüntü oturumu kurulamadı (bu çözünürlük/kare hızı desteklenmiyor olabilir)."); HataKaydi.not("kamera", "onConfigureFailed $ad ${secilenBoyut()} ${ayar.fps}") }
-            }, h)
+            }))
         } catch (e: Exception) { hataGeri(e.message ?: "Oturum kurulamadı"); HataKaydi.not("kamera", e.stackTraceToString()) }
     }
 
@@ -286,8 +327,16 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, ayar.ev)
             r.set(CaptureRequest.CONTROL_AE_LOCK, pozKilit)
         }
-        r.set(CaptureRequest.CONTROL_AWB_MODE, ayar.awb)
-        if (ayar.awb == CameraMetadata.CONTROL_AWB_MODE_AUTO) r.set(CaptureRequest.CONTROL_AWB_LOCK, pozKilit)
+        val donusum = sonDonusum; val kelvin = ayar.kelvin
+        if (kelvin != null && elleBdVar && donusum != null) {
+            r.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_OFF)
+            r.set(CaptureRequest.COLOR_CORRECTION_MODE, CameraMetadata.COLOR_CORRECTION_MODE_TRANSFORM_MATRIX)
+            r.set(CaptureRequest.COLOR_CORRECTION_GAINS, BeyazDenge.kazanc(oz, kelvin, ayar.ton, sonKazanc))
+            r.set(CaptureRequest.COLOR_CORRECTION_TRANSFORM, donusum)
+        } else {
+            r.set(CaptureRequest.CONTROL_AWB_MODE, if (kelvin != null) CameraMetadata.CONTROL_AWB_MODE_AUTO else ayar.awb)
+            if (ayar.awb == CameraMetadata.CONTROL_AWB_MODE_AUTO) r.set(CaptureRequest.CONTROL_AWB_LOCK, pozKilit)
+        }
         if (ayar.odakMesafe != null && yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, ayar.odakMesafe!!) }
         else if (odakNoktasi != null) {
             val b = bolge(odakNoktasi!!)
@@ -296,6 +345,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AE_REGIONS, b)
         }
         else r.set(CaptureRequest.CONTROL_AF_MODE, if (fotoModu) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+        ayar.diyafram?.takeIf { diyaframlar.size > 1 && diyaframlar.any { d -> d == it } }?.let { r.set(CaptureRequest.LENS_APERTURE, it) }
         // Yakınlaştırma (Android 11+: lensler arası geçiş dahil; .5 geniş açı telefon destekliyorsa)
         if (android.os.Build.VERSION.SDK_INT >= 30) zoomAralik?.let { z -> r.set(CaptureRequest.CONTROL_ZOOM_RATIO, ayar.zoomOrani.coerceIn(z.lower, z.upper)) }
         // Flaş: yalnız otomatik pozlamada
@@ -305,7 +355,12 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             3 -> { r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON); r.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_TORCH) }
             else -> r.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_OFF)
         }
-        r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, if (ayar.sabitleme && !foto) CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON else CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
+        r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, when {
+            foto || fotoModu || ayar.sabit !in sabitlemeler -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+            ayar.sabit == 2 && android.os.Build.VERSION.SDK_INT >= 33 -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
+            ayar.sabit >= 1 -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON
+            else -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+        })
         sahneUygula(r, foto)
     }
 
@@ -469,14 +524,18 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         h.post {
             try {
                 val b = secilenBoyut(); val fps = ayar.fps?.upper ?: 30
-                val m = MediaRecorder(ctx)
-                if (ses) m.setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
+                val m = MediaRecorder(ctx); val hdr = hdrAcik
+                if (ses) {
+                    m.setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
+                    sesGirisi(ctx, ayar.sesGirdi)?.let { m.setPreferredDevice(it) }
+                }
                 m.setVideoSource(MediaRecorder.VideoSource.SURFACE)
                 m.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 m.setOutputFile(dosya.fileDescriptor)
-                m.setVideoEncoder(if (hevc) MediaRecorder.VideoEncoder.HEVC else MediaRecorder.VideoEncoder.H264)
+                m.setVideoEncoder(if (hevc || hdr) MediaRecorder.VideoEncoder.HEVC else MediaRecorder.VideoEncoder.H264)
+                if (hdr) m.setVideoEncodingProfileLevel(android.media.MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10, android.media.MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel51)
                 m.setVideoSize(b.width, b.height); m.setVideoFrameRate(fps); m.setVideoEncodingBitRate(mbps * 1_000_000)
-                if (ses) { m.setAudioEncoder(MediaRecorder.AudioEncoder.AAC); m.setAudioSamplingRate(48000); m.setAudioEncodingBitRate(192_000); m.setAudioChannels(2) }
+                if (ses) { m.setAudioEncoder(MediaRecorder.AudioEncoder.AAC); m.setAudioSamplingRate(48000); m.setAudioEncodingBitRate(256_000); m.setAudioChannels(2) }
                 // Oynatıcı videoyu, telefon kayıt anında nasıl tutulduysa öyle dik göstersin
                 m.setOrientationHint(cikisYonu())
                 m.prepare()
@@ -538,4 +597,29 @@ class AgKaynak(private val ctx: Context, private val adres: String) : Kaynak {
     }
 
     override fun durdur() { oynatici?.release(); oynatici = null }
+}
+
+/** Ses girişleri (telefon mikrofonu, USB, kablolu, Bluetooth): (id, ad, harici mi) */
+fun sesGirisleri(ctx: Context): List<Triple<Int, String, Boolean>> {
+    val am = ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    return am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS).mapNotNull { d ->
+        val (tur, harici) = when (d.type) {
+            android.media.AudioDeviceInfo.TYPE_BUILTIN_MIC -> "Telefon mikrofonu" to false
+            android.media.AudioDeviceInfo.TYPE_USB_DEVICE, android.media.AudioDeviceInfo.TYPE_USB_HEADSET -> "USB" to true
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Kablolu mikrofon" to true
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth" to true
+            else -> if (android.os.Build.VERSION.SDK_INT >= 31 && d.type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET) "Bluetooth LE" to true else return@mapNotNull null
+        }
+        val ad = d.productName?.toString()?.takeIf { it.isNotBlank() && harici && it != android.os.Build.MODEL }?.let { "$tur · $it" } ?: tur
+        Triple(d.id, ad, harici)
+    }.distinctBy { it.second }
+}
+
+/** Kayıtta kullanılacak giriş: seçilen (takılıysa), yoksa takılı harici mikrofon, yoksa null (telefonun kendi seçimi) */
+fun sesGirisi(ctx: Context, secilen: Int?): android.media.AudioDeviceInfo? {
+    val am = ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    val hepsi = am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
+    secilen?.let { id -> hepsi.firstOrNull { it.id == id }?.let { return it } }
+    val harici = sesGirisleri(ctx).firstOrNull { it.third } ?: return null
+    return hepsi.firstOrNull { it.id == harici.first }
 }
