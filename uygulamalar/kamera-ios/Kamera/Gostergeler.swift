@@ -37,7 +37,7 @@ extension Kamera {
         } else {
             cizici.ozelLut(anahtar: nil, uret: nil)
         }
-        cizici.doldur = false
+        cizici.doldur = true  // önizleme ekranı doldurur (Onizleme aspect fill ile aynı)
         if cizici.ayar != a { cizici.ayar = a }
         let h = histo
         if histogram { cizici.olcumGeri = { d, w, hh in h.kare(d, w, hh) } } else { cizici.olcumGeri = nil }

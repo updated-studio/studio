@@ -108,12 +108,16 @@ struct AnaEkran: View {
 
     private func dikeyDuzen(_ g: GeometryProxy) -> some View {
         let ust: CGFloat = 52, alt: CGFloat = 96
+        // Önizleme tam ekran (Monitör'deki gibi); menüler görüntünün üstünde, okunsun diye üstte ve altta hafif karartma
         return ZStack {
+            goruntu.ignoresSafeArea()
             VStack(spacing: 0) {
-                Color.black.frame(height: ust)
-                goruntu
-                Color.black.frame(height: alt)
+                LinearGradient(colors: [.black.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom).frame(height: ust + 70)
+                Spacer(minLength: 0)
+                LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .top, endPoint: .bottom).frame(height: alt + 200)
             }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
             VStack(spacing: 0) {
                 ustBant.frame(height: ust)
                 bilgi.padding(.top, 10)
@@ -143,41 +147,48 @@ struct AnaEkran: View {
     }
 
     private func yatayDuzen(_ g: GeometryProxy) -> some View {
-        HStack(spacing: 0) {
-            ZStack {
-                goruntu
-                VStack(spacing: 0) {
-                    HStack(alignment: .top) {
-                        ustDugmeler
-                        Spacer()
-                    }
-                    .overlay(alignment: .top) { bilgi }
-                    .padding(.horizontal, 12).padding(.top, 8)
-                    cipler.padding(.top, 6)
-                    Spacer(minLength: 0)
-                    if let b = kamera.bildirim { bildirimKutusu(b) }
-                    if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 10) }
-                    if panel == nil, let f = acikSatir { FavoriSatir(f: f, kamera: kamera).frame(maxWidth: 480).padding(.bottom, 10) }
-                    if let p = panel {
-                        HStack {
-                            panelKabi(p, enYuksek: g.size.height * 0.82).frame(maxWidth: 480)
-                            Spacer(minLength: 0)
+        ZStack {
+            goruntu.ignoresSafeArea()
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .leading, endPoint: .trailing).frame(width: 190)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            HStack(spacing: 0) {
+                ZStack {
+                    VStack(spacing: 0) {
+                        HStack(alignment: .top) {
+                            ustDugmeler
+                            Spacer()
+                        }
+                        .overlay(alignment: .top) { bilgi }
+                        .padding(.horizontal, 12).padding(.top, 8)
+                        cipler.padding(.top, 6)
+                        Spacer(minLength: 0)
+                        if let b = kamera.bildirim { bildirimKutusu(b) }
+                        if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 10) }
+                        if panel == nil, let f = acikSatir { FavoriSatir(f: f, kamera: kamera).frame(maxWidth: 480).padding(.bottom, 10) }
+                        if let p = panel {
+                            HStack {
+                                panelKabi(p, enYuksek: g.size.height * 0.82).frame(maxWidth: 480)
+                                Spacer(minLength: 0)
+                            }
                         }
                     }
-                }
-                if panel == nil {
-                    HStack(spacing: 14) {
-                        Spacer()
-                        mercekler(dikey: true)
-                        modSecici(dikey: true, genislik: 0)
+                    if panel == nil {
+                        HStack(spacing: 14) {
+                            Spacer()
+                            mercekler(dikey: true)
+                            modSecici(dikey: true, genislik: 0)
+                        }
+                        .padding(.trailing, 10)
                     }
-                    .padding(.trailing, 10)
                 }
+                sagSutun
+                    .frame(width: 104)
+                    .frame(maxHeight: .infinity)
             }
-            sagSutun
-                .frame(width: 104)
-                .frame(maxHeight: .infinity)
-                .background(Color.black.ignoresSafeArea())
         }
     }
 
@@ -199,9 +210,20 @@ struct AnaEkran: View {
 
     // MARK: görüntü
 
+    /// Görüntü ekranı doldurunca (aspect fill) karenin ekrandaki tam dikdörtgeni; taşan kenarlar ekran dışında kalır
+    static func doldurAlan(oran: CGFloat, boyut: CGSize) -> CGRect {
+        guard oran > 0, boyut.width > 0, boyut.height > 0 else { return CGRect(origin: .zero, size: boyut) }
+        if boyut.width / boyut.height > oran {
+            let h = boyut.width / oran
+            return CGRect(x: 0, y: (boyut.height - h) / 2, width: boyut.width, height: h)
+        }
+        let w = boyut.height * oran
+        return CGRect(x: (boyut.width - w) / 2, y: 0, width: w, height: boyut.height)
+    }
+
     private var goruntu: some View {
         GeometryReader { tam in
-            let alan = AVMakeRect(aspectRatio: CGSize(width: kamera.goruntuOrani, height: 1), insideRect: CGRect(origin: .zero, size: tam.size))
+            let alan = AnaEkran.doldurAlan(oran: kamera.goruntuOrani, boyut: tam.size)
             ZStack {
                 Onizleme(oturum: kamera.oturum) { nokta in
                     panel = nil
@@ -215,7 +237,7 @@ struct AnaEkran: View {
                 if kamera.gostergeGorunur && kamera.histogram {
                     KoseHistogram(o: kamera.histo)
                         .frame(width: 112, height: 56)
-                        .position(x: alan.minX + 68, y: alan.minY + 40)
+                        .position(x: 76, y: tam.size.height * 0.2)
                         .allowsHitTesting(false)
                 }
                 KompozisyonKatman(tur: kamera.kompTur, yon: kamera.kompYon, alan: alan, asistan: kamera.asistanAcik, konu: kamera.asistanAcik ? kamera.konu : nil,
@@ -225,7 +247,7 @@ struct AnaEkran: View {
                         .font(.subheadline.weight(.bold))
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(Capsule().fill(Color(red: 18 / 255, green: 20 / 255, blue: 24 / 255).opacity(0.72)))
-                        .position(x: alan.midX, y: alan.maxY - min(alan.width, alan.height) * 0.11 - 52)
+                        .position(x: tam.size.width / 2, y: tam.size.height * 0.62)
                         .allowsHitTesting(false)
                 }
             }

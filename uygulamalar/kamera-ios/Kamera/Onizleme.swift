@@ -35,7 +35,7 @@ struct Onizleme: UIViewRepresentable {
         let v = Gorunum()
         v.backgroundColor = .black
         v.katman.session = oturum
-        v.katman.videoGravity = .resizeAspect
+        v.katman.videoGravity = .resizeAspectFill
         v.dokun = dokun
         v.addGestureRecognizer(UITapGestureRecognizer(target: v, action: #selector(Gorunum.dokunuldu(_:))))
         return v
