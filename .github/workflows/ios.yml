@@ -54,6 +54,9 @@ jobs:
             echo "::error title=ASC_KEY_P8::Anahtar .p8 dosyasının içine benzemiyor (uzunluk ${#GOVDE}; beklenen ~200). Dosyayı metin düzenleyiciyle açıp BEGIN'den END'e kadar tamamını yapıştırın."
             exit 1
           fi
+          # Eski makinelerin geliştirme sertifikaları birikip sınırı doldurmasın (scripts/sertifika_temizle.py); olmazsa yükleme yine denenir
+          python3 -m venv /tmp/asc && /tmp/asc/bin/pip install -q "pyjwt[crypto]" \
+            && /tmp/asc/bin/python scripts/sertifika_temizle.py "$ANAHTAR" || echo "::warning title=Sertifika::Eski sertifikalar temizlenemedi"
           YETKI=(-allowProvisioningUpdates -authenticationKeyPath "$ANAHTAR" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
           xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Release \
             -destination 'generic/platform=iOS' -archivePath build/UpdatedKamera.xcarchive archive \
