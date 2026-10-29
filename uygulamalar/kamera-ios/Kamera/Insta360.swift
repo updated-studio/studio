@@ -2,10 +2,11 @@ import AVFoundation
 import Network
 import SwiftUI
 
-/// Insta360 kameralarının Wi-Fi canlı görüntüsü (Luna, X, GO serisi). Kamera kendi Wi-Fi'ını açar (192.168.42.1); telefon/iPad o ağa bağlanır.
-/// Dil (yayımlanmış tersine mühendislik çalışmalarından, bkz. uygulamalar/monitor/notlar/insta360-luna.md): TCP 6666, her paket
-/// [uzunluk 4 bayt LE, kendisi dahil][yük]. Yük türü ilk 3 bayt: 06 eşleşme ("syNceNdinS"), 05 canlı tutma (2 sn), 04 komut/yanıt, 01 görüntü
-/// (12 bayt başlıktan sonra Annex-B; GO Ultra'da H.265). Kameraya hiçbir şey yazılmaz; yalnız görüntü istenir.
+/// Insta360 Luna Ultra'nın Wi-Fi canlı görüntüsü. Kamera kendi Wi-Fi'ını açar (192.168.42.1); iPhone o ağa bağlanır.
+/// Dil ("UCD2" çerçevesi, bkz. uygulamalar/monitor/notlar/insta360-luna.md): TCP 6666, her çerçeve
+/// "UCD2" 01 0c [tür] [sıra] [gövde uzunluğu 4B LE] [gövde] [CRC-32 4B LE]. Tür 05 selam/nabız (3 sn'de bir), 04 komut/yanıt, 01 görüntü
+/// (gövde 0. bayt 0x20 = görüntü; 9 baytlık başlıktan sonra H.265 Annex-B). Sıra: selam → 39 yetki (kamera ekranda onay sorabilir) → 118 → 1 canlı.
+/// Kameraya yalnız bu dört istek yazılır; ayar değiştirilmez.
 final class Insta360Alici: ObservableObject {
     static let adres = "192.168.42.1"
     static let kapi: UInt16 = 6666
@@ -20,7 +21,6 @@ final class Insta360Alici: ObservableObject {
     private var zamanlayici: DispatchSourceTimer?
     private var tampon = Data()
     private var akis = Data()
-    private var sira: UInt32 = 0
     private var hevc: Bool?
     private var vps: Data?, sps: Data?, pps: Data?
     private var bicim: CMVideoFormatDescription?
@@ -73,8 +73,9 @@ final class Insta360Alici: ObservableObject {
 
     private func durdurIc() {
         zamanlayici?.cancel(); zamanlayici = nil
+        yetkiZamanAsimi?.cancel(); yetkiZamanAsimi = nil; yetkiIstek = nil
         if let c = baglanti {
-            gonder(komut(2))  // StopLiveStream
+            komut(2)  // StopLiveStream
             c.cancel()
         }
         baglanti = nil
@@ -86,47 +87,119 @@ final class Insta360Alici: ObservableObject {
         DispatchQueue.main.async { self.katman.flushAndRemoveImage() }
     }
 
-    // MARK: gönderme
+    // MARK: gönderme (UCD2 çerçevesi)
 
-    private func paket(_ yuk: Data) -> Data {
-        var d = Data()
-        withUnsafeBytes(of: UInt32(yuk.count + 4).littleEndian) { d.append(contentsOf: $0) }
-        return d + yuk
+    /// Uygulamanın kendi kimliği (yetki isteğinde gider; başka uygulamanınki kullanılmaz)
+    static var kimlik: String {
+        if let k = UserDefaults.standard.string(forKey: "insta360.kimlik") { return k }
+        let k = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(k, forKey: "insta360.kimlik")
+        return k
     }
 
-    private func gonder(_ yuk: Data) { baglanti?.send(content: paket(yuk), completion: .contentProcessed { _ in }) }
-
-    /// 04 00 00 [komut 2B LE] 02 [sıra 3B LE] 80 00 00 [protobuf]
-    private func komut(_ no: UInt16, _ pb: Data = Data()) -> Data {
-        var d = Data([4, 0, 0])
-        withUnsafeBytes(of: no.littleEndian) { d.append(contentsOf: $0) }
-        d.append(2)
-        withUnsafeBytes(of: sira.littleEndian) { d.append(contentsOf: $0.prefix(3)) }
-        d.append(contentsOf: [0x80, 0, 0])
-        sira += 1
-        return d + pb
+    /// CRC-32 (MSB-önce 04C11DB7 tablosu, başlangıç FFFFFFFF, bayt en düşük bayta XOR'lanır, son XOR yok)
+    private static let crcTablo: [UInt32] = (0..<256).map { i -> UInt32 in
+        var c = UInt32(i) << 24
+        for _ in 0..<8 { c = (c & 0x8000_0000) != 0 ? (c << 1) ^ 0x04C1_1DB7 : c << 1 }
+        return c
     }
 
-    private static let esles = Data([6, 0, 0]) + Data("syNceNdinS".utf8)
-    private static let canli = Data([5, 0, 0])
+    static func crc(_ d: Data) -> UInt32 {
+        var c: UInt32 = 0xFFFF_FFFF
+        for b in d {
+            c ^= UInt32(b)
+            for _ in 0..<4 { c = (c << 8) ^ crcTablo[Int(c >> 24)] }
+        }
+        return c
+    }
+
+    private var sira: UInt8 = 0
+    private var istekNo: UInt16 = 1
+    private var yetkiIstek: UInt16?
+    private var yetkiZamanAsimi: DispatchWorkItem?
+
+    private func cerceve(_ tur: UInt8, _ govde: Data) -> Data {
+        var d = Data("UCD2".utf8)
+        d.append(contentsOf: [1, 0x0c, tur, sira])
+        sira &+= 1
+        withUnsafeBytes(of: UInt32(govde.count).littleEndian) { d.append(contentsOf: $0) }
+        d.append(govde)
+        withUnsafeBytes(of: Insta360Alici.crc(d).littleEndian) { d.append(contentsOf: $0) }
+        return d
+    }
+
+    /// Selam/nabız: 16 bayt, sonu sabit (LunaLive uygulamasının gönderdiği gibi; kamera kabul ediyor)
+    private func selam() -> Data {
+        var d = Data("UCD2".utf8)
+        d.append(contentsOf: [1, 0x0c, 5, sira, 0, 0, 0, 0, 0xf6, 0xcc, 0x4f, 0x09])
+        sira &+= 1
+        return d
+    }
+
+    private func gonder(_ d: Data) { baglanti?.send(content: d, completion: .contentProcessed { _ in }) }
+
+    /// Komut gövdesi: [komut 2B LE] 02 [istek no 2B LE] 00 80 00 00 [protobuf]
+    @discardableResult
+    private func komut(_ no: UInt16, _ pb: Data = Data()) -> UInt16 {
+        var g = Data()
+        withUnsafeBytes(of: no.littleEndian) { g.append(contentsOf: $0) }
+        g.append(2)
+        let istek = istekNo; istekNo &+= 1
+        withUnsafeBytes(of: istek.littleEndian) { g.append(contentsOf: $0) }
+        g.append(contentsOf: [0, 0x80, 0, 0])
+        gonder(cerceve(4, g + pb))
+        return istek
+    }
+
+    // Protobuf (düz): varint ve metin alanları
+    private static func varint(_ v: UInt64) -> Data {
+        var v = v, d = Data()
+        repeat { var b = UInt8(v & 0x7f); v >>= 7; if v > 0 { b |= 0x80 }; d.append(b) } while v > 0
+        return d
+    }
+    private static func pbSayi(_ alan: UInt64, _ deger: UInt64) -> Data { varint(alan << 3) + varint(deger) }
+    private static func pbMetin(_ alan: UInt64, _ s: String) -> Data { varint(alan << 3 | 2) + varint(UInt64(s.utf8.count)) + Data(s.utf8) }
 
     private func ilkKonusma() {
-        gonder(Insta360Alici.esles)
-        gonder(Insta360Alici.canli)
-        // SetOptions (7): saat eşitleme (GO Ultra çalışmasındaki biçim)
-        var ms = Int64(Date().timeIntervalSince1970 * 1000).littleEndian
-        let zaman = withUnsafeBytes(of: &ms) { Data($0.prefix(6)) }
-        gonder(komut(7, Data([0x0a, 0x02, 0x0c, 0x0d, 0x12, 0x06]) + zaman))
-        kuyruk.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self, self.baglanti != nil else { return }
-            self.gonder(self.komut(1))  // StartLiveStream (boş istek)
-            self.yaz("Canlı görüntü istendi")
-        }
+        gonder(selam())
         let z = DispatchSource.makeTimerSource(queue: kuyruk)
-        z.schedule(deadline: .now() + 2, repeating: 2)
-        z.setEventHandler { [weak self] in self?.gonder(Insta360Alici.canli); self?.sayimYaz() }
+        z.schedule(deadline: .now() + 3, repeating: 3)
+        z.setEventHandler { [weak self] in guard let self else { return }; self.gonder(self.selam()); self.sayimYaz() }
         z.resume()
         zamanlayici = z
+        kuyruk.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, self.baglanti != nil else { return }
+            self.yaz("Yetki isteniyor (39); kamera ekranında onay sorabilir, 30 sn bekleniyor")
+            self.durumYaz("Kamera izin istiyor olabilir, ekranına bak")
+            self.yetkiIstek = self.komut(39, Insta360Alici.pbMetin(1, Insta360Alici.kimlik) + Insta360Alici.pbSayi(2, 2))
+            let z = DispatchWorkItem { [weak self] in
+                guard let self, self.yetkiIstek != nil else { return }
+                self.yaz("Yetki yanıtı 30 sn'de gelmedi; kamerada onay verilmemiş olabilir")
+                self.durumYaz("Kamera yanıt vermedi")
+            }
+            self.yetkiZamanAsimi = z
+            self.kuyruk.asyncAfter(deadline: .now() + 30, execute: z)
+        }
+    }
+
+    private func yetkiGeldi(_ kod: Int) {
+        yetkiIstek = nil
+        yetkiZamanAsimi?.cancel(); yetkiZamanAsimi = nil
+        guard kod == 200 else {
+            yaz("Yetki reddedildi (\(kod)); kamerada onayla ve yeniden Bağlan")
+            durumYaz("Kamera izin vermedi")
+            return
+        }
+        yaz("Yetki tamam; 118 ve canlı görüntü (1) isteniyor")
+        komut(118, Insta360Alici.pbSayi(1, 5))
+        kuyruk.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self, self.baglanti != nil else { return }
+            var pb = Data()
+            for (alan, deger) in [(2, 1), (6, 40), (7, 9), (8, 1), (9, 40), (10, 18)] as [(UInt64, UInt64)] { pb += Insta360Alici.pbSayi(alan, deger) }
+            self.komut(1, pb)
+            self.yaz("Canlı görüntü istendi")
+            self.durumYaz("Görüntü bekleniyor")
+        }
     }
 
     // MARK: alma
@@ -148,37 +221,40 @@ final class Insta360Alici: ObservableObject {
     }
 
     private func ayikla() {
-        while tampon.count >= 4 {
+        while tampon.count >= 12 {
             let b = tampon.startIndex
-            let n = Int(tampon[b]) | Int(tampon[b + 1]) << 8 | Int(tampon[b + 2]) << 16 | Int(tampon[b + 3]) << 24
-            guard n >= 4, n < 16 * 1024 * 1024 else {
+            guard tampon[b] == 0x55, tampon[b + 1] == 0x43, tampon[b + 2] == 0x44, tampon[b + 3] == 0x32 else {
                 bozukSayisi += 1
                 if bozukSayisi <= 3 { yaz("Tanınmayan paket (\(tampon.count) bayt): \(onaltilik(tampon.prefix(48)))") }
                 tampon = Data(); return
             }
-            guard tampon.count >= n else { return }
-            let yuk = Data(tampon[(b + 4)..<(b + n)])
-            tampon = Data(tampon[(b + n)...])
-            isle(yuk)
+            let n = Int(tampon[b + 8]) | Int(tampon[b + 9]) << 8 | Int(tampon[b + 10]) << 16 | Int(tampon[b + 11]) << 24
+            guard n < 16 * 1024 * 1024 else { yaz("Aşırı uzun çerçeve (\(n))"); tampon = Data(); return }
+            let toplam = 12 + n + 4
+            guard tampon.count >= toplam else { return }
+            let tur = tampon[b + 6]
+            let govde = Data(tampon[(b + 12)..<(b + 12 + n)])
+            tampon = Data(tampon[(b + toplam)...])
+            isle(tur, govde)
         }
     }
 
-    private func isle(_ y: Data) {
-        guard y.count >= 3 else { return }
-        let t = y[y.startIndex]
-        switch t {
+    private func isle(_ tur: UInt8, _ y: Data) {
+        switch tur {
         case 1:
             paketSayisi += 1; bayt += y.count
-            guard y.count > 12 else { return }
+            guard y.count > 9, y[y.startIndex] == 0x20 else { return }
             if paketSayisi == 1 { yaz("İlk görüntü paketi: \(y.count) bayt, başı \(onaltilik(y.prefix(20)))") }
-            akisaEkle(Data(y.dropFirst(12)))
+            akisaEkle(Data(y.dropFirst(9)))
         case 4:
-            guard y.count >= 9 else { return }
-            let kod = Int(y[y.startIndex + 3]) | Int(y[y.startIndex + 4]) << 8
-            if kod != 8208 && kod != 8198 { yaz("Yanıt \(kod)\(kod == 200 ? " (tamam)" : kod == 500 ? " (hata: kamera izin istiyor olabilir)" : "")") }
+            guard y.count >= 5 else { return }
+            let kod = Int(y[y.startIndex]) | Int(y[y.startIndex + 1]) << 8
+            let istek = UInt16(y[y.startIndex + 3]) | UInt16(y[y.startIndex + 4]) << 8
+            if kod >= 8192 { if kod != 8195 { yaz("Bildirim \(kod)") }; return }
+            if let yi = yetkiIstek, yi == istek { yetkiGeldi(kod); return }
+            yaz("Yanıt \(kod) (istek \(istek))\(kod == 200 ? " tamam" : kod == 500 ? " ret" : "")")
         case 5: break
-        case 6: yaz("Eşleşme yanıtı geldi")
-        default: yaz("Bilinmeyen paket türü \(t), \(y.count) bayt")
+        default: yaz("Bilinmeyen çerçeve türü \(tur), \(y.count) bayt")
         }
     }
 
@@ -365,7 +441,7 @@ struct Insta360Deneme: View {
                 }
                 .buttonStyle(.borderless)
             } footer: {
-                Text("1) Insta360 uygulamasını tamamen kapat. 2) iPhone Ayarlar → Wi-Fi'dan kameranın ağına bağlan. 3) Buraya dönüp Bağlan'a dokun. Kameraya hiçbir şey yazılmaz, yalnız görüntü istenir.")
+                Text("1) Her telefondaki Insta360 uygulamasını tamamen kapat (kamera tek bağlantı kabul eder). 2) iPhone Ayarlar → Wi-Fi'dan kameranın ağına bağlan. 3) Buraya dönüp Bağlan'a dokun; ilk seferde kamera kendi ekranında izin sorabilir, onayla. Kameraya yalnız görüntü isteği yazılır, ayar değiştirilmez.")
             }
             Section {
                 ForEach(Array(a.kayit.enumerated()), id: \.offset) { _, s in Text(s).font(.system(size: 11, design: .monospaced)) }
