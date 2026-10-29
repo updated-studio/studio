@@ -4,7 +4,9 @@ Amaç: Luna Ultra (ve X serisi) görüntüsünü telefon olmadan Masa'ya kaynak 
 canlı görüntü yalnız kameranın kendi Wi-Fi erişim noktası (AP) üzerinden Insta360 uygulamasına gidiyor. Kameraya hiçbir şey yazılmadı/yüklenmedi.
 
 ## Kesin olmayanlar önce
-- **APK statik incelemesi yapılamadı:** APKPure (403, bot koruması) ve Uptodown (indirme bağlantısı JavaScript ile) sunucudan indirmeye izin vermedi.
+- **Güncel (29 Ekim akşam):** Luna'ya özgü protokol aşağıda, "Luna UCD2 protokolü (APK incelemesi)" bölümünde. Ondan önceki bölümler
+  eski kuşak (ONE RS/GO Ultra) bilgisi; Luna'da çerçeve farklı.
+- İlk denemede APK statik incelemesi yapılamamıştı: APKPure (403, bot koruması) ve Uptodown (indirme bağlantısı JavaScript ile) sunucudan indirmeye izin vermedi.
   Aşağıdakiler Luna'ya özgü doğrulanmış bilgi değil; aynı uygulamayı ve aynı kuşağı (GO Ultra 2025, X4/X5) kullanan kameralar için yayımlanmış
   tersine mühendislik çalışmalarına dayanıyor. Luna'da doğrulama: APK'yı (APKPure'dan XAPK) bir bilgisayarda indirip proje dosyalarına koymak
   ya da doğrudan Luna ile denemek (aşağıdaki deneme planı).
@@ -87,3 +89,49 @@ canlı görüntü yalnız kameranın kendi Wi-Fi erişim noktası (AP) üzerinde
   2. Kameranın nabzını aynen geri gönder (yankı) ve bizim sıra numaramızla, yukarıdaki formülle hesaplanmış bir `05` nabzı gönder;
      kamera farklı türde (01/02/…) bir paket gönderiyor mu bak.
   3. Kameranın seri numarasını ve Wi-Fi adını not et (gizli kısım bunlardan türetiliyor olabilir).
+
+## Luna UCD2 protokolü (APK incelemesi, 29 Ekim akşam)
+Kaynak: Fatih'in paylaştığı üçüncü taraf "LunaLive 0.1.49" APK'sı (Luna'dan canlı yayın yapan bağımsız bir uygulama; Kotlin, yerel kitaplık yok).
+Yalnız statik inceleme (dexdump); hiçbir şey çalıştırılmadı, kameraya bir şey yazılmadı. Aşağıdakiler protokol bilgisi; kod alınmadı.
+APK sha256: 3cc24010aa243f3b55d76b350b1654bd288d10ca1e719bcd8fae61fa934ff36d
+
+**Çerçeve** (her yön aynı; tüm sayılar küçük-endian):
+```
+0  4  "UCD2" (55 43 44 32)
+4  1  sürüm = 01
+5  1  başlık uzunluğu = 0c (12)
+6  1  tür: 01 medya, 04 komut/yanıt/bildirim, 05 nabız (selam)
+7  1  sıra (gönderenin sayacı, 8 bit)
+8  4  gövde uzunluğu N (en çok 8 MB)
+12 N  gövde
+12+N 4 denetim değeri
+```
+- **Denetim değeri** = bayt 0 … 12+N-1 üzerinden CRC: başlangıç FFFFFFFF; her bayt değerin **en düşük** baytına XOR'lanır, sonra 4 kez
+  "8 bit sola kaydır, tablo[en üst bayt] ile XOR" (tablo: MSB-önce polinom 04C11DB7). Son XOR yok; sonuç LE yazılır.
+  Kameranın nabzı için hesap tutuyor: sıra 0 → `4c 19 e7 a5` (önceki notlardaki `C = 0xA5E7194C`), yani gizli bayt yok.
+- **İstemci nabzı/selamı:** 16 bayt: `UCD2 01 0c 05 [sıra] 00 00 00 00` + sabit `f6 cc 4f 09` (CRC hesaplanmıyor, sabit gönderiliyor;
+  kamera kabul ediyor). Bağlanınca bir kez, sonra 3 sn'de bir, sıra artarak.
+- **Komut gövdesi** (tür 04): `[komut 2B] 02 [istek no 2B] 00 80 00 00 [protobuf]`. Yanıt da tür 04: bayt 0-1 yanıt kodu (200 tamam, 500 ret),
+  bayt 3-4 aynı istek no, 9'dan sonrası protobuf. Kod ≥ 8192 olanlar bildirim (8195 pil, 8201 kayıt durdu).
+- **Medya** (tür 01): gövde bayt 0 alt akış (0x20 = görüntü), 9 baytlık medya başlığından sonrası **H.265 Annex B** erişim birimi
+  (başlangıç kodlu; anahtar kare = NAL 16-23 ya da VPS/SPS). Uygulama 1280×720 HEVC çözücü açıyor.
+
+**Bağlantı sırası:**
+1. Kameranın Wi-Fi'ı (SSID "Luna Ultra…"), `192.168.42.1:6666` TCP (Nagle kapalı).
+2. Selam gönder, 1,5 sn bekle. Kamera bağlantıyı kapatırsa: başka telefonda Insta360 uygulaması açık (kamera tek istemci kabul ediyor).
+3. 3 sn'de bir selam (canlı tutma).
+4. **Yetki:** komut 39 (CheckAuthorization), protobuf {1: uygulama kimliği (metin, UUID), 2: 2}; yanıtı 30 sn'ye kadar bekle
+   (kameranın ekranında onay isteyebilir). Biz kendi kimliğimizi üretmeliyiz (başka uygulamanınkini kullanmıyoruz).
+5. Komut 118 (dosya erişim durumu) {1: 5}: bundan sonra gimbal park konumundan çıkıyor.
+6. **Canlı görüntü:** komut 1 (StartLiveStream) protobuf {2:1, 6:40, 7:9, 8:1, 9:40, 10:18} (alan anlamları: eski tanımlarda
+   2 enableAudio?, 6/9 çözünürlük kodu, 7/10 bit hızı/ikinci akış olabilir; ham değerler bu). Sonra tür 01 paketleri akar.
+- Diğer komutlar: 2 StopLiveStream, 4 StartCapture {1: …}, 5 StopCapture, 8 GetOptions {1: 40, 1: 41 …} (40 foto alt modu, 41 video alt modu,
+  11 pil), 9 SetPhotographyOptions (zoom: seçenek 53), 49 ekranı aç, 56 bekleme modu {1:1}, 226 gimbal (alt komut 1 hareket ±100, 2 ortala, 3 selfie).
+- Protobuf düz: varint alanlar (anahtar = alan<<3), metin/bayt alanlar (anahtar = alan<<3|2).
+
+**Bluetooth (Wi-Fi'ı açmak için):** GATT hizmeti `0000be80-0000-1000-8000-00805f9b34fb`, yazma `be81`, bildirim `be82` (CCCD 2902).
+Aynı UCD2 çerçevesi BLE üzerinden de gidiyor: komut 33 kameranın Wi-Fi'ını aç, GetOptions 36 Wi-Fi adı/şifresi, 56 bekleme/uyandırma.
+Yani kamera beklemedeyken telefon/Pi BLE ile uyandırıp Wi-Fi'ı açtırabilir, şifreyi alıp bağlanabilir.
+
+**Sonuç / yapılacak:** Önceki iOS deneme aracı eski çerçeveyi gönderiyordu; Luna onu tanımıyor. Deneme aracına yukarıdaki selam + 39 + 118 + 1
+eklenince görüntünün gelmesi bekleniyor. Görüntü HEVC; Masa/AgYayin için `"kodek":"hevc"` planı geçerli.
