@@ -78,6 +78,27 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
     }
     @Volatile var ustPay = 0f; @Volatile var altPay = 0f
 
+    /** Tablet (yönetmen masası, iPad'deki MasaIpad gibi): üstte ÖNİZLEME ve PROGRAM yan yana, altta kaynak ızgarası */
+    @Volatile var tablet = false
+    /** Önizlemede hazırlanan kaynak (yalnız tablette; -1 yok) */
+    @Volatile var siradaki = -1
+        set(v) { field = v; requestRender() }
+    /** Tablet düzeni: (önizleme, program, kaynaklar); yazı payı monitörlerin üstünde */
+    fun tabletAlanlar(w: Float = width.toFloat(), h: Float = height.toFloat(), ustPay: Float = 0f, altPay: Float = 0f): Triple<RectF, RectF, List<RectF>> {
+        val d = resources.displayMetrics.density
+        val kenar = 20 * d; val ara = 14 * d; val yazi = 24 * d
+        val sutun = if (w > h) 4 else 2; val satir = EN_COK / sutun
+        val kw = (w - 2 * kenar - (sutun - 1) * ara) / sutun; val kh = kw * 9f / 16f
+        val izgaraH = satir * kh + (satir - 1) * ara
+        var mw = (w - 2 * kenar - ara) / 2; var mh = mw * 9f / 16f
+        val bos = h - ustPay - altPay - yazi - ara - izgaraH - ara
+        if (mh > bos && bos > 0) { mh = bos; mw = mh * 16f / 9f }
+        val sol = (w - 2 * mw - ara) / 2; val mUst = ustPay + yazi
+        val oniz = RectF(sol, mUst, sol + mw, mUst + mh); val prog = RectF(sol + mw + ara, mUst, sol + 2 * mw + ara, mUst + mh)
+        val iUst = oniz.bottom + ara * 1.5f
+        return Triple(oniz, prog, List(EN_COK) { i -> val x = kenar + (i % sutun) * (kw + ara); val y = iUst + (i / sutun) * (kh + ara); RectF(x, y, x + kw, y + kh) })
+    }
+
     private inner class Isleyici : Renderer, SurfaceTexture.OnFrameAvailableListener {
         private var program = 0
         private var gw = 1; private var gh = 1
@@ -111,9 +132,16 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
             for (y in yuvalar) if (y.yeni) { y.yeni = false; runCatching { y.doku?.updateTexImage(); y.doku?.getTransformMatrix(y.mat) } }
             GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glViewport(0, 0, gw, gh); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
             GLES30.glUseProgram(program)
-            val (canliA, kucukler) = alanlar(gw.toFloat(), gh.toFloat(), ustPay, altPay)
-            if (dolu[canli]) ciz(yuvalar[canli], canliA, gh)
-            kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
+            if (tablet) {
+                val (oniz, prog, kucukler) = tabletAlanlar(gw.toFloat(), gh.toFloat(), ustPay, altPay)
+                siradaki.takeIf { it in 0 until EN_COK && dolu[it] }?.let { ciz(yuvalar[it], oniz, gh) }
+                if (dolu[canli]) ciz(yuvalar[canli], prog, gh)
+                kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
+            } else {
+                val (canliA, kucukler) = alanlar(gw.toFloat(), gh.toFloat(), ustPay, altPay)
+                if (dolu[canli]) ciz(yuvalar[canli], canliA, gh)
+                kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
+            }
             if (canliYeni) kayitCiz()
         }
 

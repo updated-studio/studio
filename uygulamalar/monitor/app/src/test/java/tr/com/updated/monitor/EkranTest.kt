@@ -98,6 +98,11 @@ class EkranTest {
             RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, yatay))
             Robolectric.buildActivity(MasaActivity::class.java).setup().use { c -> val a = c.get(); kaydet(a, "masa-${if (yatay) "land" else "port"}"); a.ornekDoldur(); kaydet(a, "masa-${if (yatay) "land" else "port"}") }
         }
+        // Android tablet (yönetmen masası): 1280×800 dp
+        for (yatay in listOf(true, false)) {
+            RuntimeEnvironment.setQualifiers(if (yatay) "w1280dp-h800dp-land-xhdpi" else "w800dp-h1280dp-port-xhdpi")
+            Robolectric.buildActivity(MasaActivity::class.java).setup().use { c -> val a = c.get(); a.ornekDoldur(); kaydet(a, "masa-tablet-${if (yatay) "land" else "port"}") }
+        }
     }
 
     @Test fun katman() {
