@@ -65,6 +65,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 29 Ekim 2026
+- 00:45 (Natro Claude): Site taraması 2 (Vercel kuralları + axe + SEO/performans, canlıda yalnız okuma). 8 küçük düzeltme yayında (site 5266a4e): varsayılan paylaşım görseli, 404 canonical/başlık, yapışkan bar odak payı, arama odak çizgisi, kaydırma sızması, ilk kapaklar eager, UPscore kontrastı, /uper boş istek. Karar bekleyenler site DURUM.md'de (HSTS, künye açıklamaları, 20 px dokunma alanları, Kulüp örnek görselleri). Ekibin göreceği değişiklik yok, yenilik notu yazılmadı.
+
 ### 28 Ekim 2026
 - 19:00 (Natro Claude): Kullanıcı "hepsine onay" dedi. Marka kiti 1.4: tek ikon seti (2 px düz uç), Stüdyo Marka Kiti → İkonlar bölümü, `svg.i` kit çizgisine çekildi; site künye satırında ikonlar. Panelde yazar bağları (karar 35, site deposu), 91 kesik başlık düzeltildi, reklam alanları (yan dikey ≥1600 px). Yenilik notu 2026-10-28-c.
 - Göç 0046 uygulandı (kullanıcı iki kez onayladı). Cloudflare bağlandı; sunucudan deneme: gerçek haber görseli → 200, image/webp, arka plan temiz (BMW iX5). **Görsel kırpma** (kullanıcı onayı "onaylıyorum devam"): `KapakOnizleme.tsx` (Duzenle'de kapağın altında 4 çerçeve: 16:7, 4:3, 16:9, küçük; "Odağı otomatik bul" → fonksiyon `gorsel-odak` (Gemini, konunun merkezi yüzde) → panel PATCH focalX/Y; "Odağı elle ayarla" → GorselDuzen). Otomatik akış: `SECIM_SISTEM` seçimle birlikte "odak" döndürür, `site.ts` panele gönderir, panel `triyajKapak` medyaya yazar. Site tarafı `Img.astro` object-position. Kural (konu ortada) + odak birlikte: odak yakınlaştırmaz, yalnız kırpma penceresini kaydırır.
