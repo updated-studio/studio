@@ -28,6 +28,7 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | Elle ISO + baz ISO işareti | ✓ | ✓ | |
 | Wi-Fi kamera ol (Masa'ya) | ✓ | ✓ | |
 | Ayarlar paneli (Fotoğraf, Video, Timelapse, Masa, Yardımcılar, Uygulama) | ✓ | ✓ | KameraAyarlar.swift |
+| **Genel Ayarlar** (Fatih 29 Ekim): çözünürlük en üstte, kodek (HEVC / H.264 / ProRes 422 HQ·422·LT·Proxy), SDR / HDR / Log, sabitleme, enstantane süre ↔ açı, video enstantanesi, ses girişi seçimi, harici mikrofonda 24 bit PCM (16 bit / AAC da seçilebilir), beyaz dengede Kelvin kaydırıcısı + yeşil–macenta | ○ (sunucudaki Claude) | ✱ (proje sohbetindeki Claude) | iOS KayitAyarlari.swift + KameraAyarlar.swift. 2. aşama: LUT/Log önizleme, false color, zebra, histogram, stiller pedi |
 | Açılış ekranı (Kamera / Monitör / Masa) ve "Açılışta sor" | ✓ | ✓ | `GirisEkran`, UserDefaults "giris" (Android ile aynı anahtar) |
 
 ## Monitör ekranı (Android: MainActivity + MonitorGorunum)

@@ -266,8 +266,12 @@ struct AnaEkran: View {
         if kamera.flas == .acik || kamera.flas == .fener { l.append(("⚡︎", kamera.flas == .fener ? "FENER" : "FLAŞ", true)) }
         if abs(kamera.ev) >= 0.05 { l.append((Cetvel.evYazi(kamera.ev), "EV", true)) }
         if let i = kamera.secilenIso { l.append(("\(Int(i))", "ISO", true)) }
-        if let e = kamera.secilenEnst { l.append((e >= Kamera.bulb ? "BULB" : ProMod.enstYazi(e), "S", true)) }
+        if let e = kamera.secilenEnst { l.append((kamera.enstGoster(e), kamera.mod == .video && kamera.enstAci ? "AÇI" : "S", true)) }
         if let k = kamera.bd { l.append(("\(Int(k))", "K", true)) }
+        if kamera.mod == .video {
+            if kamera.kodek.prores { l.append((kamera.kodek.kisa, "PRORES", true)) }
+            if kamera.renkModu != .sdr { l.append((kamera.renkModu.kisa, "", true)) }
+        }
         if kamera.mod.foto, kamera.zamanlayici > 0 { l.append(("\(kamera.zamanlayici)", "SN", true)) }
         return l
     }
@@ -602,7 +606,7 @@ struct AnaEkran: View {
     }
 
     private var pozYazi: String {
-        if let e = kamera.secilenEnst { return e >= Kamera.bulb ? "BULB" : ProMod.enstYazi(e) }
+        if let e = kamera.secilenEnst { return kamera.enstGoster(e) }
         if let i = kamera.secilenIso { return "ISO \(Int(i))" }
         return abs(kamera.ev) < 0.05 ? "Oto" : Cetvel.evYazi(kamera.ev)
     }
@@ -657,7 +661,7 @@ struct BicimPanel: View {
             switch kamera.mod {
             case .video:
                 satir("ÇÖZ.", kamera.videoSecenekleri.map { h in (h >= 2160 ? "4K" : (h >= 1080 ? "HD" : "720p"), kamera.videoYukseklik == h, { kamera.videoYukseklik = h }) })
-                satir("KARE HIZI", (kamera.fps60Var ? [30, 60] : [30]).map { f in ("\(f)", kamera.videoFps == f, { kamera.videoFps = f }) })
+                satir("KARE HIZI", kamera.videoFpsler.map { f in ("\(f)", kamera.videoFps == f, { kamera.videoFps = f }) })
             case .timelapse:
                 satir("ÇÖZ.", kamera.videoSecenekleri.map { h in (h >= 2160 ? "4K" : (h >= 1080 ? "HD" : "720p"), kamera.videoYukseklik == h, { kamera.videoYukseklik = h }) })
                 satir("ARALIK", Timelapse.hizli.map { a in (Timelapse.aralikYazi(a), kamera.tlAralik == a, { kamera.tlAralik = a }) })

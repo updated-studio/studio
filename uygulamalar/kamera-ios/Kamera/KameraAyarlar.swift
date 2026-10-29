@@ -1,8 +1,8 @@
 import AVFoundation
 import SwiftUI
 
-/// Kamera ekranının Ayarlar paneli (Android KameraActivity.ayarlarAc ile aynı bölümler):
-/// Fotoğraf · Video · Timelapse · Masa (çok kamera) · Yardımcılar · Uygulama
+/// Genel Ayarlar (Fatih 29 Ekim, Final Cut Camera gibi): en üstte çözünürlük, altında tek dokunuşla açılan bölümler:
+/// Kayıt (kodek, SDR / HDR / Log, sabitleme) · Pozlama · Fotoğraf · Ses · Göstergeler · Timelapse · Masa · Uygulama
 struct KameraAyarlar: View {
     @ObservedObject var kamera: Kamera
     var wifiKamera: () -> Void
@@ -12,67 +12,202 @@ struct KameraAyarlar: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
-                    baslik("FOTOĞRAF", "camera")
+            List {
+                Section {
+                    Picker("Video", selection: $kamera.videoYukseklik) {
+                        ForEach(kamera.videoSecenekleri, id: \.self) { h in Text(KameraAyarlar.cozYazi(h)).tag(h) }
+                    }
+                    Picker("Kare hızı", selection: $kamera.videoFps) {
+                        ForEach(kamera.videoFpsler, id: \.self) { f in Text("\(f) fps").tag(f) }
+                    }
                     if !kamera.fotoBoyutlari.isEmpty {
-                        secim("Fotoğraf çözünürlüğü", kamera.fotoBoyutlari.prefix(5).map { b in
-                            (KameraAyarlar.mp(b), kamera.fotoBoyut.map { $0.width == b.width && $0.height == b.height } ?? false, { kamera.fotoBoyutSec(b) })
-                        })
-                    }
-                    if kamera.rawVar { anahtar("RAW (DNG) da kaydet", $kamera.raw) }
-                    secim("Zamanlayıcı", [0, 3, 10].map { z in (z == 0 ? "Kapalı" : "\(z) sn", kamera.zamanlayici == z, { kamera.zamanlayici = z }) })
-                    if kamera.sesKapatilabilir {
-                        anahtar("Deklanşör sesi", $kamera.deklansorSesi)
-                    } else {
-                        not("Deklanşör sesini iPhone kendisi çalar (sessiz düğmesine göre).")
-                    }
-
-                    baslik("VİDEO", "video")
-                    secim("Çözünürlük", kamera.videoSecenekleri.map { h in (h >= 2160 ? "4K" : "\(h)p", kamera.videoYukseklik == h, { kamera.videoYukseklik = h }) })
-                    if kamera.fps60Var {
-                        secim("Kare hızı", [30, 60].map { f in ("\(f) fps", kamera.videoFps == f, { kamera.videoFps = f }) })
-                    }
-
-                    baslik("TIMELAPSE", "timer")
-                    secim("Kare aralığı", Timelapse.araliklar.map { a in (Timelapse.aralikYazi(a), kamera.tlAralik == a, { kamera.tlAralik = a }) })
-                    secim("Çekim süresi", Timelapse.sureler.map { s in (Timelapse.sureYazi(s), kamera.tlSure == s, { kamera.tlSure = s }) })
-                    anahtar("Pozlamayı başta sabitle", $kamera.tlPozSabit)
-                    not("Açıkken parlaklık kareden kareye oynamaz (titreme olmaz). Gün batımı gibi ışığın değiştiği çekimlerde kapat. Tripod kullan; ekran açık kalır.")
-
-                    baslik("MASA (ÇOK KAMERA)", "dot.radiowaves.left.and.right")
-                    satirDugme("Wi-Fi kamera ol", "wifi") { kapat(); wifiKamera() }
-                    not("Bu telefonun görüntüsü aynı Wi-Fi'daki masaya gider; masa kendiliğinden bulur.")
-                    satirDugme("Bu telefonu masa yap", "rectangle.split.2x2") { kapat(); masa() }
-
-                    baslik("YARDIMCILAR", "wand.and.stars")
-                    anahtar("Otomatik sahne önerisi", $kamera.sahneOto)
-                    anahtar("Akıllı yardımcı (ibre)", $kamera.asistanAcik)
-                    anahtar("Terazi", $kamera.teraziAcik)
-
-                    baslik("UYGULAMA", "info.circle")
-                    anahtar("Açılışta Kamera / Monitör sor", $girisSor)
-                        .onChange(of: girisSor) { _, acik in
-                            if acik { UserDefaults.standard.removeObject(forKey: "giris") } else { UserDefaults.standard.set("kamera", forKey: "giris") }
+                        Picker("Fotoğraf", selection: Binding(get: { kamera.fotoBoyut.map { "\($0.width)x\($0.height)" } ?? "" },
+                                                              set: { k in if let b = kamera.fotoBoyutlari.first(where: { "\($0.width)x\($0.height)" == k }) { kamera.fotoBoyutSec(b) } })) {
+                            ForEach(kamera.fotoBoyutlari.prefix(5).map { "\($0.width)x\($0.height)" }, id: \.self) { k in
+                                Text(kamera.fotoBoyutlari.first { "\($0.width)x\($0.height)" == k }.map(KameraAyarlar.mp) ?? k).tag(k)
+                            }
                         }
-                    not("UPDATED Kamera \(KameraAyarlar.surum) · güncellemeler TestFlight'tan kendiliğinden gelir.")
+                    }
+                } header: { Text("Çözünürlük") } footer: { Text(ozet) }
+
+                Section {
+                    NavigationLink { kayit } label: { satir("film", .orange, "Kayıt", "\(kamera.kodek.kisa) · \(kamera.renkModu.kisa)") }
+                    NavigationLink { pozlama } label: { satir("plusminus.circle", .yellow, "Pozlama", kamera.enstAci ? "Açı" : "Süre") }
+                    NavigationLink { renk } label: { satir("thermometer.sun", .pink, "Renk ve beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto") }
+                    NavigationLink { ses } label: { satir("mic", .red, "Ses", kamera.etkinSesGirdi ?? "Otomatik") }
+                    NavigationLink { fotograf } label: { satir("camera", .blue, "Fotoğraf", kamera.raw && kamera.rawVar ? "RAW" : "JPEG") }
+                    NavigationLink { gostergeler } label: { satir("scope", .green, "Göstergeler", kamera.kompTur == .kapali ? "" : kamera.kompTur.ad) }
+                    NavigationLink { timelapse } label: { satir("timer", .purple, "Timelapse", Timelapse.aralikYazi(kamera.tlAralik)) }
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 24)
+                Section {
+                    NavigationLink { masaBolum } label: { satir("rectangle.split.2x2", .teal, "Masa (çok kamera)", "") }
+                    NavigationLink { uygulama } label: { satir("info.circle", .gray, "Uygulama", KameraAyarlar.surum) }
+                }
             }
-            .navigationTitle("Ayarlar")
+            .navigationTitle("Genel Ayarlar")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Tamam") { kapat() }.tint(Tema.vurgu) } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Tamam") { kapat() }.fontWeight(.semibold) } }
         }
-        .tint(Tema.vurgu)
-        .presentationDetents([.fraction(0.62), .large])
-        .presentationBackground(Color(red: 30 / 255, green: 33 / 255, blue: 38 / 255))
+        .tint(Tema.sari)
+        .preferredColorScheme(.dark)
+        .presentationDetents([.large])
+        .disabled(kamera.kayitta)
+        .onAppear { kamera.secenekleriYaz() }
+        .onChange(of: kamera.videoYukseklik) { _, _ in kamera.secenekleriYaz() }
+        .onChange(of: kamera.videoFps) { _, _ in kamera.secenekleriYaz() }
     }
+
+    private var ozet: String {
+        var p = ["\(KameraAyarlar.cozYazi(kamera.videoYukseklik)) \(kamera.videoFps)", kamera.kodek.kisa, kamera.renkModu.kisa]
+        if kamera.harici { p.append("harici mikrofon") }
+        return "Video kaydı: " + p.joined(separator: " · ")
+    }
+
+    // MARK: bölümler
+
+    private var kayit: some View {
+        List {
+            Section {
+                ForEach(Kodek.allCases) { k in
+                    secimSatiri(k.ad, k.aciklama, secili: kamera.kodek == k, destek: kamera.kodekler.contains(k)) { kamera.kodek = k }
+                }
+            } header: { Text("Kodek") } footer: {
+                Text(kamera.mod == .video ? "Soluk olanları bu iPhone bu çözünürlük ve kare hızında kaydedemiyor. ProRes 4K 60 için iPhone'a harici SSD gerekebilir."
+                                          : "ProRes seçenekleri VİDEO modundayken görünür.")
+            }
+            Section {
+                ForEach(RenkModu.allCases) { r in
+                    secimSatiri(r.ad, r.aciklama, secili: kamera.renkModu == r, destek: kamera.renkModlari.contains(r)) { kamera.renkModu = r }
+                }
+            } header: { Text("Renk") } footer: { Text("Log görüntü kayıtta soluktur; kurguda LUT ile renklendirilir. Log ve HDR çoğu iPhone'da 10 bit biçim ister.") }
+            Section("Sabitleme") {
+                ForEach(Sabitleme.allCases) { s in
+                    secimSatiri(s.ad, s.aciklama, secili: kamera.sabitleme == s, destek: kamera.sabitlemeler.contains(s)) { kamera.sabitleme = s }
+                }
+            }
+        }
+        .navigationTitle("Kayıt")
+    }
+
+    private var pozlama: some View {
+        List {
+            Section {
+                Picker("Enstantane gösterimi", selection: $kamera.enstAci) {
+                    Text("Süre (1/50)").tag(false)
+                    Text("Açı (180°)").tag(true)
+                }
+                .pickerStyle(.inline).labelsHidden()
+            } header: { Text("Video enstantanesi") } footer: {
+                Text("Sinema kameralarındaki gibi açı: 180° kare hızının iki katı süre demek (\(kamera.videoFps) fps'te 1/\(kamera.videoFps * 2)). Değer, kamera ekranında Pozlama'dan seçilir.")
+            }
+        }
+        .navigationTitle("Pozlama")
+    }
+
+    private var renk: some View {
+        List {
+            Section {
+                Cetvel(tur: .bd, kamera: kamera).listRowBackground(Color.clear)
+            } footer: { Text("Kamera ekranındaki beyaz denge düğmesi de aynı ayarları açar.") }
+        }
+        .navigationTitle("Renk")
+    }
+
+    private var ses: some View {
+        List {
+            Section {
+                secimSatiri("Otomatik", "Takılan harici mikrofon kendiliğinden seçilir", secili: kamera.sesGirdi == nil, destek: true) { kamera.sesGirdi = nil }
+                ForEach(kamera.sesGirdileri) { g in
+                    secimSatiri(g.ad, g.harici ? "Harici" : "iPhone", secili: kamera.sesGirdi == g.id, destek: true) { kamera.sesGirdi = g.id }
+                }
+            } header: { Text("Giriş") } footer: { Text("Şu an kaydeden: \(kamera.etkinSesGirdi ?? "—")") }
+            Section {
+                ForEach(SesBicimi.allCases) { b in
+                    secimSatiri(b.ad, b.aciklama, secili: kamera.sesBicimi == b, destek: true) { kamera.sesBicimi = b }
+                }
+            } header: { Text("Biçim") } footer: { Text("PCM ses .mov dosyasına sıkıştırmasız yazılır; dosya biraz büyür.") }
+        }
+        .navigationTitle("Ses")
+        .onAppear { kamera.sesGirdileriYaz() }
+    }
+
+    private var fotograf: some View {
+        List {
+            if kamera.rawVar { Toggle("RAW (DNG) da kaydet", isOn: $kamera.raw) }
+            Picker("Zamanlayıcı", selection: $kamera.zamanlayici) {
+                ForEach([0, 3, 10], id: \.self) { z in Text(z == 0 ? "Kapalı" : "\(z) sn").tag(z) }
+            }
+            if kamera.sesKapatilabilir {
+                Toggle("Deklanşör sesi", isOn: $kamera.deklansorSesi)
+            } else {
+                Text("Deklanşör sesini iPhone kendisi çalar (sessiz düğmesine göre).").font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Fotoğraf")
+    }
+
+    private var gostergeler: some View {
+        List {
+            Section("Kompozisyon") {
+                Picker("Kılavuz", selection: $kamera.kompTur) {
+                    ForEach(KompTur.allCases) { t in Text(t.ad).tag(t) }
+                }
+                Toggle("Otomatik kılavuz önerisi", isOn: $kamera.oneriAcik)
+            }
+            Section("Yardımcılar") {
+                Toggle("Terazi", isOn: $kamera.teraziAcik)
+                Toggle("Akıllı yardımcı (ibre)", isOn: $kamera.asistanAcik)
+                Toggle("Otomatik sahne önerisi", isOn: $kamera.sahneOto)
+            }
+        }
+        .navigationTitle("Göstergeler")
+    }
+
+    private var timelapse: some View {
+        List {
+            Picker("Kare aralığı", selection: $kamera.tlAralik) {
+                ForEach(Timelapse.araliklar, id: \.self) { a in Text(Timelapse.aralikYazi(a)).tag(a) }
+            }
+            Picker("Çekim süresi", selection: $kamera.tlSure) {
+                ForEach(Timelapse.sureler, id: \.self) { s in Text(Timelapse.sureYazi(s)).tag(s) }
+            }
+            Section {
+                Toggle("Pozlamayı başta sabitle", isOn: $kamera.tlPozSabit)
+            } footer: { Text("Açıkken parlaklık kareden kareye oynamaz (titreme olmaz). Gün batımı gibi ışığın değiştiği çekimlerde kapat.") }
+        }
+        .navigationTitle("Timelapse")
+    }
+
+    private var masaBolum: some View {
+        List {
+            Section {
+                Button { kapat(); wifiKamera() } label: { Label("Wi-Fi kamera ol", systemImage: "wifi") }
+            } footer: { Text("Bu telefonun görüntüsü aynı Wi-Fi'daki masaya gider; masa kendiliğinden bulur.") }
+            Button { kapat(); masa() } label: { Label("Bu cihazı masa yap", systemImage: "rectangle.split.2x2") }
+        }
+        .navigationTitle("Masa")
+    }
+
+    private var uygulama: some View {
+        List {
+            Section {
+                Toggle("Açılışta Kamera / Monitör / Masa sor", isOn: $girisSor)
+                    .onChange(of: girisSor) { _, acik in
+                        if acik { UserDefaults.standard.removeObject(forKey: "giris") } else { UserDefaults.standard.set("kamera", forKey: "giris") }
+                    }
+            } footer: { Text("UPDATED Kamera \(KameraAyarlar.surum) · güncellemeler TestFlight'tan kendiliğinden gelir.") }
+        }
+        .navigationTitle("Uygulama")
+    }
+
+    // MARK: parçalar
 
     static var surum: String {
         let b = Bundle.main.infoDictionary
         return "\(b?["CFBundleShortVersionString"] as? String ?? "") (\(b?["CFBundleVersion"] as? String ?? ""))"
     }
+
+    static func cozYazi(_ h: Int) -> String { h >= 2160 ? "4K" : (h >= 1080 ? "HD 1080p" : "\(h)p") }
 
     static func mp(_ b: CMVideoDimensions) -> String {
         let mp = Int((Double(b.width) * Double(b.height) / 1_000_000).rounded())
@@ -81,32 +216,32 @@ struct KameraAyarlar: View {
         return "\(mp) MP · \(oran)"
     }
 
-    private func baslik(_ t: String, _ simge: String) -> some View {
-        Label(t, systemImage: simge).font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).padding(.top, 16).padding(.bottom, 2)
-    }
-
-    private func not(_ t: String) -> some View { Text(t).font(.caption).foregroundStyle(Tema.metin2).fixedSize(horizontal: false, vertical: true) }
-
-    private func anahtar(_ ad: String, _ deger: Binding<Bool>) -> some View {
-        Toggle(ad, isOn: deger).font(.subheadline).padding(.vertical, 4)
-    }
-
-    private func satirDugme(_ ad: String, _ simge: String, eylem: @escaping () -> Void) -> some View {
-        Button(action: eylem) { Label(ad, systemImage: simge).font(.subheadline.weight(.semibold)).padding(.vertical, 8) }
-            .foregroundStyle(Color(red: 106 / 255, green: 152 / 255, blue: 248 / 255))
-    }
-
-    private func secim(_ ad: String, _ secenekler: [(String, Bool, () -> Void)]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(ad).font(.subheadline).padding(.top, 6)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(Array(secenekler.enumerated()), id: \.offset) { _, s in
-                        Secenek(yazi: s.0, secili: s.1, sec: s.2)
-                    }
-                }
-            }
+    /// Ayarlar uygulamasındaki gibi: renkli kare simge, ad, sağda o anki değer
+    private func satir(_ simge: String, _ renk: Color, _ ad: String, _ deger: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: simge).font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
+                .frame(width: 28, height: 28).background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(renk.gradient))
+            Text(ad)
+            Spacer()
+            Text(deger).foregroundStyle(.secondary).lineLimit(1)
         }
+    }
+
+    /// Tek seçimli satır: ad, altında kısa açıklama, seçiliyse ✓; desteklenmiyorsa soluk
+    private func secimSatiri(_ ad: String, _ aciklama: String, secili: Bool, destek: Bool, sec: @escaping () -> Void) -> some View {
+        Button(action: sec) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ad).foregroundStyle(.primary)
+                    Text(aciklama).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if secili { Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(Tema.sari) }
+            }
+            .contentShape(Rectangle())
+        }
+        .disabled(!destek)
+        .opacity(destek ? 1 : 0.4)
     }
 }
 

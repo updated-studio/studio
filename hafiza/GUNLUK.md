@@ -65,6 +65,11 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 29 Ekim 2026
+
+- UPDATED Kamera iOS 0.4.0 TestFlight'ta: iPad Masa (yönetmen masası: ÖNİZLEME yeşil / PROGRAM kırmızı, KES, çift dokunuşla canlı, Hızlı geçiş, klavye 1–4 / boşluk / R; MasaIpad.swift) ve daha küçük, ince düğmeler (Fatih: "birazcık daha kibar, küçük"; sonra "Gösterme, düzelt ve yap"). CI'da sertifika sınırı dolmasın diye her yüklemede eski "Created via API" geliştirme sertifikaları iptal ediliyor (Fatih onayı; scripts/sertifika_temizle.py).
+- iOS 0.5.0 Genel Ayarlar (Fatih 00:30 isteği, 1. aşama): çözünürlük en üstte; Kayıt (HEVC / H.264 / ProRes 422 HQ·422·LT·Proxy, SDR / HDR / Apple Log, sabitleme), Pozlama (enstantane süre ↔ açı; VİDEO'da enstantane seçimi), Renk (Kelvin kaydırıcısı + yeşil–macenta), Ses (giriş seçimi, harici mikrofonda kendiliğinden 24 bit PCM; 16 bit / AAC seçilebilir), Fotoğraf, Göstergeler, Timelapse, Masa, Uygulama. Desteklenmeyen seçenek soluk. Kod: KayitAyarlari.swift, KameraAyarlar.swift. Yarım: 2. aşama (Metal önizleme: LUT / Log→709, false color, zebra, histogram, stiller pedi, ekrandaki menü grupları), değişken diyafram (API izin verirse). Android karşılıkları sunucudaki Claude'da.
+
 ### 28 Ekim 2026
 
 - (Fatih, sunucudaki Claude) Fatih'in istekleri: yan tutuşta deklanşör sağda ortada; zoom kalksın, yalnız gerçek mercekler, PRO mod ayarlarında mercek; iPhone'da 1 sn'den uzun pozlama. Sonra Apple Kamera'nın (iOS 26) 4 ekran görüntüsünü gönderdi: "arayüz bu görüntüleri baz alacaksın".

@@ -70,6 +70,26 @@ final class Kamera: NSObject, ObservableObject {
     @Published var videoFps = Kamera.ud.object(forKey: "k.videoFps") as? Int ?? 30 { didSet { Kamera.ud.set(videoFps, forKey: "k.videoFps"); yenidenKur() } }
     @Published var videoSecenekleri: [Int] = [1080]
     @Published var fps60Var = false
+    @Published var videoFpsler: [Int] = [30]
+    // Genel ayarlar: kayıt biçimi, renk, sabitleme, enstantane gösterimi, ses (KayitAyarlari.swift)
+    @Published var kodek = Kodek(rawValue: Kamera.ud.string(forKey: "k.kodek") ?? "") ?? .hevc { didSet { Kamera.ud.set(kodek.rawValue, forKey: "k.kodek"); bicimYaz() } }
+    @Published var renkModu = RenkModu(rawValue: Kamera.ud.string(forKey: "k.renk") ?? "") ?? .sdr { didSet { Kamera.ud.set(renkModu.rawValue, forKey: "k.renk"); yenidenKur() } }
+    @Published var sabitleme = Sabitleme(rawValue: Kamera.ud.string(forKey: "k.sabit") ?? "") ?? .standart { didSet { Kamera.ud.set(sabitleme.rawValue, forKey: "k.sabit") } }
+    /// Video enstantanesi açı (180°) olarak mı gösterilsin
+    @Published var enstAci = Kamera.ud.bool(forKey: "k.enstAci") { didSet { Kamera.ud.set(enstAci, forKey: "k.enstAci") } }
+    @Published var sesBicimi = SesBicimi(rawValue: Kamera.ud.string(forKey: "k.ses") ?? "") ?? .oto { didSet { Kamera.ud.set(sesBicimi.rawValue, forKey: "k.ses") } }
+    /// Seçilen ses girişi (uid); nil = otomatik
+    @Published var sesGirdi = Kamera.ud.string(forKey: "k.sesGirdi") { didSet { Kamera.ud.set(sesGirdi, forKey: "k.sesGirdi"); sesGirdisiUygula() } }
+    @Published var sesGirdileri: [SesGirdi] = []
+    @Published var etkinSesGirdi: String?
+    @Published var harici = false
+    @Published var kodekler: [Kodek] = [.hevc, .h264]
+    @Published var renkModlari: [RenkModu] = [.sdr]
+    @Published var sabitlemeler: [Sabitleme] = [.kapali, .standart]
+    /// Beyaz denge tonu: yeşil (−) ↔ macenta (+)
+    @Published var renkTon: Float = 0
+    var varsayilanSes: [String: Any]?
+    var sonSesBicimi = ""
     // Timelapse
     @Published var tlAralik = Kamera.ud.object(forKey: "k.tlAralik") as? Int ?? 2000 { didSet { Kamera.ud.set(tlAralik, forKey: "k.tlAralik"); bicimYaz() } }
     @Published var tlSure = Kamera.ud.integer(forKey: "k.tlSure") { didSet { Kamera.ud.set(tlSure, forKey: "k.tlSure") } }
@@ -99,7 +119,7 @@ final class Kamera: NSObject, ObservableObject {
     var cihaz: AVCaptureDevice?
     private var girdi: AVCaptureDeviceInput?
     let fotoCikti = AVCapturePhotoOutput()
-    private let videoCikti = AVCaptureMovieFileOutput()
+    let videoCikti = AVCaptureMovieFileOutput()
     /// Kare kare görüntü (Pro birleştirme, timelapse, akıllı yardımcı; Wi-Fi kamera da `kareDinleyiciler` ile bağlanabilir). Yalnız gerektiğinde oturumda.
     let kareCikti = AVCaptureVideoDataOutput()
     let kareKuyruk = DispatchQueue(label: "tr.com.updated.kamera.kare")
@@ -170,6 +190,7 @@ final class Kamera: NSObject, ObservableObject {
         kuruldu = true
         oturum.beginConfiguration()
         oturum.sessionPreset = .photo
+        sesOturumuKur()
         if let mik = AVCaptureDevice.default(for: .audio), let g = try? AVCaptureDeviceInput(device: mik), oturum.canAddInput(g) {
             oturum.addInput(g)
         }
@@ -229,8 +250,9 @@ final class Kamera: NSObject, ObservableObject {
         let videolu = mod == .video || mod == .timelapse
         if videolu {
             let fps = mod == .video ? videoFps : 30
-            if let b = Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps) ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: 30)
-                ?? Kamera.videoBicimi(d, yukseklik: 1080, fps: 30), (try? d.lockForConfiguration()) != nil {
+            let renk = mod == .video ? renkModu : .sdr
+            if let b = Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps, renk: renk) ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps)
+                ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: 30) ?? Kamera.videoBicimi(d, yukseklik: 1080, fps: 30), (try? d.lockForConfiguration()) != nil {
                 d.activeFormat = b
                 let gercekFps = b.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(fps) } ? fps : 30
                 let sure = CMTime(value: 1, timescale: CMTimeScale(gercekFps))
@@ -243,6 +265,7 @@ final class Kamera: NSObject, ObservableObject {
         } else {
             oturum.sessionPreset = .photo
         }
+        renkAlaniUygula(d, video: videolu)
         // Video kaydı ve kare çıkışı aynı anda oturumda tutulmaz (iOS'ta ikisi birlikte güvenilir değil)
         if mod == .video {
             if !oturum.outputs.contains(videoCikti), oturum.canAddOutput(videoCikti) { oturum.addOutput(videoCikti) }
@@ -262,7 +285,9 @@ final class Kamera: NSObject, ObservableObject {
         if #available(iOS 18.0, *) { sessiz = fotoCikti.isShutterSoundSuppressionSupported }
         let videoSec = [720, 1080, 2160].filter { Kamera.videoBicimi(d, yukseklik: $0, fps: 30) != nil }
         let fps60 = Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: 60) != nil
+        let fpsler = [24, 25, 30, 60].filter { Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: $0) != nil }
         DispatchQueue.main.async {
+            self.videoFpsler = fpsler.isEmpty ? [30] : fpsler
             self.fotoBoyutlari = boyutlar; self.fotoBoyut = secili; self.rawVar = rawVarMi; self.sesKapatilabilir = sessiz
             self.videoSecenekleri = videoSec.isEmpty ? [1080] : videoSec; self.fps60Var = fps60
         }
@@ -281,18 +306,22 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
-    /// 16:9 video biçimi (8 bit tercih); bulunamazsa nil
-    static func videoBicimi(_ d: AVCaptureDevice, yukseklik: Int, fps: Int) -> AVCaptureDevice.Format? {
+    /// 16:9 video biçimi (SDR'de 8 bit tercih; HDR / Log için o renk alanını destekleyen 10 bit biçim); bulunamazsa nil
+    static func videoBicimi(_ d: AVCaptureDevice, yukseklik: Int, fps: Int, renk: RenkModu = .sdr) -> AVCaptureDevice.Format? {
         let adaylar = d.formats.filter { f in
             let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
             return Int(b.height) == yukseklik && Int(b.width) * 9 == Int(b.height) * 16
                 && f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(fps) }
         }
-        return adaylar.first { CMFormatDescriptionGetMediaSubType($0.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange } ?? adaylar.first
+        switch renk {
+        case .log: return adaylar.first { $0.supportedColorSpaces.contains(.appleLog) }
+        case .hdr: return adaylar.first { $0.supportedColorSpaces.contains(.HLG_BT2020) }
+        case .sdr: return adaylar.first { CMFormatDescriptionGetMediaSubType($0.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange } ?? adaylar.first
+        }
     }
 
     /// Ayarlar değişince oturum yeniden kurulur
-    private func yenidenKur() {
+    func yenidenKur() {
         guard kuruldu, !kayitta else { return }
         kuyruk.async {
             self.oturum.beginConfiguration()
@@ -351,7 +380,7 @@ final class Kamera: NSObject, ObservableObject {
         Kamera.ud.set(yeni.rawValue, forKey: "k.mod")
         sahneOnerisi = nil
         if yeni == .pro && !onde { mercekUygula() }
-        if yeni != .foto, secilenEnst != nil { secilenEnst = nil }
+        if secilenEnst != nil { secilenEnst = nil }
         if yeni.foto, flas == .fener { flas = .kapali }
         if !yeni.foto, flas == .oto || flas == .acik { flas = .kapali }
         kuyruk.async {
@@ -415,7 +444,7 @@ final class Kamera: NSObject, ObservableObject {
     /// Seçilen enstantane tek karede verilemiyor: kareler birleştirilecek
     var uzunPozlama: Bool { secilenEnst.map { $0 > enUzunEnst + 0.01 } ?? false }
     func evSec(_ v: Float) { ev = v; kuyruk.async { self.normalUygula() } }
-    func bdSec(_ k: Float?) { bd = k; kuyruk.async { self.normalUygula() } }
+    func bdSec(_ k: Float?) { bd = k; if k == nil { renkTon = 0 }; kuyruk.async { self.normalUygula() } }
     func odakSec(_ o: Float?) { odakKonum = o; kuyruk.async { self.normalUygula() } }
 
     func flasDegistir() {
@@ -443,8 +472,10 @@ final class Kamera: NSObject, ObservableObject {
             let enUzun = bicim.maxExposureDuration.seconds
             // Tek karenin süresi telefonun sınırında kalır; ortalama birleştirmede ISO aradaki fark kadar artar (parlaklık istenen süreninki olur)
             let istenen = secilenEnst ?? d.exposureDuration.seconds
-            let sure = min(max(istenen, bicim.minExposureDuration.seconds), enUzun)
-            let kazanc = istenen < Kamera.bulb && uzunYol == .ortalama ? Float(max(1, istenen / sure)) : 1
+            // VİDEO'da enstantane kare süresini aşamaz (açı en çok 360°)
+            let tavan = mod == .video ? min(enUzun, 1 / Double(max(1, videoFps))) : enUzun
+            let sure = min(max(istenen, bicim.minExposureDuration.seconds), tavan)
+            let kazanc = mod == .foto && istenen < Kamera.bulb && uzunYol == .ortalama ? Float(max(1, istenen / sure)) : 1
             let iso = (secilenIso ?? d.iso * Float(d.exposureDuration.seconds / sure)) * kazanc
             d.setExposureModeCustom(duration: CMTime(seconds: sure, preferredTimescale: 1_000_000), iso: min(max(iso, bicim.minISO), bicim.maxISO))
         } else {
@@ -452,7 +483,7 @@ final class Kamera: NSObject, ObservableObject {
             d.setExposureTargetBias(min(max(ev, d.minExposureTargetBias), d.maxExposureTargetBias))
         }
         if let k = bd, d.isWhiteBalanceModeSupported(.locked) {
-            var g = d.deviceWhiteBalanceGains(for: AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: k, tint: 0))
+            var g = d.deviceWhiteBalanceGains(for: AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: k, tint: renkTon))
             let ust = d.maxWhiteBalanceGain
             g.redGain = min(max(g.redGain, 1), ust); g.greenGain = min(max(g.greenGain, 1), ust); g.blueGain = min(max(g.blueGain, 1), ust)
             d.setWhiteBalanceModeLocked(with: g)
@@ -535,6 +566,7 @@ final class Kamera: NSObject, ObservableObject {
                 if let b = self.videoCikti.connection(with: .video), b.isVideoMirroringSupported {
                     b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = self.cihaz?.position == .front
                 }
+                self.kayitBicimiUygula()
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-\(Int(Date().timeIntervalSince1970)).mov")
                 self.videoCikti.startRecording(to: url, recordingDelegate: self)
             }

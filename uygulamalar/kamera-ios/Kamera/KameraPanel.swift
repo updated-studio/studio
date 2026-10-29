@@ -37,6 +37,8 @@ struct Cetvel: View {
     static let bdler: [(Float?, String, String?)] = [(nil, "Oto", nil), (3200, "3200K", "Ampul"), (4000, "4000K", "Floresan"),
                                                      (5600, "5600K", "Gün ışığı"), (6500, "6500K", "Bulutlu"), (7500, "7500K", "Gölge")]
 
+    static func tonYazi(_ t: Float) -> String { abs(t) < 1 ? "" : String(format: " %@%d", t < 0 ? "Y" : "M", Int(abs(t))) }
+
     static func evYazi(_ e: Float) -> String { abs(e) < 0.05 ? "±0" : String(format: "%+.1f", e).replacingOccurrences(of: ".", with: ",") }
 
     var body: some View {
@@ -88,7 +90,32 @@ struct Cetvel: View {
                 }
             }
             if kamera.mod == .foto { uzun }
+            if kamera.mod == .video { videoEnst }
         }
+    }
+
+    /// VİDEO'da enstantane: süre (1/50) ya da açı (180°); Genel Ayarlar → Pozlama'dan ya da buradan değişir
+    @ViewBuilder private var videoEnst: some View {
+        HStack {
+            Text(kamera.enstAci ? "ENSTANTANE AÇISI" : "ENSTANTANE").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2)
+            Spacer()
+            Picker("", selection: Binding(get: { kamera.enstAci }, set: { kamera.enstAci = $0; kamera.enstSec(nil) })) {
+                Text("Süre").tag(false)
+                Text("Açı").tag(true)
+            }
+            .pickerStyle(.segmented).frame(width: 120)
+        }
+        .padding(.top, 4)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Secenek(yazi: "AUTO", secili: kamera.secilenEnst == nil) { kamera.enstSec(nil) }
+                ForEach(kamera.videoEnstSecenekleri, id: \.self) { e in
+                    let kural = abs(e * Double(kamera.videoFps) - 0.5) < 0.001
+                    Secenek(yazi: kamera.enstGoster(e), alt: kural ? "doğal" : nil, secili: kamera.secilenEnst.map { abs($0 - e) < 1e-7 } ?? false) { kamera.enstSec(e) }
+                }
+            }
+        }
+        not("180° (kare hızının iki katı) hareketi en doğal gösterir. Işık çoksa ND filtre kullan.")
     }
 
     /// FOTO'da enstantane: telefonun tek karede verebildiğinden uzunsa (ve BULB) kareler art arda alınıp birleştirilir
@@ -118,7 +145,7 @@ struct Cetvel: View {
 
     private var beyaz: some View {
         Group {
-            baslik("Beyaz denge", "thermometer.sun", Cetvel.bdler.first { $0.0 == kamera.bd }?.1 ?? "Oto", oto: nil)
+            baslik("Beyaz denge", "thermometer.sun", kamera.bd.map { "\(Int($0))K" + Cetvel.tonYazi(kamera.renkTon) } ?? "Oto", oto: kamera.bd == nil) { kamera.bdSec(nil) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(Array(Cetvel.bdler.enumerated()), id: \.offset) { _, b in
@@ -126,6 +153,19 @@ struct Cetvel: View {
                     }
                 }
             }
+            // Kelvin: sürükleyerek 50K adımla; sola sıcak (turuncu), sağa soğuk (mavi) ışık için
+            HStack(spacing: 10) {
+                Text("K").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).frame(width: 18)
+                Slider(value: Binding(get: { kamera.bd ?? kamera.mevcutKelvin }, set: { kamera.bdSec(($0 / 50).rounded() * 50) }), in: 2500...10000)
+                    .tint(LinearGradient(colors: [.orange, .white, .blue], startPoint: .leading, endPoint: .trailing))
+            }
+            HStack(spacing: 10) {
+                Text("T").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).frame(width: 18)
+                Slider(value: Binding(get: { kamera.renkTon }, set: { kamera.tonSec(($0 / 2).rounded() * 2) }), in: -100...100)
+                    .tint(Tema.sari)
+                    .background(Capsule().fill(LinearGradient(colors: [.green.opacity(0.5), .clear, Color(red: 1, green: 0, blue: 1).opacity(0.5)], startPoint: .leading, endPoint: .trailing)).frame(height: 4))
+            }
+            not("K: ışığın sıcaklığı · T: sola yeşil, sağa macenta (floresan ve LED'deki yeşili giderir).")
         }
     }
 
