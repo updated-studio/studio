@@ -42,8 +42,10 @@ jobs:
             exit 1
           }
           tail -n 5 derleme.log
+      # Her gönderimde değil, yalnız sürüm gönderimlerinde ("iOS Kamera x.y.z:" ile başlayan ileti) ya da elle başlatınca:
+      # Fatih her yüklemede TestFlight e-postası alıyordu (29 Ekim). CI, Android ve not değişiklikleri yüklenmez
       - name: TestFlight'a yükle
-        if: github.event_name != 'pull_request' && env.ASC_KEY_P8 != ''
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && env.ASC_KEY_P8 != '' && startsWith(github.event.head_commit.message, 'iOS Kamera '))
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           ANAHTAR=~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
