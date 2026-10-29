@@ -21,16 +21,15 @@ class KayitDugmesi(c: Context) : View(c) {
     var basili = false; set(v) { field = v; invalidate() }
     private val beyaz = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private val halka = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE }
-    private val kirmizi = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(230, 40, 40) }
+    private val kirmizi = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 69, 58) }
+    /** Ölçüler 74 dp düğmeye göre (tasarım dili): 2 dp halka, 60 dp iç daire; kayıtta 26 dp kırmızı kare ve halka %50 */
     override fun onDraw(c: Canvas) {
-        val r = minOf(width, height) / 2f; val cx = width / 2f; val cy = height / 2f
-        halka.strokeWidth = r * 0.075f
-        c.drawCircle(cx, cy, r * 0.94f, halka)
-        if (foto) { c.drawCircle(cx, cy, r * (if (basili) 0.68f else 0.78f), beyaz); return }
-        if (kayitta) {
-            val a = (System.currentTimeMillis() / 500 % 2 == 0L); kirmizi.alpha = if (a) 255 else 200
-            val s = r * 0.42f; c.drawRoundRect(RectF(cx - s, cy - s, cx + s, cy + s), s * 0.25f, s * 0.25f, kirmizi); postInvalidateDelayed(500)
-        } else { kirmizi.alpha = 255; c.drawCircle(cx, cy, r * 0.76f, kirmizi) }
+        val r = minOf(width, height) / 2f; val cx = width / 2f; val cy = height / 2f; val b = r / 37f
+        halka.strokeWidth = 2f * b; halka.alpha = if (kayitta) 128 else 255
+        c.drawCircle(cx, cy, r - b, halka)
+        if (foto) { c.drawCircle(cx, cy, (if (basili) 26f else 30f) * b, beyaz); return }
+        if (kayitta) { val s = 13f * b; c.drawRoundRect(RectF(cx - s, cy - s, cx + s, cy + s), 6f * b, 6f * b, kirmizi) }
+        else c.drawCircle(cx, cy, (if (basili) 26f else 30f) * b, kirmizi)
     }
 }
 

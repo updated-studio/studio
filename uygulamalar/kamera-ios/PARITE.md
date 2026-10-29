@@ -77,6 +77,7 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | Masa: kaynakları bul, canlı geçiş, tally, 1080p kayıt | ✓ | ✓ | |
 | USB kameraları masaya ekle | ✓ | ✓ | iOS'ta yalnız iPad |
 | **Tablet masası (yönetmen masası):** ÖNİZLEME + PROGRAM monitörleri, numaralı kaynaklar, KES, hızlı geçiş, klavye (1–4, boşluk, R) | ✓ | ✓ | 29 Ekim; iOS MasaIpad.swift; Android MasaActivity tabletDuzen (en kısa kenar ≥ 600 dp), telefon düzeni aynı |
+| **Tasarım dili (stüdyo):** tek yazı ailesi Inter (tablo rakamları); okuma 15 sp yarı kalın + 9,5 sp büyük harf etiket; metin beyaz / %62 / %28; yüzeyler siyah %34 + 0,5 px beyaz %18 hat (paneller köşe 30); sarı yalnız elle değişen değerde, yeşil onay, kırmızı kayıt. Üstte tek okuma şeridi, altında 24 dp sabitlenen kapsülleri; AI Kadraj açıkken köşe çentikleri; kayıtta zaman kodu çipi; mercekler 40/34 dp; mod şeridi arkasız (PRO, yanda TL / MON.); deklanşör 74 dp; panellerde 13 sp başlık, 28 dp ✕, 10 sp bölüm başlıkları, seçili kapsül sarı yazı + beyaz %12 + sarı yarım hat | … | ✓ (paneller görüntü bulanıklaştırılamadığı için siyah %84) | Fatih 29 Ekim: "Tasarım daha iyi" |
 
 ## Uygulama
 

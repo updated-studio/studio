@@ -78,6 +78,9 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
     var asistan = false
     /** Kullanıcı konuyu seçti: odak ve pozlama onu izliyor (sarı köşe çentikli kutu, "Yüz · AF") */
     var konuSecili = false; set(v) { field = v; postInvalidate() }
+    /** AI Kadraj açıkken ekran köşelerindeki kadraj çentiklerinin alanı (görünümde piksel; null = çizilmez) */
+    var kenar: (() -> RectF)? = null
+    private val centik = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
     var hizalama = 0f; private set
     /** Görüntü analizi (ufuk, öncü çizgiler, kaçış noktası); yardımcı açıkken çizilir */
     var analiz: AnalizSonuc? = null; set(v) { field = v; postInvalidate() }
@@ -104,6 +107,14 @@ class KompozisyonGorunum(c: Context, private val alan: () -> RectF) : View(c) {
         val noktalar = gucluNoktalar(tur, yon, r.width() / r.height()).let { if (tur == KompTur.ONCU) listOf(analiz?.kacis?.takeIf { k -> k.x in 0f..1f && k.y in 0f..1f }?.let { k -> PointF(k.x, k.y) } ?: it[0]) else if (tur == KompTur.UCGEN) { val (a1, a2) = ucgenAyaklari(r.width() / r.height()); listOf(PointF(yx(a1.x), yy(a1.y)), PointF(yx(a2.x), yy(a2.y))) } else it }
         // AI Kadraj: konu güçlü noktadaysa kılavuz da yeşil (iyi kadraj gözden kaçmasın)
         val iyi = asistan && konu?.let { k -> noktalar.minOfOrNull { hypot((it.x - k.centerX()) * r.width(), (it.y - k.centerY()) * r.height()) / r.height() }?.let { it < 0.045f } } == true
+        // Kadraj çentikleri: 16 dp, beyaz %75; iyi kadrajda yeşil
+        val kn = kenar?.invoke()
+        if (asistan && kn != null && kn.width() > 0f) {
+            val d = resources.displayMetrics.density; val u = 16f * d
+            centik.strokeWidth = 2f * d; centik.color = if (iyi) Color.rgb(52, 199, 89) else Color.argb(191, 255, 255, 255)
+            for ((x, y, sx, sy) in listOf(floatArrayOf(kn.left, kn.top, 1f, 1f), floatArrayOf(kn.right, kn.top, -1f, 1f), floatArrayOf(kn.left, kn.bottom, 1f, -1f), floatArrayOf(kn.right, kn.bottom, -1f, -1f)))
+                c.drawPath(Path().apply { moveTo(x, y + sy * u); lineTo(x, y); lineTo(x + sx * u, y) }, centik)
+        }
         cizgi.color = if (iyi) Color.argb(242, 60, 220, 110) else Color.argb(200, 255, 255, 255)
         ince.color = if (iyi) Color.argb(153, 60, 220, 110) else Color.argb(130, 255, 255, 255)
         when (tur) {
