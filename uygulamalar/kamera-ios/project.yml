@@ -6,7 +6,7 @@ options:
   deploymentTarget: { iOS: "17.0" }
 settings:
   base:
-    MARKETING_VERSION: "0.8.1"
+    MARKETING_VERSION: "0.9.0"
     # İlk TestFlight yüklemesi: 27 Ekim 2026
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
@@ -16,6 +16,8 @@ targets:
     type: application
     platform: iOS
     sources: [Kamera]
+    dependencies:
+      - target: EkranYayini
     scheme: {}
     settings:
       base:
@@ -40,3 +42,27 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations~iphone: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+  # Ekranı Masa'ya gönder: ReplayKit yayın uzantısı (kendi Wi-Fi yayını olmayan kameralar için, üreticinin uygulaması açıkken)
+  EkranYayini:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Ekran
+      - Kamera/AgYayin.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tr.com.updated.monitor.ekran
+        PRODUCT_NAME: EkranYayini
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: Ekran/Info.plist
+      properties:
+        CFBundleDisplayName: UPDATED Ekran
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSLocalNetworkUsageDescription: Ekran görüntüsü aynı Wi-Fi'daki masaya gitsin diye.
+        NSBonjourServices: [_updatedkam._tcp]
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).YayinIsleyici
+          RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
