@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import Photos
 import SwiftUI
 import UniformTypeIdentifiers
 
