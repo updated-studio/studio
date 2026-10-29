@@ -434,13 +434,94 @@ struct FavoriDuzenle: View {
     }
 }
 
-extension View {
-    /// Menülerdeki bir ayara basılı tutunca "Sabitle / Sabitlemeyi kaldır"
-    func sabitlenebilir(_ f: Favori, _ kamera: Kamera) -> some View {
-        contextMenu {
+/// Basılı tutunca açılan hızlı menü (Fatih 29 Ekim: "haptic touch gibi basınca duyarlı alt menüler"): ayarın en çok kullanılan
+/// 4-6 değeri, "Ayrıntılı…" ile tam panel, altta Sabitle / Sabitlemeyi kaldır. Üst şeritteki kapsüllerde ve Denetimler dairelerinde.
+struct HizliMenu: View {
+    let f: Favori
+    @ObservedObject var kamera: Kamera
+    var ayrinti: (() -> Void)?
+
+    var body: some View {
+        Group {
+            switch f {
+            case .bd:
+                ForEach(Array(Cetvel.bdler.enumerated()), id: \.offset) { _, b in
+                    secenek(b.2.map { "\(b.1) · \($0)" } ?? b.1, secili: kamera.bd == b.0) { kamera.bdSec(b.0) }
+                }
+            case .iso:
+                secenek("Oto", secili: kamera.secilenIso == nil) { kamera.isoSec(nil) }
+                ForEach(isoSecenekleri, id: \.self) { i in secenek("ISO \(Int(i))", secili: kamera.secilenIso == i) { kamera.isoSec(i) } }
+            case .enst:
+                secenek("Oto", secili: kamera.secilenEnst == nil) { kamera.enstSec(nil) }
+                ForEach(enstSecenekleri, id: \.self) { e in secenek(kamera.enstGoster(e), secili: kamera.secilenEnst == e) { kamera.enstSec(e) } }
+            case .ev:
+                ForEach([-1, -0.5, 0, 0.5, 1] as [Float], id: \.self) { v in secenek(Cetvel.evYazi(v), secili: abs(kamera.ev - v) < 0.05) { kamera.evSec(v) } }
+            case .odak:
+                secenek("Otomatik", secili: kamera.odakKonum == nil) { kamera.odakSec(nil) }
+                secenek("Sonsuz", secili: kamera.odakKonum.map { $0 >= 0.99 } ?? false) { kamera.odakSec(1) }
+            case .kodek:
+                ForEach(kamera.kodekler) { k in secenek(k.ad, secili: kamera.kodek == k) { kamera.kodek = k } }
+            case .renk:
+                ForEach(kamera.renkModlari) { r in secenek(r.ad, secili: kamera.renkModu == r) { kamera.renkModu = r } }
+            case .sabitleme:
+                ForEach(kamera.sabitlemeler) { m in secenek(m.ad, secili: kamera.sabitleme == m) { kamera.sabitleme = m } }
+            case .stil:
+                ForEach(HazirStil.temel) { h in secenek(h.ad, secili: kamera.stil.hazir == h) { kamera.stil.hazir = h } }
+                Menu("Film reçeteleri") {
+                    ForEach(HazirStil.receteler) { h in secenek(h.ad, secili: kamera.stil.hazir == h) { kamera.stil.hazir = h } }
+                }
+            case .lut:
+                secenek("Kapalı", secili: !kamera.gosterge.lutAcik) { kamera.gosterge.lutAcik = false }
+                ForEach(Lut.kitaplik().map(\.lastPathComponent), id: \.self) { ad in
+                    secenek(ad.replacingOccurrences(of: ".cube", with: ""), secili: kamera.gosterge.lutAcik && kamera.gosterge.lutAdi == ad) {
+                        kamera.gosterge.lutAdi = ad; kamera.gosterge.lutAcik = true
+                    }
+                }
+            case .flas:
+                ForEach(Array(["Kapalı", "Oto", "Açık", "Fener"].enumerated()), id: \.offset) { i, ad in
+                    secenek(ad, secili: kamera.flas.rawValue == i) { var n = 0; while kamera.flas.rawValue != i, n < 4 { kamera.flasDegistir(); n += 1 } }
+                }
+            case .zamanlayici:
+                ForEach([0, 3, 10], id: \.self) { sn in secenek(sn == 0 ? "Kapalı" : "\(sn) sn", secili: kamera.zamanlayici == sn) { kamera.zamanlayici = sn } }
+            case .kilavuz:
+                ForEach(KompTur.allCases) { t in secenek(t.ad, secili: kamera.kompTur == t) { kamera.kompTur = t } }
+            case .zebra, .falseColor, .peaking, .histogram, .monokrom, .terazi, .yardimci:
+                let acik = kamera.favoriDeger(f).etkin
+                Button { kamera.favoriDegistir(f) } label: { Label(acik ? "Kapat" : "Aç", systemImage: acik ? "xmark.circle" : "checkmark.circle") }
+            case .cozunurluk, .ses:
+                EmptyView()
+            }
+            if let ayrinti, f != .zebra, f != .falseColor, f != .peaking, f != .histogram, f != .monokrom, f != .terazi, f != .yardimci {
+                Divider()
+                Button(action: ayrinti) { Label("Ayrıntılı…", systemImage: "slider.horizontal.3") }
+            }
+            Divider()
             Button { kamera.favoriAcKapa(f) } label: {
-                kamera.favoriler.contains(f) ? Label("Sabitlemeyi kaldır", systemImage: "pin.slash") : Label("Sabitle", systemImage: "pin")
+                kamera.favoriler.contains(f) ? Label("Sabitlemeyi kaldır", systemImage: "pin.slash") : Label("Üst şeride sabitle", systemImage: "pin")
             }
         }
+    }
+
+    private func secenek(_ ad: String, secili: Bool, _ eylem: @escaping () -> Void) -> some View {
+        Button(action: eylem) { if secili { Label(ad, systemImage: "checkmark") } else { Text(ad) } }
+    }
+
+    /// ISO listesinden 5 adım (baz, 200, 400, 800, 1600 gibi)
+    private var isoSecenekleri: [Float] {
+        let l = kamera.isoDegerleri
+        guard l.count > 5 else { return l }
+        let hedef: [Float] = [l[0], 200, 400, 800, 1600, 3200]
+        return Array(Set(hedef.compactMap { h in l.min { abs($0 - h) < abs($1 - h) } })).sorted()
+    }
+
+    private var enstSecenekleri: [Double] {
+        kamera.mod == .video ? [1.0 / 1000, 1.0 / 250, 1.0 / 100, 1.0 / 50, 1.0 / 25] : [1.0 / 1000, 1.0 / 250, 1.0 / 60, 1.0 / 15, 1.0 / 4]
+    }
+}
+
+extension View {
+    /// Basılı tutunca hızlı menü (HizliMenu) + Sabitle / Sabitlemeyi kaldır
+    func sabitlenebilir(_ f: Favori, _ kamera: Kamera, ayrinti: (() -> Void)? = nil) -> some View {
+        contextMenu { HizliMenu(f: f, kamera: kamera, ayrinti: ayrinti) }
     }
 }

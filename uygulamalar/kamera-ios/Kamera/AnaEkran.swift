@@ -369,6 +369,7 @@ struct AnaEkran: View {
                 ForEach(kamera.favoriler) { f in
                     Button { kisayolDokun(f) } label: { SabitKapsul(f: f, kamera: kamera) }
                         .buttonStyle(.plain)
+                        .sabitlenebilir(f, kamera) { ayrintiAc(f) }
                         .overlay(alignment: .bottom) { if acikSatir == f { Circle().fill(Tema.sari).frame(width: 3, height: 3).offset(y: 5) } }
                 }
             }
@@ -382,6 +383,12 @@ struct AnaEkran: View {
             if !o.1.isEmpty { Text(o.1.lowercased(with: Locale(identifier: "tr"))).font(Tema.etiket).tracking(0.8).textCase(.uppercase).foregroundStyle(o.2 ? Tema.sari.opacity(0.8) : Tema.ikincil) }
         }
         .foregroundStyle(o.2 ? Tema.sari : .white)
+    }
+
+    /// Hızlı menüden "Ayrıntılı…": ayarın tam paneli
+    private func ayrintiAc(_ f: Favori) {
+        acikSatir = nil
+        withAnimation(.easeOut(duration: 0.18)) { panel = .favori(f) }
     }
 
     /// Kısayola ya da Denetimler dairesine dokununca
@@ -866,7 +873,7 @@ struct AnaEkran: View {
                     ForEach(Favori.allCases) { f in
                         Button { kisayolDokun(f) } label: { DenetimDaire(f: f, kamera: kamera) }
                             .buttonStyle(.plain)
-                            .sabitlenebilir(f, kamera)
+                            .sabitlenebilir(f, kamera) { ayrintiAc(f) }
                     }
                 }
                 HStack(spacing: 10) {
