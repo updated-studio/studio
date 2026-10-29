@@ -663,6 +663,8 @@ final class Kamera: NSObject, ObservableObject {
     // MARK: çekim
 
     func deklansor(yon: AVCaptureVideoOrientation) {
+        // Kamera bağlı değilse (simülatör, izin yok) çekim başlatılmaz: bağlantısız çıkışa capturePhoto/startRecording uygulamayı çökertir
+        guard cihaz != nil, kuruldu else { bildirim = "Kamera hazır değil."; return }
         switch mod {
         case .foto, .portre:
             if geriSayiyor { geriSayiyor = false; proIlerleme = nil; return }
@@ -726,6 +728,7 @@ final class Kamera: NSObject, ObservableObject {
         let f: AVCaptureDevice.FlashMode = flas == .oto ? .auto : (flas == .acik ? .on : .off)
         if mod != .pro, fotoCikti.supportedFlashModes.contains(f) { ayar.flashMode = f }
         if #available(iOS 18.0, *), !deklansorSesi, fotoCikti.isShutterSoundSuppressionSupported { ayar.isShutterSoundSuppressionEnabled = true }
+        guard fotoCikti.connection(with: .video) != nil else { return }
         fotoCikti.capturePhoto(with: ayar, delegate: self)
     }
 
