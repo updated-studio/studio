@@ -43,6 +43,8 @@ final class Kamera: NSObject, ObservableObject {
     /// Ortadaki büyük yazı: geri sayım, birleştirme ilerlemesi ("3", "Birleştiriliyor 12/90"), seri sayısı
     @Published var proIlerleme: String?
     @Published var proCalisiyor = false
+    /// Her fotoğraf çekiminde artar (ekrandaki kısa kararma)
+    @Published var cekimAni = 0
     /// Telefonun tek karede verebildiği en uzun enstantane (sn)
     @Published var enUzunEnst: Double = 1
     // Araç şeridi: pozlama telafisi, beyaz denge (Kelvin, nil = oto), odak (mercek konumu 0 yakın … 1 uzak, nil = oto)
@@ -287,6 +289,13 @@ final class Kamera: NSObject, ObservableObject {
             } else {
                 oturum.sessionPreset = oturum.canSetSessionPreset(.hd4K3840x2160) ? .hd4K3840x2160 : .high
             }
+        } else if let b = Kamera.fotoBicimi(d), (try? d.lockForConfiguration()) != nil {
+            // Apple Kamera gibi: önizleme/kare akışı küçük (≈1920×1440), fotoğraf tam çözünürlük. ".photo" hazır ayarı akışı 12 MP verir;
+            // kare çıkışı (kompozisyon, sahne) her kareyi o boyutta dönüştürünce deklanşör takılıyordu.
+            d.activeFormat = b
+            let sure = CMTime(value: 1, timescale: 30)
+            if b.videoSupportedFrameRateRanges.contains(where: { $0.maxFrameRate >= 30 }) { d.activeVideoMinFrameDuration = sure; d.activeVideoMaxFrameDuration = sure }
+            d.unlockForConfiguration()
         } else {
             oturum.sessionPreset = .photo
         }
@@ -305,6 +314,9 @@ final class Kamera: NSObject, ObservableObject {
             ?? boyutlar.first { Int($0.width) * Int($0.height) <= 12_600_000 } ?? boyutlar.last
         if let s = secili { fotoCikti.maxPhotoDimensions = s }
         if fotoCikti.isAppleProRAWSupported { fotoCikti.isAppleProRAWEnabled = raw }
+        // Art arda dokunuşlarda deklanşör beklemesin (iOS 17)
+        if fotoCikti.isResponsiveCaptureSupported { fotoCikti.isResponsiveCaptureEnabled = true }
+        if fotoCikti.isFastCapturePrioritizationSupported { fotoCikti.isFastCapturePrioritizationEnabled = true }
         let rawVarMi = !fotoCikti.availableRawPhotoPixelFormatTypes.isEmpty || fotoCikti.isAppleProRAWSupported
         var sessiz = false
         if #available(iOS 18.0, *) { sessiz = fotoCikti.isShutterSoundSuppressionSupported }
@@ -337,6 +349,25 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     /// 16:9 video biçimi (SDR'de 8 bit tercih; HDR / Log için o renk alanını destekleyen 10 bit biçim); bulunamazsa nil
+    /// Fotoğraf için: 4:3, akışı 1080-1512 satır, 30 fps, en büyük fotoğraf boyutu (eşitse tam aralık 420f)
+    static func fotoBicimi(_ d: AVCaptureDevice) -> AVCaptureDevice.Format? {
+        func foto(_ f: AVCaptureDevice.Format) -> Int { f.supportedMaxPhotoDimensions.map { Int($0.width) * Int($0.height) }.max() ?? 0 }
+        let adaylar = d.formats.filter { f in
+            let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
+            let tur = CMFormatDescriptionGetMediaSubType(f.formatDescription)
+            return Int(b.width) * 3 == Int(b.height) * 4 && b.height >= 1080 && b.height <= 1512
+                && (tur == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange || tur == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+                && f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= 30 }
+        }
+        return adaylar.max { a, b in
+            let fa = foto(a), fb = foto(b)
+            if fa != fb { return fa < fb }
+            let ta = CMFormatDescriptionGetMediaSubType(a.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+            let tb = CMFormatDescriptionGetMediaSubType(b.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+            return !ta && tb
+        }
+    }
+
     static func videoBicimi(_ d: AVCaptureDevice, yukseklik: Int, fps: Int, renk: RenkModu = .sdr) -> AVCaptureDevice.Format? {
         let adaylar = d.formats.filter { f in
             let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
@@ -622,7 +653,7 @@ final class Kamera: NSObject, ObservableObject {
             ayar = AVCapturePhotoSettings(rawPixelFormatType: rawTip, processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg])
         } else {
             ayar = AVCapturePhotoSettings()
-            ayar.photoQualityPrioritization = hizli ? .speed : .quality
+            ayar.photoQualityPrioritization = hizli ? .speed : .balanced
         }
         ayar.maxPhotoDimensions = fotoCikti.maxPhotoDimensions
         let f: AVCaptureDevice.FlashMode = flas == .oto ? .auto : (flas == .acik ? .on : .off)
@@ -844,6 +875,11 @@ final class Kamera: NSObject, ObservableObject {
 }
 
 extension Kamera: AVCapturePhotoCaptureDelegate {
+    /// Çekim anı: ekran Apple Kamera gibi bir an kararır (dokunuşun alındığı görülsün)
+    func photoOutput(_ output: AVCapturePhotoOutput, willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
+        DispatchQueue.main.async { self.cekimAni += 1 }
+    }
+
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         guard error == nil, let veri = photo.fileDataRepresentation() else { return }
         let id = photo.resolvedSettings.uniqueID

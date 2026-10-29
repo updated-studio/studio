@@ -48,6 +48,7 @@ struct AnaEkran: View {
                 Color.black.ignoresSafeArea()
                 // Önizleme iki düzende de aynı görünüm: döndürünce yeniden kurulmaz (eskiden yan çevirince kararıp takılıyordu)
                 goruntu.ignoresSafeArea()
+                CekimKararmasi(sayac: kamera.cekimAni).ignoresSafeArea().allowsHitTesting(false)
                 if yatay { yatayDuzen(g) } else { dikeyDuzen(g) }
                 if !kamera.izinVar { izinUyarisi }
                 if let p = kamera.proIlerleme {
@@ -537,6 +538,7 @@ struct AnaEkran: View {
     private var deklansor: some View {
         Button {
             panel = nil
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             kamera.deklansor(yon: ekranYonu)
         } label: {
             ZStack {
@@ -551,11 +553,14 @@ struct AnaEkran: View {
             }
             .animation(.easeOut(duration: 0.15), value: kamera.kayitta)
         }
-        .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in kamera.seriBasla(yon: ekranYonu) })
-        .simultaneousGesture(DragGesture(minimumDistance: 0).onEnded { _ in kamera.seriBitir() })
+        // Seri çekim hareketleri yalnız seri PRO modda (diğer modlarda düğmenin dokunuşunu yutmasın)
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in kamera.seriBasla(yon: ekranYonu) }, including: seriAcik ? .all : .subviews)
+        .simultaneousGesture(DragGesture(minimumDistance: 0).onEnded { _ in kamera.seriBitir() }, including: seriAcik ? .all : .subviews)
         .accessibilityLabel(kamera.mod.foto ? "Fotoğraf çek" : (kamera.kayitta ? "Kaydı durdur" : "Kaydı başlat"))
         .yardimBalonu(yardim, kamera.mod == .pro && kamera.proMod.seri ? "Basılı tut: seri" : (kamera.uzunPozlama && kamera.mod == .foto ? "Uzun pozlama" : "Çek"))
     }
+
+    private var seriAcik: Bool { kamera.mod == .pro && kamera.proMod.seri }
 
     private var ekranYonu: AVCaptureVideoOrientation {
         Onizleme.yon(UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.interfaceOrientation }.first ?? .portrait)
@@ -966,5 +971,18 @@ extension View {
                     .allowsHitTesting(false)
             }
         }
+    }
+}
+
+/// Fotoğraf çekilince ekranın bir an kararması (Apple Kamera gibi)
+private struct CekimKararmasi: View {
+    let sayac: Int
+    @State private var opaklik = 0.0
+    var body: some View {
+        Color.black.opacity(opaklik)
+            .onChange(of: sayac) { _, _ in
+                opaklik = 0.85
+                withAnimation(.easeOut(duration: 0.22)) { opaklik = 0 }
+            }
     }
 }
