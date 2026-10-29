@@ -99,9 +99,12 @@ jobs:
           mkdir -p gezinti
           set -o pipefail
           rm -rf gezinti.xcresult
+          DURUM=0
+          # "set -e" altında başarısız komut betiği hemen bitirir ve günlük hiç yazılmazdı; o yüzden "|| DURUM=$?"
           xcodebuild test -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -destination "id=$UDID" \
-            -resultBundlePath gezinti.xcresult CODE_SIGNING_ALLOWED=NO TEST_RUNNER_EKRAN_KLASORU="$PWD/gezinti" > test.log 2>&1; DURUM=$?
-          grep -E "GEZINTI|error:|failed|ÇÖKTÜ|Crash|Test Case" test.log | head -n 400
+            -resultBundlePath gezinti.xcresult CODE_SIGNING_ALLOWED=NO TEST_RUNNER_EKRAN_KLASORU="$PWD/gezinti" > test.log 2>&1 || DURUM=$?
+          grep -E "GEZINTI|error:|failed|ÇÖKTÜ|Crash|Test Case" test.log | head -n 400 || true
+          if [ "$DURUM" != "0" ]; then echo "--- test.log sonu ---"; tail -n 80 test.log; fi
           # Ekran görüntüleri test sonucundan dışarı (doğrudan yazılanlar eksik kalabiliyor)
           xcrun xcresulttool export attachments --path gezinti.xcresult --output-path gezinti 2>/dev/null || true
           echo "Ekran görüntüsü: $(ls gezinti | wc -l)"
