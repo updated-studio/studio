@@ -33,6 +33,7 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | **Stiller** (Renk grubu): hazır stiller (Standart, Sinematik, Sıcak, Soğuk, Canlı, S-B), pad (soğuk ↔ sıcak, ton), yoğunluk, doygunluk; "Ekranda" ya da "Kayda göm" (fotoğraf yeniden yazılır, video kayıttan sonra HEVC'ye işlenir). Stil + LUT tek 3D LUT | ✓ | ✓ | 29 Ekim; iOS Stiller.swift |
 | **Ekrandaki menü grupları:** "⋯" son grubu açar; alttaki şeritte Kayıt (biçim, kodek, renk, sabitleme, flaş…), Pozlama (+ odak), Renk (Stiller / Beyaz denge), Ses (giriş, biçim), Göstergeler (+ kılavuz, yardımcı, terazi) | ✓ | ✓ | 29 Ekim; AnaEkran `Grup`, HizliMenuler.swift |
 | **Otomatik kompozisyon:** açıkken (varsayılan) kılavuz sahneye göre kendisi gelir (öneri 1,5 sn sabit kalınca), kılavuza dokununca elle seçime geçer | ✓ | ✓ | Fatih 29 Ekim 06:56; Kamera.otoKompozisyon |
+| **Sabitlenen kısayollar (iOS 27 Kamera gibi):** seçilen denetimler (en fazla 6; varsayılan ISO, enstantane, beyaz denge, zebra) vizörün üstünde durur; "⋯" DENETİMLER ızgarası (3 sütun daire); üst şeride uzun bas ya da "Düzenle" → ⊖ ile çıkar, 4 sütunlu ızgaradan ekle, "Temel Ayarlara Sıfırla"; Genel Ayarlar → Sabitlenenler | ✓ | … | Fatih 29 Ekim; Favoriler.swift, anahtar "k.favoriler" iki tarafta aynı |
 | Açılış ekranı (Kamera / Monitör / Masa) ve "Açılışta sor" | ✓ | ✓ | `GirisEkran`, UserDefaults "giris" (Android ile aynı anahtar) |
 
 ## Monitör ekranı (Android: MainActivity + MonitorGorunum)

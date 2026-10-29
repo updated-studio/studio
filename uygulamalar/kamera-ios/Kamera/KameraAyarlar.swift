@@ -36,6 +36,7 @@ struct KameraAyarlar: View {
                     NavigationLink { renk } label: { satir("thermometer.sun", .pink, "Renk ve beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto") }
                     NavigationLink { ses } label: { satir("mic", .red, "Ses", kamera.etkinSesGirdi ?? "Otomatik") }
                     NavigationLink { fotograf } label: { satir("camera", .blue, "Fotoğraf", kamera.raw && kamera.rawVar ? "RAW" : "JPEG") }
+                    NavigationLink { FavoriDuzenle(kamera: kamera) } label: { satir("pin", .yellow, "Sabitlenenler", "\(kamera.favoriler.count)") }
                     NavigationLink { gostergeler } label: { satir("chart.bar.xaxis", .green, "Göstergeler", kamera.gostergeEtkin ? "Açık" : (kamera.kompTur == .kapali ? "" : kamera.kompTur.ad)) }
                     NavigationLink { timelapse } label: { satir("timer", .purple, "Timelapse", Timelapse.aralikYazi(kamera.tlAralik)) }
                 }

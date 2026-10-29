@@ -98,6 +98,10 @@ final class Kamera: NSObject, ObservableObject {
     @Published var stil: Stil = (try? JSONDecoder().decode(Stil.self, from: Kamera.ud.data(forKey: "k.stil") ?? Data())) ?? Stil() {
         didSet { if let d = try? JSONEncoder().encode(stil) { Kamera.ud.set(d, forKey: "k.stil") }; if stil.anahtar != oldValue.anahtar || stil.kaydaGom != oldValue.kaydaGom { gostergeUygula() } }
     }
+    /// Sabitlenen kısayollar (Favoriler.swift), sırasıyla; en çok 6
+    @Published var favoriler: [Favori] = (try? JSONDecoder().decode([Favori].self, from: Kamera.ud.data(forKey: "k.favoriler") ?? Data())) ?? Favori.varsayilan {
+        didSet { if let d = try? JSONEncoder().encode(favoriler) { Kamera.ud.set(d, forKey: "k.favoriler") } }
+    }
     /// Otomatik kompozisyon: kılavuzu sahneye göre kendisi seçer (elle seçince kapanır)
     @Published var kompOto = Kamera.ud.object(forKey: "k.kompOto") as? Bool ?? true { didSet { Kamera.ud.set(kompOto, forKey: "k.kompOto"); yardimcilariAyarla() } }
     var otoAday: (tur: KompTur, yon: Int, bas: Date)?

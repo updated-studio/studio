@@ -10,7 +10,7 @@ enum ProPanelTuru { case mod, ayar }
 /// Telefon yan tutulunca deklanşör sağ kenarda dikey ortada; mercekler ve modlar onun yanında dikey sıralanır.
 struct AnaEkran: View {
     @StateObject private var kamera = Kamera()
-    enum Panel: Equatable { case proKartlar, proAyar, poz, bd, odak, kilavuz, kontroller, bicim, gosterge, grup(Grup) }
+    enum Panel: Equatable { case proKartlar, proAyar, poz, bd, odak, kilavuz, kontroller, bicim, gosterge, grup(Grup), favori(Favori) }
     /// Ekrandaki menü grupları (Fatih 29 Ekim): "⋯" tek dokunuşla son açılan grubu açar, alttaki şeritten diğerlerine geçilir
     enum Grup: String, CaseIterable, Identifiable {
         case kayit, pozlama, renk, ses, gosterge
@@ -21,6 +21,11 @@ struct AnaEkran: View {
     @State private var panel: Panel?
     @AppStorage("k.sonGrup") private var sonGrup = Grup.pozlama.rawValue
     @State private var renkSekme = 0
+    /// Merceklerin yerinde açık tek satır seçim (Denetimler'den ya da kısayoldan)
+    @State private var acikSatir: Favori?
+    /// Kısayolları düzenleme (Apple Kamera "Düzenle"); vazgeçince eski liste geri gelir
+    @State private var duzenleme = false
+    @State private var yedekFavoriler: [Favori] = []
     @State private var uyariMod: ProMod?
     @State private var yardim = false
     @State private var ayarlar = false
@@ -71,6 +76,7 @@ struct AnaEkran: View {
             if yeni == nil { kamera.baslat() } else { kamera.durdur() }
         }
         .onChange(of: kamera.mod) { _, m in panel = m == .pro ? .proKartlar : nil }
+        .onChange(of: panel) { _, p in if p != .kontroller && duzenleme { duzenleme = false } }
         .fullScreenCover(item: $ekran) { e in
             switch e {
             case .masa: MasaEkran { ekran = nil }
@@ -115,7 +121,9 @@ struct AnaEkran: View {
                 Spacer(minLength: 0)
                 if let b = kamera.bildirim { bildirimKutusu(b) }
                 if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 14) }
-                if panel == nil { mercekler(dikey: false).padding(.bottom, 20) }
+                if panel == nil {
+                    if let f = acikSatir { FavoriSatir(f: f, kamera: kamera).padding(.bottom, 14) } else { mercekler(dikey: false).padding(.bottom, 20) }
+                }
                 HStack {
                     solDugme
                     Spacer()
@@ -149,6 +157,7 @@ struct AnaEkran: View {
                     Spacer(minLength: 0)
                     if let b = kamera.bildirim { bildirimKutusu(b) }
                     if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 10) }
+                    if panel == nil, let f = acikSatir { FavoriSatir(f: f, kamera: kamera).frame(maxWidth: 480).padding(.bottom, 10) }
                     if let p = panel {
                         HStack {
                             panelKabi(p, enYuksek: g.size.height * 0.82).frame(maxWidth: 480)
@@ -226,6 +235,40 @@ struct AnaEkran: View {
     // MARK: üst
 
     private var ustBant: some View {
+        Group {
+            if duzenleme {
+                HStack {
+                    bantDugme("Vazgeç") { kamera.favoriler = yedekFavoriler; duzenlemeBitir() }
+                    Spacer()
+                    bantDugme("Bitti") { duzenlemeBitir() }
+                }
+                .padding(.horizontal, 16)
+            } else {
+                normalUstBant
+            }
+        }
+    }
+
+    private func bantDugme(_ ad: String, eylem: @escaping () -> Void) -> some View {
+        Button(action: eylem) {
+            Text(ad).font(.system(size: 15, weight: .medium))
+                .padding(.horizontal, 14).frame(height: 32)
+                .background(Capsule().fill(AnaEkran.cam))
+                .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
+        }
+    }
+
+    private func duzenlemeBasla() {
+        yedekFavoriler = kamera.favoriler
+        acikSatir = nil
+        withAnimation(.easeOut(duration: 0.18)) { duzenleme = true; panel = .kontroller }
+    }
+
+    private func duzenlemeBitir() {
+        withAnimation(.easeOut(duration: 0.18)) { duzenleme = false; panel = nil }
+    }
+
+    private var normalUstBant: some View {
         HStack { ustDugmeler; Spacer() }
             .overlay(alignment: .trailing) {
                 kucukDaire("gearshape.fill", aciklama: "Ayarlar") { ayarlar = true }.disabled(kamera.kayitta)
@@ -255,22 +298,61 @@ struct AnaEkran: View {
         .yardimBalonu(yardim, aciklama)
     }
 
-    /// Görüntünün üstünde ortada: biçim (4K / 60, 12 MP / JPEG) ve elle değişen değerler sarı. Dokununca BİÇİM.
+    /// Görüntünün üstünde ortada (Apple Kamera'daki kısayollar): biçim, sabitlenenler, sabitlenmemiş ama elle değişmiş değerler (sarı).
+    /// Dokun: aç/kapa değişir ya da o ayarın seçimi açılır; uzun bas: düzenleme (⊖ ile kaldır, alttan ekle).
     private var bilgi: some View {
-        Button { panelAc(.bicim) } label: {
-            HStack(alignment: .top, spacing: 18) {
-                ForEach(Array(bilgiOgeleri.enumerated()), id: \.offset) { _, o in
-                    VStack(spacing: 0) {
-                        Text(o.0).font(.system(size: 17, weight: .semibold, design: .rounded))
-                        Text(o.1).font(.system(size: 10, weight: .bold, design: .rounded))
+        HStack(alignment: .center, spacing: 18) {
+            if duzenleme {
+                HStack(spacing: 14) {
+                    ForEach(kamera.favoriler) { f in
+                        KisayolOge(f: f, kamera: kamera)
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(Color.black.opacity(0.4)))
+                            .overlay(alignment: .topLeading) {
+                                Button { withAnimation { kamera.favoriAcKapa(f) } } label: {
+                                    Image(systemName: "minus").font(.system(size: 10, weight: .heavy)).foregroundStyle(.black)
+                                        .frame(width: 18, height: 18).background(Circle().fill(Color(white: 0.85)))
+                                }
+                                .offset(x: -6, y: -6)
+                                .accessibilityLabel("\(f.ad) kaldır")
+                            }
                     }
-                    .foregroundStyle(o.2 ? Tema.sari : .white)
+                    if kamera.favoriler.isEmpty { Text("Aşağıdan ekle").font(.footnote).foregroundStyle(.white.opacity(0.7)) }
                 }
+                .padding(.horizontal, 18).frame(minWidth: 220, minHeight: 52)
+                .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1))
+            } else {
+                Button { panelAc(.bicim) } label: { ikiSatir(bilgiOgeleri.first ?? ("", "", false)) }
+                    .yardimBalonu(yardim, "Biçim")
+                ForEach(kamera.favoriler) { f in
+                    Button { kisayolDokun(f) } label: { KisayolOge(f: f, kamera: kamera) }
+                        .overlay(alignment: .bottom) { if acikSatir == f { Circle().fill(Tema.sari).frame(width: 4, height: 4).offset(y: 7) } }
+                }
+                ForEach(Array(bilgiOgeleri.dropFirst().enumerated()), id: \.offset) { _, o in ikiSatir(o) }
             }
-            .shadow(color: .black.opacity(0.5), radius: 3)
         }
-        .disabled(kamera.kayitta)
-        .yardimBalonu(yardim, "Biçim")
+        .shadow(color: .black.opacity(0.5), radius: 3)
+        .disabled(kamera.kayitta && !duzenleme)
+        .onLongPressGesture(minimumDuration: 0.5) { if !duzenleme && !kamera.kayitta { duzenlemeBasla() } }
+    }
+
+    private func ikiSatir(_ o: (String, String, Bool)) -> some View {
+        VStack(spacing: 0) {
+            Text(o.0).font(.system(size: 17, weight: .semibold, design: .rounded))
+            Text(o.1).font(.system(size: 10, weight: .bold, design: .rounded))
+        }
+        .foregroundStyle(o.2 ? Tema.sari : .white)
+    }
+
+    /// Kısayola ya da Denetimler dairesine dokununca
+    private func kisayolDokun(_ f: Favori) {
+        if f.anahtar { kamera.favoriDegistir(f); return }
+        if FavoriSatir.satirli(f) {
+            withAnimation(.easeOut(duration: 0.15)) { panel = nil; acikSatir = acikSatir == f ? nil : f }
+        } else {
+            acikSatir = nil
+            withAnimation(.easeOut(duration: 0.18)) { panel = panel == .favori(f) ? nil : .favori(f) }
+        }
     }
 
     private var bilgiOgeleri: [(String, String, Bool)] {
@@ -282,11 +364,12 @@ struct AnaEkran: View {
             if let e = a.enst { l.append((ProMod.enstYazi(e), "S", true)) }
             return l
         }
-        if kamera.flas == .acik || kamera.flas == .fener { l.append(("⚡︎", kamera.flas == .fener ? "FENER" : "FLAŞ", true)) }
-        if abs(kamera.ev) >= 0.05 { l.append((Cetvel.evYazi(kamera.ev), "EV", true)) }
-        if let i = kamera.secilenIso { l.append(("\(Int(i))", "ISO", true)) }
-        if let e = kamera.secilenEnst { l.append((kamera.enstGoster(e), kamera.mod == .video && kamera.enstAci ? "AÇI" : "S", true)) }
-        if let k = kamera.bd { l.append(("\(Int(k))", "K", true)) }
+        if kamera.flas == .acik || kamera.flas == .fener, !kamera.favoriler.contains(.flas) { l.append(("⚡︎", kamera.flas == .fener ? "FENER" : "FLAŞ", true)) }
+        let fav = Set(kamera.favoriler)
+        if abs(kamera.ev) >= 0.05, !fav.contains(.ev) { l.append((Cetvel.evYazi(kamera.ev), "EV", true)) }
+        if let i = kamera.secilenIso, !fav.contains(.iso) { l.append(("\(Int(i))", "ISO", true)) }
+        if let e = kamera.secilenEnst, !fav.contains(.enst) { l.append((kamera.enstGoster(e), kamera.mod == .video && kamera.enstAci ? "AÇI" : "S", true)) }
+        if let k = kamera.bd, !fav.contains(.bd) { l.append(("\(Int(k))", "K", true)) }
         if kamera.mod == .video {
             if kamera.kodek.prores { l.append((kamera.kodek.kisa, "PRORES", true)) }
             if kamera.renkModu != .sdr { l.append((kamera.renkModu.kisa, "", true)) }
@@ -392,7 +475,7 @@ struct AnaEkran: View {
 
     /// Sağda: kontroller (pozlama, beyaz denge, odak, kılavuz…); bir değer elle değişmişse sarı halka
     private var kontrolDugme: some View {
-        Button { panelAc(.grup(Grup(rawValue: sonGrup) ?? .pozlama)) } label: {
+        Button { acikSatir = nil; panelAc(.kontroller) } label: {
             VStack(spacing: 5) {
                 ForEach(0..<2, id: \.self) { _ in
                     HStack(spacing: 5) { ForEach(0..<3, id: \.self) { _ in Circle().frame(width: 4.5, height: 4.5) } }
@@ -538,12 +621,27 @@ struct AnaEkran: View {
             ZStack {
                 Text(panelBaslik(p)).font(.system(size: 15, weight: .semibold)).tracking(1.2).lineLimit(1)
                 HStack {
-                    Button { withAnimation(.easeOut(duration: 0.15)) { panel = nil } } label: {
-                        Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
-                            .frame(width: 34, height: 34).background(Circle().fill(Color.white.opacity(0.13)))
+                    if p == .kontroller && !duzenleme {
+                        Button { duzenlemeBasla() } label: {
+                            Text("Düzenle").font(.system(size: 14, weight: .semibold))
+                                .padding(.horizontal, 14).frame(height: 34).background(Capsule().fill(Color.white.opacity(0.13)))
+                        }
+                        .disabled(kamera.kayitta)
+                    } else if !duzenleme {
+                        Button { withAnimation(.easeOut(duration: 0.15)) { panel = nil } } label: {
+                            Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
+                                .frame(width: 34, height: 34).background(Circle().fill(Color.white.opacity(0.13)))
+                        }
+                        .accessibilityLabel("Kapat")
                     }
-                    .accessibilityLabel("Kapat")
                     Spacer()
+                    if p == .kontroller && !duzenleme {
+                        Button { withAnimation(.easeOut(duration: 0.15)) { panel = nil } } label: {
+                            Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
+                                .frame(width: 34, height: 34).background(Circle().fill(Color.white.opacity(0.13)))
+                        }
+                        .accessibilityLabel("Kapat")
+                    }
                 }
             }
             ViewThatFits(in: .vertical) {
@@ -573,10 +671,11 @@ struct AnaEkran: View {
         case .bd: return "BEYAZ DENGE"
         case .odak: return "ODAK"
         case .kilavuz: return "KOMPOZİSYON"
-        case .kontroller: return "KONTROLLER"
+        case .kontroller: return duzenleme ? "KAMERA DENETİMLERİNİ EKLE" : "DENETİMLER"
         case .bicim: return "BİÇİM"
         case .gosterge: return "GÖSTERGELER"
         case let .grup(g): return g.ad.uppercased(with: Locale(identifier: "tr"))
+        case let .favori(f): return FavoriSatir.baslik(f)
         }
     }
 
@@ -597,6 +696,7 @@ struct AnaEkran: View {
         case .bicim: BicimPanel(kamera: kamera)
         case .gosterge: GostergeMenu(kamera: kamera)
         case let .grup(g): grupIcerik(g)
+        case let .favori(f): FavoriPanel(f: f, kamera: kamera)
         }
     }
 
@@ -685,30 +785,49 @@ struct AnaEkran: View {
         }
     }
 
-    /// Kontroller: Apple Kamera'daki gibi yuvarlak düğme ızgarası (etkin olan sarı)
+    /// Denetimler: iOS 27 Kamera'daki gibi yuvarlak daire ızgarası. Uzun basınca (ya da "Düzenle") üst şeride sabitlenecekler seçilir.
     private var kontroller: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 14) {
-            if kamera.mod != .pro {
-                kontrol(kamera.flas == .kapali ? "bolt.slash.fill" : "bolt.fill", "Flaş", ["Kapalı", "Oto", "Açık", "Fener"][kamera.flas.rawValue],
-                        etkin: kamera.flas != .kapali) { kamera.flasDegistir() }
-            }
-            if kamera.mod == .foto || kamera.mod == .portre {
-                kontrol("timer", "Zamanlayıcı", kamera.zamanlayici == 0 ? "Kapalı" : "\(kamera.zamanlayici) sn", etkin: kamera.zamanlayici > 0) {
-                    kamera.zamanlayici = kamera.zamanlayici == 0 ? 3 : (kamera.zamanlayici == 3 ? 10 : 0)
+        VStack(spacing: 14) {
+            if duzenleme {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 14) {
+                    ForEach(Favori.allCases) { f in
+                        let secili = kamera.favoriler.contains(f)
+                        Button { if !secili { kamera.favoriAcKapa(f) } } label: {
+                            DenetimDaire(f: f, kamera: kamera, kucuk: true, soluk: secili)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                Button { withAnimation(.easeOut(duration: 0.15)) { kamera.favoriler = Favori.varsayilan } } label: {
+                    Text("Temel Ayarlara Sıfırla").font(.system(size: 14, weight: .semibold))
+                        .padding(.horizontal, 18).frame(height: 36)
+                        .background(Capsule().fill(Color.white.opacity(0.13)))
+                }
+                .buttonStyle(.plain)
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 16) {
+                    ForEach(Favori.allCases) { f in
+                        Button { kisayolDokun(f) } label: { DenetimDaire(f: f, kamera: kamera) }
+                            .buttonStyle(.plain)
+                            .sabitlenebilir(f, kamera)
+                    }
+                }
+                HStack(spacing: 10) {
+                    kucukGecis("display", "Monitör") { monitoreGec() }
+                    kucukGecis("gearshape", "Genel Ayarlar") { panel = nil; ayarlar = true }
                 }
             }
-            kontrol("plusminus.circle", "Pozlama", pozYazi, etkin: abs(kamera.ev) >= 0.05 || kamera.secilenIso != nil || kamera.secilenEnst != nil) { cetvelAc(.poz) }
-            kontrol("thermometer.sun", "Beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto", etkin: kamera.bd != nil) { cetvelAc(.bd) }
-            kontrol("scope", "Odak", kamera.odakKonum == nil ? "Oto" : "MF", etkin: kamera.odakKonum != nil) { cetvelAc(.odak) }
-            kontrol("chart.bar.xaxis", "Göstergeler", kamera.gostergeEtkin ? "Açık" : "Kapalı", etkin: kamera.gostergeEtkin) { panelAc(.gosterge) }
-            kontrol("squareshape.split.3x3", "Kılavuz", kamera.kompTur == .kapali ? "Kapalı" : kamera.kompTur.ad, etkin: kamera.kompTur != .kapali) { panelAc(.kilavuz) }
-            kontrol("wand.and.stars", "Yardımcı", kamera.asistanAcik ? "Açık" : "Kapalı", etkin: kamera.asistanAcik) { kamera.asistanAcik.toggle() }
-            kontrol("level", "Terazi", kamera.teraziAcik ? "Açık" : "Kapalı", etkin: kamera.teraziAcik) { kamera.teraziAcik.toggle() }
-            kontrol("square.resize", "Biçim", kamera.cozunurluk.components(separatedBy: " · ").first ?? "", etkin: false) { panelAc(.bicim) }
-            kontrol("display", "Monitör", "Harici", etkin: false) { monitoreGec() }
-            kontrol("gearshape", "Ayarlar", "Tümü", etkin: false) { panel = nil; ayarlar = true }
         }
         .padding(.top, 4)
+    }
+
+    private func kucukGecis(_ simge: String, _ ad: String, eylem: @escaping () -> Void) -> some View {
+        Button(action: eylem) {
+            Label(ad, systemImage: simge).font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 14).frame(height: 34)
+                .background(Capsule().fill(Color.white.opacity(0.13)))
+        }
+        .buttonStyle(.plain)
     }
 
     private var pozYazi: String {
