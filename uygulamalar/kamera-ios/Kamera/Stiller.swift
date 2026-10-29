@@ -225,11 +225,26 @@ extension Kamera {
         return baglam.jpegRepresentation(of: son, colorSpace: alan, options: [:]) ?? veri
     }
 
-    /// Videoya stil/LUT işler (yeniden kodlar); bitince yeni dosya, olmazsa özgün
+    /// Bekleyen (yarıda kalmış) işlemelerin klasörü: uygulama kapanırsa dosya burada durur, açılınca sürer
+    static var bekleyenKlasor: URL {
+        let u = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("stil-bekleyen", isDirectory: true)
+        try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
+        return u
+    }
+
+    /// Videoya stil/LUT işler (yeniden kodlar); bitince yeni dosya, olmazsa özgün.
+    /// İşleme ekrana bağlı değildir: ekrandan çıkılsa, telefon kilitlense de sürer (arka plan görevi); yine de kesilirse dosya bekleyen
+    /// klasöründe kalır ve uygulama açılınca kaldığı yerden değil baştan, ama aynı stille yeniden işlenir
     func videoyaGom(_ url: URL, bitti: @escaping (URL) -> Void) {
         guard gom, let r = renkLutu(), let f = r.uret().suzgec(renkAlani: CGColorSpace(name: CGColorSpace.itur_709)!) else { bitti(url); return }
-        let varlik = AVURLAsset(url: url)
+        // Özgün dosya bekleyen klasörüne taşınır; işlenince silinir
+        let bekleyen = Kamera.bekleyenKlasor.appendingPathComponent(url.lastPathComponent)
+        if url != bekleyen { try? FileManager.default.removeItem(at: bekleyen); if (try? FileManager.default.moveItem(at: url, to: bekleyen)) == nil { bitti(url); return } }
+        let varlik = AVURLAsset(url: bekleyen)
+        var gorev = UIBackgroundTaskIdentifier.invalid
+        gorev = UIApplication.shared.beginBackgroundTask(withName: "stil-isle") { UIApplication.shared.endBackgroundTask(gorev); gorev = .invalid }
         Task {
+            defer { if gorev != .invalid { UIApplication.shared.endBackgroundTask(gorev) } }
             let kompozisyon: AVMutableVideoComposition
             do {
                 kompozisyon = try await AVMutableVideoComposition.videoComposition(with: varlik) { istek in
@@ -237,17 +252,44 @@ extension Kamera {
                     s.setValue(istek.sourceImage.clampedToExtent(), forKey: kCIInputImageKey)
                     istek.finish(with: (s.outputImage ?? istek.sourceImage).cropped(to: istek.sourceImage.extent), context: nil)
                 }
-            } catch { bitti(url); return }
+            } catch { bitti(bekleyen); return }
             // Yeniden kodlama HEVC (ProRes kaydı da HEVC'ye döner; özgün ProRes için stil Standart'a alınır)
-            guard let disari = AVAssetExportSession(asset: varlik, presetName: AVAssetExportPresetHEVCHighestQuality) else { bitti(url); return }
+            guard let disari = AVAssetExportSession(asset: varlik, presetName: AVAssetExportPresetHEVCHighestQuality) else { bitti(bekleyen); return }
             let hedef = FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-stil-\(Int(Date().timeIntervalSince1970)).mov")
             disari.videoComposition = kompozisyon
             disari.outputURL = hedef
             disari.outputFileType = .mov
             await MainActor.run { self.proIlerleme = "Stil işleniyor" }
+            let ilerleme = Task { @MainActor in
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    if self.proIlerleme?.hasPrefix("Stil") == true { self.proIlerleme = "Stil işleniyor %\(Int(disari.progress * 100))" }
+                }
+            }
             await disari.export()
+            ilerleme.cancel()
             await MainActor.run { self.proIlerleme = nil }
-            if disari.status == .completed { try? FileManager.default.removeItem(at: url); bitti(hedef) } else { bitti(url) }
+            if disari.status == .completed { try? FileManager.default.removeItem(at: bekleyen); bitti(hedef) } else {
+                // Kesildi (ör. uygulama kapandı): özgün bekleyende kalır, uygulama açılınca yeniden denenir
+                try? FileManager.default.removeItem(at: hedef)
+                await MainActor.run { self.bildirim = "Stil işlenemedi, uygulama açılınca yeniden denenecek" }
+            }
+        }
+    }
+
+    /// Uygulama açılınca: yarıda kalmış işlemeler yeniden yapılır ve Fotoğraflar'a kaydedilir
+    func bekleyenleriIsle() {
+        guard let dosyalar = try? FileManager.default.contentsOfDirectory(at: Kamera.bekleyenKlasor, includingPropertiesForKeys: nil), !dosyalar.isEmpty else { return }
+        guard gom else {
+            // Stil artık kapalıysa özgün haliyle kaydedilir, kaybolmasın
+            for u in dosyalar { kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: u, options: nil) }, mesaj: "Bekleyen video kaydedildi", kucuk: Kamera.kucukResim(video: u)) }
+            return
+        }
+        guard let u = dosyalar.first else { return }
+        videoyaGom(u) { son in
+            self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: son, options: nil) }, mesaj: "Bekleyen video işlendi ve kaydedildi", kucuk: Kamera.kucukResim(video: son))
+            if son != u { try? FileManager.default.removeItem(at: u) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.bekleyenleriIsle() }
         }
     }
 }

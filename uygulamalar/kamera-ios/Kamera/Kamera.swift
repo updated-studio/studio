@@ -213,6 +213,7 @@ final class Kamera: NSObject, ObservableObject {
             await MainActor.run {
                 self.yardimcilariAyarla()
                 if self.saat == nil { self.saat = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.tik() } }
+                if self.proIlerleme == nil { self.bekleyenleriIsle() }
             }
         }
     }
