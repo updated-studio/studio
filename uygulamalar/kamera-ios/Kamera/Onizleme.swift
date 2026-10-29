@@ -4,6 +4,8 @@ import SwiftUI
 /// Tam ekran canlı görüntü; dokunulan noktaya odaklanır.
 struct Onizleme: UIViewRepresentable {
     let oturum: AVCaptureSession
+    /// Arayüz yönü (verilmezse pencereden okunur); döndürünce önizleme bağlantısı buna göre çevrilir
+    var yonu: UIInterfaceOrientation? = nil
     var dokun: (CGPoint) -> Void
 
     final class Gorunum: UIView {
@@ -41,5 +43,10 @@ struct Onizleme: UIViewRepresentable {
         return v
     }
 
-    func updateUIView(_ v: Gorunum, context: Context) { v.dokun = dokun }
+    func updateUIView(_ v: Gorunum, context: Context) {
+        v.dokun = dokun
+        if let y = yonu, let b = v.katman.connection, b.isVideoOrientationSupported, b.videoOrientation != Onizleme.yon(y) {
+            b.videoOrientation = Onizleme.yon(y)
+        }
+    }
 }

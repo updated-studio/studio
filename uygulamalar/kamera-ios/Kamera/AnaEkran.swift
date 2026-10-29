@@ -27,6 +27,7 @@ struct AnaEkran: View {
     @State private var duzenleme = false
     @State private var yedekFavoriler: [Favori] = []
     @State private var uyariMod: ProMod?
+    @State private var arayuz: UIInterfaceOrientation = .portrait
     @State private var yardim = false
     @State private var ayarlar = false
     @State private var giris = !GirisEkran.soruldu && UserDefaults.standard.string(forKey: "giris") == nil
@@ -45,6 +46,8 @@ struct AnaEkran: View {
             let yatay = g.size.width > g.size.height
             ZStack {
                 Color.black.ignoresSafeArea()
+                // Önizleme iki düzende de aynı görünüm: döndürünce yeniden kurulmaz (eskiden yan çevirince kararıp takılıyordu)
+                goruntu.ignoresSafeArea()
                 if yatay { yatayDuzen(g) } else { dikeyDuzen(g) }
                 if !kamera.izinVar { izinUyarisi }
                 if let p = kamera.proIlerleme {
@@ -92,6 +95,7 @@ struct AnaEkran: View {
     private func yonBildir() {
         let y = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.interfaceOrientation }.first ?? .portrait
         kamera.yonGuncelle(y)
+        arayuz = y
     }
 
     /// Ayarlar kapandıktan sonra tam ekran açılır (iki sunum üst üste binmesin)
@@ -110,7 +114,6 @@ struct AnaEkran: View {
         let ust: CGFloat = 52, alt: CGFloat = 96
         // Önizleme tam ekran (Monitör'deki gibi); menüler görüntünün üstünde, okunsun diye üstte ve altta hafif karartma
         return ZStack {
-            goruntu.ignoresSafeArea()
             VStack(spacing: 0) {
                 LinearGradient(colors: [.black.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom).frame(height: ust + 70)
                 Spacer(minLength: 0)
@@ -148,7 +151,6 @@ struct AnaEkran: View {
 
     private func yatayDuzen(_ g: GeometryProxy) -> some View {
         ZStack {
-            goruntu.ignoresSafeArea()
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
                 LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .leading, endPoint: .trailing).frame(width: 190)
@@ -225,7 +227,7 @@ struct AnaEkran: View {
         GeometryReader { tam in
             let alan = AnaEkran.doldurAlan(oran: kamera.goruntuOrani, boyut: tam.size)
             ZStack {
-                Onizleme(oturum: kamera.oturum) { nokta in
+                Onizleme(oturum: kamera.oturum, yonu: arayuz) { nokta in
                     panel = nil
                     kamera.odakla(nokta)
                 }
