@@ -68,6 +68,17 @@ class EkranTest {
                 a.window.decorView.findViewWithText("Kontroller")?.performClick()
                 a.window.decorView.findViewWithText("Kontroller")?.performClick()
                 a.window.decorView.findViewWithText("Kılavuz")?.performClick(); kaydet(a, "kamera-kilavuz-$ad")
+                if (ad == "orta") {
+                    // Beyaz denge ton çubuğu (kamera yokken pano açılmaz; satır tek başına çizilir)
+                    a.window.decorView.findViewWithText("Kapat")?.performClick()
+                    val m = KameraActivity::class.java.getDeclaredMethod("tonSatiri", Function1::class.java).apply { isAccessible = true }
+                    val kutu = android.widget.LinearLayout(a).apply { orientation = android.widget.LinearLayout.VERTICAL; setBackgroundColor(android.graphics.Color.rgb(40, 40, 42)); setPadding(40, 40, 40, 40) }
+                    kutu.addView(m.invoke(a, { _: Int -> Unit }) as android.view.View, android.widget.LinearLayout.LayoutParams(-1, 130))
+                    (a.window.decorView as android.view.ViewGroup).addView(kutu, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.CENTER))
+                    kaydet(a, "kamera-ton-$ad")
+                    (a.window.decorView as android.view.ViewGroup).removeView(kutu)
+                    a.window.decorView.findViewWithText("Kontroller")?.performClick(); a.window.decorView.findViewWithText("Kılavuz")?.performClick()
+                }
                 a.window.decorView.findViewWithText("Biçim")?.performClick(); kaydet(a, "kamera-bicim-$ad")
                 a.window.decorView.findViewWithText("Kapat")?.performClick()
                 a.window.decorView.findViewWithText("Ayarlar")?.performClick(); kaydet(a, "kamera-ayarlar-$ad")

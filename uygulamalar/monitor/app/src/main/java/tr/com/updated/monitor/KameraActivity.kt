@@ -824,6 +824,59 @@ class KameraActivity : Activity() {
         CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT to "Bulutlu", CameraMetadata.CONTROL_AWB_MODE_SHADE to "Gölge")
     private fun evYazi(ev: Int, adim: Float) = if (ev == 0) "±0" else "%+.1f".format(ev * adim).replace('.', ',')
 
+    /** Beyaz denge tonu (iPhone'daki TonCubugu): − / + (±5), yeşil ↔ macenta çubuk, ortada sıfır çentiği, çift dokunuş sıfırlar, sağda "Y12 / M12 / 0" */
+    private fun tonSatiri(degisti: (Int) -> Unit): LinearLayout {
+        val satir = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val yazi = TextView(this).apply { textSize = 13f; typeface = mono; gravity = Gravity.END }
+        lateinit var cubuk: TonCubugu
+        fun ayarla(t: Int) {
+            val y = t.coerceIn(-100, 100); val eski = ayar.ton
+            if (y == eski) return
+            if ((y == 0) != (eski == 0) || (y != 0 && y % 50 == 0)) satir.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            degisti(y); yaziCiz(yazi); cubuk.invalidate()
+        }
+        fun adim(isaret: String, d: Int) = etiket(isaret, 16f).apply { background = Tema.kapsul(Color.argb(92, 120, 120, 120)); contentDescription = if (d < 0) "Yeşile" else "Macentaya"
+            setOnClickListener { ayarla(ayar.ton + d); ayarKaydet() } }
+        cubuk = TonCubugu { ayarla(it) }
+        satir.addView(adim("−", -5), LinearLayout.LayoutParams(dp(30f), dp(30f)))
+        satir.addView(cubuk, LinearLayout.LayoutParams(0, dp(36f), 1f).apply { marginStart = dp(8f); marginEnd = dp(8f) })
+        satir.addView(adim("+", 5), LinearLayout.LayoutParams(dp(30f), dp(30f)))
+        satir.addView(yazi, LinearLayout.LayoutParams(dp(40f), -2))
+        yaziCiz(yazi)
+        return satir
+    }
+    private fun yaziCiz(t: TextView) { val v = ayar.ton; t.text = if (v == 0) "0" else "${if (v < 0) "Y" else "M"}${abs(v)}"; t.setTextColor(if (v == 0) GRI else Color.WHITE) }
+
+    private inner class TonCubugu(val ayarla: (Int) -> Unit) : View(this@KameraActivity) {
+        private val boya = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        private val yesil = Color.rgb(48, 209, 88); private val macenta = Color.rgb(255, 55, 210)
+        private val algila = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean { ayarla(0); ayarKaydet(); return true }
+        })
+        init { contentDescription = "Ton" }
+        override fun onDraw(c: android.graphics.Canvas) {
+            val w = width.toFloat(); val h = height.toFloat(); val r = dp(12f).toFloat(); val cy = h / 2
+            boya.style = android.graphics.Paint.Style.FILL
+            boya.shader = android.graphics.LinearGradient(r, 0f, w - r, 0f, intArrayOf(yesil, Color.argb(90, 255, 255, 255), macenta), null, android.graphics.Shader.TileMode.CLAMP)
+            val k = dp(2.5f).toFloat(); c.drawRoundRect(RectF(r, cy - k, w - r, cy + k), k, k, boya); boya.shader = null
+            boya.color = Color.argb(204, 255, 255, 255); c.drawRect(w / 2 - 1.5f, cy - dp(6f), w / 2 + 1.5f, cy + dp(6f), boya)
+            val v = ayar.ton; val x = r + (v + 100) / 200f * (w - 2 * r)
+            boya.setShadowLayer(dp(3f).toFloat(), 0f, dp(1f).toFloat(), Color.argb(90, 0, 0, 0)); boya.color = Color.WHITE; c.drawCircle(x, cy, r, boya); boya.clearShadowLayer()
+            if (v != 0) { boya.color = (if (v < 0) yesil else macenta).let { Color.argb(((abs(v) / 60f).coerceAtMost(1f) * 255).toInt(), Color.red(it), Color.green(it), Color.blue(it)) }; c.drawCircle(x, cy, r - dp(7f), boya) }
+        }
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            if (algila.onTouchEvent(e)) return true
+            parent?.requestDisallowInterceptTouchEvent(true)
+            val r = dp(12f).toFloat(); val t = ((e.x - r) / (width - 2 * r)).coerceIn(0f, 1f) * 200 - 100
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> ayarla(if (abs(t) < 3) 0 else (Math.round(t / 2) * 2))
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> ayarKaydet()
+            }
+            return true
+        }
+    }
+
     private fun cetvelAc(c: Cetvel) {
         if (grupIci == null) aktifGrup?.let { return grupAc(it) }
         if (mod == KMod.PRO) return proOzellestir() // PRO MODLAR'da pozlama, beyaz denge ve odak modun ayarlarında
@@ -885,8 +938,9 @@ class KameraActivity : Activity() {
                     not("Sıcaklık (Kelvin)")
                     cubuk((BeyazDenge.EN_COK - BeyazDenge.EN_AZ) / BeyazDenge.ADIM, ((ayar.kelvin ?: k.mevcutKelvin()) - BeyazDenge.EN_AZ) / BeyazDenge.ADIM) { v ->
                         ayar.kelvin = BeyazDenge.EN_AZ + v * BeyazDenge.ADIM; k.ayarDegisti(); bdYaz() }
-                    not("Ton: sola yeşil · sağa macenta")
-                    cubuk(200, ayar.ton + 100) { v -> if (ayar.kelvin == null) ayar.kelvin = k.mevcutKelvin(); ayar.ton = v - 100; k.ayarDegisti(); bdYaz() }
+                    p.addView(tonSatiri { v -> if (ayar.kelvin == null) ayar.kelvin = k.mevcutKelvin(); ayar.ton = v; k.ayarDegisti(); bdYaz() },
+                        LinearLayout.LayoutParams(-1, dp(44f)).apply { topMargin = dp(8f) })
+                    not("Ton: sola yeşil, sağa macenta (floresan ve LED'deki yeşili giderir). Ortaya çift dokun: sıfır.")
                 }
             }
             Cetvel.ODAK -> {
@@ -1149,7 +1203,7 @@ class KameraActivity : Activity() {
             anahtar("Siyah-beyaz", m.monokrom) { m.monokrom = it; kaydet() }
         }
         val lutlar = lutKlasoru.listFiles { f -> f.name.endsWith(".cube", true) }?.sortedBy { it.name.lowercase() }.orEmpty()
-        grup("LUT", "Görünüm (LUT) yalnız ekrana uygulanır, kayda girmez. 3D .cube dosyası ekle; kitaplık Monitör ile ortak. Android'de Log yok; HDR ile çekip kurguda renklendir.") {
+        grup("LUT", "LUT fotoğrafa ve videoya da işlenir (HDR video hariç). 3D .cube dosyası ekle; kitaplık Monitör ile ortak. Android'de Log yok; HDR ile çekip kurguda renklendir.") {
             secenek("Kapalı", kullaniciLut == null) { lutUygula(null) }
             lutlar.forEach { f -> secenek(f.name.removeSuffix(".cube"), kullaniciLutAdi == f.name) { lutUygula(f.name) } }
             deger("+ Ekle (.cube)", renk = AyarEkrani.MAVI) { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }, 7) }
@@ -1786,14 +1840,13 @@ class KameraActivity : Activity() {
     private var kullaniciLut: Lut? = null; private var kullaniciLutAdi: String? = null
     /** Ekrandaki tek LUT (kullanıcı LUT'u + stil); null = renk değişmiyor */
     @Volatile private var renkLut: Lut? = null
-    /** Kayda işlenen: yalnız stil (Fatih 29 Ekim: "Monitör değil burası", seçilen stil doğrudan çekime girer; Göstergeler'deki LUT yalnız ekranda) */
-    @Volatile private var kayitLut: Lut? = null
+    /** Kayda işlenen = ekrandaki (Fatih 29 Ekim: "Monitör değil burası"; stil ve LUT doğrudan çekime girer) */
+    private val kayitLut: Lut? get() = renkLut
 
     private fun renkGuncelle() {
         val l = if (stil.etkin) stil.lut(kullaniciLut) else kullaniciLut
         renkLut = l
         if (l != null) monitor.lutYukle(l) else { monitor.ayarlar.lutAcik = false; monitor.requestRender() }
-        kayitLut = if (stil.etkin) (if (kullaniciLut == null) l else stil.lut(null)) else null
         kaynak?.jpegIsle = if (kayitLut != null) { b -> kayitLut?.let { StilGom.foto(b, it) } ?: b } else null
     }
     private fun stilKaydet() { tercih.edit().putString("stil", stil.json()).apply(); renkGuncelle() }
@@ -1827,6 +1880,7 @@ class KameraActivity : Activity() {
         }
         hazirSirasi("TEMEL", HazirStil.TEMEL)
         hazirSirasi("FİLM REÇETELERİ", HazirStil.RECETELER)
+        lutSirasi(p, yenile)
         val sira = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val solKap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         solKap.addView(StilPad(), LinearLayout.LayoutParams(dp(140f), dp(140f)))
@@ -1855,8 +1909,43 @@ class KameraActivity : Activity() {
         sira.addView(sag, LinearLayout.LayoutParams(0, -2, 1f))
         p.addView(sira)
         p.addView(TextView(this).apply { textSize = 12f; setTextColor(GRI); setPadding(0, dp(8f), 0, 0)
-            text = if (!stil.etkin) "Stil seçince fotoğraf ve video o renkle kaydedilir."
-                else "Fotoğraf ve video bu renkle kaydedilir; video kayıttan sonra işlenir." + (if (ayar.renk == 1) " HDR videoya işlenmez (yalnız SDR)." else "") })
+            text = "Fotoğraf ve video bu renkle kaydedilir." + (if (ayar.renk == 1) " HDR videoya işlenmez (yalnız SDR)." else "") })
+    }
+
+    /** Dosya seçiciden dönünce açık Stiller panosu yenilensin */
+    private var stilYenile: (() -> Unit)? = null
+
+    /** Kendi LUT'ların (.cube): seçili olan stilin altına taban olarak girer; "+" dosya seçiciyi açar, basılı tutunca Sil */
+    private fun lutSirasi(p: LinearLayout, yenile: () -> Unit) {
+        stilYenile = yenile
+        p.addView(TextView(this).apply { text = "LUT'LARIN"; textSize = 11f; letterSpacing = 0.05f; typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(Color.argb(140, 255, 255, 255)); setPadding(0, 0, 0, dp(6f)) })
+        val sira = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun kutu(ad: String, secili: Boolean, zemin: android.graphics.drawable.Drawable, ic: View) = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; contentDescription = ad
+            addView(FrameLayout(this@KameraActivity).apply { background = zemin; addView(ic, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER)) }, LinearLayout.LayoutParams(dp(56f), dp(44f)))
+            addView(etiket(ad, 11f, if (secili) VURGU else Color.argb(217, 255, 255, 255)).apply { setPadding(0, dp(4f), 0, 0); ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(-1, -2))
+        }
+        val lutlar = lutKlasoru.listFiles { f -> f.name.endsWith(".cube", true) }?.sortedBy { it.name.lowercase() }.orEmpty()
+        lutlar.forEach { f ->
+            val secili = kullaniciLutAdi == f.name
+            sira.addView(kutu(f.name.removeSuffix(".cube"), secili,
+                GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(82, 82, 82), Color.rgb(31, 31, 31))).apply { cornerRadius = dp(10f).toFloat(); if (secili) setStroke(dp(1.5f), VURGU) },
+                etiket("LUT", 10f, Color.argb(179, 255, 255, 255)).apply { letterSpacing = 0.1f; typeface = android.graphics.Typeface.DEFAULT_BOLD }).apply {
+                setOnClickListener { lutUygula(if (secili) null else f.name); yenile() }
+                setOnLongClickListener {
+                    performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    AlertDialog.Builder(this@KameraActivity).setTitle(f.name.removeSuffix(".cube")).setMessage("Bu LUT kitaplıktan silinsin mi? (Monitör'le ortak)")
+                        .setPositiveButton("Sil") { _, _ -> if (secili) lutUygula(null); f.delete(); yenile() }.setNegativeButton("Vazgeç", null).show()
+                    true }
+            }, LinearLayout.LayoutParams(dp(60f), -2).apply { marginEnd = dp(8f) })
+        }
+        sira.addView(kutu("Ekle", false, GradientDrawable().apply { cornerRadius = dp(10f).toFloat(); setColor(Color.argb(15, 255, 255, 255))
+            setStroke(dp(1f), Color.argb(89, 255, 255, 255), dp(3f).toFloat(), dp(3f).toFloat()) },
+            etiket("+", 18f, Color.argb(217, 255, 255, 255))).apply { contentDescription = "LUT ekle"; tag = "lutEkle"
+            setOnClickListener { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }, 7) } },
+            LinearLayout.LayoutParams(dp(60f), -2))
+        p.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(sira) }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
     }
 
     /** Stil pedi: dokun ya da sürükle (x soğuk ↔ sıcak, y ton); çift dokunuş ortaya döner */
@@ -2343,7 +2432,7 @@ class KameraActivity : Activity() {
             val ad = (contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: "lut-${System.currentTimeMillis()}").let { if (it.endsWith(".cube", true)) it else "$it.cube" }
             val hedef = java.io.File(lutKlasoru, ad.replace(Regex("[^\\wçğıöşüÇĞİÖŞÜ .()-]"), "_"))
             contentResolver.openInputStream(uri)!!.use { g -> hedef.outputStream().use { g.copyTo(it) } }
-            lutUygula(hedef.name); tost("LUT kitaplığa eklendi"); ayarEkrani?.yenile()
+            lutUygula(hedef.name); tost("LUT kitaplığa eklendi"); ayarEkrani?.yenile(); if (acilir?.findViewWithTag<View>("lutEkle") != null) stilYenile?.invoke()
         } catch (e: Exception) { tost("LUT okunamadı: ${e.message}") }
     }
 
