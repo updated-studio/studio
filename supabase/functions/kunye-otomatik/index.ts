@@ -1,4 +1,4 @@
-// Künye otomasyonu (25 Ekim 2026, kullanıcı: "kaynaklarından çekeceğimiz bir otomasyon"): her ürün için yapay zekâ Google aramasıyla
+// Künye otomasyonu (25 Ekim 2026, kullanıcı: "kaynaklarından çekeceğimiz bir otomasyon"; 29 Ekim: resmî sayfadan sonra B&H Photo): her ürün için yapay zekâ Google aramasıyla
 // resmî üretici sayfasını (yoksa güvenilir kaynağı) bulur, ürünün özellik şablonundaki değerleri kaynak bağlantısı ve kanıtıyla önerir.
 // Öneriler public.kunye_oneriler'e yazılır (göç 0036); editör Stüdyo → Site → Künye onayı'ndan onaylayınca panele yazılır.
 // POST { adet?: 1-3, urun_id?: number } · Giriş: Stüdyo oturumu. Ürünler panelin herkese açık API'sinden okunur.
@@ -23,7 +23,7 @@ type Urun = { id: number; name: string; brand: string; type: string; specs?: Spe
 
 const SISTEM = `Sen bir teknoloji sitesinin ürün veritabanı editörüsün. Görevin bir ürünün teknik özelliklerini İNTERNETTE ARAYARAK bulmak.
 KURALLAR:
-- Önce üreticinin resmî ürün/teknik özellik sayfasını ara ve kullan. Orada yoksa güvenilir bir kaynak (DPReview, GSMArena, B&H, üreticinin basın bülteni) kullan.
+- Önce üreticinin resmî ürün/teknik özellik sayfasını ara ve kullan. Orada yoksa ya da eksikse İKİNCİ KAYNAK B&H Photo'dur (bhphotovideo.com, ürünün "Specs" sekmesi). Orada da yoksa güvenilir bir kaynak (DPReview, GSMArena, üreticinin basın bülteni) kullan.
 - Yalnız kaynakta açıkça yazan bilgiyi ver. Tahmin etme; emin değilsen o özelliği listeye koyma. Söylenti/sızıntı kullanma.
 - "value": kısa Türkçe değer, birimiyle; ondalıkta virgül (ör. "24,2 MP", "658 g (pil ve kartla)", "4K 60p (10-bit)").
 - "num": karşılaştırma için tek sayı, özelliğin birimi cinsinden (ör. 658), sayısal değilse null.
