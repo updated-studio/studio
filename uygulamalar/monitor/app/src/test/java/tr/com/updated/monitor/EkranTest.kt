@@ -60,8 +60,13 @@ class EkranTest {
             KameraActivity.girisSoruldu = true
             Robolectric.buildActivity(KameraActivity::class.java).setup().use { c ->
                 val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-$ad")
-                a.window.decorView.findViewWithText("Kontroller")?.performClick(); kaydet(a, "kamera-grup-pozlama-$ad")
-                for (g in listOf("Kayıt", "Renk", "Ses", "Göstergeler")) { a.window.decorView.findViewWithText(g)?.performClick(); kaydet(a, "kamera-grup-${g.lowercase()}-$ad") }
+                a.window.decorView.findViewWithText("Kontroller")?.performClick(); kaydet(a, "kamera-denetimler-$ad")
+                a.window.decorView.findViewWithText("Düzenle")?.performClick(); kaydet(a, "kamera-duzenle-$ad")
+                a.window.decorView.findViewWithText("Bitti")?.performClick()
+                a.window.decorView.findViewWithText("Kontroller")?.performClick()
+                a.window.decorView.findViewWithText("Stiller")?.performClick(); kaydet(a, "kamera-stil-$ad")
+                a.window.decorView.findViewWithText("Kontroller")?.performClick()
+                a.window.decorView.findViewWithText("Kontroller")?.performClick()
                 a.window.decorView.findViewWithText("Kılavuz")?.performClick(); kaydet(a, "kamera-kilavuz-$ad")
                 a.window.decorView.findViewWithText("Biçim")?.performClick(); kaydet(a, "kamera-bicim-$ad")
                 a.window.decorView.findViewWithText("Kapat")?.performClick()
@@ -137,6 +142,7 @@ class EkranTest {
 }
 
 private fun View.findViewWithText(t: String): View? {
+    if (visibility != View.VISIBLE) return null
     if (contentDescription?.toString() == t) return this
     if (this is android.view.ViewGroup) for (k in 0 until childCount) getChildAt(k).findViewWithText(t)?.let { return it }
     return null
