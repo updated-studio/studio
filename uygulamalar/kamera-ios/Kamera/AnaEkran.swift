@@ -228,9 +228,11 @@ struct AnaEkran: View {
         GeometryReader { tam in
             let alan = AnaEkran.doldurAlan(oran: kamera.goruntuOrani, boyut: tam.size)
             ZStack {
-                Onizleme(oturum: kamera.oturum, yonu: arayuz) { nokta in
+                Onizleme(oturum: kamera.oturum, yonu: arayuz) { nokta, ekran in
                     panel = nil
-                    kamera.odakla(nokta)
+                    // AI Kadraj açıkken dokunulan yerdeki konu seçilir; AF-AE onu izler. Konu yoksa düz odak
+                    let kare = CGPoint(x: (ekran.x * tam.size.width - alan.minX) / max(alan.width, 1), y: (ekran.y * tam.size.height - alan.minY) / max(alan.height, 1))
+                    if kamera.asistanAcik { kamera.konuSec(kare, cihaz: nokta) } else { kamera.odakla(nokta) }
                 }
                 .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in kamera.odakSerbest() })
                 if kamera.gostergeGorunur {
@@ -244,7 +246,7 @@ struct AnaEkran: View {
                         .allowsHitTesting(false)
                 }
                 KompozisyonKatman(tur: kamera.kompTur, yon: kamera.kompYon, alan: alan, asistan: kamera.asistanAcik, konu: kamera.asistanAcik ? kamera.konu : nil,
-                                  konuAdi: kamera.konuAdi, analiz: kamera.analiz, egim: kamera.egim, egimTaban: kamera.egimTaban)
+                                  konuAdi: kamera.konuAdi, konuSecili: kamera.konuSecili, analiz: kamera.analiz, egim: kamera.egim, egimTaban: kamera.egimTaban)
                 if let i = kamera.ipucu {
                     Text(i)
                         .font(.subheadline.weight(.bold))

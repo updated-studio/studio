@@ -117,6 +117,8 @@ struct KompozisyonKatman: View {
     var asistan = false
     var konu: CGRect?
     var konuAdi = ""
+    /// Kullanıcı konuyu seçti: AF-AE onu izliyor (sarı kutu)
+    var konuSecili = false
     var analiz: AnalizSonuc?
     var ipucu: String?
     /// derece; nil = terazi kapalı. Çizginin ekrandaki açısı = taban + eğim
@@ -208,7 +210,17 @@ struct KompozisyonKatman: View {
         if asistan, let k = konu, let h = Kompozisyon.hedef(tur, yon: yon, oran: oran, konu: k, analiz: analiz) {
             let renk = h.tamam ? Self.yesil : (h.hizalama > 0.6 ? Self.sari : .white)
             let kutu = CGRect(origin: P(k.minX, k.minY), size: CGSize(width: k.width * r.width, height: k.height * r.height))
-            g.stroke(Path(kutu), with: .color(renk), lineWidth: 1.5)
+            if konuSecili {
+                // Seçili konu: köşe çentikleri (stüdyo kamerası izleme kutusu gibi)
+                let u = min(kutu.width, kutu.height) * 0.22
+                var c = Path()
+                for (x, y, sx, sy) in [(kutu.minX, kutu.minY, 1.0, 1.0), (kutu.maxX, kutu.minY, -1.0, 1.0), (kutu.minX, kutu.maxY, 1.0, -1.0), (kutu.maxX, kutu.maxY, -1.0, -1.0)] {
+                    c.move(to: CGPoint(x: x, y: y + sy * u)); c.addLine(to: CGPoint(x: x, y: y)); c.addLine(to: CGPoint(x: x + sx * u, y: y))
+                }
+                g.stroke(c, with: .color(Tema.sari), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+            } else {
+                g.stroke(Path(kutu), with: .color(renk), lineWidth: 1.5)
+            }
             let hp = P(h.nokta.x, h.nokta.y)
             if !h.tamam {
                 let sp = P(k.midX, k.midY)
@@ -221,7 +233,8 @@ struct KompozisyonKatman: View {
             g.stroke(Path(ellipseIn: CGRect(x: hp.x - 8, y: hp.y - 8, width: 16, height: 16)), with: .color(renk), lineWidth: 2)
             ibre(&g, r, h.hizalama, h.tamam)
             if !konuAdi.isEmpty {
-                g.draw(Text(konuAdi).font(.caption.weight(.bold)).foregroundColor(.white), at: CGPoint(x: kutu.minX, y: kutu.minY - 4), anchor: .bottomLeading)
+                g.draw(Text(konuSecili ? "\(konuAdi) · AF" : konuAdi).font(.caption.weight(.bold)).foregroundColor(konuSecili ? Tema.sari : .white),
+                       at: CGPoint(x: kutu.minX, y: kutu.minY - 4), anchor: .bottomLeading)
             }
         }
         // Terazi: ufuk çizgisi, düzse yeşil

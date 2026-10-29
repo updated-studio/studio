@@ -95,7 +95,7 @@ struct WifiKameraEkran: View {
     var body: some View {
         ZStack {
             Tema.zemin.ignoresSafeArea()
-            Onizleme(oturum: k.oturum) { _ in }
+            Onizleme(oturum: k.oturum) { _, _ in }
                 .ignoresSafeArea()
             if k.canlida {
                 Rectangle().strokeBorder(Color.red, lineWidth: 6).ignoresSafeArea().allowsHitTesting(false)

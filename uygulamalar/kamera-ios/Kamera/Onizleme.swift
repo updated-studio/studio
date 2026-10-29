@@ -6,15 +6,18 @@ struct Onizleme: UIViewRepresentable {
     let oturum: AVCaptureSession
     /// Arayüz yönü (verilmezse pencereden okunur); döndürünce önizleme bağlantısı buna göre çevrilir
     var yonu: UIInterfaceOrientation? = nil
-    var dokun: (CGPoint) -> Void
+    /// (cihaz noktası, görünümde 0–1 nokta)
+    var dokun: (CGPoint, CGPoint) -> Void
 
     final class Gorunum: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var katman: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-        var dokun: ((CGPoint) -> Void)?
+        var dokun: ((CGPoint, CGPoint) -> Void)?
 
         @objc func dokunuldu(_ g: UITapGestureRecognizer) {
-            dokun?(katman.captureDevicePointConverted(fromLayerPoint: g.location(in: self)))
+            let p = g.location(in: self)
+            let n = CGPoint(x: bounds.width > 0 ? p.x / bounds.width : 0.5, y: bounds.height > 0 ? p.y / bounds.height : 0.5)
+            dokun?(katman.captureDevicePointConverted(fromLayerPoint: p), n)
         }
 
         override func layoutSubviews() {

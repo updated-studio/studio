@@ -161,7 +161,7 @@ struct KameraAyarlar: View {
             Section {
                 Toggle("AI Kadraj", isOn: $kamera.asistanAcik)
                 if kamera.asistanAcik { Toggle("Sahne önerileri (gece, portre…)", isOn: $kamera.sahneOto) }
-            } footer: { Text("Konuyu bulur, yön tarif eder; sahneyi birkaç saniye inceleyip tek öneri getirir, dokununca uygulanır. Kadraj iyiyse çizgiler yeşil olur. Kapalıyken ekranda hiçbiri görünmez.") }
+            } footer: { Text("Konuyu bulur, yön tarif eder; sahneyi birkaç saniye inceleyip tek öneri getirir, dokununca uygulanır. Kadraj iyiyse çizgiler yeşil olur. Ekranda konuya dokununca o konu seçilir, odak ve pozlama onu izler; uzun basınca bırakır. Kapalıyken ekranda hiçbiri görünmez.") }
         }
         .navigationTitle("Göstergeler")
     }

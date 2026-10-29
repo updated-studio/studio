@@ -136,6 +136,10 @@ final class Kamera: NSObject, ObservableObject {
     @Published var sahneOto = Kamera.ud.object(forKey: "k.sahneOto") as? Bool ?? true { didSet { Kamera.ud.set(sahneOto, forKey: "k.sahneOto"); yardimcilariAyarla() } }
     @Published var konu: CGRect?
     @Published var konuAdi = ""
+    /// Kullanıcı dokunup konuyu seçti (Fatih 29 Ekim): AF-AE konuyu izler; uzun basınca ya da konu kaybolunca düşer
+    @Published var konuSecili = false
+    private var sonKonuOdak = Date.distantPast
+    private var sonKonuNokta = CGPoint(x: -1, y: -1)
     @Published var analiz: AnalizSonuc?
     @Published var ipucu: String?
     @Published var kompOneri: (tur: KompTur, yon: Int)?
@@ -447,6 +451,7 @@ final class Kamera: NSObject, ObservableObject {
         mod = yeni
         Kamera.ud.set(yeni.rawValue, forKey: "k.mod")
         sahneOnerisi = nil
+        if konuSecili { konuSecili = false; asistan.hedef = nil }
         if yeni == .pro && !onde { mercekUygula() }
         if secilenEnst != nil { secilenEnst = nil }
         if yeni.foto, flas == .fener { flas = .kapali }
@@ -583,9 +588,57 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
+    /// AI Kadraj açıkken dokunuş: o noktadaki konu seçilir, AF-AE onu izler. Konu bulunamazsa düz odak
+    func konuSec(_ kare: CGPoint, cihaz: CGPoint) {
+        guard asistanAcik, (0...1).contains(kare.x), (0...1).contains(kare.y) else { odakla(cihaz); return }
+        asistan.hedef = kare
+        asistan.konuKayboldu = { [weak self] in
+            guard let self, self.konuSecili else { return }
+            self.konuSecili = false
+            self.bildirim = "Konu kayboldu; otomatik odak"
+        }
+        konuSecili = true
+        sonKonuNokta = CGPoint(x: -1, y: -1)
+        odakla(cihaz)
+        // 1,5 sn içinde konu bulunmazsa seçim düşer (düz odak kalır)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, self.konuSecili, self.konu == nil else { return }
+            self.asistan.hedef = nil; self.konuSecili = false
+            self.bildirim = "Orada konu bulunamadı"
+        }
+    }
+
+    /// Kare koordinatı (ekran yönünde, 0–1, y aşağı) → cihaz odak noktası (sensör yönü)
+    func cihazNoktasi(_ p: CGPoint) -> CGPoint {
+        let fx = onde ? 1 - p.x : p.x, fy = p.y
+        switch arayuzYonu {
+        case .landscapeRight: return CGPoint(x: fx, y: fy)
+        case .landscapeLeft: return CGPoint(x: 1 - fx, y: 1 - fy)
+        case .portraitUpsideDown: return CGPoint(x: 1 - fy, y: fx)
+        default: return CGPoint(x: fy, y: 1 - fx)
+        }
+    }
+
+    /// Seçili konu hareket ettikçe odak ve pozlama noktası onu izler (0,3 sn'de bir, konu yerinden oynadıysa)
+    private func konuyuIzle(_ k: CGRect) {
+        let m = CGPoint(x: k.midX, y: k.midY)
+        guard Date().timeIntervalSince(sonKonuOdak) > 0.3, hypot(m.x - sonKonuNokta.x, m.y - sonKonuNokta.y) > 0.02 else { return }
+        sonKonuOdak = Date(); sonKonuNokta = m
+        let nokta = cihazNoktasi(m)
+        kuyruk.async {
+            guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
+            let pro = self.mod == .pro
+            let elleOdak = pro ? (self.proAyar.odak == .sonsuz || self.proAyar.odak == .iki) : self.odakKonum != nil
+            if !elleOdak, d.isFocusPointOfInterestSupported { d.focusPointOfInterest = nokta; d.focusMode = .continuousAutoFocus }
+            if !pro, self.secilenIso == nil, self.secilenEnst == nil, d.isExposurePointOfInterestSupported { d.exposurePointOfInterest = nokta; d.exposureMode = .continuousAutoExposure }
+            d.unlockForConfiguration()
+        }
+    }
+
     /// Uzun basınca: odak ve pozlama yeniden otomatik
     func odakSerbest() {
         odakKonum = nil
+        if konuSecili { konuSecili = false; asistan.hedef = nil }
         kuyruk.async {
             guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
             if d.isFocusPointOfInterestSupported { d.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5) }
@@ -815,7 +868,7 @@ final class Kamera: NSObject, ObservableObject {
         asistan.konuSonuc = { [weak self] k in self?.konuGeldi(k) }
         asistan.analizSonuc = { [weak self] a in self?.analiz = a; self?.ipucuGuncelle(); self?.aiDusun() }
         asistan.renkSonuc = { [weak self] r in self?.renkOrt = r }
-        if !asistanAcik { ipucu = nil; kompOneri = nil; sahneOnerisi = nil; aiAday = nil; sahneAday = nil; aiDusunuyor = false; konu = nil; konuAdi = ""; analiz = nil }
+        if !asistanAcik { ipucu = nil; kompOneri = nil; sahneOnerisi = nil; aiAday = nil; sahneAday = nil; aiDusunuyor = false; konu = nil; konuAdi = ""; analiz = nil; konuSecili = false; asistan.hedef = nil }
         if !teraziAcik { egim = nil }
         if (teraziAcik || sahneOto && asistanAcik), hareket.isDeviceMotionAvailable {
             if !hareket.isDeviceMotionActive {
@@ -854,6 +907,7 @@ final class Kamera: NSObject, ObservableObject {
         konu = k?.kutu
         konuAdi = k?.ad ?? ""
         sonYuz = k?.yuz
+        if let k, k.secili, konuSecili { konuyuIzle(k.kutu) }
         aiDusun()
         ipucuGuncelle()
     }
@@ -949,7 +1003,7 @@ extension Kamera: AVCaptureVideoDataOutputSampleBufferDelegate {
 extension Kamera: AVCaptureMetadataOutputObjectsDelegate {
     /// PORTRE: en büyük yüze odak ve pozlama (kuyrukta, saniyede en çok iki kez)
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        guard mod == .portre, Date().timeIntervalSince(sonYuzOdak) > 0.5,
+        guard mod == .portre, !konuSecili, Date().timeIntervalSince(sonYuzOdak) > 0.5,
               let y = metadataObjects.filter({ $0.type == .face }).max(by: { $0.bounds.width * $0.bounds.height < $1.bounds.width * $1.bounds.height }),
               let d = cihaz, (try? d.lockForConfiguration()) != nil else { return }
         sonYuzOdak = Date()

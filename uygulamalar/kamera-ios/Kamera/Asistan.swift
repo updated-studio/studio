@@ -6,7 +6,13 @@ import Vision
 /// konu kutusu (0–1, y aşağı) geri verilir. Telefonun içinde çalışır (Apple Vision), saniyede ~5 kez. Android'de ML Kit.
 /// Aynı karenin küçük kopyasıyla kompozisyon analizi (Analiz.swift) ve sahne önerisi için renk ortalaması da burada.
 final class Asistan {
-    struct Konu { var kutu: CGRect; var ad: String; var yuz: YuzBilgi? }
+    struct Konu { var kutu: CGRect; var ad: String; var yuz: YuzBilgi?; var secili = false }
+
+    /// Kullanıcının seçtiği konu (karede 0–1, y aşağı): bulunan adaylardan bu noktayı içeren ya da en yakın olan izlenir,
+    /// nokta her karede konunun ortasına taşınır. ~2,5 sn bulunamazsa seçim düşer (`konuKayboldu`).
+    var hedef: CGPoint? { didSet { kayipSecili = 0 } }
+    var konuKayboldu: () -> Void = {}
+    private var kayipSecili = 0
 
     var konuAcik = false
     var analizAcik = false
@@ -48,6 +54,7 @@ final class Asistan {
     }
 
     private func konuBul(_ pb: CVPixelBuffer) {
+        if let h = hedef { konuIzle(pb, hedef: h); return }
         let yuzIstek = VNDetectFaceLandmarksRequest()
         let hayvanIstek = VNRecognizeAnimalsRequest()
         let insanIstek = VNDetectHumanRectanglesRequest()
@@ -78,6 +85,47 @@ final class Asistan {
             self.mesgul = false
             // Konu birkaç kare kaybolunca kutu silinir (titreme olmasın)
             if let b = bulunan { self.kayip = 0; self.konuSonuc(b) } else { self.kayip += 1; if self.kayip >= 4 { self.konuSonuc(nil) } }
+        }
+    }
+
+    /// Seçili konu: tüm algılayıcılar birlikte çalışır, hedefe en yakın aday seçilir
+    private func konuIzle(_ pb: CVPixelBuffer, hedef h: CGPoint) {
+        let yuzIstek = VNDetectFaceLandmarksRequest(), hayvanIstek = VNRecognizeAnimalsRequest()
+        let insanIstek = VNDetectHumanRectanglesRequest(), belirgin = VNGenerateObjectnessBasedSaliencyImageRequest()
+        let el = VNImageRequestHandler(cvPixelBuffer: pb, orientation: .up)
+        try? el.perform([yuzIstek, hayvanIstek, insanIstek, belirgin])
+        var adaylar: [Konu] = []
+        for f in yuzIstek.results ?? [] {
+            var gozY: CGFloat?
+            let gozler = [f.landmarks?.leftEye, f.landmarks?.rightEye].compactMap { $0 }
+            if !gozler.isEmpty {
+                let ort = gozler.map { g in g.normalizedPoints.map { CGFloat($0.y) }.reduce(0, +) / CGFloat(max(1, g.pointCount)) }.reduce(0, +) / CGFloat(gozler.count)
+                gozY = 1 - (f.boundingBox.minY + ort * f.boundingBox.height)
+            }
+            adaylar.append(Konu(kutu: Asistan.ustten(f.boundingBox), ad: "Yüz", yuz: YuzBilgi(gozY: gozY, donus: CGFloat(f.yaw?.doubleValue ?? 0) * 180 / .pi), secili: true))
+        }
+        for a in hayvanIstek.results ?? [] {
+            let ad = a.labels.first?.identifier == VNAnimalIdentifier.cat.rawValue ? "Kedi" : (a.labels.first?.identifier == VNAnimalIdentifier.dog.rawValue ? "Köpek" : "Hayvan")
+            adaylar.append(Konu(kutu: Asistan.ustten(a.boundingBox), ad: ad, yuz: nil, secili: true))
+        }
+        for i in insanIstek.results ?? [] { adaylar.append(Konu(kutu: Asistan.ustten(i.boundingBox), ad: "İnsan", yuz: nil, secili: true)) }
+        for o in belirgin.results?.first?.salientObjects ?? [] where Asistan.alan(o.boundingBox) < 0.7 {
+            adaylar.append(Konu(kutu: Asistan.ustten(o.boundingBox), ad: "Konu", yuz: nil, secili: true))
+        }
+        // Hedefi içeren en küçük kutu (yüz, insanın içinde: yüz kazanır); yoksa ortası 0,2'den yakın olan
+        let iceren = adaylar.filter { $0.kutu.insetBy(dx: -0.02, dy: -0.02).contains(h) }.min { Asistan.alan($0.kutu) < Asistan.alan($1.kutu) }
+        let yakin = adaylar.min { hypot($0.kutu.midX - h.x, $0.kutu.midY - h.y) < hypot($1.kutu.midX - h.x, $1.kutu.midY - h.y) }
+        let secim = iceren ?? yakin.flatMap { hypot($0.kutu.midX - h.x, $0.kutu.midY - h.y) < 0.2 ? $0 : nil }
+        DispatchQueue.main.async {
+            self.mesgul = false
+            guard self.hedef != nil else { return }
+            if let k = secim {
+                self.hedef = CGPoint(x: k.kutu.midX, y: k.kutu.midY)
+                self.konuSonuc(k)
+            } else {
+                self.kayipSecili += 1
+                if self.kayipSecili >= 12 { self.hedef = nil; self.konuSonuc(nil); self.konuKayboldu() }
+            }
         }
     }
 
