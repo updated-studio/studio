@@ -83,13 +83,13 @@ struct GostergeMenu: View {
             }
             if kamera.gosterge.zebra {
                 HStack(spacing: 6) {
-                    Text("Zebra").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).frame(width: 52, alignment: .leading)
+                    Text("ZEBRA").bolumBasligi().frame(width: 52, alignment: .leading)
                     Secenek(yazi: "%95", alt: "patlama", secili: kamera.gosterge.zebraEsik >= 0.9) { kamera.gosterge.zebraEsik = 0.95 }
                     Secenek(yazi: "%70", alt: "ten", secili: kamera.gosterge.zebraEsik < 0.9) { kamera.gosterge.zebraEsik = 0.70 }
                 }
             }
             HStack(spacing: 6) {
-                Text("LUT").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).frame(width: 52, alignment: .leading)
+                Text("LUT").bolumBasligi().frame(width: 52, alignment: .leading)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         Secenek(yazi: "Kapalı", secili: !kamera.gosterge.lutAcik) { kamera.gosterge.lutAcik = false }

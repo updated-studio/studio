@@ -287,7 +287,7 @@ struct StilPedi: View {
     /// Kendi LUT'ların (.cube): seçili olan stilin altına taban olarak girer; "+" Dosyalar'dan ekler, basılı tutunca siler
     private var lutSirasi: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("LUT'LARIN").font(.system(size: 11, weight: .semibold)).tracking(0.6).foregroundStyle(.white.opacity(0.55))
+            Text("LUT'LARIN").bolumBasligi()
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(lutlar, id: \.self) { ad in
@@ -340,7 +340,7 @@ struct StilPedi: View {
     /// Bir sıra stil kutusu; reçeteye basılı tutunca üst şeride sabitlenir (tek dokunuşla açılır)
     private func sira(_ baslik: String, _ liste: [HazirStil]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(baslik).font(.system(size: 11, weight: .semibold)).tracking(0.6).foregroundStyle(.white.opacity(0.55))
+            Text(baslik).bolumBasligi()
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(liste) { h in

@@ -20,10 +20,11 @@ struct Secenek: View {
                 Text(yazi).font(.subheadline.weight(.semibold))
                 if let alt { Text(alt).font(.system(size: 10, weight: .medium)).opacity(0.7) }
             }
-            .foregroundStyle(secili ? .black : (baz ? Tema.baz : .white))
+            .foregroundStyle(secili ? (baz ? Tema.baz : Tema.sari) : (baz ? Tema.baz : .white.opacity(0.85)))
             .padding(.horizontal, 12)
-            .frame(minHeight: alt == nil ? 36 : 46)
-            .background(RoundedRectangle(cornerRadius: 12).fill(secili ? (baz ? Tema.baz : Tema.sari) : Color.white.opacity(0.1)))
+            .frame(minHeight: alt == nil ? 34 : 44)
+            .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color.white.opacity(secili ? 0.12 : 0.07)))
+            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(secili ? (baz ? Tema.baz : Tema.sari).opacity(0.55) : Tema.hat, lineWidth: 0.5))
         }
     }
 }
@@ -54,20 +55,20 @@ struct Cetvel: View {
 
     private func baslik(_ ad: String, _ simge: String, _ deger: String, oto: Bool?, otoYap: @escaping () -> Void = {}) -> some View {
         HStack {
-            Label(ad, systemImage: simge).font(.subheadline.weight(.semibold))
-            Text(deger).font(Tema.mono).foregroundStyle(Tema.sari).padding(.leading, 6)
+            Label(ad, systemImage: simge).font(.system(size: 13, weight: .semibold))
+            Text(deger).font(Tema.deger).foregroundStyle(oto == true ? Tema.ikincil : Tema.sari).padding(.leading, 6)
             Spacer()
             if let oto {
                 Button("OTO", action: otoYap)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(oto ? .black : .white)
-                    .padding(.horizontal, 14).frame(height: 30)
-                    .background(Capsule().fill(oto ? Tema.sari : Color.white.opacity(0.14)))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(oto ? Tema.sari : .white.opacity(0.85))
+                    .padding(.horizontal, 12).frame(height: 26)
+                    .background(Capsule().fill(Color.white.opacity(oto ? 0.12 : 0.07)).overlay(Capsule().strokeBorder(oto ? Tema.sari.opacity(0.55) : Tema.hat, lineWidth: 0.5)))
             }
         }
     }
 
-    private func not(_ t: String) -> some View { Text(t).font(.caption).foregroundStyle(Tema.metin2) }
+    private func not(_ t: String) -> some View { Text(t).font(.system(size: 11)).foregroundStyle(Tema.ikincil) }
 
     private var poz: some View {
         Group {

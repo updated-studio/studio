@@ -131,13 +131,28 @@ struct KompozisyonKatman: View {
     static let sari = Color(red: 1, green: 196 / 255, blue: 0)
 
     var body: some View {
-        Canvas { c, _ in ciz(&c) }
+        Canvas { c, boyut in ciz(&c, ekran: boyut) }
             .allowsHitTesting(false)
     }
 
-    private func ciz(_ c: inout GraphicsContext) {
+    private func ciz(_ c: inout GraphicsContext, ekran: CGSize) {
         let r = alan
         guard r.width > 0, r.height > 0 else { return }
+        // AI Kadraj açıkken ekranın köşelerinde kadraj çentikleri (stüdyo kamerası gibi); iyi kadrajda yeşil
+        if asistan, !kucuk {
+            let iyiK = konu.flatMap { Kompozisyon.hedef(tur, yon: yon, oran: r.width / r.height, konu: $0, analiz: analiz) }?.tamam == true
+            let dik = ekran.height > ekran.width, u: CGFloat = 16
+            let sol = dik ? 20 : ekran.width * 0.08, sag = dik ? ekran.width - 20 : ekran.width * 0.78
+            let ust = ekran.height * (dik ? 0.19 : 0.18), alt = ekran.height * (dik ? 0.64 : 0.82)
+            if alt - ust > 80 {
+                var p = Path()
+                for (x, y, sx, sy) in [(sol, ust, 1.0, 1.0), (sag, ust, -1.0, 1.0), (sol, alt, 1.0, -1.0), (sag, alt, -1.0, -1.0)] {
+                    p.move(to: CGPoint(x: x, y: y + sy * u)); p.addLine(to: CGPoint(x: x, y: y)); p.addLine(to: CGPoint(x: x + sx * u, y: y))
+                }
+                var g0 = c; g0.addFilter(.shadow(color: .black.opacity(0.5), radius: 1))
+                g0.stroke(p, with: .color(iyiK ? Tema.yesil : Color.white.opacity(0.75)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+            }
+        }
         func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: r.minX + x * r.width, y: r.minY + y * r.height) }
         func yx(_ x: CGFloat) -> CGFloat { yon & 1 == 1 ? 1 - x : x }
         func yy(_ y: CGFloat) -> CGFloat { yon & 2 == 2 ? 1 - y : y }

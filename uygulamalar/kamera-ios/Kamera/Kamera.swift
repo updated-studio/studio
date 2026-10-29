@@ -11,6 +11,9 @@ final class Kamera: NSObject, ObservableObject {
     enum Mod: String, CaseIterable {
         case timelapse = "TIMELAPSE", video = "VİDEO", foto = "FOTO", pro = "PRO MODLAR", portre = "PORTRE"
         var foto: Bool { self == .foto || self == .pro || self == .portre }
+        /// Mod şeridinde görünen ad; yan tutuşta daha kısa (Fatih: "yatayda isimler uzun kalıyor")
+        var ad: String { self == .pro ? "PRO" : rawValue }
+        var kisa: String { self == .timelapse ? "TL" : ad }
     }
     enum Lens { case ultra, genis, tele }
     enum Flas: Int { case kapali, oto, acik, fener }

@@ -124,7 +124,8 @@ struct AnaEkran: View {
             .allowsHitTesting(false)
             VStack(spacing: 0) {
                 ustBant.frame(height: ust)
-                bilgi.padding(.top, 10)
+                bilgi.padding(.top, 6)
+                sabitler.padding(.top, 8)
                 cipler.padding(.top, 8)
                 Spacer(minLength: 0)
                 if let b = kamera.bildirim { bildirimKutusu(b) }
@@ -167,6 +168,7 @@ struct AnaEkran: View {
                         }
                         .overlay(alignment: .top) { bilgi }
                         .padding(.horizontal, 12).padding(.top, 8)
+                        sabitler.padding(.top, 6)
                         cipler.padding(.top, 6)
                         Spacer(minLength: 0)
                         if let b = kamera.bildirim { bildirimKutusu(b) }
@@ -278,10 +280,9 @@ struct AnaEkran: View {
 
     private func bantDugme(_ ad: String, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
-            Text(ad).font(.system(size: 15, weight: .medium))
+            Text(ad).font(.system(size: 14, weight: .semibold))
                 .padding(.horizontal, 14).frame(height: 32)
-                .background(Capsule().fill(AnaEkran.cam))
-                .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .yuzey(16)
         }
     }
 
@@ -307,10 +308,10 @@ struct AnaEkran: View {
         HStack(spacing: 10) {
             kucukDaire("display", renk: AnaEkran.mavi, aciklama: "Monitör (harici kamera)") { monitoreGec() }
             Button { withAnimation(.easeOut(duration: 0.15)) { yardim.toggle() } } label: {
-                Text("?").font(.system(size: 16, weight: .heavy))
-                    .foregroundStyle(yardim ? .black : .white)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(yardim ? Tema.sari : AnaEkran.cam))
+                Text("?").font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(yardim ? Tema.sari : .white)
+                    .frame(width: 34, height: 34)
+                    .yuvarlakYuzey(yardim ? Tema.sari : nil)
             }
             .accessibilityLabel("Açıklamalar")
         }
@@ -318,55 +319,67 @@ struct AnaEkran: View {
 
     private func kucukDaire(_ sistem: String, renk: Color = .white, aciklama: String, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
-            Image(systemName: sistem).font(.system(size: 15, weight: .semibold)).foregroundStyle(renk)
-                .frame(width: 36, height: 36).background(Circle().fill(AnaEkran.cam))
+            Image(systemName: sistem).font(.system(size: 14, weight: .semibold)).foregroundStyle(renk)
+                .frame(width: 34, height: 34).yuvarlakYuzey()
         }
         .accessibilityLabel(aciklama)
         .yardimBalonu(yardim, aciklama)
     }
 
-    /// Görüntünün üstünde ortada (Apple Kamera'daki kısayollar): biçim, sabitlenenler, sabitlenmemiş ama elle değişmiş değerler (sarı).
-    /// Dokun: aç/kapa değişir ya da o ayarın seçimi açılır; uzun bas: düzenleme (⊖ ile kaldır, alttan ekle).
+    /// Görüntünün üstünde ortada tek okuma şeridi: biçim ve elle değişmiş değerler (sarı). Dokun: BİÇİM; uzun bas: sabitlenenleri düzenle.
     private var bilgi: some View {
-        HStack(alignment: .center, spacing: 18) {
+        Group {
             if duzenleme {
-                HStack(spacing: 14) {
+                HStack(spacing: 10) {
                     ForEach(kamera.favoriler) { f in
-                        KisayolOge(f: f, kamera: kamera)
-                            .frame(width: 40, height: 40)
-                            .background(Circle().fill(Color.black.opacity(0.4)))
+                        SabitKapsul(f: f, kamera: kamera)
                             .overlay(alignment: .topLeading) {
                                 Button { withAnimation { kamera.favoriAcKapa(f) } } label: {
-                                    Image(systemName: "minus").font(.system(size: 10, weight: .heavy)).foregroundStyle(.black)
-                                        .frame(width: 18, height: 18).background(Circle().fill(Color(white: 0.85)))
+                                    Image(systemName: "minus").font(.system(size: 9, weight: .heavy)).foregroundStyle(.black)
+                                        .frame(width: 16, height: 16).background(Circle().fill(Color(white: 0.9)))
                                 }
                                 .offset(x: -6, y: -6)
                                 .accessibilityLabel("\(f.ad) kaldır")
                             }
                     }
-                    if kamera.favoriler.isEmpty { Text("Aşağıdan ekle").font(.footnote).foregroundStyle(.white.opacity(0.7)) }
+                    if kamera.favoriler.isEmpty { Text("Aşağıdan ekle").font(.footnote).foregroundStyle(Tema.ikincil) }
                 }
-                .padding(.horizontal, 18).frame(minWidth: 220, minHeight: 52)
-                .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1))
+                .padding(.horizontal, 16).frame(minWidth: 220, minHeight: 44)
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
             } else {
-                Button { panelAc(.bicim) } label: { ikiSatir(bilgiOgeleri.first ?? ("", "", false)) }
-                    .yardimBalonu(yardim, "Biçim")
-                ForEach(kamera.favoriler) { f in
-                    Button { kisayolDokun(f) } label: { KisayolOge(f: f, kamera: kamera) }
-                        .overlay(alignment: .bottom) { if acikSatir == f { Circle().fill(Tema.sari).frame(width: 4, height: 4).offset(y: 7) } }
+                Button { panelAc(.bicim) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        ForEach(Array(bilgiOgeleri.enumerated()), id: \.offset) { _, o in okuma(o) }
+                    }
+                    .padding(.horizontal, 14).frame(height: 36)
+                    .yuzey(12)
                 }
-                ForEach(Array(bilgiOgeleri.dropFirst().enumerated()), id: \.offset) { _, o in ikiSatir(o) }
+                .buttonStyle(.plain)
+                .yardimBalonu(yardim, "Biçim")
             }
         }
-        .shadow(color: .black.opacity(0.5), radius: 3)
         .disabled(kamera.kayitta && !duzenleme)
         .onLongPressGesture(minimumDuration: 0.5) { if !duzenleme && !kamera.kayitta { duzenlemeBasla() } }
     }
 
-    private func ikiSatir(_ o: (String, String, Bool)) -> some View {
-        VStack(spacing: 0) {
-            Text(o.0).font(.system(size: 17, weight: .semibold, design: .rounded))
-            Text(o.1).font(.system(size: 10, weight: .bold, design: .rounded))
+    /// Şeridin altında sabitlenenler: küçük kapsüller; dokununca satır ya da panel açılır
+    @ViewBuilder private var sabitler: some View {
+        if !duzenleme, !kamera.favoriler.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(kamera.favoriler) { f in
+                    Button { kisayolDokun(f) } label: { SabitKapsul(f: f, kamera: kamera) }
+                        .buttonStyle(.plain)
+                        .overlay(alignment: .bottom) { if acikSatir == f { Circle().fill(Tema.sari).frame(width: 3, height: 3).offset(y: 5) } }
+                }
+            }
+            .disabled(kamera.kayitta)
+        }
+    }
+
+    private func okuma(_ o: (String, String, Bool)) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(o.0).font(Tema.deger)
+            if !o.1.isEmpty { Text(o.1.lowercased(with: Locale(identifier: "tr"))).font(Tema.etiket).tracking(0.8).textCase(.uppercase).foregroundStyle(o.2 ? Tema.sari.opacity(0.8) : Tema.ikincil) }
         }
         .foregroundStyle(o.2 ? Tema.sari : .white)
     }
@@ -410,12 +423,18 @@ struct AnaEkran: View {
     private var cipler: some View {
         VStack(spacing: 8) {
             if kamera.kayitta, let bas = kamera.kayitBasi {
-                TimelineView(.periodic(from: bas, by: 1)) { an in
+                // Zaman kodu (stüdyo kamerası gibi): kırmızı nokta + ss:dd:ss:kare
+                TimelineView(.periodic(from: bas, by: kamera.mod == .timelapse ? 1 : 1.0 / 30)) { an in
                     let gecen = an.date.timeIntervalSince(bas)
-                    Text(kamera.mod == .timelapse ? "\(Kamera.saat(gecen))  →  \(Kamera.saat(Double(Timelapse.videoMs(kamera.tlKare)) / 1000))" : Kamera.saat(gecen))
-                        .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
-                        .padding(.horizontal, 10).padding(.vertical, 3)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color(red: 1, green: 59 / 255, blue: 48 / 255)))
+                    let kare = Int((gecen - floor(gecen)) * Double(max(1, kamera.videoFps)))
+                    HStack(spacing: 8) {
+                        Circle().fill(Tema.kirmizi).frame(width: 8, height: 8).shadow(color: Tema.kirmizi.opacity(0.9), radius: 4)
+                        Text(kamera.mod == .timelapse ? "\(Kamera.saat(gecen))  →  \(Kamera.saat(Double(Timelapse.videoMs(kamera.tlKare)) / 1000))"
+                             : Kamera.saat(gecen) + String(format: ":%02d", kare))
+                            .font(Tema.deger).tracking(0.4)
+                    }
+                    .padding(.horizontal, 12).frame(height: 32)
+                    .yuzey(10)
                 }
             }
             if kamera.mod == .pro {
@@ -429,8 +448,8 @@ struct AnaEkran: View {
                 } else if let s = kamera.sahneOnerisi {
                     cip(Text("Sahne: ") + Text(s.ad).bold().foregroundColor(AnaEkran.mavi), simge: "sparkles", renk: AnaEkran.mavi) { kamera.sahneUygula() }
                 } else if kamera.aiDusunuyor {
-                    Label("AI Kadraj inceliyor", systemImage: "sparkles").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
-                        .padding(.horizontal, 10).padding(.vertical, 4).background(Capsule().fill(AnaEkran.cam.opacity(0.6)))
+                    Label("AI Kadraj inceliyor", systemImage: "sparkles").font(.system(size: 11, weight: .semibold)).foregroundStyle(Tema.ikincil)
+                        .padding(.horizontal, 10).frame(height: 26).yuzey(13)
                         .transition(.opacity)
                 }
             }
@@ -439,14 +458,17 @@ struct AnaEkran: View {
 
     private func cip(_ yazi: Text, simge: String, renk: Color, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
-            HStack(spacing: 6) {
-                Image(systemName: simge).foregroundStyle(renk)
+            HStack(spacing: 7) {
+                Image(systemName: simge).font(.system(size: 11, weight: .bold)).foregroundStyle(.black)
+                    .frame(width: 18, height: 18).background(Circle().fill(renk))
                 yazi.lineLimit(1).minimumScaleFactor(0.75)
             }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(Capsule().fill(AnaEkran.cam))
+            .font(.system(size: 13, weight: .semibold))
+            .padding(.leading, 7).padding(.trailing, 12).frame(height: 32)
+            .yuzey(16)
+            .overlay(Capsule().strokeBorder(renk.opacity(0.5), lineWidth: 0.5))
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: mercekler (yalnız telefonun gerçek mercekleri)
@@ -459,12 +481,16 @@ struct AnaEkran: View {
             ForEach(dikey ? Array(d.reversed()) : d, id: \.self) { z in
                 let secili = z == yakin
                 Button { kamera.yakinlastir(z) } label: {
-                    Text(AnaEkran.fmt(z) + (secili ? "×" : ""))
-                        .font(.system(size: secili ? 13 : 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(secili ? Tema.sari : .white)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(secili ? AnaEkran.gri : Color.clear))
-                        .shadow(color: .black.opacity(secili ? 0 : 0.5), radius: 2)
+                    Group {
+                        if secili {
+                            Text(AnaEkran.fmt(z) + "×").font(.system(size: 12.5, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(Tema.sari).frame(width: 40, height: 40).yuvarlakYuzey()
+                        } else {
+                            Text(AnaEkran.fmt(z)).font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(Tema.ikincil).frame(width: 34, height: 34)
+                                .shadow(color: .black.opacity(0.6), radius: 2)
+                        }
+                    }
                 }
                 .accessibilityLabel("Mercek \(AnaEkran.fmt(z))×")
             }
@@ -484,10 +510,11 @@ struct AnaEkran: View {
             ForEach(Timelapse.hizli, id: \.self) { ms in
                 let s = kamera.tlAralik == ms
                 Button { kamera.tlAralik = ms } label: {
-                    Text(Timelapse.aralikYazi(ms)).font(.caption.weight(.bold))
-                        .foregroundStyle(s ? Tema.sari : .white)
-                        .padding(.horizontal, 10).frame(height: 30)
-                        .background(Capsule().fill(s ? AnaEkran.gri : Color.black.opacity(0.4)))
+                    Text(Timelapse.aralikYazi(ms)).font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(s ? Tema.sari : Tema.ikincil)
+                        .padding(.horizontal, 10).frame(height: 26)
+                        .yuzey(13)
+                        .overlay(Capsule().strokeBorder(s ? Tema.sari.opacity(0.5) : .clear, lineWidth: 0.5))
                 }
             }
         }
@@ -509,15 +536,10 @@ struct AnaEkran: View {
     /// Sağda: kontroller (pozlama, beyaz denge, odak, kılavuz…); bir değer elle değişmişse sarı halka
     private var kontrolDugme: some View {
         Button { acikSatir = nil; panelAc(.kontroller) } label: {
-            VStack(spacing: 5) {
-                ForEach(0..<2, id: \.self) { _ in
-                    HStack(spacing: 5) { ForEach(0..<3, id: \.self) { _ in Circle().frame(width: 4.5, height: 4.5) } }
-                }
-            }
-            .foregroundStyle(degisik ? Tema.sari : .white)
-            .frame(width: 44, height: 44)
-            .background(Circle().fill(AnaEkran.gri))
-            .overlay(Circle().stroke(degisik || grupAcik ? Tema.sari : .clear, lineWidth: 1.5).padding(0.5))
+            Image(systemName: "ellipsis").font(.system(size: 17, weight: .medium))
+                .foregroundStyle(degisik ? Tema.sari : .white)
+                .frame(width: 42, height: 42)
+                .yuvarlakYuzey(degisik || grupAcik ? Tema.sari : nil)
         }
         .accessibilityLabel("Kontroller")
         .yardimBalonu(yardim, "Kontroller")
@@ -532,11 +554,10 @@ struct AnaEkran: View {
 
     private func yuvarlak(simge: String, etkin: Bool, aciklama: String, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
-            Image(systemName: simge).font(.system(size: 17, weight: .medium))
+            Image(systemName: simge).font(.system(size: 16, weight: .medium))
                 .foregroundStyle(etkin ? Tema.sari : .white)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(AnaEkran.gri))
-                .overlay(Circle().stroke(etkin ? Tema.sari : .clear, lineWidth: 1.5).padding(0.5))
+                .frame(width: 42, height: 42)
+                .yuvarlakYuzey(etkin ? Tema.sari : nil)
         }
         .accessibilityLabel(aciklama)
         .yardimBalonu(yardim, aciklama)
@@ -549,14 +570,15 @@ struct AnaEkran: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             kamera.deklansor(yon: ekranYonu)
         } label: {
+            let kayit = kamera.proCalisiyor || ((kamera.mod == .video || kamera.mod == .timelapse) && kamera.kayitta)
             ZStack {
-                Circle().stroke(Color(white: 0.8), lineWidth: 3).frame(width: 70, height: 70)
-                if kamera.proCalisiyor || ((kamera.mod == .video || kamera.mod == .timelapse) && kamera.kayitta) {
-                    RoundedRectangle(cornerRadius: 7).fill(Color(red: 1, green: 59 / 255, blue: 48 / 255)).frame(width: 26, height: 26)
+                Circle().stroke(Color.white.opacity(kayit ? 0.5 : 0.9), lineWidth: 2).frame(width: 74, height: 74)
+                if kayit {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Tema.kirmizi).frame(width: 26, height: 26)
                 } else if kamera.mod.foto {
-                    Circle().fill(.white).frame(width: 59, height: 59)
+                    Circle().fill(.white).frame(width: 60, height: 60)
                 } else {
-                    Circle().fill(Color(red: 1, green: 59 / 255, blue: 48 / 255)).frame(width: 59, height: 59)
+                    Circle().fill(Tema.kirmizi).frame(width: 60, height: 60)
                 }
             }
             .animation(.easeOut(duration: 0.15), value: kamera.kayitta)
@@ -592,8 +614,9 @@ struct AnaEkran: View {
             Group {
                 if let r = kamera.sonResim { Image(uiImage: r).resizable().scaledToFill() } else { Color(white: 0.11) }
             }
-            .frame(width: 44, height: 44)
-            .clipShape(Circle())
+            .frame(width: 42, height: 42)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Tema.hat, lineWidth: 0.5))
         }
         .accessibilityLabel("Son çekim")
         .yardimBalonu(yardim, "Son çekim")
@@ -601,8 +624,8 @@ struct AnaEkran: View {
 
     private var cevirDugme: some View {
         Button { kamera.cevir() } label: {
-            Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 17, weight: .medium))
-                .frame(width: 44, height: 44).background(Circle().fill(Color(white: 0.17)))
+            Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 15, weight: .medium))
+                .frame(width: 42, height: 42).yuvarlakYuzey()
         }
         .accessibilityLabel("Ön / arka")
         .yardimBalonu(yardim, "Ön / arka")
@@ -617,14 +640,14 @@ struct AnaEkran: View {
                 duzen {
                     if !dikey { Color.clear.frame(width: max(0, genislik / 2 - 60), height: 1) }
                     ForEach(Kamera.Mod.allCases, id: \.self) { m in
-                        modDugme(m.rawValue, secili: kamera.mod == m, renk: Tema.sari) {
+                        modDugme(dikey ? m.kisa : m.ad, secili: kamera.mod == m, renk: .white) {
                             if m == kamera.mod { if m == .pro { panelAc(.proKartlar) }; return }
                             guard !kamera.kayitta else { kamera.bildirim = "Kayıt sürerken mod değişmez."; return }
                             kamera.modDegistir(m)
                         }
                         .id(m.rawValue)
                     }
-                    modDugme("MONİTÖR", secili: false, renk: AnaEkran.mavi) { monitoreGec() }
+                    modDugme(dikey ? "MON." : "MONİTÖR", secili: false, renk: AnaEkran.mavi) { monitoreGec() }
                     if !dikey { Color.clear.frame(width: max(0, genislik / 2 - 60), height: 1) }
                 }
                 .padding(dikey ? .vertical : .horizontal, 6)
@@ -636,18 +659,17 @@ struct AnaEkran: View {
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.14),
                                          .init(color: .black, location: 0.86), .init(color: .clear, location: 1)],
                                  startPoint: dikey ? .top : .leading, endPoint: dikey ? .bottom : .trailing))
-            .frame(width: dikey ? 104 : nil, height: dikey ? 230 : 42)
-            .background(Capsule().fill(Color(white: 0.11)))
+            .frame(width: dikey ? 76 : nil, height: dikey ? 230 : 42)
             .disabled(kamera.proCalisiyor)
     }
 
     private func modDugme(_ ad: String, secili: Bool, renk: Color, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
-            Text(ad).font(.system(size: 13, weight: .medium)).tracking(0.8).lineLimit(1)
-                .foregroundStyle(secili ? renk : .white.opacity(0.9))
-                .padding(.horizontal, 12).frame(height: 34)
-                .background(Capsule().fill(secili ? Color.black.opacity(0.55) : .clear))
-                .overlay(Capsule().stroke(secili ? Color.white.opacity(0.12) : .clear, lineWidth: 1))
+            Text(ad).font(.system(size: 12, weight: .semibold)).tracking(1.4).lineLimit(1)
+                .foregroundStyle(secili ? renk : (renk == .white ? Tema.ikincil : renk.opacity(0.8)))
+                .padding(.horizontal, 11).frame(height: 30)
+                .background(Capsule().fill(secili ? Color.white.opacity(0.12) : .clear))
+                .shadow(color: .black.opacity(0.5), radius: 2)
         }
     }
 
@@ -656,26 +678,26 @@ struct AnaEkran: View {
     private func panelKabi(_ p: Panel, enYuksek: CGFloat) -> some View {
         VStack(spacing: 8) {
             ZStack {
-                Text(panelBaslik(p)).font(.system(size: 15, weight: .semibold)).tracking(1.2).lineLimit(1)
+                Text(panelBaslik(p)).font(.system(size: 13, weight: .semibold)).tracking(1.6).lineLimit(1)
                 HStack {
                     if p == .kontroller && !duzenleme {
                         Button { duzenlemeBasla() } label: {
-                            Text("Düzenle").font(.system(size: 14, weight: .semibold))
-                                .padding(.horizontal, 14).frame(height: 34).background(Capsule().fill(Color.white.opacity(0.13)))
+                            Text("Düzenle").font(.system(size: 13, weight: .semibold))
+                                .padding(.horizontal, 12).frame(height: 28).background(Capsule().fill(Color.white.opacity(0.1)))
                         }
                         .disabled(kamera.kayitta)
                     } else if !duzenleme {
                         Button { withAnimation(.easeOut(duration: 0.15)) { panel = nil } } label: {
-                            Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
-                                .frame(width: 34, height: 34).background(Circle().fill(Color.white.opacity(0.13)))
+                            Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
+                                .frame(width: 28, height: 28).background(Circle().fill(Color.white.opacity(0.1)))
                         }
                         .accessibilityLabel("Kapat")
                     }
                     Spacer()
                     if p == .kontroller && !duzenleme {
                         Button { withAnimation(.easeOut(duration: 0.15)) { panel = nil } } label: {
-                            Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
-                                .frame(width: 34, height: 34).background(Circle().fill(Color.white.opacity(0.13)))
+                            Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
+                                .frame(width: 28, height: 28).background(Circle().fill(Color.white.opacity(0.1)))
                         }
                         .accessibilityLabel("Kapat")
                     }
@@ -688,14 +710,10 @@ struct AnaEkran: View {
             .frame(maxHeight: enYuksek)
             if case let .grup(g) = p { grupCubugu(g) }
         }
-        .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 38, style: .continuous).fill(.ultraThinMaterial)
-                .overlay(RoundedRectangle(cornerRadius: 38, style: .continuous).fill(Color(white: 0.32).opacity(0.45)))
-                .overlay(RoundedRectangle(cornerRadius: 38, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
-        )
+        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 16)
+        .yuzey(30, dolgu: Color(red: 18 / 255, green: 18 / 255, blue: 20 / 255).opacity(0.72))
         .environment(\.colorScheme, .dark)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .padding(.bottom, 4)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
@@ -759,16 +777,16 @@ struct AnaEkran: View {
                         Image(systemName: g.simge).font(.system(size: 15, weight: .medium))
                         Text(g.ad).font(.system(size: 10, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
                     }
-                    .foregroundStyle(g == secili ? .black : .white.opacity(0.9))
+                    .foregroundStyle(g == secili ? .white : Tema.ikincil)
                     .frame(maxWidth: .infinity).frame(height: 44)
-                    .background(Capsule().fill(g == secili ? Tema.sari : .clear))
+                    .background(Capsule().fill(g == secili ? Color.white.opacity(0.12) : .clear))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(g.ad)
             }
         }
-        .padding(4)
-        .background(Capsule().fill(Color.white.opacity(0.08)))
+        .padding(3)
+        .background(Capsule().fill(Color.white.opacity(0.06)).overlay(Capsule().strokeBorder(Tema.hat, lineWidth: 0.5)))
     }
 
     @ViewBuilder private func grupIcerik(_ g: Grup) -> some View {
@@ -862,9 +880,9 @@ struct AnaEkran: View {
 
     private func kucukGecis(_ simge: String, _ ad: String, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
-            Label(ad, systemImage: simge).font(.system(size: 13, weight: .semibold))
-                .padding(.horizontal, 14).frame(height: 34)
-                .background(Capsule().fill(Color.white.opacity(0.13)))
+            Label(ad, systemImage: simge).font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 12).frame(height: 30)
+                .background(Capsule().fill(Color.white.opacity(0.08)).overlay(Capsule().strokeBorder(Tema.hat, lineWidth: 0.5)))
         }
         .buttonStyle(.plain)
     }
@@ -878,13 +896,13 @@ struct AnaEkran: View {
     private func kontrol(_ simge: String, _ ad: String, _ deger: String, etkin: Bool, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
             VStack(spacing: 5) {
-                Image(systemName: simge).font(.system(size: 17, weight: .medium))
+                Image(systemName: simge).font(.system(size: 16, weight: .medium))
                     .foregroundStyle(etkin ? Tema.sari : .white)
-                    .frame(width: 46, height: 46)
-                    .background(Circle().fill(Color.white.opacity(0.12)))
-                    .overlay(Circle().stroke(etkin ? Tema.sari : .clear, lineWidth: 1.5))
-                Text(ad).font(.system(size: 11, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
-                Text(deger).font(.system(size: 10, weight: .medium)).foregroundStyle(etkin ? Tema.sari : .white.opacity(0.6))
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.white.opacity(0.08)))
+                    .overlay(Circle().strokeBorder(etkin ? Tema.sari.opacity(0.6) : Tema.hat, lineWidth: etkin ? 1 : 0.5))
+                Text(ad).font(.system(size: 11, weight: .medium)).lineLimit(1).minimumScaleFactor(0.7)
+                Text(deger).font(.system(size: 10, weight: .medium)).foregroundStyle(etkin ? Tema.sari : Tema.ikincil)
                     .lineLimit(1).minimumScaleFactor(0.7)
             }
         }
@@ -893,9 +911,9 @@ struct AnaEkran: View {
 
     private func bildirimKutusu(_ yazi: String) -> some View {
         Text(yazi)
-            .font(.footnote.weight(.semibold))
-            .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(Capsule().fill(Tema.yuzey))
+            .font(.system(size: 13, weight: .semibold))
+            .padding(.horizontal, 14).frame(height: 32)
+            .yuzey(16)
             .padding(.bottom, 10)
             .task(id: yazi) {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)

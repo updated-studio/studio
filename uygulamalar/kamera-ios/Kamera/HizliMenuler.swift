@@ -18,7 +18,7 @@ struct KayitHizli: View {
 
     private func sira(_ ad: String, _ secenekler: [(String, Bool, () -> Void)]) -> some View {
         HStack(spacing: 8) {
-            Text(ad).font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).frame(width: 78, alignment: .leading)
+            Text(ad).bolumBasligi().frame(width: 78, alignment: .leading)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(Array(secenekler.enumerated()), id: \.offset) { _, s in Secenek(yazi: s.0, secili: s.1, sec: s.2) }
@@ -40,7 +40,7 @@ struct SesHizli: View {
                 Spacer()
                 if kamera.harici { Text("HARİCİ").font(.caption2.weight(.bold)).foregroundStyle(.black).padding(.horizontal, 6).padding(.vertical, 2).background(Capsule().fill(Tema.sari)) }
             }
-            Text("GİRİŞ").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2)
+            Text("GİRİŞ").bolumBasligi()
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     Secenek(yazi: "Otomatik", secili: kamera.sesGirdi == nil) { kamera.sesGirdi = nil }
@@ -49,7 +49,7 @@ struct SesHizli: View {
                     }
                 }
             }
-            Text("BİÇİM").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2)
+            Text("BİÇİM").bolumBasligi()
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(SesBicimi.allCases) { b in Secenek(yazi: b.ad, secili: kamera.sesBicimi == b) { kamera.sesBicimi = b } }

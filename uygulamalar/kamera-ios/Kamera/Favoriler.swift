@@ -144,6 +144,25 @@ extension Kamera {
     }
 }
 
+/// Okuma şeridinin altındaki sabitlenen ayar: küçük kapsül, değeri (ya da adı) yazar; elle değişmişse sarı
+struct SabitKapsul: View {
+    let f: Favori
+    @ObservedObject var kamera: Kamera
+
+    var body: some View {
+        let d = kamera.favoriDeger(f)
+        let yazi = d.yazi.isEmpty || d.yazi == "Kapalı" ? FavoriSatir.baslik(f).capitalized(with: Locale(identifier: "tr")) : d.yazi
+        HStack(spacing: 4) {
+            if d.yazi.isEmpty { Image(systemName: f.simge).font(.system(size: 10, weight: .semibold)) }
+            Text(yazi).font(.system(size: 11, weight: .semibold).monospacedDigit()).tracking(0.3).lineLimit(1)
+        }
+        .foregroundStyle(d.etkin ? Tema.sari : Tema.ikincil)
+        .padding(.horizontal, 9).frame(height: 24)
+        .yuzey(12)
+        .overlay(Capsule().strokeBorder(d.etkin ? Tema.sari.opacity(0.5) : .clear, lineWidth: 0.5))
+    }
+}
+
 /// Üst satırdaki bir kısayol (Apple Kamera'daki gibi): aç/kapa olanlar simge, değer türleri ayarlanmışsa iki satır değer
 struct KisayolOge: View {
     let f: Favori
