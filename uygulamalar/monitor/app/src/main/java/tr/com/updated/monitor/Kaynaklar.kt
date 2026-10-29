@@ -101,6 +101,8 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     val haricimi: Boolean get() = ad.startsWith("USB")
     val onKamera: Boolean get() = oz.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
     /** Ekranın o anki dönüşü (0/90/180/270); kaydın yön bilgisi bundan hesaplanır */
+    /** Kayda göm açıkken fotoğrafın JPEG verisine renk stili işler (Stiller) */
+    @Volatile var jpegIsle: ((ByteArray) -> ByteArray)? = null
     @Volatile var ekranYonu = 0
     val kayitta: Boolean get() = kaydedici != null
     private var hataGeri: (String) -> Unit = {}
@@ -462,7 +464,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             fun bitti(e: String?) { if (e != null && hata == null) hata = e; if (--bekleyen == 0) { cekiliyor = false; sonuc(hata) } }
             jr.setOnImageAvailableListener({ r ->
                 val img = runCatching { r.acquireNextImage() }.getOrNull() ?: return@setOnImageAvailableListener
-                try { val buf = img.planes[0].buffer; val b = ByteArray(buf.remaining()); buf.get(b); bitti(if (kaydet("$ad.jpg", "image/jpeg") { it.write(b) }) null else "JPEG kaydedilemedi.") }
+                try { val buf = img.planes[0].buffer; val b0 = ByteArray(buf.remaining()); buf.get(b0); val b = jpegIsle?.invoke(b0) ?: b0; bitti(if (kaydet("$ad.jpg", "image/jpeg") { it.write(b) }) null else "JPEG kaydedilemedi.") }
                 catch (e: Exception) { bitti("JPEG: ${e.message}") } finally { img.close() }
             }, h)
             var meta: TotalCaptureResult? = null; var rawImg: Image? = null

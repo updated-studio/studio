@@ -60,7 +60,8 @@ class EkranTest {
             KameraActivity.girisSoruldu = true
             Robolectric.buildActivity(KameraActivity::class.java).setup().use { c ->
                 val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-$ad")
-                a.window.decorView.findViewWithText("Kontroller")?.performClick(); kaydet(a, "kamera-kontroller-$ad")
+                a.window.decorView.findViewWithText("Kontroller")?.performClick(); kaydet(a, "kamera-grup-pozlama-$ad")
+                for (g in listOf("Kayıt", "Renk", "Ses", "Göstergeler")) { a.window.decorView.findViewWithText(g)?.performClick(); kaydet(a, "kamera-grup-${g.lowercase()}-$ad") }
                 a.window.decorView.findViewWithText("Kılavuz")?.performClick(); kaydet(a, "kamera-kilavuz-$ad")
                 a.window.decorView.findViewWithText("Biçim")?.performClick(); kaydet(a, "kamera-bicim-$ad")
                 a.window.decorView.findViewWithText("Kapat")?.performClick()
