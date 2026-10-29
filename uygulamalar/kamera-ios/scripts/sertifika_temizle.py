@@ -2,6 +2,7 @@
 (makine her seferinde sıfırdan; eski sertifikanın anahtarı makineyle birlikte gidiyor). Sınır dolunca yükleme duruyor
 ("Your account has reached the maximum number of certificates"). Bu betik eski, API ile açılmış ("Created via API") geliştirme
 sertifikalarını iptal eder; elle açılmış sertifikalara dokunmaz (Fatih'in onayı, 29 Ekim 2026). Günlüğe ad ve kimlik yazılmaz (depo açık).
+Yalnız SERTIFIKA_P12 girilmemişse çalışır; kalıcı sertifika da "Created via API" adlı olduğundan o yolda çalıştırılmaz.
 Kullanım: python sertifika_temizle.py <AuthKey.p8>  (ASC_KEY_ID ve ASC_ISSUER_ID ortamdan)"""
 import json
 import os

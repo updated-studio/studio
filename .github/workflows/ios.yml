@@ -1,6 +1,8 @@
 # UPDATED Kamera iPhone/iPad sürümü (uygulamalar/kamera-ios). GitHub'ın Mac makinesinde derlenir; Mac gerekmez.
 # Her değişiklikte imzasız derleme denetimi. TestFlight'a yükleme her gönderimde (push) ya da elle başlatınca (Actions → iOS → Run workflow),
 # PR'da değil, ve dört gizli bilgi girilmişse: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (.p8 dosyasının içi), APPLE_TEAM_ID.
+# Beşinci gizli bilgi SERTIFIKA_P12 (bir kez "sertifika-olustur" işiyle üretilir): kalıcı imza sertifikası; yoksa Xcode her yüklemede
+# yeni sertifika açar ve Apple e-posta gönderir.
 name: iOS
 on:
   push:
@@ -8,9 +10,16 @@ on:
   pull_request:
     paths: ['uygulamalar/kamera-ios/**', '.github/workflows/ios.yml']
   workflow_dispatch:
+    inputs:
+      is:
+        description: "testflight: yükle · sertifika-olustur: kalıcı imza sertifikası aç (bir kez; sonucu SERTIFIKA_P12 gizli bilgisine yapıştır)"
+        type: choice
+        default: testflight
+        options: [testflight, sertifika-olustur]
 permissions: { contents: read }
 jobs:
   derle:
+    if: github.event_name != 'workflow_dispatch' || inputs.is == 'testflight'
     runs-on: macos-15
     # İki Claude aynı dala sık gönderiyor: TestFlight yüklemesi yarıda kesilmesin, yalnız PR denetimi iptal edilir.
     # Gezinti işi ayrı kuyrukta: yavaş test TestFlight yüklemesini bekletmesin
@@ -24,6 +33,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SERTIFIKA_P12: ${{ secrets.SERTIFIKA_P12 }}
     steps:
       - uses: actions/checkout@v4
       - name: En yeni Xcode (App Store yüklemesi güncel SDK istiyor)
@@ -47,19 +57,25 @@ jobs:
       - name: TestFlight'a yükle
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && env.ASC_KEY_P8 != '' && startsWith(github.event.head_commit.message, 'iOS Kamera '))
         run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          ANAHTAR=~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
-          # Yapıştırırken satır sonları kaybolmuş ya da başlık satırları eksik olabilir: anahtarı PEM biçimine yeniden diz
-          GOVDE=$(printf '%s' "$ASC_KEY_P8" | tr -d '\r' | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \n\t')
-          { echo "-----BEGIN PRIVATE KEY-----"; printf '%s' "$GOVDE" | fold -w 64; echo; echo "-----END PRIVATE KEY-----"; } > "$ANAHTAR"
-          # Gizli değeri göstermeden kısa denetim
-          if ! printf '%s' "$GOVDE" | base64 -D > /dev/null 2>&1 || [ ${#GOVDE} -lt 150 ] || [ ${#GOVDE} -gt 400 ]; then
-            echo "::error title=ASC_KEY_P8::Anahtar .p8 dosyasının içine benzemiyor (uzunluk ${#GOVDE}; beklenen ~200). Dosyayı metin düzenleyiciyle açıp BEGIN'den END'e kadar tamamını yapıştırın."
-            exit 1
+          ANAHTAR=$(bash scripts/anahtar_yaz.sh) || exit 1
+          if [ -n "$SERTIFIKA_P12" ]; then
+            # Kalıcı sertifika (scripts/sertifika_olustur.py ile bir kez açıldı): geçici anahtarlığa alınır, Xcode yenisini açmaz
+            printf '%s' "$SERTIFIKA_P12" | tr -d ' \n' | base64 -D > /tmp/sertifika.p12
+            security create-keychain -p "" ci.keychain
+            security set-keychain-settings -lut 21600 ci.keychain
+            security unlock-keychain -p "" ci.keychain
+            curl -fsS https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer -o /tmp/wwdr.cer && security import /tmp/wwdr.cer -k ci.keychain || true
+            security import /tmp/sertifika.p12 -k ci.keychain -P "${ASC_KEY_ID}${ASC_ISSUER_ID}" -T /usr/bin/codesign -T /usr/bin/security
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" ci.keychain > /dev/null
+            security list-keychains -d user -s ci.keychain "$HOME/Library/Keychains/login.keychain-db"
+            rm -f /tmp/sertifika.p12
+            echo "Kalıcı sertifika kullanılıyor: $(security find-identity -v -p codesigning ci.keychain | grep -c 'Apple Development') kimlik"
+          else
+            echo "::warning title=Sertifika::SERTIFIKA_P12 girilmemiş: Xcode yine yeni sertifika açacak (Apple e-posta gönderir). Actions → iOS → Run workflow → sertifika-olustur"
+            # Eski makinelerin geliştirme sertifikaları birikip sınırı doldurmasın (scripts/sertifika_temizle.py); olmazsa yükleme yine denenir
+            python3 -m venv /tmp/asc && /tmp/asc/bin/pip install -q "pyjwt[crypto]" \
+              && /tmp/asc/bin/python scripts/sertifika_temizle.py "$ANAHTAR" || echo "::warning title=Sertifika::Eski sertifikalar temizlenemedi"
           fi
-          # Eski makinelerin geliştirme sertifikaları birikip sınırı doldurmasın (scripts/sertifika_temizle.py); olmazsa yükleme yine denenir
-          python3 -m venv /tmp/asc && /tmp/asc/bin/pip install -q "pyjwt[crypto]" \
-            && /tmp/asc/bin/python scripts/sertifika_temizle.py "$ANAHTAR" || echo "::warning title=Sertifika::Eski sertifikalar temizlenemedi"
           YETKI=(-allowProvisioningUpdates -authenticationKeyPath "$ANAHTAR" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
           xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Release \
             -destination 'generic/platform=iOS' -archivePath build/UpdatedKamera.xcarchive archive \
@@ -69,6 +85,35 @@ jobs:
             -exportPath build/cikti "${YETKI[@]}" | tail -n 60
           rm -f "$ANAHTAR"
           echo "::notice title=TestFlight::Yapı ${{ github.run_number }} yüklendi; Apple işledikten sonra (10-30 dk) TestFlight'ta görünür."
+
+  # Bir kez: kalıcı imza sertifikası açar (Apple her yüklemede sertifika aç/iptal e-postası göndermesin).
+  # Sonuç "sertifika" yapıtındaki SERTIFIKA_P12.txt; içeriği GitHub Secrets'a SERTIFIKA_P12 adıyla yapıştırılır. .p12 şifresi ASC_KEY_ID+ASC_ISSUER_ID.
+  sertifika:
+    if: github.event_name == 'workflow_dispatch' && inputs.is == 'sertifika-olustur'
+    runs-on: macos-15
+    defaults:
+      run: { shell: bash, working-directory: uygulamalar/kamera-ios }
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sertifika aç ve paketle
+        run: |
+          ANAHTAR=$(bash scripts/anahtar_yaz.sh) || exit 1
+          OSSL=$(brew --prefix openssl@3)/bin/openssl
+          $OSSL genrsa -out /tmp/anahtar.key 2048 2>/dev/null
+          $OSSL req -new -key /tmp/anahtar.key -out /tmp/istek.csr -subj "/CN=UPDATED Kamera CI/O=UPDATED"
+          python3 -m venv /tmp/asc && /tmp/asc/bin/pip install -q "pyjwt[crypto]"
+          /tmp/asc/bin/python scripts/sertifika_olustur.py "$ANAHTAR" /tmp/istek.csr /tmp/sertifika.cer
+          $OSSL x509 -inform DER -in /tmp/sertifika.cer -out /tmp/sertifika.pem
+          $OSSL pkcs12 -export -inkey /tmp/anahtar.key -in /tmp/sertifika.pem -name "UPDATED Kamera CI" -out /tmp/sertifika.p12 -passout pass:"${ASC_KEY_ID}${ASC_ISSUER_ID}"
+          mkdir -p /tmp/cikti && base64 -i /tmp/sertifika.p12 > /tmp/cikti/SERTIFIKA_P12.txt
+          rm -f "$ANAHTAR" /tmp/anahtar.key /tmp/sertifika.p12
+          echo "::notice title=Sertifika::Yapıtı indir, SERTIFIKA_P12.txt içini GitHub Secrets'a SERTIFIKA_P12 adıyla yapıştır."
+      - uses: actions/upload-artifact@v4
+        with: { name: sertifika, path: /tmp/cikti/SERTIFIKA_P12.txt, retention-days: 1 }
 
   # Simülatörde tüm ekranları gezer (uygulamalar/kamera-ios/Gezinti); her adımın ekran görüntüsü "gezinti" yapıtında.
   # TestFlight yüklemesini beklemez ve durdurmaz; çökme olursa bu iş kırmızı olur ve günlükte "ÇÖKTÜ" satırı adımı gösterir.
