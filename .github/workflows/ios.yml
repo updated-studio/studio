@@ -9,13 +9,14 @@ on:
     paths: ['uygulamalar/kamera-ios/**', '.github/workflows/ios.yml']
   workflow_dispatch:
 permissions: { contents: read }
-concurrency:
-  group: ios-${{ github.ref }}
-  # İki Claude aynı dala sık gönderiyor: TestFlight yüklemesi yarıda kesilmesin, yalnız PR denetimi iptal edilir
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   derle:
     runs-on: macos-15
+    # İki Claude aynı dala sık gönderiyor: TestFlight yüklemesi yarıda kesilmesin, yalnız PR denetimi iptal edilir.
+    # Gezinti işi ayrı kuyrukta: yavaş test TestFlight yüklemesini bekletmesin
+    concurrency:
+      group: ios-derle-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     defaults:
       run: { shell: bash, working-directory: uygulamalar/kamera-ios }
     env:
@@ -72,6 +73,10 @@ jobs:
   gezinti:
     runs-on: macos-15
     timeout-minutes: 40
+    # En son gönderim kazanır; eskisi iptal
+    concurrency:
+      group: ios-gezinti-${{ github.ref }}
+      cancel-in-progress: true
     defaults:
       run: { shell: bash, working-directory: uygulamalar/kamera-ios }
     steps:
