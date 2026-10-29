@@ -27,6 +27,11 @@ final class Insta360Alici: ObservableObject {
     private var kareNal: [Data] = []
     private var kareSayisi = 0, paketSayisi = 0, bayt = 0
     private var sonSayim = Date()
+    /// Tanımadığımız dil için: gelen ilk baytlar olduğu gibi saklanır (paylaşılıp incelenir)
+    private var ham = Data()
+    private var hamParca = 0
+    private var bozukSayisi = 0
+    static let hamDosya = FileManager.default.temporaryDirectory.appendingPathComponent("insta360-ham.bin")
 
     init() { katman.videoGravity = .resizeAspect }
 
@@ -43,7 +48,13 @@ final class Insta360Alici: ObservableObject {
                 case .ready:
                     self.yaz("Bağlandı")
                     self.durumYaz("Bağlandı, görüntü isteniyor")
-                    self.ilkKonusma()
+                    // Önce 1 sn yalnız dinle: kamera kendi selamını gönderiyorsa kayda olduğu gibi düşer
+                    self.yaz("1 sn dinleniyor (hiçbir şey gönderilmeden)")
+                    self.kuyruk.asyncAfter(deadline: .now() + 1) { [weak self] in
+                        guard let self, self.baglanti === c else { return }
+                        self.yaz("Eşleşme gönderiliyor")
+                        self.ilkKonusma()
+                    }
                 case let .waiting(h):
                     self.yaz("Bekliyor: \(h.localizedDescription)")
                     self.durumYaz("Kameranın Wi-Fi'ına bağlı mısın?")
@@ -68,6 +79,8 @@ final class Insta360Alici: ObservableObject {
         }
         baglanti = nil
         tampon = Data(); akis = Data(); kareNal = []
+        if !ham.isEmpty { try? ham.write(to: Insta360Alici.hamDosya) }
+        ham = Data(); hamParca = 0; bozukSayisi = 0
         hevc = nil; vps = nil; sps = nil; pps = nil; bicim = nil
         kareSayisi = 0; paketSayisi = 0; bayt = 0
         DispatchQueue.main.async { self.katman.flushAndRemoveImage() }
@@ -121,7 +134,10 @@ final class Insta360Alici: ObservableObject {
     private func oku(_ c: NWConnection) {
         c.receive(minimumIncompleteLength: 1, maximumLength: 256 * 1024) { [weak self] veri, _, bitti, hata in
             guard let self, self.baglanti === c else { return }
-            if let veri { self.tampon.append(veri); self.ayikla() }
+            if let veri {
+                self.hamSakla(veri)
+                self.tampon.append(veri); self.ayikla()
+            }
             if bitti || hata != nil {
                 self.yaz(bitti ? "Kamera bağlantıyı kapattı" : "Okuma hatası")
                 self.durumYaz("Bağlantı koptu")
@@ -135,7 +151,11 @@ final class Insta360Alici: ObservableObject {
         while tampon.count >= 4 {
             let b = tampon.startIndex
             let n = Int(tampon[b]) | Int(tampon[b + 1]) << 8 | Int(tampon[b + 2]) << 16 | Int(tampon[b + 3]) << 24
-            guard n >= 4, n < 16 * 1024 * 1024 else { yaz("Bozuk paket uzunluğu \(n)"); tampon = Data(); return }
+            guard n >= 4, n < 16 * 1024 * 1024 else {
+                bozukSayisi += 1
+                if bozukSayisi <= 3 { yaz("Tanınmayan paket (\(tampon.count) bayt): \(onaltilik(tampon.prefix(48)))") }
+                tampon = Data(); return
+            }
             guard tampon.count >= n else { return }
             let yuk = Data(tampon[(b + 4)..<(b + n)])
             tampon = Data(tampon[(b + n)...])
@@ -284,7 +304,22 @@ final class Insta360Alici: ObservableObject {
         }
     }
 
-    private func onaltilik(_ d: Data) -> String { d.map { String(format: "%02x", $0) }.joined(separator: " ") }
+    private func onaltilik(_ d: Data) -> String {
+        let h = d.map { String(format: "%02x", $0) }.joined(separator: " ")
+        let a = String(d.map { $0 >= 32 && $0 < 127 ? Character(UnicodeScalar($0)) : "." })
+        return "\(h)  |\(a)|"
+    }
+
+    /// İlk 8 parça kayda (ilk 96 bayt), ilk 1 MB dosyaya
+    private func hamSakla(_ v: Data) {
+        hamParca += 1
+        if hamParca <= 8 { yaz("Gelen #\(hamParca) (\(v.count) bayt): \(onaltilik(v.prefix(96)))") }
+        guard ham.count < 1_048_576 else { return }
+        ham.append(v.prefix(1_048_576 - ham.count))
+        if hamParca % 20 == 1 || ham.count >= 1_048_576 { try? ham.write(to: Insta360Alici.hamDosya) }
+    }
+
+    func hamYaz() { kuyruk.sync { try? ham.write(to: Insta360Alici.hamDosya) } }
 
     private func yaz(_ s: String) {
         let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
@@ -337,6 +372,8 @@ struct Insta360Deneme: View {
                     UIPasteboard.general.string = ([a.bilgi] + a.kayit).joined(separator: "\n")
                     kopyalandi = true
                 }
+                ShareLink(item: Insta360Alici.hamDosya) { Label("Ham veriyi paylaş (dosya)", systemImage: "square.and.arrow.up") }
+                    .simultaneousGesture(TapGesture().onEnded { a.hamYaz() })
             } header: { Text("Kayıt") }
         }
         .navigationTitle("Insta360 deneme")
