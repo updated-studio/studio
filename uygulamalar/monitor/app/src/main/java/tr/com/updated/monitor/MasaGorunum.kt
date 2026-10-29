@@ -18,7 +18,8 @@ import javax.microedition.khronos.opengles.GL10
 /**
  * Masa ekranı: en çok 4 kaynak (Wi-Fi kamerası, USB görüntü) aynı GL bağlamında. Ekranda üstte büyük "canlı" (program),
  * altta bütün kaynakların küçük görüntüleri (multiview); yatay ekranda canlı solda, kaynaklar sağda. Kayıt açıksa canlıdaki
- * kaynak her yeni karesinde 1920×1080'lik kayıt yüzeyine sığdırılarak çizilir (kenarlar siyah).
+ * kaynak her yeni karesinde program kayıt yüzeyine (kayitW×kayitH) sığdırılarak çizilir (kenarlar siyah); USB kaynakların ayrı
+ * kaydı (ISO) için de her yuvanın yeni karesi kendi yüzeyine (isoHedef) tam boyutta çizilir.
  */
 class MasaGorunum(context: Context) : GLSurfaceView(context) {
     companion object { const val EN_COK = 4; const val KAYIT_W = 1920; const val KAYIT_H = 1080 }
@@ -44,6 +45,9 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
     /** Ekranda kaynak olan yuvalar (boşlar çizilmez) */
     @Volatile var dolu = BooleanArray(EN_COK)
     @Volatile var kayitYuzeyi: Surface? = null
+    @Volatile var kayitW = KAYIT_W; @Volatile var kayitH = KAYIT_H
+    /** Yuvanın ayrı kayıt yüzeyi ve boyutu (yalnız yeniden kodlanması gereken USB kaynaklar) */
+    val isoHedef = arrayOfNulls<Triple<Surface, Int, Int>>(EN_COK)
 
     init {
         setEGLContextClientVersion(3)
@@ -103,7 +107,8 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
         private var program = 0
         private var gw = 1; private var gh = 1
         private val dortgen: FloatBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)); position(0) }
-        private var kayitEgl: android.opengl.EGLSurface? = null; private var kayitHedef: Surface? = null
+        /** Kayıt yüzeyleri için EGL yüzeyleri (yüzey kaldırılınca silinir) */
+        private val egller = HashMap<Surface, android.opengl.EGLSurface>()
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             program = MonitorGorunum.programYap(MonitorGorunum.KOSE, PARCA)
@@ -129,6 +134,7 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
 
         override fun onDrawFrame(gl: GL10?) {
             val canliYeni = yuvalar[canli].yeni
+            val yeniler = BooleanArray(EN_COK) { yuvalar[it].yeni }
             for (y in yuvalar) if (y.yeni) { y.yeni = false; runCatching { y.doku?.updateTexImage(); y.doku?.getTransformMatrix(y.mat) } }
             GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glViewport(0, 0, gw, gh); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
             GLES30.glUseProgram(program)
@@ -142,7 +148,9 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
                 if (dolu[canli]) ciz(yuvalar[canli], canliA, gh)
                 kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
             }
-            if (canliYeni) kayitCiz()
+            egllerTemizle()
+            if (canliYeni && dolu[canli]) kayitYuzeyi?.let { hedefeCiz(it, kayitW, kayitH, canli) }
+            for (i in 0 until EN_COK) if (yeniler[i] && dolu[i]) isoHedef[i]?.let { (s, w, h) -> hedefeCiz(s, w, h, i) }
         }
 
         /** Kaynağı alana sığdırarak çizer (alan ekran koordinatında, üstten) */
@@ -160,25 +168,28 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
             GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
         }
 
-        private fun kayitCiz() {
-            val hedef = kayitYuzeyi
+        private fun egllerTemizle() {
+            val kullanilan = (listOfNotNull(kayitYuzeyi) + isoHedef.mapNotNull { it?.first }).toSet()
             val dpy = EGL14.eglGetCurrentDisplay()
-            if (hedef !== kayitHedef) {
-                kayitEgl?.let { EGL14.eglDestroySurface(dpy, it) }; kayitEgl = null; kayitHedef = hedef
-                if (hedef != null) runCatching {
-                    val bag = EGL14.eglGetCurrentContext(); val no = IntArray(1)
-                    EGL14.eglQueryContext(dpy, bag, EGL14.EGL_CONFIG_ID, no, 0)
-                    val l = arrayOfNulls<android.opengl.EGLConfig>(1); val n = IntArray(1)
-                    EGL14.eglChooseConfig(dpy, intArrayOf(EGL14.EGL_CONFIG_ID, no[0], EGL14.EGL_NONE), 0, l, 0, 1, n, 0)
-                    kayitEgl = EGL14.eglCreateWindowSurface(dpy, l[0], hedef, intArrayOf(EGL14.EGL_NONE), 0).takeIf { it != EGL14.EGL_NO_SURFACE }
-                }.onFailure { HataKaydi.not("masa", it.stackTraceToString()) }
-            }
-            val es = kayitEgl ?: return
-            if (!dolu[canli]) return
+            egller.keys.filter { it !in kullanilan }.forEach { egller.remove(it)?.let { e -> EGL14.eglDestroySurface(dpy, e) } }
+        }
+
+        private fun egl(hedef: Surface): android.opengl.EGLSurface? = egller[hedef] ?: runCatching {
+            val dpy = EGL14.eglGetCurrentDisplay(); val bag = EGL14.eglGetCurrentContext(); val no = IntArray(1)
+            EGL14.eglQueryContext(dpy, bag, EGL14.EGL_CONFIG_ID, no, 0)
+            val l = arrayOfNulls<android.opengl.EGLConfig>(1); val n = IntArray(1)
+            EGL14.eglChooseConfig(dpy, intArrayOf(EGL14.EGL_CONFIG_ID, no[0], EGL14.EGL_NONE), 0, l, 0, 1, n, 0)
+            EGL14.eglCreateWindowSurface(dpy, l[0], hedef, intArrayOf(EGL14.EGL_NONE), 0).takeIf { it != EGL14.EGL_NO_SURFACE }?.also { egller[hedef] = it }
+        }.onFailure { HataKaydi.not("masa", it.stackTraceToString()) }.getOrNull()
+
+        /** Yuvayı kayıt yüzeyine sığdırarak çizer (kenarlar siyah) */
+        private fun hedefeCiz(hedef: Surface, w: Int, h: Int, i: Int) {
+            val es = egl(hedef) ?: return
+            val dpy = EGL14.eglGetCurrentDisplay()
             val ciz = EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW); val oku = EGL14.eglGetCurrentSurface(EGL14.EGL_READ); val bag = EGL14.eglGetCurrentContext()
             if (!EGL14.eglMakeCurrent(dpy, es, es, bag)) return
-            GLES30.glViewport(0, 0, KAYIT_W, KAYIT_H); GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-            ciz(yuvalar[canli], RectF(0f, 0f, KAYIT_W.toFloat(), KAYIT_H.toFloat()), KAYIT_H)
+            GLES30.glViewport(0, 0, w, h); GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+            ciz(yuvalar[i], RectF(0f, 0f, w.toFloat(), h.toFloat()), h)
             EGLExt.eglPresentationTimeANDROID(dpy, es, System.nanoTime())
             EGL14.eglSwapBuffers(dpy, es)
             EGL14.eglMakeCurrent(dpy, ciz, oku, bag)

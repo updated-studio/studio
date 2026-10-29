@@ -69,3 +69,23 @@ class LunaTest {
         sunucu.close()
     }
 }
+
+/** Masa ISO kaydı: Annex B'den parametre kümelerinin ayıklanması */
+class AkisKaydiTest {
+    private fun hex(s: String) = s.replace(" ", "").chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+    @Test fun hevcParametreKumeleri() {
+        // VPS (32), SPS (33), PPS (34), IDR (19); 4 ve 3 baytlık başlangıç kodları karışık
+        val au = hex("00000001 4001 0c01 00000001 4201 0101 000001 4401 c172 00000001 2601 af09")
+        val l = AkisKaydi.nallar(au)
+        assertEquals(listOf(32, 33, 34, 19), l.map { it.second })
+        assertArrayEquals(hex("4001 0c01"), l[0].first)
+        assertArrayEquals(hex("2601 af09"), l[3].first)
+    }
+
+    @Test fun h264AyarSpsPps() {
+        val ayar = hex("00000001 6742c01f da 00000001 68ce3c80")
+        val t = AkisKaydi.nallar(ayar).map { it.first[0].toInt() and 0x1F }
+        assertEquals(listOf(7, 8), t)
+    }
+}

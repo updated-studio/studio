@@ -38,6 +38,8 @@ class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescripto
     @Volatile private var calis = true
     private var gIs: Thread? = null; private var sIs: Thread? = null
     private var yazilan = 0L
+    /** Dosyaya yazma başarısız oldu (disk çıkarıldı/doldu) */
+    @Volatile var yazmaHatasi = false; private set
 
     fun baslat() {
         val mime = if (hevc) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
@@ -148,8 +150,10 @@ class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescripto
         if (bilgi.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0 || bilgi.size == 0) return
         synchronized(kilit) {
             if (!basladi) { kilit.wait(2000); if (!basladi) return } // diğer iz henüz hazır değil (ilk birkaç parça atlanabilir)
+            if (yazmaHatasi) return
             b.position(bilgi.offset); b.limit(bilgi.offset + bilgi.size)
-            muxer.writeSampleData(iz, b, bilgi); yazilan++
+            // Dosya yazılamıyorsa (ör. SSD çıkarıldı) iş parçacığı çökmesin; Masa bunu görüp kaydı telefona taşır
+            try { muxer.writeSampleData(iz, b, bilgi); yazilan++ } catch (e: Exception) { yazmaHatasi = true; HataKaydi.not("kayit", "yazılamadı: ${e.message}") }
         }
     }
 

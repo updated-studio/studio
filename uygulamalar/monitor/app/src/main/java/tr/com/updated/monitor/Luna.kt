@@ -187,6 +187,8 @@ class LunaKaynak(private val ctx: Context, override val ad: String = "Insta360 L
     }
     @Volatile private var calis = true
     @Volatile private var baglanti: LunaBaglanti? = null
+    /** Masa kaydı: gelen H.265 akışı yeniden kodlanmadan bu dosyaya da yazılır (ISO) */
+    @Volatile var kayit: AkisKaydi? = null
 
     override fun baslat(yuzey: Surface, boyut: (Int, Int) -> Unit, hata: (String) -> Unit) {
         Thread({
@@ -196,7 +198,9 @@ class LunaKaynak(private val ctx: Context, override val ad: String = "Insta360 L
                 if (ag == null) { if (son != "ag") { son = "ag"; hata("$ad: telefonu kameranın Wi-Fi'ına bağla (Ayarlar → Wi-Fi → \"Luna Ultra…\")") }; Thread.sleep(2000); continue }
                 var cozucu: MediaCodec? = null; var anahtarGeldi = false; var bas = 0L
                 val b = LunaBaglanti(kimlik(ctx), ag = ag, goruntu = { au ->
-                    if (!anahtarGeldi) anahtarGeldi = anahtarMi(au)
+                    val anahtar = anahtarMi(au)
+                    kayit?.kare(au, anahtar)
+                    if (!anahtarGeldi) anahtarGeldi = anahtar
                     val c = cozucu
                     if (anahtarGeldi && c != null) runCatching {
                         val i = c.dequeueInputBuffer(30_000)

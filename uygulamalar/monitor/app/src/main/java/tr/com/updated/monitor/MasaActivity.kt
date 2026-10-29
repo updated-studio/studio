@@ -3,7 +3,6 @@ package tr.com.updated.monitor
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -15,7 +14,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.MediaStore
 import android.view.Gravity
 import android.view.Surface
 import android.view.View
@@ -26,15 +24,14 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Masa: telefon ya da tablet ATEM gibi çalışır. Kaynaklar: aynı ağdaki UPDATED Kamera'lar (Wi-Fi kamera, kendiliğinden bulunur)
  * ve USB'den takılan görüntü aygıtları (Sony "USB yayını", HDMI→USB çevirici, webcam modundaki aksiyon kamerası).
  * Üstte canlı (program), altta bütün kaynaklar; bir kaynağa dokununca canlıya geçer, canlıdaki Wi-Fi kamerasının ekranı kırmızı yanar.
- * Kayıt canlıdaki görüntüden 1080p; ses USB'den gelen makine sesi, yoksa telefonun mikrofonu.
+ * Kayıt (iOS ile aynı kurallar): seçilen klasöre (harici SSD; yoksa telefona) "UPDATED Masa/<tarih>/" altında canlı görüntü
+ * "Program.mp4" (en büyük kaynak 4K ise 4K, yoksa 1080p; 60 fps, H.265; ses USB'den gelen makine sesi, yoksa mikrofon) ve her
+ * kaynağın ayrı dosyası (Wi-Fi kamera ve Luna yeniden kodlanmadan, USB kaynaklar H.265). SSD çıkarılırsa kayıt telefonda sürer.
  */
 class MasaActivity : Activity() {
     companion object {
@@ -59,7 +56,11 @@ class MasaActivity : Activity() {
     private var bulucu: KameraBulucu? = null
     /** Bulunan ama eklenmemiş Wi-Fi kameraları: ad → (adres, kapı) */
     private val bulunan = LinkedHashMap<String, Pair<String, Int>>()
-    private var kaydedici: Kaydedici? = null; private var kayitUri: Uri? = null; private var kayitBas = 0L
+    private var kaydedici: Kaydedici? = null; private var kayitBas = 0L
+    private var oturum: KayitOturumu? = null; private var programDosya: KayitOturumu.Dosya? = null
+    /** Kaynakların ayrı kayıtları: yuva → bitir (dosya sağlamsa true) ve yazma hatası denetimi */
+    private val isolar = HashMap<Int, Pair<() -> Boolean, () -> Boolean>>()
+    private lateinit var yerYazi: TextView
     private var ustPay = 0; private var altPay = 0
     private var cokluYayin: android.net.wifi.WifiManager.MulticastLock? = null
     /** Tablet: yönetmen masası düzeni (iPad'deki gibi). Kaynağa dokun → önizleme, KES → canlı, çift dokun → hemen canlı */
@@ -89,6 +90,10 @@ class MasaActivity : Activity() {
         if (tablet) ust.addView(hizliYazi, LinearLayout.LayoutParams(-2, dp(40f)).apply { marginEnd = dp(10f) })
         sure = etiket("", 15f).apply { typeface = mono; setPadding(dp(10f), 0, dp(10f), 0); background = Tema.kapsul(KIRMIZI, dp(12f).toFloat()); visibility = View.GONE }
         ust.addView(sure, LinearLayout.LayoutParams(-2, dp(30f)).apply { marginEnd = dp(10f) })
+        yerYazi = etiket("", 13f).apply { background = Tema.kapsul(Color.argb(40, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
+            contentDescription = "Kayıt yeri"; setOnClickListener { yerMenu() } }
+        ust.addView(yerYazi, LinearLayout.LayoutParams(-2, dp(34f)).apply { marginEnd = dp(10f) })
+        yerGoster()
         ust.addView(etiket("+  Kaynak", 15f).apply { background = Tema.kapsul(Color.argb(60, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(14f), 0, dp(14f), 0); setOnClickListener { kaynakMenu() } },
             LinearLayout.LayoutParams(-2, dp(40f)))
         kok.addView(ust, FrameLayout.LayoutParams(-1, dp(52f), Gravity.TOP))
@@ -149,6 +154,7 @@ class MasaActivity : Activity() {
             k.addView(etiket(if (dolu) "${i + 1}  ${adlar[i]}" else "+  Kaynak ekle", 12f, if (canlimi) KIRMIZI else if (dolu) Color.WHITE else GRI).apply {
                 if (dolu) { gravity = Gravity.START; setPadding(dp(8f), dp(5f), dp(8f), 0) } },
                 FrameLayout.LayoutParams(if (dolu) -2 else -1, if (dolu) -2 else -1, Gravity.TOP or Gravity.START))
+            if (dolu && i in isolar) k.addView(kayitRozeti(), FrameLayout.LayoutParams(-2, dp(20f), Gravity.TOP or Gravity.END).apply { topMargin = dp(6f); marginEnd = dp(6f) })
             katman.addView(k, FrameLayout.LayoutParams(r.width().toInt(), r.height().toInt()).apply { leftMargin = r.left.toInt(); topMargin = r.top.toInt() })
         }
     }
@@ -192,6 +198,7 @@ class MasaActivity : Activity() {
                 addView(etiket(adlar[i] ?: "", 12f).apply { setPadding(dp(6f), 0, 0, 0); setShadowLayer(0f, 0f, 0f, 0) })
             }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply { leftMargin = dp(8f); bottomMargin = dp(8f) })
             else k.addView(etiket("+\nKaynak ${i + 1}", 13f, GRI).apply { isSingleLine = false; setShadowLayer(0f, 0f, 0f, 0) }, FrameLayout.LayoutParams(-1, -1))
+            if (dolu && i in isolar) k.addView(kayitRozeti(), FrameLayout.LayoutParams(-2, dp(20f), Gravity.TOP or Gravity.END).apply { topMargin = dp(6f); marginEnd = dp(6f) })
             katman.addView(k, FrameLayout.LayoutParams(r.width().toInt(), r.height().toInt()).apply { leftMargin = r.left.toInt(); topMargin = r.top.toInt() })
         }
         hizliYazi.text = if (hizli) "●  Hızlı geçiş" else "○  Hızlı geçiş"; hizliYazi.setTextColor(if (hizli) YESIL else Color.WHITE)
@@ -278,6 +285,7 @@ class MasaActivity : Activity() {
 
     private fun kaldir(i: Int) {
         if (kaydedici != null && i == masa.canli) return tost("Kayıt sürerken canlıdaki kaynak kaldırılamaz.")
+        isoBitir(i)
         kaynaklar[i]?.durdur(); kaynaklar[i] = null; adlar[i] = null
         masa.dolu = masa.dolu.copyOf().also { it[i] = false }
         if (i == masa.canli) masa.dolu.indexOfFirst { it }.takeIf { it >= 0 }?.let { masa.canli = it }
@@ -344,39 +352,142 @@ class MasaActivity : Activity() {
     }
 
     /* ================= kayıt ================= */
-    private fun kayitDugmesi() {
-        kaydedici?.let { k -> bitir(k); return }
-        if (!masa.dolu[masa.canli]) return tost("Önce bir kaynak ekle.")
-        val ad = "UPDATED_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}_masa.mp4"
-        val d = ContentValues().apply { put(MediaStore.Video.Media.DISPLAY_NAME, ad); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4"); put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/UPDATED Kamera"); put(MediaStore.Video.Media.IS_PENDING, 1) }
-        val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, d) ?: return tost("Kayıt dosyası açılamadı.")
-        val fd = contentResolver.openFileDescriptor(uri, "w") ?: run { contentResolver.delete(uri, null, null); return tost("Kayıt dosyası açılamadı.") }
-        val ses = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val k = runCatching { Kaydedici(this, fd, MasaGorunum.KAYIT_W, MasaGorunum.KAYIT_H, 30, 16, false, sesIste = ses).also { it.baslat() } }
-            .getOrElse { e -> runCatching { fd.close() }; contentResolver.delete(uri, null, null); HataKaydi.not("masa", e.stackTraceToString()); return tost("Kayıt başlamadı: ${e.message}") }
-        kaydedici = k; kayitUri = uri; kayitBas = System.currentTimeMillis()
-        masa.kayitYuzeyi = k.yuzey; masa.requestRender()
-        kayitDugme.kayitta = true; sure.visibility = View.VISIBLE
-        k.sesKaynagi?.let { tost("Ses: $it") }
+    /** Seçilen kayıt klasörü (SSD); izni düşmüşse null */
+    private fun klasor(): Uri? = tercih.getString("masa.klasor", null)?.let { Uri.parse(it) }
+        ?.takeIf { u -> contentResolver.persistedUriPermissions.any { it.uri == u && it.isWritePermission } }
+
+    /** Kaynak hücresinde: bu kaynak ayrıca kendi dosyasına kaydediliyor */
+    private fun kayitRozeti() = etiket("●  KAYIT", 10f, KIRMIZI).apply { setShadowLayer(0f, 0f, 0f, 0); letterSpacing = 0.08f
+        setPadding(dp(7f), 0, dp(8f), 0); background = Tema.kapsul(Color.argb(170, 0, 0, 0), dp(10f).toFloat()) }
+
+    private fun yerGoster() {
+        val k = klasor()
+        val bos = bosAlan(k)?.let { " · ${"%.0f".format(it / 1e9)} GB boş" } ?: ""
+        yerYazi.text = (if (k != null) "Kayıt: ${klasorAdi(k)}" else "Kayıt: telefon") + bos
     }
 
-    private fun bitir(k: Kaydedici) {
-        kaydedici = null; masa.kayitYuzeyi = null; masa.requestRender()
-        kayitDugme.kayitta = false; sure.visibility = View.GONE
-        val u = kayitUri; kayitUri = null
+    /** Kayıt yerindeki boş alan (bayt); SSD'nin bölümü bulunamazsa null */
+    private fun bosAlan(k: Uri?): Long? = runCatching {
+        val dizin: java.io.File? = if (k == null) android.os.Environment.getExternalStorageDirectory() else {
+            val kimlik = android.provider.DocumentsContract.getTreeDocumentId(k).substringBefore(':')
+            if (kimlik == "primary") android.os.Environment.getExternalStorageDirectory()
+            else if (android.os.Build.VERSION.SDK_INT >= 30) (getSystemService(STORAGE_SERVICE) as android.os.storage.StorageManager).storageVolumes
+                .firstOrNull { it.uuid.equals(kimlik, true) }?.directory else null
+        }
+        dizin?.let { android.os.StatFs(it.path).availableBytes }
+    }.getOrNull()
+    private fun klasorAdi(u: Uri) = runCatching { android.provider.DocumentsContract.getTreeDocumentId(u).substringAfterLast(':').ifEmpty { "SSD" } }.getOrDefault("SSD")
+        .let { if (it.length > 18) it.take(17) + "…" else it }
+
+    private fun yerMenu() {
+        if (kaydedici != null) return tost("Kayıt sürerken kayıt yeri değişmez.")
+        val k = klasor()
+        AlertDialog.Builder(this).setTitle("Kayıt yeri")
+            .setMessage((if (k != null) "Şu an: ${klasorAdi(k)}\n\n" else "Şu an: telefon (Movies/UPDATED Masa)\n\n") +
+                "Harici SSD için: SSD'yi tak (hub ya da doğrudan), \"SSD seç\"e dokun, SSD'yi ve bir klasörü seç. Her kayıt orada \"UPDATED Masa/<tarih>\" klasörüne gider: Program.mp4 ve her kaynak ayrı dosya.")
+            .setPositiveButton("SSD seç") { _, _ -> runCatching { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION), 7) }.onFailure { tost("Klasör seçici açılmadı.") } }
+            .setNeutralButton("Telefona kaydet") { _, _ -> tercih.edit().remove("masa.klasor").apply(); yerGoster() }
+            .setNegativeButton("Kapat", null).show()
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
+    override fun onActivityResult(istek: Int, sonuc: Int, veri: Intent?) {
+        super.onActivityResult(istek, sonuc, veri)
+        val u = veri?.data ?: return
+        if (istek != 7 || sonuc != RESULT_OK) return
+        runCatching { contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+            .onFailure { return tost("Bu klasöre yazma izni alınamadı.") }
+        tercih.edit().putString("masa.klasor", u.toString()).apply(); yerGoster(); tost("Kayıtlar buraya gidecek: ${klasorAdi(u)}")
+    }
+
+    private fun kayitDugmesi() {
+        if (kaydedici != null) { kayitBitir(true); return }
+        if (!masa.dolu[masa.canli]) return tost("Önce bir kaynak ekle.")
+        val o = KayitOturumu(this, klasor())
+        if (klasor() != null && !o.harici) tost("SSD'ye ulaşılamadı; kayıt telefona yapılıyor.")
+        kayitBaslat(o)
+    }
+
+    /** Program boyutu: en büyük kaynak 4K ise 4K (cihaz kodlayabiliyorsa), yoksa 1080p; 60 fps */
+    private fun programBoyutu(): Triple<Int, Int, Int> {
+        val enBuyuk = masa.yuvalar.filterIndexed { i, _ -> masa.dolu[i] }.maxOfOrNull { minOf(it.boyut[0], it.boyut[1]) } ?: 1080
+        if (enBuyuk >= 2160) for (fps in intArrayOf(60, 30)) if (KayitOturumu.kodlayiciVar(android.media.MediaFormat.MIMETYPE_VIDEO_HEVC, 3840, 2160, fps)) return Triple(3840, 2160, fps)
+        return Triple(1920, 1080, 60)
+    }
+
+    private fun kayitBaslat(o: KayitOturumu) {
+        val (pw, ph, pfps) = programBoyutu()
+        val d = o.ac("Program") ?: return tost("Kayıt dosyası açılamadı.")
+        val ses = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val k = runCatching { Kaydedici(this, d.pfd, pw, ph, pfps, if (pw > 1920) 60 else 20, true, sesIste = ses).also { it.baslat() } }
+            .getOrElse { e -> d.bitti(false); HataKaydi.not("masa", e.stackTraceToString()); return tost("Kayıt başlamadı: ${e.message}") }
+        kaydedici = k; programDosya = d; oturum = o; if (kayitBas == 0L) kayitBas = System.currentTimeMillis()
+        masa.kayitW = pw; masa.kayitH = ph; masa.kayitYuzeyi = k.yuzey; masa.requestRender()
+        var iso = 0
+        kaynaklar.forEachIndexed { i, kk -> if (kk != null && isoBaslat(o, i, kk)) iso++ }
+        kayitDugme.kayitta = true; sure.visibility = View.VISIBLE; duzen()
+        tost("Kayıt: ${if (o.harici) "SSD" else "telefon"} · Program ${if (pw > 1920) "4K" else "1080p"}$pfps + $iso kaynak ayrı" + (k.sesKaynagi?.let { " · ses: $it" } ?: ""))
+    }
+
+    /** Kaynağın ayrı dosyası: ağdan gelen akış olduğu gibi, USB görüntü H.265 ile kodlanarak */
+    private fun isoBaslat(o: KayitOturumu, i: Int, k: Kaynak): Boolean {
+        val ad = "${i + 1} - ${(adlar[i] ?: k.ad).substringAfter("USB: ").substringAfter("UPDATED · ")}"
+        when (k) {
+            is WifiKameraKaynak -> {
+                if (k.genislik <= 0) return false
+                val d = o.ac(ad) ?: return false
+                val a = runCatching { AkisKaydi(d, false, k.genislik, k.yukseklik, o.bas) }.getOrElse { d.bitti(false); return false }
+                k.sonAyar?.let { a.ayarVer(it) }; k.kayit = a; k.anahtarIste()
+                isolar[i] = { k.kayit = null; a.bitir() } to { a.bozuk }
+            }
+            is LunaKaynak -> {
+                val d = o.ac(ad) ?: return false
+                val a = runCatching { AkisKaydi(d, true, 1280, 720, o.bas) }.getOrElse { d.bitti(false); return false }
+                k.kayit = a
+                isolar[i] = { k.kayit = null; a.bitir() } to { a.bozuk }
+            }
+            is UvcKaynak -> {
+                val y = masa.yuvalar[i]; val w = y.boyut[0] and 15.inv(); val h = y.boyut[1] and 15.inv()
+                if (w <= 0 || h <= 0) return false
+                val d = o.ac(ad) ?: return false
+                val kd = runCatching { Kaydedici(this, d.pfd, w, h, k.fps, if (minOf(w, h) >= 2160) 60 else 20, true, sesIste = false).also { it.baslat() } }
+                    .getOrElse { e -> d.bitti(false); HataKaydi.not("masa", "ISO kodlayıcı: ${e.message}"); tost("${adlar[i]}: ayrı kayıt açılamadı (cihazın kodlayıcısı yetmiyor)"); return false }
+                masa.isoHedef[i] = Triple(kd.yuzey, w, h); masa.requestRender()
+                isolar[i] = { masa.isoHedef[i] = null; Thread.sleep(100); kd.bitir().also { d.bitti(it) } } to { kd.yazmaHatasi }
+            }
+            else -> return false
+        }
+        return true
+    }
+
+    private fun isoBitir(i: Int) { val b = isolar.remove(i) ?: return; Thread { runCatching { b.first() } }.start() }
+
+    /** Kaydı kapatır; `son` false ise (SSD çıktı) hemen telefonda yeni oturum açılır */
+    private fun kayitBitir(son: Boolean) {
+        val k = kaydedici ?: return; val d = programDosya; val o = oturum
+        kaydedici = null; programDosya = null; oturum = null; masa.kayitYuzeyi = null; masa.requestRender()
+        val bitecek = isolar.values.map { it.first }; isolar.clear()
+        if (son) { kayitDugme.kayitta = false; sure.visibility = View.GONE; kayitBas = 0L; duzen(); yerGoster() }
         Thread {
             Thread.sleep(150)
-            val ok = runCatching { k.bitir() }.getOrDefault(false)
-            runOnUiThread {
-                if (u == null) return@runOnUiThread
-                if (ok) { contentResolver.update(u, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null); tost("Kayıt galeride: Movies/UPDATED Kamera") }
-                else { contentResolver.delete(u, null, null); tost("Kayıt kaydedilemedi (görüntü gelmedi).") }
+            val ok = runCatching { k.bitir() }.getOrDefault(false); d?.bitti(ok)
+            val iso = bitecek.count { runCatching { it() }.getOrDefault(false) }
+            if (son) runOnUiThread {
+                if (ok) tost("Kayıt bitti: ${if (o?.harici == true) "SSD" else "telefon"} · UPDATED Masa/${o?.ad} · Program + $iso kaynak")
+                else tost("Kayıt kaydedilemedi (görüntü gelmedi).")
             }
         }.start()
     }
 
+    private var ssdUyarildi = false
     private fun tik() {
-        if (kaydedici != null) { val ms = System.currentTimeMillis() - kayitBas; sure.text = "●  %02d:%02d".format(ms / 60000, ms / 1000 % 60) }
+        if (kaydedici != null) { val ms = System.currentTimeMillis() - kayitBas; sure.text = "●  %02d:%02d".format(ms / 60000, ms / 1000 % 60) + (if (isolar.isNotEmpty()) "  ·  ${isolar.size} KAMERA + PROGRAM" else "") }
+        // SSD çıkarıldı / doldu: kayıt telefonda yeni klasörde sürer
+        val k = kaydedici ?: return
+        if (oturum?.harici == true && (k.yazmaHatasi || isolar.values.any { it.second() })) {
+            if (!ssdUyarildi) { ssdUyarildi = true; tost("SSD'ye yazılamıyor (çıkarıldı ya da doldu). Kayıt telefonda sürüyor.") }
+            kayitBitir(false); kayitBaslat(KayitOturumu(this, null)); ssdUyarildi = false
+        }
     }
 
     /* ================= yaşam döngüsü ================= */
@@ -392,7 +503,7 @@ class MasaActivity : Activity() {
     }
     override fun onPause() {
         super.onPause(); acik = false; bulucu?.durdur(); bulucu = null; runCatching { cokluYayin?.release() }; cokluYayin = null
-        kaydedici?.let { bitir(it) }
+        if (kaydedici != null) kayitBitir(true)
         masa.onPause()
     }
     override fun onDestroy() {

@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit
  *
  * Akış (TCP): önce tek satır JSON başlık {"ad","w","h"}, sonra paketler: [tür 1 bayt][uzunluk 4][zaman µs 8][veri].
  * Tür: 0 = kodlayıcı ayarı (SPS/PPS), 1 = anahtar kare, 2 = kare, 3 = yön (veri: derece, 2 bayt). Masadan kameraya
- * satır satır JSON gelir: {"tally":true} (kamera canlıda).
+ * satır satır JSON gelir: {"tally":true} (kamera canlıda), {"anahtar":true} (masa kayda başladı: hemen anahtar kare).
+ * Kayıt kalitesi (iOS ile aynı): H.264, 1080p, 60 fps (kamera 60 vermiyorsa ne veriyorsa), 20 Mb/sn, en geç 1 sn'de bir anahtar kare.
  */
 object AgYayin {
     const val TUR = "_updatedkam._tcp."
@@ -32,7 +33,7 @@ object AgYayin {
 }
 
 /** Kamera tarafı: `yuzey`e çizilen görüntüyü sıkıştırıp bağlanan masaya gönderir */
-class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, val yukseklik: Int, private val mbps: Int = 6,
+class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, val yukseklik: Int, private val mbps: Int = 20,
                   private val tally: (Boolean) -> Unit, private val durum: (String) -> Unit) {
     lateinit var yuzey: Surface; private set
     private lateinit var kodlayici: MediaCodec
@@ -51,7 +52,7 @@ class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, v
     fun baslat() {
         val f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, genislik, yukseklik).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, mbps * 1_000_000); setInteger(MediaFormat.KEY_FRAME_RATE, 30); setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+            setInteger(MediaFormat.KEY_BIT_RATE, mbps * 1_000_000); setInteger(MediaFormat.KEY_FRAME_RATE, 60); setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
             if (android.os.Build.VERSION.SDK_INT >= 30) setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
         }
         kodlayici = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).also { it.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE) }
@@ -98,7 +99,7 @@ class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, v
 
     private fun dinle(c: Socket) {
         runCatching {
-            c.getInputStream().bufferedReader().forEachLine { l -> runCatching { val j = JSONObject(l); if (j.has("tally")) tally(j.getBoolean("tally")) } }
+            c.getInputStream().bufferedReader().forEachLine { l -> runCatching { val j = JSONObject(l); if (j.has("tally")) tally(j.getBoolean("tally")); if (j.optBoolean("anahtar")) anahtarIste() } }
         }
         if (istemci === c) { istemci = null; tally(false); if (calis) durum("Masa bekleniyor") }
     }
@@ -154,6 +155,11 @@ class WifiKameraKaynak(val host: String, val port: Int, override val ad: String)
     var yonDegisti: (Int) -> Unit = {}
     @Volatile var bagli = false; private set
     @Volatile private var tallyAcik = false
+    /** Masa kaydı: gelen H.264 akışı yeniden kodlanmadan bu dosyaya da yazılır (ISO) */
+    @Volatile var kayit: AkisKaydi? = null
+    @Volatile var sonAyar: ByteArray? = null; private set
+    @Volatile var genislik = 0; private set
+    @Volatile var yukseklik = 0; private set
 
     override fun baslat(yuzey: Surface, boyut: (Int, Int) -> Unit, hata: (String) -> Unit) {
         Thread({
@@ -171,7 +177,7 @@ class WifiKameraKaynak(val host: String, val port: Int, override val ad: String)
         s.connect(InetSocketAddress(host, port), 3000); soket = s
         val giris = DataInputStream(s.getInputStream().buffered(256 * 1024))
         val bas = StringBuilder(); while (true) { val c = giris.read(); if (c < 0) throw java.io.EOFException(); if (c == '\n'.code) break; bas.append(c.toChar()) }
-        val j = JSONObject(bas.toString()); val w = j.getInt("w"); val h = j.getInt("h")
+        val j = JSONObject(bas.toString()); val w = j.getInt("w"); val h = j.getInt("h"); genislik = w; yukseklik = h
         boyut(w, h); bagli = true; tallyGonder(tallyAcik)
         var cozucu: MediaCodec? = null
         try {
@@ -182,6 +188,7 @@ class WifiKameraKaynak(val host: String, val port: Int, override val ad: String)
                 when (tur) {
                     AgYayin.YON -> { yon = ((v[0].toInt() and 0xFF) shl 8) or (v[1].toInt() and 0xFF); yonDegisti(yon) }
                     AgYayin.AYAR -> {
+                        sonAyar = v; kayit?.ayarVer(v)
                         runCatching { cozucu?.stop() }; runCatching { cozucu?.release() }
                         val f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h).apply {
                             setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(v))
@@ -190,6 +197,7 @@ class WifiKameraKaynak(val host: String, val port: Int, override val ad: String)
                         cozucu = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).also { it.configure(f, yuzey, null, 0); it.start() }
                     }
                     else -> cozucu?.let { c ->
+                        kayit?.kare(v, tur == AgYayin.ANAHTAR, us)
                         val i = c.dequeueInputBuffer(50_000)
                         if (i >= 0) { c.getInputBuffer(i)!!.apply { clear(); put(v) }; c.queueInputBuffer(i, 0, n, us, if (tur == AgYayin.ANAHTAR) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0) }
                         // Çözülen kare beklemeden ekrana (gecikme birikmesin)
@@ -203,6 +211,8 @@ class WifiKameraKaynak(val host: String, val port: Int, override val ad: String)
 
     /** Canlıdaki kameranın ekranı kırmızı çerçeveyle yanar */
     fun tally(acik: Boolean) { tallyAcik = acik; Thread { tallyGonder(acik) }.start() }
+    /** Masa kayda başladı: kamera hemen anahtar kare üretsin (ISO dosyası boş beklemesin) */
+    fun anahtarIste() { Thread { runCatching { soket?.getOutputStream()?.apply { write("{\"anahtar\":true}\n".toByteArray()); flush() } } }.start() }
     private fun tallyGonder(acik: Boolean) { runCatching { soket?.getOutputStream()?.apply { write((JSONObject().put("tally", acik).toString() + "\n").toByteArray()); flush() } } }
 
     override fun durdur() { calis = false; runCatching { soket?.close() } }
