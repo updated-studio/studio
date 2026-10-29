@@ -243,6 +243,7 @@ class KameraActivity : Activity() {
             falseColor = tercih.getBoolean("g_fc", false), monokrom = tercih.getBoolean("g_mono", false)) }
         histoAcik = tercih.getBoolean("g_histo", false)
         favOku()
+        EkranYayini.degisti = { runOnUiThread { ayarEkrani?.yenile() } }
         stil = Stil.oku(tercih.getString("stil", null))
         tercih.getString("g_lut", null)?.let { lutUygula(it) } ?: renkGuncelle()
         monitor.yuzeyHazir = { y -> yuzey = y; kameraAc() }
@@ -1191,6 +1192,16 @@ class KameraActivity : Activity() {
     private fun AyarEkrani.Sayfa.masaSayfasi() {
         grup(not = "Açıkken bu telefonun görüntüsü aynı Wi-Fi'daki masaya gider; masa kendiliğinden bulur. Masada bulunmazsa adres: ${ipAdresi() ?: "Wi-Fi'a bağlı değil"}") {
             anahtar("Wi-Fi kamera ol", wifiKamera) { wifiKamera = it; tercih.edit().putBoolean("wifiKamera", it).apply(); yayinAyarla() }
+        }
+        grup(not = "Kameranın kendi uygulamasındaki görüntüyü (ör. USB'den webcam vermeyen Insta360) masaya kaynak olarak gönderir: aç, kameranın uygulamasına geç, telefonu yan tut. " +
+            "Masada \"Ekran · ${android.os.Build.MODEL}\" adıyla görünür. Durdurmak için buraya ya da bildirimdeki Durdur'a dokun." + (EkranYayini.durum.takeIf { it.isNotEmpty() }?.let { "\nDurum: $it" } ?: "")) {
+            anahtar("Ekranı Masa'ya gönder", EkranYayini.calisiyor) { ac ->
+                if (ac) {
+                    if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+                        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9)
+                    @Suppress("DEPRECATION") startActivityForResult((getSystemService(MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager).createScreenCaptureIntent(), 8)
+                } else EkranYayini.durdur(this@KameraActivity)
+            }
         }
         grup { deger("Bu telefonu masa yap", renk = AyarEkrani.MAVI) { ayarEkrani?.kapat(); masayaGec() } }
     }
@@ -2311,6 +2322,11 @@ class KameraActivity : Activity() {
     /** Göstergeler → LUT → + Ekle: seçilen .cube kitaplığa kopyalanır ve uygulanır */
     @Deprecated("startActivityForResult") override fun onActivityResult(k: Int, s: Int, veri: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(k, s, veri)
+        if (k == 8) {
+            if (s == RESULT_OK && veri != null) startForegroundService(Intent(this, EkranYayini::class.java).putExtra(EkranYayini.SONUC, s).putExtra(EkranYayini.VERI, veri))
+            else tost("Ekran paylaşımına izin verilmedi.")
+            return
+        }
         val uri = veri?.data ?: return
         if (k != 7 || s != RESULT_OK) return
         try {
