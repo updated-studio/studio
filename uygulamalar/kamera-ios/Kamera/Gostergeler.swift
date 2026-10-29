@@ -10,7 +10,7 @@ extension Kamera {
 
     var gostergeEtkin: Bool {
         let g = gosterge
-        return g.falseColor || g.zebra || g.peaking || g.monokrom || g.lutAcik || histogram || logDuzelt
+        return g.falseColor || g.zebra || g.peaking || g.monokrom || g.lutAcik || histogram || logDuzelt || stil.etkin
     }
 
     /// Ana iş parçacığında: çizici ayarları; oturumda kare çıkışı gerekiyorsa eklenir (kayıt sürerken oturuma dokunulmaz)
@@ -30,7 +30,13 @@ extension Kamera {
     func ciziciAyarla() {
         var a = gosterge
         a.temiz = false
-        if logDuzelt && !a.lutAcik { a.lutAcik = true; a.lutAdi = Lut.logAdi }
+        // Renk: taban LUT (kullanıcının ya da Log → Rec.709) ve stil tek LUT'ta birleşir
+        if let r = renkLutu() {
+            a.lutAcik = true
+            cizici.ozelLut(anahtar: r.anahtar, uret: r.uret)
+        } else {
+            cizici.ozelLut(anahtar: nil, uret: nil)
+        }
         cizici.doldur = false
         if cizici.ayar != a { cizici.ayar = a }
         let h = histo

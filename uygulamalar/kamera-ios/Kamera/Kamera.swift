@@ -94,6 +94,13 @@ final class Kamera: NSObject, ObservableObject {
     }
     @Published var histogram = Kamera.ud.bool(forKey: "k.histogram") { didSet { Kamera.ud.set(histogram, forKey: "k.histogram"); gostergeUygula() } }
     @Published var logOnizleme = Kamera.ud.object(forKey: "k.logOnizleme") as? Bool ?? true { didSet { Kamera.ud.set(logOnizleme, forKey: "k.logOnizleme"); gostergeUygula() } }
+    /// Stil (Stiller.swift): ekranda çizici, "Kayda göm" ise kayıtta da
+    @Published var stil: Stil = (try? JSONDecoder().decode(Stil.self, from: Kamera.ud.data(forKey: "k.stil") ?? Data())) ?? Stil() {
+        didSet { if let d = try? JSONEncoder().encode(stil) { Kamera.ud.set(d, forKey: "k.stil") }; if stil.anahtar != oldValue.anahtar || stil.kaydaGom != oldValue.kaydaGom { gostergeUygula() } }
+    }
+    /// Otomatik kompozisyon: kılavuzu sahneye göre kendisi seçer (elle seçince kapanır)
+    @Published var kompOto = Kamera.ud.object(forKey: "k.kompOto") as? Bool ?? true { didSet { Kamera.ud.set(kompOto, forKey: "k.kompOto"); yardimcilariAyarla() } }
+    var otoAday: (tur: KompTur, yon: Int, bas: Date)?
     /// Çizici ekranda (kare çıkışı oturumda ve araç açık)
     @Published var gostergeGorunur = false
     /// Araç istendi ama iPhone bu modda kare çıkışına izin vermedi
@@ -312,7 +319,7 @@ final class Kamera: NSObject, ObservableObject {
     /// Kare çıkışı yalnız gerektiğinde (her karenin dönüştürülmesi pil ve ısı demek)
     func kareCiktiAyarla() {
         let araclar = gostergeEtkin
-        let gerekli = araclar || mod != .video && (mod == .pro || mod == .timelapse || uzunSuruyor || asistanAcik || (sahneOto && mod == .foto) || !kareDinleyiciler.isEmpty)
+        let gerekli = araclar || mod != .video && (mod == .pro || mod == .timelapse || uzunSuruyor || asistanAcik || kompOto || (sahneOto && mod == .foto) || !kareDinleyiciler.isEmpty)
         if gerekli, !oturum.outputs.contains(kareCikti), oturum.canAddOutput(kareCikti) { oturum.addOutput(kareCikti) }
         if !gerekli, oturum.outputs.contains(kareCikti) { oturum.removeOutput(kareCikti) }
         let var_ = oturum.outputs.contains(kareCikti)
@@ -751,13 +758,14 @@ final class Kamera: NSObject, ObservableObject {
     // MARK: kompozisyon yardımcıları
 
     func yardimcilariAyarla() {
-        asistan.konuAcik = asistanAcik
-        asistan.analizAcik = asistanAcik
+        asistan.konuAcik = asistanAcik || kompOto
+        asistan.analizAcik = asistanAcik || kompOto
         asistan.renkAcik = sahneOto
         asistan.konuSonuc = { [weak self] k in self?.konuGeldi(k) }
-        asistan.analizSonuc = { [weak self] a in self?.analiz = a; self?.ipucuGuncelle() }
+        asistan.analizSonuc = { [weak self] a in self?.analiz = a; self?.ipucuGuncelle(); self?.otoKompozisyon() }
         asistan.renkSonuc = { [weak self] r in self?.renkOrt = r }
-        if !asistanAcik { konu = nil; konuAdi = ""; analiz = nil; ipucu = nil; kompOneri = nil }
+        if !asistanAcik { ipucu = nil; kompOneri = nil }
+        if !asistanAcik && !kompOto { konu = nil; konuAdi = ""; analiz = nil }
         if !teraziAcik { egim = nil }
         if (teraziAcik || sahneOto), hareket.isDeviceMotionAvailable {
             if !hareket.isDeviceMotionActive {
@@ -792,10 +800,11 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     private func konuGeldi(_ k: Asistan.Konu?) {
-        guard asistanAcik else { return }
+        guard asistanAcik || kompOto else { return }
         konu = k?.kutu
         konuAdi = k?.ad ?? ""
         sonYuz = k?.yuz
+        if kompOto { otoKompozisyon(); ipucuGuncelle(); return }
         if kompTur == .kapali, k != nil { kompTur = sonKomp }
         let o = oneriAcik ? Kompozisyon.oner(konu: konu, mevcut: kompTur, oran: goruntuOrani, analiz: analiz) : nil
         let h = Kompozisyon.hedef(kompTur, yon: kompYon, oran: goruntuOrani, konu: konu, analiz: analiz)
@@ -808,6 +817,20 @@ final class Kamera: NSObject, ObservableObject {
         guard asistanAcik, !kayitta else { ipucu = nil; return }
         let h = Kompozisyon.hedef(kompTur, yon: kompYon, oran: goruntuOrani, konu: konu, analiz: analiz)
         ipucu = ipucuSabit.ver(ipucuUret(konu: konu, konuAdi: konuAdi, yuz: konuAdi == "Yüz" ? sonYuz : nil, a: analiz, hedef: h?.nokta, hizalama: h?.hizalama ?? 0))
+    }
+
+    /// Otomatik kompozisyon: öneri 1,5 sn aynı kalınca kılavuz ona geçer (titremesin); konu ve çizgi yoksa üçte bir
+    func otoKompozisyon() {
+        guard kompOto, !kayitta, mod != .pro else { return }
+        kompOneri = nil
+        let o = Kompozisyon.oner(konu: konu, mevcut: kompTur, oran: goruntuOrani, analiz: analiz)
+            ?? (kompTur == .kapali ? (.ucteBir, 0) : nil)
+        guard let o else { otoAday = nil; return }
+        if let a = otoAday, a.tur == o.0, a.yon == o.1 {
+            if Date().timeIntervalSince(a.bas) >= 1.5 { kompTur = o.0; kompYon = o.1; otoAday = nil }
+        } else {
+            otoAday = (o.0, o.1, Date())
+        }
     }
 
     func kompOneriUygula() {
@@ -830,11 +853,12 @@ extension Kamera: AVCapturePhotoCaptureDelegate {
             if error != nil { DispatchQueue.main.async { self.bildirim = "Fotoğraf çekilemedi." } }
             return
         }
+        let gomulu = p.islenmis.map { fotoyaGom($0) } ?? ana
         let kucuk = p.islenmis.flatMap { Kamera.kucukResim($0) }
         let mesaj = mod == .pro && proMod.seri ? (seriSayi > 1 ? "\(seriSayi) kare çekildi" : "Fotoğraf kaydedildi") : (p.ham != nil ? "Fotoğraf kaydedildi (RAW + JPEG)" : "Fotoğraf kaydedildi")
         kaydet({
             let istek = PHAssetCreationRequest.forAsset()
-            istek.addResource(with: .photo, data: ana, options: nil)
+            istek.addResource(with: .photo, data: gomulu, options: nil)
             if p.islenmis != nil, let ham = p.ham {
                 let s = PHAssetResourceCreationOptions()
                 s.originalFilename = "UPDATED-\(Int(Date().timeIntervalSince1970)).dng"
@@ -847,8 +871,10 @@ extension Kamera: AVCapturePhotoCaptureDelegate {
 extension Kamera: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo url: URL, from connections: [AVCaptureConnection], error: Error?) {
         DispatchQueue.main.async { self.kayitta = false; self.kayitBasi = nil }
-        let kucuk = Kamera.kucukResim(video: url)
-        kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil) }, mesaj: "Video kaydedildi", kucuk: kucuk)
+        videoyaGom(url) { url in
+            let kucuk = Kamera.kucukResim(video: url)
+            self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil) }, mesaj: "Video kaydedildi", kucuk: kucuk)
+        }
     }
 }
 

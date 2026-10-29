@@ -64,8 +64,26 @@ final class MonitorCizici: NSObject, MTKViewDelegate {
         olcumDoku = aygit.makeTexture(descriptor: o)
     }
 
+    /// Kamera ekranı: ad yerine hazırlanmış LUT (stil + taban); nil = adla yüklenen LUT. Sürüklerken son istenen kazanır.
+    private var ozelAnahtar: String?
+    func ozelLut(anahtar: String?, uret: (() -> Lut)?) {
+        guard anahtar != ozelAnahtar else { return }
+        ozelAnahtar = anahtar
+        guard let aygit, let anahtar, let uret else { lutYenile(); return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let l = uret()
+            let d = l.doku(aygit)
+            DispatchQueue.main.async {
+                guard self.ozelAnahtar == anahtar else { return }
+                self.lutDoku = d ?? self.lutDoku
+                self.lutBoyut = Float(l.boyut)
+                self.iste()
+            }
+        }
+    }
+
     private func lutYenile() {
-        guard let aygit else { return }
+        guard let aygit, ozelAnahtar == nil else { return }
         let a = ayar
         DispatchQueue.global(qos: .userInitiated).async {
             let l = (a.lutAcik ? Lut.yukle(a.lutAdi) : nil) ?? Lut.bos

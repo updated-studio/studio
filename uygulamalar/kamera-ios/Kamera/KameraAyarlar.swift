@@ -152,10 +152,13 @@ struct KameraAyarlar: View {
                 GostergeMenu(kamera: kamera).listRowBackground(Color.clear)
             } header: { Text("Görüntü araçları") }
             Section("Kompozisyon") {
-                Picker("Kılavuz", selection: $kamera.kompTur) {
-                    ForEach(KompTur.allCases) { t in Text(t.ad).tag(t) }
+                Toggle("Otomatik kompozisyon (sahneye göre)", isOn: $kamera.kompOto)
+                if !kamera.kompOto {
+                    Picker("Kılavuz", selection: $kamera.kompTur) {
+                        ForEach(KompTur.allCases) { t in Text(t.ad).tag(t) }
+                    }
+                    Toggle("Elle seçerken öneri göster", isOn: $kamera.oneriAcik)
                 }
-                Toggle("Otomatik kılavuz önerisi", isOn: $kamera.oneriAcik)
             }
             Section("Yardımcılar") {
                 Toggle("Terazi", isOn: $kamera.teraziAcik)
