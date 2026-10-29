@@ -67,3 +67,23 @@ canlı görüntü yalnız kameranın kendi Wi-Fi erişim noktası (AP) üzerinde
 - Daiki-Iijima/insta360-go-ultra-sdk (GO Ultra; canlı H.265, Pi Zero 2W + USB Wi-Fi ile köprü): https://github.com/Daiki-Iijima/insta360-go-ultra-sdk
 - NiklasVoigt/Insta360-Livestream (One R; APK + tcpdump ile canlı akış): https://github.com/NiklasVoigt/Insta360-Livestream
 - Insta360 geliştirici SSS (resmi SDK; X serisi, H.264 önizleme): https://onlinemanual.insta360.com/developer/en-us/resource/integration
+
+## Luna Ultra ilk ham döküm (29 Ekim, iPhone deneme aracı, 192.168.42.1:6666)
+- Luna, **eski çerçeveyi (`syNceNdinS`) kullanmıyor**. Bağlanınca, istemci bir şey göndermeden, saniyede bir 16 baytlık bir paket yolluyor:
+  `55 43 44 32 | 01 | 0c | 05 | SS 00 00 00 | 00 | T0 T1 T2 T3`
+  - `UCD2` imza; `01` sürüm; `0c` = imzadan sonraki başlık uzunluğu (12); `05` mesaj türü (nabız/selam);
+    `SS` sıra (1, 2, 3 … artıyor; muhtemelen 32 bit LE); `00` (yük uzunluğu 0 olabilir); son 4 bayt denetim değeri.
+- **Denetim değeri çözüldü (doğrusal yapı):** Ardışık paketlerdeki son 4 baytın XOR farkları sıra numarasının değişen bitleriyle birebir
+  tekrarlıyor; yani değer sıra numarasının doğrusal (affine) bir işlevi: **CRC-32, polinom 0x04C11DB7, MSB önce (MPEG-2/BZIP2 ailesi),
+  sonuç küçük-endian yazılmış.** Sıra baytından sonra CRC hesabına 16 bayt daha giriyor (paketin kalanı 8 bayt; yani hesapta kabloda
+  görünmeyen ~8 bayt ya da standart dışı başlangıç değeri var). Sabit kısım `C = 0xA5E7194C` (sıra=0 için değer, LE) ile 8 örneğin
+  hepsi birebir tutuyor: `T(sıra) = C xor CRC32lin(sıra baytı + 16 sıfır bayt)`.
+- Standart CRC-32/MPEG-2, BZIP2, POSIX (başlangıç/çıkış FFFFFFFF/0 bileşimleri, başlığın tüm alt aralıkları, sıfır dolgulu) tam eşleşmiyor.
+  Kalan sabit, büyük olasılıkla kabloda olmayan bir oturum/cihaz değeri (ör. Bluetooth'tan alınan anahtar, seri no) ya da özel başlangıç değeri.
+- Sonuç: **şifreleme değil, CRC.** Aynı uzunluktaki (16 bayt) paketlerin denetim değerini artık hesaplayabiliyoruz; farklı uzunluktaki
+  paketler için gizli 8 baytlık kısmın ne olduğu gerekiyor (APK ya da ikinci döküm).
+- Sonraki zararsız denemeler (kameraya yazma yok):
+  1. Bağlantıyı kapatıp yeniden aç, ve kamerayı kapatıp aç: iki yeni döküm. `C` aynı kalıyorsa cihaz sabiti (seri/anahtar), değişiyorsa oturum değeri.
+  2. Kameranın nabzını aynen geri gönder (yankı) ve bizim sıra numaramızla, yukarıdaki formülle hesaplanmış bir `05` nabzı gönder;
+     kamera farklı türde (01/02/…) bir paket gönderiyor mu bak.
+  3. Kameranın seri numarasını ve Wi-Fi adını not et (gizli kısım bunlardan türetiliyor olabilir).
