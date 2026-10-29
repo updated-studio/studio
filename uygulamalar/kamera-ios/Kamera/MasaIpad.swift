@@ -47,6 +47,7 @@ struct MasaIpad: View {
             HStack(spacing: 16) {
                 Button(action: kapat) { Label("Kamera", systemImage: "chevron.left").font(.body.weight(.semibold)) }
                     .disabled(m.kayitta)
+                SsdCipi(k: m.klasor, kilitli: m.kayitta)
                 Spacer()
                 Toggle(isOn: $hizli) { Text("Hızlı geçiş").font(.subheadline) }
                     .toggleStyle(.switch).tint(MasaIpad.yesil).fixedSize()
@@ -105,7 +106,7 @@ struct MasaIpad: View {
             ForEach(0..<Masa.enCok, id: \.self) { i in
                 if i < m.yuvalar.count {
                     let y = m.yuvalar[i]
-                    IpadHucre(y: y, no: i + 1, canli: y.id == m.canli, sirada: y.id == m.siradaki)
+                    IpadHucre(y: y, no: i + 1, canli: y.id == m.canli, sirada: y.id == m.siradaki, kayitBasi: m.kayitBasi)
                         .onTapGesture(count: 2) { m.canliYap(y) }
                         .onTapGesture { sec(y) }
                         .contextMenu {
@@ -167,7 +168,12 @@ struct MasaIpad: View {
                         RoundedRectangle(cornerRadius: m.kayitta ? 4 : 13).fill(MasaIpad.kirmizi)
                             .frame(width: m.kayitta ? 14 : 26, height: m.kayitta ? 14 : 26)
                     }
-                    Text(m.kayitta ? "DURDUR" : "KAYIT").font(.system(size: 17, weight: .bold))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(m.kayitta ? "DURDUR" : "KAYIT").font(.system(size: 17, weight: .bold))
+                        if m.kayitta, !m.kayitOzeti.isEmpty {
+                            Text(m.kayitOzeti).font(.system(size: 10, weight: .semibold)).tracking(0.6).foregroundStyle(Tema.metin2)
+                        }
+                    }
                 }
                 .padding(.horizontal, 18)
                 .frame(height: 60)
@@ -192,11 +198,15 @@ private struct IpadHucre: View {
     let no: Int
     let canli: Bool
     let sirada: Bool
+    let kayitBasi: Date?
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Goruntu(gorunum: y.gorunum)
             if !y.bagli { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+            if y.kaydediyor, let bas = kayitBasi {
+                KayitRozeti(bas: bas).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(8)
+            }
             HStack(spacing: 6) {
                 Text("\(no)").font(.caption.weight(.heavy).monospacedDigit())
                     .frame(width: 20, height: 20)
@@ -213,5 +223,57 @@ private struct IpadHucre: View {
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
             .stroke(canli ? Color.red : (sirada ? Color.green : Color.white.opacity(0.15)), lineWidth: canli || sirada ? 3 : 1))
         .contentShape(Rectangle())
+    }
+}
+
+/// Kaynak hücresinin köşesinde: bu kaynağın kendi dosyası yazılıyor
+struct KayitRozeti: View {
+    let bas: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: bas, by: 1)) { an in
+            HStack(spacing: 5) {
+                Circle().fill(Color.red).frame(width: 7, height: 7)
+                Text(MasaIpad.sure(an.date.timeIntervalSince(bas))).font(.system(size: 11, weight: .semibold).monospacedDigit())
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7).padding(.vertical, 4)
+            .background(Capsule().fill(Color.black.opacity(0.6)))
+        }
+    }
+}
+
+/// Üst şeritte kayıt klasörü (SSD): adı ve boş alanı; dokununca Dosyalar'dan klasör seçilir, basılı tutunca kaldırılır
+struct SsdCipi: View {
+    @ObservedObject var k: KayitKlasoru
+    var kilitli: Bool
+    @State private var secimAcik = false
+
+    var body: some View {
+        Button { secimAcik = true } label: {
+            HStack(spacing: 6) {
+                Image(systemName: k.ad == nil ? "externaldrive.badge.plus" : (k.takili ? "externaldrive.fill" : "externaldrive.badge.xmark"))
+                if let ad = k.ad {
+                    Text(ad).lineLimit(1)
+                    if k.takili, let b = k.bosAlan {
+                        Text("· \(KayitKlasoru.boyutYazisi(b)) boş").foregroundStyle(Tema.metin2)
+                    } else if !k.takili {
+                        Text("· takılı değil").foregroundStyle(.orange)
+                    }
+                } else {
+                    Text("SSD / klasör seç")
+                }
+            }
+            .font(.footnote.weight(.semibold))
+            .padding(.horizontal, 12).frame(height: 32)
+            .yuzey(9)
+        }
+        .disabled(kilitli)
+        .contextMenu {
+            if k.ad != nil { Button(role: .destructive) { k.sil() } label: { Label("Klasörü kaldır (Fotoğraflar'a kaydet)", systemImage: "xmark") } }
+        }
+        .sheet(isPresented: $secimAcik) { KlasorSecici { k.sec($0) }.ignoresSafeArea() }
+        .onAppear { k.guncelle() }
+        .accessibilityLabel("Kayıt klasörü")
     }
 }

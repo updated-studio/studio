@@ -68,6 +68,10 @@ final class Yuva: ObservableObject, Identifiable {
     let usbKimlik: String?
     let gorunum = GoruntuGorunumu()
     @Published var bagli: Bool
+    /// Kayıtta bu kaynağın kendi dosyası yazılıyor
+    @Published var kaydediyor = false
+    /// USB kaynağın seçilen biçimi (program kaydının boyutu için); Wi-Fi'da alıcıdan okunur
+    var boyut: CMVideoDimensions?
     @Published var dondur = 0 {
         didSet { gorunum.dondur = dondur; kilit.lock(); _donus = dondur; kilit.unlock() }
     }
@@ -97,11 +101,12 @@ final class Yuva: ObservableObject, Identifiable {
     func yeniKare(_ pb: CVPixelBuffer) { kilit.lock(); son = pb; kilit.unlock() }
 }
 
-/// Masa: en çok 4 kaynak (Wi-Fi kameralar + iPad'e USB ile takılı kameralar), canlı geçişi, tally, 1920×1080 program kaydı.
+/// Masa: en çok 4 kaynak (Wi-Fi kameralar + iPad'e USB ile takılı kameralar), canlı geçişi, tally, çoklu kayıt.
+/// Kayıt: her kaynak kendi dosyasına (Wi-Fi akışı geldiği gibi, USB kaynağı HEVC) + program (canlıdaki görüntü, kesimli; en büyük kaynağın
+/// boyutunda, 4K'ya kadar, HEVC) aynı anda; seçili SSD klasörüne "UPDATED Masa/<tarih saat>/", yoksa Fotoğraflar'a.
 /// Android'deki MasaActivity ile aynı iş; Android telefonlar da bu masaya Wi-Fi kamera olarak bağlanır.
 final class Masa: NSObject, ObservableObject {
     static let enCok = 4
-    static let kayitW = 1920, kayitH = 1080
 
     @Published var yuvalar: [Yuva] = []
     @Published var canli: UUID?
@@ -110,6 +115,9 @@ final class Masa: NSObject, ObservableObject {
     let onizleme = GoruntuGorunumu()
     @Published var kayitta = false
     @Published var kayitBasi: Date?
+    /// Kayıttaki dosyalar, ör. "3 KAMERA + PROGRAM"
+    @Published var kayitOzeti = ""
+    let klasor = KayitKlasoru()
     @Published var bildirim: String?
     @Published var aglarIzni = true
     let program = GoruntuGorunumu()
@@ -130,14 +138,27 @@ final class Masa: NSObject, ObservableObject {
 
     // Kayıt (hepsi kayitKuyruk'ta)
     private let kayitKuyruk = DispatchQueue(label: "tr.com.updated.masa.kayit")
-    private var yazici: AVAssetWriter?
-    private var videoGirdi: AVAssetWriterInput?
-    private var uyarlayici: AVAssetWriterInputPixelBufferAdaptor?
-    private var sesGirdi: AVAssetWriterInput?
-    private var ilkZaman: CMTime?
+    private var oturumKaydi: KayitOturumu?
     private var sesBicimi: AudioStreamBasicDescription?
-    private var zamanlayici: DispatchSourceTimer?
     private let ci = CIContext(options: [.cacheIntermediates: false])
+
+    /// Süren kaydın dosyaları
+    private final class KayitOturumu {
+        let baslangic: CMTime           // ana saat (host): tüm dosyaların 0 anı
+        let klasorUrl: URL?             // SSD'deki oturum klasörü; nil = geçici, sonra Fotoğraflar
+        let erisim: URL?                // güvenlik kapsamı açılan kök
+        let dizin: URL
+        var program: DosyaYazici?
+        var programBoyut = (w: 1920, h: 1080)
+        var kaynaklar: [UUID: DosyaYazici] = [:]
+        var kaynakUrl: [UUID: URL] = [:]
+        /// Wi-Fi kaynağı: ilk yazılan paketin kamera zamanı ve o anki kayıt zamanı
+        var wifiIlk: [UUID: (us: Int64, pts: CMTime)] = [:]
+        var sonProgramPts = CMTime.negativeInfinity
+        init(baslangic: CMTime, klasorUrl: URL?, erisim: URL?, dizin: URL) {
+            self.baslangic = baslangic; self.klasorUrl = klasorUrl; self.erisim = erisim; self.dizin = dizin
+        }
+    }
 
     func ac() {
         UIApplication.shared.isIdleTimerDisabled = true
@@ -194,6 +215,10 @@ final class Masa: NSObject, ObservableObject {
         a.kare = { [weak self, weak y] pb in
             guard let self, let y else { return }
             self.kareGeldi(y, pb)
+        }
+        a.ornekGeldi = { [weak self, weak y] sb, us, anahtar in
+            guard let self, let y, self.kayitta else { return }
+            self.kayitKuyruk.async { self.wifiOrnegi(y, sb, us, anahtar) }
         }
         a.yonDegisti = { [weak self, weak y] d in
             DispatchQueue.main.async {
@@ -296,24 +321,34 @@ final class Masa: NSObject, ObservableObject {
             s.removeConnection(b); s.removeOutput(c); s.removeInput(g); return false
         }
         c.setSampleBufferDelegate(self, queue: kareKuyruk)
+        y.boyut = CMVideoFormatDescriptionGetDimensions(d.activeFormat.formatDescription)
         kilit.lock(); usbBaglar[ObjectIdentifier(c)] = UsbBag(yuva: y, girdi: g, cikti: c); kilit.unlock()
         return true
     }
 
-    /// 1080p'yi geçmeyen en büyük biçim, en az 25 kare/sn
+    /// En büyük biçim (tek USB kamerada 4K'ya, çok kamerada 1080p'ye kadar), en az 25 kare/sn; aynı boyutta 60 kare/sn veren öne
     private func bicimSec(_ d: AVCaptureDevice, coklu: Bool) {
+        let enW: Int32 = coklu ? 1920 : 3840, enH: Int32 = coklu ? 1080 : 2160
         let uygun = d.formats.filter { f in
             let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
-            return b.width <= 1920 && b.height <= 1080 && (!coklu || f.isMultiCamSupported)
+            return b.width <= enW && b.height <= enH && (!coklu || f.isMultiCamSupported)
                 && f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= 25 }
         }
-        guard let en = uygun.max(by: { CMVideoFormatDescriptionGetDimensions($0.formatDescription).width < CMVideoFormatDescriptionGetDimensions($1.formatDescription).width }),
-              (try? d.lockForConfiguration()) != nil else { return }
+        func puan(_ f: AVCaptureDevice.Format) -> Int {
+            let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
+            let hiz = f.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0
+            return Int(b.width) * Int(b.height) * 4 + (hiz >= 60 ? 3 : hiz >= 50 ? 2 : 1)
+        }
+        guard let en = uygun.max(by: { puan($0) < puan($1) }), (try? d.lockForConfiguration()) != nil else { return }
         d.activeFormat = en
+        if let a = en.videoSupportedFrameRateRanges.first(where: { $0.maxFrameRate >= 60 }) {
+            d.activeVideoMinFrameDuration = a.minFrameDuration; d.activeVideoMaxFrameDuration = a.minFrameDuration
+        }
         d.unlockForConfiguration()
     }
 
     func kaldir(_ y: Yuva) {
+        if kayitta, y.id == canli { bildirim = "Kayıt sürerken canlıdaki kaynak kaldırılamaz"; return }
         if let a = y.alici { a.tally(false); a.durdur(); kaldirilanlar.insert(y.ad) }
         if y.usbKimlik != nil {
             usbKuyruk.async {
@@ -371,8 +406,16 @@ final class Masa: NSObject, ObservableObject {
         if let y = yuvalar.first(where: { $0.id == canli }) { program.dondur = y.dondur }
     }
 
-    private func kareGeldi(_ y: Yuva, _ pb: CVPixelBuffer) {
+    private func kareGeldi(_ y: Yuva, _ pb: CVPixelBuffer, usb: Bool = false) {
         y.yeniKare(pb)
+        if kayitta {
+            let t = CMClockGetTime(CMClockGetHostTimeClock())
+            let canli = y.canlida
+            kayitKuyruk.async {
+                if usb { self.usbKaresi(y, pb, t) }
+                if canli { self.programKaresi(y, pb, t) }
+            }
+        }
         guard let sb = AgYayin.ornek(pb) else { return }
         y.gorunum.goster(sb)
         if y.canlida { program.goster(sb) }
@@ -383,65 +426,102 @@ final class Masa: NSObject, ObservableObject {
 
     func kayitDegistir() { kayitta ? kayitBitir() : kayitBasla() }
 
+    private static func dosyaAdi(_ s: String) -> String {
+        String(s.map { "/:\\\\?*\"<>|".contains($0) ? "-" : $0 }).trimmingCharacters(in: .whitespaces)
+    }
+
     private func kayitBasla() {
+        guard !yuvalar.isEmpty else { bildirim = "Kaynak yok"; return }
+        klasor.guncelle()
+        // Oturum klasörü: SSD'de "UPDATED Masa/<tarih saat>/", yoksa geçici (sonra Fotoğraflar)
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH-mm-ss"; f.locale = Locale(identifier: "en_US_POSIX")
+        let damga = f.string(from: Date())
+        var erisim: URL?
+        var dizin: URL
+        var ssd = false
+        if klasor.takili, let kok = klasor.url, kok.startAccessingSecurityScopedResource() {
+            erisim = kok
+            dizin = kok.appendingPathComponent("UPDATED Masa", isDirectory: true).appendingPathComponent(damga, isDirectory: true)
+            if (try? FileManager.default.createDirectory(at: dizin, withIntermediateDirectories: true)) != nil { ssd = true } else {
+                kok.stopAccessingSecurityScopedResource(); erisim = nil
+                dizin = FileManager.default.temporaryDirectory.appendingPathComponent("masa-\(damga)", isDirectory: true)
+                try? FileManager.default.createDirectory(at: dizin, withIntermediateDirectories: true)
+                bildirim = "SSD'ye yazılamadı, cihaza kaydediliyor"
+            }
+        } else {
+            dizin = FileManager.default.temporaryDirectory.appendingPathComponent("masa-\(damga)", isDirectory: true)
+            try? FileManager.default.createDirectory(at: dizin, withIntermediateDirectories: true)
+            if klasor.ad != nil { bildirim = "SSD takılı değil, cihaza kaydediliyor" }
+        }
+        // Program boyutu: en büyük kaynak (4K USB kamera varsa 4K), yatay tuval
+        var w = 1920, h = 1080
+        for y in yuvalar {
+            if y.wifi, let b = y.alici?.boyut { y.boyut = b }
+            if let b = y.boyut {
+                let bw = Int(max(b.width, b.height)), bh = Int(min(b.width, b.height))
+                if bw * bh > w * h { w = bw; h = bh }
+            }
+        }
+        let bas = CMClockGetTime(CMClockGetHostTimeClock())
+        let o = KayitOturumu(baslangic: bas, klasorUrl: ssd ? dizin : nil, erisim: erisim, dizin: dizin)
+        o.programBoyut = (w, h)
+        for (i, y) in yuvalar.enumerated() {
+            o.kaynakUrl[y.id] = dizin.appendingPathComponent("\(i + 1) - \(Masa.dosyaAdi(y.ad)).mp4")
+            y.alici?.anahtarIste()
+            y.kaydediyor = true
+        }
         kayitta = true
         kayitBasi = Date()
+        kayitOzeti = "\(yuvalar.count) KAMERA + PROGRAM"
+        let yuvalarSimdi = yuvalar
+        let ses = sesBicimi
         kayitKuyruk.async {
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-Masa-\(Int(Date().timeIntervalSince1970)).mov")
-            guard let w = try? AVAssetWriter(outputURL: url, fileType: .mov) else { self.kayitHatasi("Kayıt başlamadı"); return }
-            let v = AVAssetWriterInput(mediaType: .video, outputSettings: [
-                AVVideoCodecKey: AVVideoCodecType.h264,
-                AVVideoWidthKey: Masa.kayitW, AVVideoHeightKey: Masa.kayitH,
-                AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 16_000_000, AVVideoMaxKeyFrameIntervalKey: 30,
-                                                  AVVideoExpectedSourceFrameRateKey: 30] as [String: Any],
-            ])
-            v.expectsMediaDataInRealTime = true
-            let u = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: v, sourcePixelBufferAttributes: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-                kCVPixelBufferWidthKey as String: Masa.kayitW, kCVPixelBufferHeightKey as String: Masa.kayitH,
-                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
-            ])
-            let kanal = min(Int(self.sesBicimi?.mChannelsPerFrame ?? 1), 2)
-            let hiz = self.sesBicimi.map { $0.mSampleRate } ?? 48_000
-            let a = AVAssetWriterInput(mediaType: .audio, outputSettings: [
-                AVFormatIDKey: kAudioFormatMPEG4AAC, AVNumberOfChannelsKey: max(kanal, 1), AVSampleRateKey: hiz, AVEncoderBitRateKey: 128_000,
-            ])
-            a.expectsMediaDataInRealTime = true
-            guard w.canAdd(v) else { self.kayitHatasi("Kayıt başlamadı"); return }
-            w.add(v)
-            if w.canAdd(a) { w.add(a); self.sesGirdi = a } else { self.sesGirdi = nil }
-            self.yazici = w; self.videoGirdi = v; self.uyarlayici = u; self.ilkZaman = nil
-            let t = DispatchSource.makeTimerSource(queue: self.kayitKuyruk)
-            t.schedule(deadline: .now(), repeating: .nanoseconds(1_000_000_000 / 30), leeway: .milliseconds(2))
-            t.setEventHandler { [weak self] in self?.kareYaz() }
-            t.resume()
-            self.zamanlayici = t
+            o.program = DosyaYazici(url: dizin.appendingPathComponent("Program.mp4"), tur: .kodla(w: w, h: h, fps: 60, bgra: true), ses: ses)
+            // USB kaynakların yazıcıları hemen; Wi-Fi'ninki ilk anahtar kareyle (biçim o zaman belli)
+            for y in yuvalarSimdi where !y.wifi {
+                guard let b = y.boyut, let u = o.kaynakUrl[y.id] else { continue }
+                o.kaynaklar[y.id] = DosyaYazici(url: u, tur: .kodla(w: Int(b.width), h: Int(b.height), fps: 60, bgra: false))
+            }
+            self.oturumKaydi = o
+            if o.program == nil { DispatchQueue.main.async { self.bildirim = "Program kaydı başlamadı" } }
         }
     }
 
-    private func kayitHatasi(_ m: String) {
-        DispatchQueue.main.async { self.kayitta = false; self.kayitBasi = nil; self.bildirim = m }
+    /// Wi-Fi kaynağının sıkıştırılmış karesi (kayitKuyruk): dosyaya olduğu gibi
+    private func wifiOrnegi(_ y: Yuva, _ sb: CMSampleBuffer, _ us: Int64, _ anahtar: Bool) {
+        guard let o = oturumKaydi, let u = o.kaynakUrl[y.id] else { return }
+        let simdi = CMTimeSubtract(CMClockGetTime(CMClockGetHostTimeClock()), o.baslangic)
+        if o.kaynaklar[y.id] == nil {
+            guard anahtar, let f = CMSampleBufferGetFormatDescription(sb) else { return }
+            o.kaynaklar[y.id] = DosyaYazici(url: u, tur: .gectigiGibi(f))
+            o.wifiIlk[y.id] = (us, simdi)
+        }
+        guard let d = o.kaynaklar[y.id], let ilk = o.wifiIlk[y.id] else { return }
+        // Zaman: kameranın saatiyle ilerler, 0 anı masanın kayıt başlangıcı
+        let pts = CMTimeAdd(ilk.pts, CMTime(value: us - ilk.us, timescale: 1_000_000))
+        d.ekle(ornek: sb, pts: pts, anahtar: anahtar)
     }
 
-    /// Saniyede 30 kez: canlıdaki kaynağın son karesi 1920×1080'e sığdırılarak (kenarlar siyah) yazılır
-    private func kareYaz() {
-        kilit.lock(); let y = canliYuva; kilit.unlock()
-        guard let w = yazici, let u = uyarlayici, let y, let pb = y.sonKare else { return }
-        let t = CMClockGetTime(CMClockGetHostTimeClock())
-        if w.status == .unknown {
-            guard w.startWriting() else { return }
-            w.startSession(atSourceTime: t)
-            ilkZaman = t
-        }
-        guard w.status == .writing, u.assetWriterInput.isReadyForMoreMediaData, let havuz = u.pixelBufferPool else { return }
+    /// USB kaynağının ham karesi (kayitKuyruk): kendi dosyasına kodlanır
+    private func usbKaresi(_ y: Yuva, _ pb: CVPixelBuffer, _ t: CMTime) {
+        guard let o = oturumKaydi, let d = o.kaynaklar[y.id] else { return }
+        d.ekle(kare: pb, pts: CMTimeSubtract(t, o.baslangic))
+    }
+
+    /// Canlıdaki kaynağın karesi (kayitKuyruk): program tuvaline sığdırılıp (kenarlar siyah) yazılır; kare hızı kaynağın hızıdır
+    private func programKaresi(_ y: Yuva, _ pb: CVPixelBuffer, _ t: CMTime) {
+        guard let o = oturumKaydi, let p = o.program, let havuz = p.havuz else { return }
+        let pts = CMTimeSubtract(t, o.baslangic)
+        guard pts > o.sonProgramPts else { return }
         var cikti: CVPixelBuffer?
         CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, havuz, &cikti)
         guard let cikti else { return }
-        ciz(pb, donus: y.donus, hedef: cikti)
-        u.append(cikti, withPresentationTime: t)
+        ciz(pb, donus: y.donus, hedef: cikti, w: CGFloat(o.programBoyut.w), h: CGFloat(o.programBoyut.h))
+        p.ekle(kare: cikti, pts: pts)
+        o.sonProgramPts = pts
     }
 
-    private func ciz(_ pb: CVPixelBuffer, donus: Int, hedef: CVPixelBuffer) {
+    private func ciz(_ pb: CVPixelBuffer, donus: Int, hedef: CVPixelBuffer, w W: CGFloat, h H: CGFloat) {
         var g = CIImage(cvPixelBuffer: pb)
         switch donus {
         case 90: g = g.oriented(.right)
@@ -450,7 +530,6 @@ final class Masa: NSObject, ObservableObject {
         default: break
         }
         let e = g.extent
-        let W = CGFloat(Masa.kayitW), H = CGFloat(Masa.kayitH)
         let olcek = min(W / e.width, H / e.height)
         g = g.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
             .transformed(by: CGAffineTransform(scaleX: olcek, y: olcek))
@@ -463,39 +542,59 @@ final class Masa: NSObject, ObservableObject {
         if sesBicimi == nil, let f = CMSampleBufferGetFormatDescription(sb), let a = CMAudioFormatDescriptionGetStreamBasicDescription(f) {
             sesBicimi = a.pointee
         }
-        guard let w = yazici, w.status == .writing, let a = sesGirdi, a.isReadyForMoreMediaData, let ilk = ilkZaman,
-              CMSampleBufferGetPresentationTimeStamp(sb) >= ilk else { return }
-        a.append(sb)
+        guard let o = oturumKaydi, let p = o.program else { return }
+        p.ekle(ses: sb, pts: CMTimeSubtract(CMSampleBufferGetPresentationTimeStamp(sb), o.baslangic))
     }
 
     private func kayitBitir() {
         kayitta = false
         kayitBasi = nil
+        kayitOzeti = ""
+        for y in yuvalar { y.kaydediyor = false }
         kayitKuyruk.async {
-            self.zamanlayici?.cancel(); self.zamanlayici = nil
-            guard let w = self.yazici else { return }
-            self.yazici = nil; self.uyarlayici = nil
-            let v = self.videoGirdi, a = self.sesGirdi
-            self.videoGirdi = nil; self.sesGirdi = nil
-            guard w.status == .writing else {
-                w.cancelWriting()
-                DispatchQueue.main.async { self.bildirim = "Kayıt boş: canlıda görüntü yoktu" }
-                return
+            guard let o = self.oturumKaydi else { return }
+            self.oturumKaydi = nil
+            let yazicilar = [o.program].compactMap { $0 } + o.kaynaklar.values
+            let grup = DispatchGroup()
+            var tamamlanan: [URL] = []
+            let kilit = NSLock()
+            for d in yazicilar {
+                grup.enter()
+                d.bitir { ok in
+                    if ok { kilit.lock(); tamamlanan.append(d.url); kilit.unlock() }
+                    grup.leave()
+                }
             }
-            v?.markAsFinished(); a?.markAsFinished()
-            w.finishWriting { self.fotograflaraKaydet(w.outputURL) }
+            grup.notify(queue: self.kayitKuyruk) {
+                o.erisim?.stopAccessingSecurityScopedResource()
+                guard !tamamlanan.isEmpty else {
+                    try? FileManager.default.removeItem(at: o.dizin)
+                    DispatchQueue.main.async { self.bildirim = "Kayıt boş: görüntü gelmedi" }
+                    return
+                }
+                if o.klasorUrl != nil {
+                    DispatchQueue.main.async {
+                        self.klasor.guncelle()
+                        self.bildirim = "\(tamamlanan.count) dosya SSD'de: UPDATED Masa/\(o.dizin.lastPathComponent)"
+                    }
+                } else {
+                    self.fotograflaraKaydet(tamamlanan, dizin: o.dizin)
+                }
+            }
         }
     }
 
-    private func fotograflaraKaydet(_ url: URL) {
+    private func fotograflaraKaydet(_ urller: [URL], dizin: URL) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { durum in
             guard durum == .authorized || durum == .limited else {
                 DispatchQueue.main.async { self.bildirim = "Fotoğraflar izni yok, Ayarlar'dan açılabilir." }
                 return
             }
-            PHPhotoLibrary.shared().performChanges({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil) }) { tamam, _ in
-                DispatchQueue.main.async { self.bildirim = tamam ? "Masa kaydı Fotoğraflar'a kaydedildi" : "Kaydedilemedi." }
-                try? FileManager.default.removeItem(at: url)
+            PHPhotoLibrary.shared().performChanges({
+                for u in urller { PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: u, options: nil) }
+            }) { tamam, _ in
+                DispatchQueue.main.async { self.bildirim = tamam ? "\(urller.count) dosya Fotoğraflar'a kaydedildi (SSD seçilirse oraya yazılır)" : "Kaydedilemedi." }
+                try? FileManager.default.removeItem(at: dizin)
             }
         }
     }
@@ -506,6 +605,6 @@ extension Masa: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioData
         if output is AVCaptureAudioDataOutput { sesGeldi(sb); return }
         kilit.lock(); let y = usbBaglar[ObjectIdentifier(output)]?.yuva; kilit.unlock()
         guard let y, let pb = CMSampleBufferGetImageBuffer(sb) else { return }
-        kareGeldi(y, pb)
+        kareGeldi(y, pb, usb: true)
     }
 }

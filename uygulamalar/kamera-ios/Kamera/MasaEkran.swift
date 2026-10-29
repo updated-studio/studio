@@ -56,6 +56,7 @@ struct MasaEkran: View {
             }
             .disabled(m.kayitta)
             Text("MASA").font(.footnote.weight(.heavy)).foregroundStyle(Tema.vurgu)
+            SsdCipi(k: m.klasor, kilitli: m.kayitta)
             if m.kayitta, let bas = m.kayitBasi {
                 TimelineView(.periodic(from: bas, by: 1)) { an in
                     Label(sure(an.date.timeIntervalSince(bas)), systemImage: "record.circle.fill")
@@ -93,7 +94,7 @@ struct MasaEkran: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             if let y {
-                Text("CANLI · \(y.ad)").font(.caption.weight(.heavy))
+                Text(m.kayitta && !m.kayitOzeti.isEmpty ? "CANLI · \(y.ad) · \(m.kayitOzeti)" : "CANLI · \(y.ad)").font(.caption.weight(.heavy))
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Capsule().fill(Color.red))
                     .padding(8)
@@ -123,7 +124,7 @@ struct MasaEkran: View {
         ForEach(0..<Masa.enCok, id: \.self) { i in
             if i < m.yuvalar.count {
                 let y = m.yuvalar[i]
-                YuvaHucre(y: y, canli: y.id == m.canli)
+                YuvaHucre(y: y, canli: y.id == m.canli, kayitBasi: m.kayitBasi)
                     .onTapGesture { m.canliYap(y) }
                     .contextMenu {
                         Button("Canlıya al") { m.canliYap(y) }
@@ -180,12 +181,16 @@ struct MasaEkran: View {
 private struct YuvaHucre: View {
     @ObservedObject var y: Yuva
     let canli: Bool
+    let kayitBasi: Date?
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Goruntu(gorunum: y.gorunum)
             if !y.bagli {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if y.kaydediyor, let bas = kayitBasi {
+                KayitRozeti(bas: bas).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(6)
             }
             HStack(spacing: 4) {
                 Image(systemName: y.wifi ? "wifi" : "cable.connector")

@@ -1,7 +1,7 @@
 import AVFoundation
 import SwiftUI
 
-/// Wi-Fi kamera: arka kameranın 1080p görüntüsü H.264'e sıkıştırılıp masaya (iPad ya da Android) gider.
+/// Wi-Fi kamera: arka kameranın 1080p60 (yoksa 30) görüntüsü H.264 20 Mb/sn ile masaya (iPad ya da Android) gider; masa bunu olduğu gibi kaydeder.
 /// Kendi kamera oturumu vardır; açıkken ana kamera durur.
 final class WifiKamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     @Published var durum = "Hazırlanıyor"
@@ -15,6 +15,24 @@ final class WifiKamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSamp
     private var verici: YayinVerici?
     private var kuruldu = false
     private var yon = 90
+    private var fps = 30
+
+    /// 1920×1080'de 60 kare/sn veren biçim varsa onu seçer (masa kaydı 1080p60); yoksa oturum 30'da kalır
+    private static func altmisKare(_ d: AVCaptureDevice) -> Bool {
+        let uygun = d.formats.filter { f in
+            let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
+            return b.width == 1920 && b.height == 1080
+                && CMFormatDescriptionGetMediaSubType(f.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+                && f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= 60 }
+        }
+        // Binned olmayan (daha temiz) biçim öne
+        guard let f = uygun.first(where: { !$0.isVideoBinned }) ?? uygun.first, (try? d.lockForConfiguration()) != nil else { return false }
+        d.activeFormat = f
+        d.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 60)
+        d.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 60)
+        d.unlockForConfiguration()
+        return true
+    }
 
     func baslat() {
         Task {
@@ -33,6 +51,7 @@ final class WifiKamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSamp
             if let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
                let g = try? AVCaptureDeviceInput(device: d), oturum.canAddInput(g) {
                 oturum.addInput(g)
+                fps = WifiKamera.altmisKare(d) ? 60 : 30
             }
             cikti.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
             cikti.alwaysDiscardsLateVideoFrames = true
@@ -40,7 +59,7 @@ final class WifiKamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSamp
             oturum.commitConfiguration()
         }
         if verici == nil {
-            let v = YayinVerici(ad: ad)
+            let v = YayinVerici(ad: ad, fps: fps)
             v.tally = { a in DispatchQueue.main.async { self.canlida = a } }
             v.durum = { d in DispatchQueue.main.async { self.durum = d; self.bagli = d == "Masaya bağlı" } }
             do { try v.baslat() } catch {

@@ -7,7 +7,9 @@ import VideoToolbox
 ///
 /// Akış (TCP): önce tek satır JSON başlık {"ad","w","h"}, sonra paketler: [tür 1 bayt][uzunluk 4][zaman µs 8][veri] (büyük uçlu).
 /// Tür: 0 = kodlayıcı ayarı (SPS/PPS, Annex-B), 1 = anahtar kare, 2 = kare, 3 = yön (veri: 2 bayt derece; görüntü dik olsun diye
-/// saat yönünde bu kadar döndürülür). Masadan kameraya satır satır JSON gelir: {"tally":true} (kamera canlıda).
+/// saat yönünde bu kadar döndürülür). Masadan kameraya satır satır JSON gelir: {"tally":true} (kamera canlıda),
+/// {"anahtar":true} (hemen anahtar kare gönder; masa kayda başlarken ister). Yayın 1080p60 (telefon veremiyorsa 30), 20 Mb/sn,
+/// anahtar kare en geç 1 sn'de bir: masa bu akışı yeniden kodlamadan dosyaya yazar.
 enum AgYayin {
     static let tur = "_updatedkam._tcp"
     static let kapi: UInt16 = 47800
@@ -165,8 +167,10 @@ final class YayinVerici {
     private var yolda = 0
     private var yon = 90
 
-    init(ad: String, genislik: Int32 = 1920, yukseklik: Int32 = 1080, mbps: Int = 6) {
-        self.ad = ad; self.genislik = genislik; self.yukseklik = yukseklik; self.mbps = mbps
+    private let fps: Int
+
+    init(ad: String, genislik: Int32 = 1920, yukseklik: Int32 = 1080, fps: Int = 60, mbps: Int = 20) {
+        self.ad = ad; self.genislik = genislik; self.yukseklik = yukseklik; self.fps = fps; self.mbps = mbps
     }
 
     enum Hata: Error { case kodlayici(OSStatus) }
@@ -182,8 +186,8 @@ final class YayinVerici {
         // B-kare yok: masa kareleri geldiği sırayla çözer, gecikme de düşer
         VTSessionSetProperty(s, key: kVTCompressionPropertyKey_AllowFrameReordering, value: kCFBooleanFalse)
         VTSessionSetProperty(s, key: kVTCompressionPropertyKey_AverageBitRate, value: NSNumber(value: mbps * 1_000_000))
-        VTSessionSetProperty(s, key: kVTCompressionPropertyKey_ExpectedFrameRate, value: NSNumber(value: 30))
-        VTSessionSetProperty(s, key: kVTCompressionPropertyKey_MaxKeyFrameInterval, value: NSNumber(value: 30))
+        VTSessionSetProperty(s, key: kVTCompressionPropertyKey_ExpectedFrameRate, value: NSNumber(value: fps))
+        VTSessionSetProperty(s, key: kVTCompressionPropertyKey_MaxKeyFrameInterval, value: NSNumber(value: fps))
         VTSessionSetProperty(s, key: kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, value: NSNumber(value: 1))
         VTCompressionSessionPrepareToEncodeFrames(s)
         oturum = s
@@ -239,7 +243,9 @@ final class YayinVerici {
             while let i = b.firstIndex(of: 10) {
                 let satir = b.subdata(in: b.startIndex..<i)
                 b = b.subdata(in: (i + 1)..<b.endIndex)
-                if let j = (try? JSONSerialization.jsonObject(with: satir)) as? [String: Any], let t = j["tally"] as? Bool { self.tally(t) }
+                guard let j = (try? JSONSerialization.jsonObject(with: satir)) as? [String: Any] else { continue }
+                if let t = j["tally"] as? Bool { self.tally(t) }
+                if j["anahtar"] as? Bool == true { self.anahtarIstek = true }
             }
             if bitti || hata != nil { c.cancel(); return }
             self.oku(c, n, birikmis: b)
@@ -323,6 +329,13 @@ final class WifiAlici {
     private var tallyAcik = false
     /// Çözülen kare (çözücünün iş parçacığında)
     var kare: (CVPixelBuffer) -> Void = { _ in }
+    /// Sıkıştırılmış kare olduğu gibi (alıcı kuyruğunda): örnek (AVCC, biçimli, zamansız), kameranın zamanı µs, anahtar mı.
+    /// Masa kayıtta bunu yeniden kodlamadan dosyaya yazar
+    var ornekGeldi: (CMSampleBuffer, Int64, Bool) -> Void = { _, _, _ in }
+    /// Son bilinen görüntü boyutu (SPS'ten)
+    var boyut: CMVideoDimensions? { kilit.lock(); defer { kilit.unlock() }; return _boyut }
+    private var _boyut: CMVideoDimensions?
+    private let kilit = NSLock()
     var yonDegisti: (Int) -> Void = { _ in }
     var durum: (Bool) -> Void = { _ in }
 
@@ -387,15 +400,17 @@ final class WifiAlici {
             let n = Int(tampon[i + 1]) << 24 | Int(tampon[i + 2]) << 16 | Int(tampon[i + 3]) << 8 | Int(tampon[i + 4])
             guard n <= 8_000_000 else { return false }
             guard tampon.endIndex - i - 13 >= n else { break }
+            var us: Int64 = 0
+            for k in 0..<8 { us = us << 8 | Int64(tampon[i + 5 + k]) }
             let v = tampon.subdata(in: (i + 13)..<(i + 13 + n))
             i += 13 + n
-            paket(tur, v)
+            paket(tur, us, v)
         }
         tampon = tampon.subdata(in: i..<tampon.endIndex)
         return true
     }
 
-    private func paket(_ tur: UInt8, _ v: Data) {
+    private func paket(_ tur: UInt8, _ us: Int64, _ v: Data) {
         switch tur {
         case AgYayin.yon:
             if v.count >= 2 { yonDegisti(Int(v[v.startIndex]) << 8 | Int(v[v.startIndex + 1])) }
@@ -403,7 +418,7 @@ final class WifiAlici {
             for nal in AgYayin.nallar(v) { parametre(nal) }
             bicimKur()
         case AgYayin.anahtar, AgYayin.kare:
-            coz(v)
+            coz(v, us: us, anahtar: tur == AgYayin.anahtar)
         default: break
         }
     }
@@ -423,10 +438,11 @@ final class WifiAlici {
         guard let sps, let pps, let f = AgYayin.bicim(sps: sps, pps: pps) else { return }
         if let eski = bicim, CMFormatDescriptionEqual(eski, otherFormatDescription: f) { return }
         bicim = f
+        kilit.lock(); _boyut = CMVideoFormatDescriptionGetDimensions(f); kilit.unlock()
         cozucuKapat()
     }
 
-    private func coz(_ v: Data) {
+    private func coz(_ v: Data, us: Int64, anahtar: Bool) {
         var avcc = Data(capacity: v.count + 16)
         var yeni = false
         for nal in AgYayin.nallar(v) {
@@ -451,6 +467,7 @@ final class WifiAlici {
         guard CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: blok, formatDescription: f, sampleCount: 1, sampleTimingEntryCount: 0,
                                         sampleTimingArray: nil, sampleSizeEntryCount: 1, sampleSizeArray: &boy, sampleBufferOut: &ornek) == noErr,
               let ornek else { return }
+        ornekGeldi(ornek, us, anahtar)
         let st = VTDecompressionSessionDecodeFrame(s, sampleBuffer: ornek, flags: [], infoFlagsOut: nil) { [weak self] durum, _, goruntu, _, _ in
             guard durum == noErr, let goruntu else { return }
             self?.kare(goruntu)
@@ -483,6 +500,14 @@ final class WifiAlici {
     private func tallyGonder() {
         guard basOkundu, let c = baglanti else { return }
         c.send(content: Data("{\"tally\":\(tallyAcik)}\n".utf8), completion: .contentProcessed { _ in })
+    }
+
+    /// Kameradan hemen anahtar kare ister (kayıt başında dosya anahtar kareyle başlasın)
+    func anahtarIste() {
+        kuyruk.async {
+            guard self.basOkundu, let c = self.baglanti else { return }
+            c.send(content: Data("{\"anahtar\":true}\n".utf8), completion: .contentProcessed { _ in })
+        }
     }
 
     func durdur() {
