@@ -36,7 +36,7 @@ struct KameraAyarlar: View {
                     NavigationLink { renk } label: { satir("thermometer.sun", .pink, "Renk ve beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto") }
                     NavigationLink { ses } label: { satir("mic", .red, "Ses", kamera.etkinSesGirdi ?? "Otomatik") }
                     NavigationLink { fotograf } label: { satir("camera", .blue, "Fotoğraf", kamera.raw && kamera.rawVar ? "RAW" : "JPEG") }
-                    NavigationLink { gostergeler } label: { satir("scope", .green, "Göstergeler", kamera.kompTur == .kapali ? "" : kamera.kompTur.ad) }
+                    NavigationLink { gostergeler } label: { satir("chart.bar.xaxis", .green, "Göstergeler", kamera.gostergeEtkin ? "Açık" : (kamera.kompTur == .kapali ? "" : kamera.kompTur.ad)) }
                     NavigationLink { timelapse } label: { satir("timer", .purple, "Timelapse", Timelapse.aralikYazi(kamera.tlAralik)) }
                 }
                 Section {
@@ -148,6 +148,9 @@ struct KameraAyarlar: View {
 
     private var gostergeler: some View {
         List {
+            Section {
+                GostergeMenu(kamera: kamera).listRowBackground(Color.clear)
+            } header: { Text("Görüntü araçları") }
             Section("Kompozisyon") {
                 Picker("Kılavuz", selection: $kamera.kompTur) {
                     ForEach(KompTur.allCases) { t in Text(t.ad).tag(t) }

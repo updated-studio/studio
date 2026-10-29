@@ -88,6 +88,20 @@ final class Kamera: NSObject, ObservableObject {
     @Published var sabitlemeler: [Sabitleme] = [.kapali, .standart]
     /// Beyaz denge tonu: yeşil (−) ↔ macenta (+)
     @Published var renkTon: Float = 0
+    // Görüntü araçları (Gostergeler.swift): yalnız ekranda; Monitör'ün çizicisi
+    @Published var gosterge: BolmeAyari = (try? JSONDecoder().decode(BolmeAyari.self, from: Kamera.ud.data(forKey: "k.gosterge") ?? Data())) ?? BolmeAyari() {
+        didSet { if let d = try? JSONEncoder().encode(gosterge) { Kamera.ud.set(d, forKey: "k.gosterge") }; gostergeUygula() }
+    }
+    @Published var histogram = Kamera.ud.bool(forKey: "k.histogram") { didSet { Kamera.ud.set(histogram, forKey: "k.histogram"); gostergeUygula() } }
+    @Published var logOnizleme = Kamera.ud.object(forKey: "k.logOnizleme") as? Bool ?? true { didSet { Kamera.ud.set(logOnizleme, forKey: "k.logOnizleme"); gostergeUygula() } }
+    /// Çizici ekranda (kare çıkışı oturumda ve araç açık)
+    @Published var gostergeGorunur = false
+    /// Araç istendi ama iPhone bu modda kare çıkışına izin vermedi
+    @Published var gostergeYok = false
+    let cizici = MonitorCizici()
+    let histo = OlcumHesap(yalnizHistogram: true)
+    /// Kuyrukta yazılır, kare kuyruğunda okunur
+    var araclarAcik = false
     var varsayilanSes: [String: Any]?
     var sonSesBicimi = ""
     // Timelapse
@@ -296,10 +310,15 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     /// Kare çıkışı yalnız gerektiğinde (her karenin dönüştürülmesi pil ve ısı demek)
-    private func kareCiktiAyarla() {
-        let gerekli = mod != .video && (mod == .pro || mod == .timelapse || uzunSuruyor || asistanAcik || (sahneOto && mod == .foto) || !kareDinleyiciler.isEmpty)
+    func kareCiktiAyarla() {
+        let araclar = gostergeEtkin
+        let gerekli = araclar || mod != .video && (mod == .pro || mod == .timelapse || uzunSuruyor || asistanAcik || (sahneOto && mod == .foto) || !kareDinleyiciler.isEmpty)
         if gerekli, !oturum.outputs.contains(kareCikti), oturum.canAddOutput(kareCikti) { oturum.addOutput(kareCikti) }
         if !gerekli, oturum.outputs.contains(kareCikti) { oturum.removeOutput(kareCikti) }
+        let var_ = oturum.outputs.contains(kareCikti)
+        araclarAcik = araclar && var_
+        let gorunur = araclarAcik, yok = araclar && !var_
+        DispatchQueue.main.async { self.ciziciAyarla(); self.gostergeGorunur = gorunur; self.gostergeYok = yok }
         if let b = kareCikti.connection(with: .video) {
             if b.isVideoOrientationSupported { b.videoOrientation = Onizleme.yon(arayuzYonu) }
             if b.isVideoMirroringSupported { b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = cihaz?.position == .front }
@@ -837,6 +856,7 @@ extension Kamera: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         for d in kareDinleyiciler { d(sampleBuffer) }
         guard let kare = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        if araclarAcik { cizici.kare(kare) }
         tlYazici?.kare(kare)
         asistan.kare(kare)
         birlestirmeKaresi(kare)

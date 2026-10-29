@@ -103,7 +103,35 @@ struct Lut {
             .sorted { $0.lastPathComponent.lowercased() < $1.lastPathComponent.lowercased() }
     }
 
+    /// Yerleşik: Apple Log (BT.2020) → Rec.709 görüntüleme LUT'u (yalnız ekranda; Kamera'da Log çekerken)
+    static let logAdi = "Apple Log → Rec.709"
+
+    /// Apple Log Profile White Paper (2023) eğrisi: çöz → BT.2020'den BT.709'a → yumuşak tepe (Reinhard) → Rec.709 OETF
+    static let appleLog709: Lut = {
+        let n = 33
+        let r0 = -0.05641088, rt = 0.01, sigma = 47.28711236, beta = 0.00964052, gamma = 0.08550479, delta = 0.69336945
+        let pt = sigma * (rt - r0) * (rt - r0)
+        func coz(_ p: Double) -> Double {
+            if p >= pt { return pow(2, (p - delta) / gamma) - beta }
+            if p >= 0 { return (p / sigma).squareRoot() + r0 }
+            return r0
+        }
+        func oetf(_ l: Double) -> Double { l < 0.018 ? 4.5 * l : 1.099 * pow(l, 0.45) - 0.099 }
+        func tepe(_ x: Double) -> Double { let w = 8.0; return x * (1 + x / (w * w)) / (1 + x) * 1.25 }
+        var v: [Float] = []
+        v.reserveCapacity(n * n * n * 3)
+        for b in 0..<n { for g in 0..<n { for r in 0..<n {
+            let R = coz(Double(r) / Double(n - 1)), G = coz(Double(g) / Double(n - 1)), B = coz(Double(b) / Double(n - 1))
+            let r7 = 1.6605 * R - 0.5876 * G - 0.0728 * B
+            let g7 = -0.1246 * R + 1.1329 * G - 0.0083 * B
+            let b7 = -0.0182 * R - 0.1006 * G + 1.1187 * B
+            for c in [r7, g7, b7] { v.append(Float(min(max(oetf(tepe(max(c, 0))), 0), 1))) }
+        } } }
+        return Lut(ad: logAdi, boyut: n, veri: v)
+    }()
+
     static func yukle(_ ad: String) -> Lut? {
+        if ad == logAdi { return appleLog709 }
         guard !ad.isEmpty, let m = try? String(contentsOf: klasor.appendingPathComponent(ad), encoding: .utf8) else { return nil }
         return try? oku(ad: ad, metin: m)
     }

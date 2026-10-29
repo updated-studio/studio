@@ -10,7 +10,7 @@ enum ProPanelTuru { case mod, ayar }
 /// Telefon yan tutulunca deklanşör sağ kenarda dikey ortada; mercekler ve modlar onun yanında dikey sıralanır.
 struct AnaEkran: View {
     @StateObject private var kamera = Kamera()
-    enum Panel: Equatable { case proKartlar, proAyar, poz, bd, odak, kilavuz, kontroller, bicim }
+    enum Panel: Equatable { case proKartlar, proAyar, poz, bd, odak, kilavuz, kontroller, bicim, gosterge }
     @State private var panel: Panel?
     @State private var uyariMod: ProMod?
     @State private var yardim = false
@@ -190,6 +190,16 @@ struct AnaEkran: View {
                     kamera.odakla(nokta)
                 }
                 .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in kamera.odakSerbest() })
+                if kamera.gostergeGorunur {
+                    // Görüntü araçları: aynı kare GPU'da araçlarla çizilir (yalnız ekranda)
+                    MonitorGorunum(cizici: kamera.cizici).allowsHitTesting(false)
+                }
+                if kamera.gostergeGorunur && kamera.histogram {
+                    KoseHistogram(o: kamera.histo)
+                        .frame(width: 112, height: 56)
+                        .position(x: alan.minX + 68, y: alan.minY + 40)
+                        .allowsHitTesting(false)
+                }
                 KompozisyonKatman(tur: kamera.kompTur, yon: kamera.kompYon, alan: alan, asistan: kamera.asistanAcik, konu: kamera.konu,
                                   konuAdi: kamera.konuAdi, analiz: kamera.analiz, egim: kamera.egim, egimTaban: kamera.egimTaban)
                 if let i = kamera.ipucu {
@@ -552,6 +562,7 @@ struct AnaEkran: View {
         case .kilavuz: return "KOMPOZİSYON"
         case .kontroller: return "KONTROLLER"
         case .bicim: return "BİÇİM"
+        case .gosterge: return "GÖSTERGELER"
         }
     }
 
@@ -570,6 +581,7 @@ struct AnaEkran: View {
         case .kilavuz: KilavuzMenu(kamera: kamera)
         case .kontroller: kontroller
         case .bicim: BicimPanel(kamera: kamera)
+        case .gosterge: GostergeMenu(kamera: kamera)
         }
     }
 
@@ -595,6 +607,7 @@ struct AnaEkran: View {
             kontrol("plusminus.circle", "Pozlama", pozYazi, etkin: abs(kamera.ev) >= 0.05 || kamera.secilenIso != nil || kamera.secilenEnst != nil) { cetvelAc(.poz) }
             kontrol("thermometer.sun", "Beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto", etkin: kamera.bd != nil) { cetvelAc(.bd) }
             kontrol("scope", "Odak", kamera.odakKonum == nil ? "Oto" : "MF", etkin: kamera.odakKonum != nil) { cetvelAc(.odak) }
+            kontrol("chart.bar.xaxis", "Göstergeler", kamera.gostergeEtkin ? "Açık" : "Kapalı", etkin: kamera.gostergeEtkin) { panelAc(.gosterge) }
             kontrol("squareshape.split.3x3", "Kılavuz", kamera.kompTur == .kapali ? "Kapalı" : kamera.kompTur.ad, etkin: kamera.kompTur != .kapali) { panelAc(.kilavuz) }
             kontrol("wand.and.stars", "Yardımcı", kamera.asistanAcik ? "Açık" : "Kapalı", etkin: kamera.asistanAcik) { kamera.asistanAcik.toggle() }
             kontrol("level", "Terazi", kamera.teraziAcik ? "Açık" : "Kapalı", etkin: kamera.teraziAcik) { kamera.teraziAcik.toggle() }
