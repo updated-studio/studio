@@ -158,7 +158,7 @@ private struct GirisKarti: View {
     }
 
     @ViewBuilder private var zemin: some View {
-        if tur == .monitor { Sahne(sicak: true) } else { Color(white: 0.04) }
+        if tur == .monitor { GirisSahnesi(sicak: true) } else { Color(white: 0.04) }
     }
 
     private var mini4: some View {
@@ -174,7 +174,7 @@ private struct GirisKarti: View {
         ZStack {
             if gunes {
                 LinearGradient(colors: [Color(red: 0.3, green: 0.42, blue: 0.55), Color(red: 0.75, green: 0.54, blue: 0.38), Color(red: 0.16, green: 0.12, blue: 0.1)], startPoint: .top, endPoint: .bottom)
-            } else if let sicak { Sahne(sicak: sicak) } else {
+            } else if let sicak { GirisSahnesi(sicak: sicak) } else {
                 RadialGradient(colors: [Color(red: 1, green: 0.9, blue: 0.78).opacity(0.5), Color(red: 0.17, green: 0.13, blue: 0.1)], center: .center, startRadius: 0, endRadius: 50)
             }
         }
@@ -184,7 +184,7 @@ private struct GirisKarti: View {
 }
 
 /// Stüdyo ışığında konuşan kişi silüeti (yalnız giriş kartlarında süs)
-private struct Sahne: View {
+private struct GirisSahnesi: View {
     let sicak: Bool
 
     var body: some View {

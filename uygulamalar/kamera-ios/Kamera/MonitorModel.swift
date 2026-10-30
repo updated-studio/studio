@@ -12,20 +12,18 @@ final class Monitor: NSObject, ObservableObject {
         var id: String { rawValue }
     }
     enum Param: String { case fps, enstantane, diyafram, iso, wb, ev, odak }
+    /// Ayar paneli (Fatih 30 Ekim: "her ayarı ayrı bölme, başlık altında topla, önem sırası"): 6 sekme, her biri başlıklı gruplar
     enum Sekme: String, CaseIterable, Identifiable {
-        case kayit = "KAYIT", monitor = "MONİTÖR", kompozisyon = "KOMPOZİSYON", kilavuz = "KILAVUZ", lut = "LUT", olcum = "ÖLÇÜM", ses = "SES", kaynak = "KAYNAK", kurulum = "KURULUM"
+        case kaynak = "KAYNAK", monitor = "GÖRÜNTÜ", lut = "STİLLER", kompozisyon = "KADRAJ", olcum = "ÖLÇÜM", kayit = "KAYIT"
         var id: String { rawValue }
         var simge: String {
             switch self {
-            case .kayit: return "record.circle"
-            case .monitor: return "display"
-            case .kompozisyon: return "squareshape.split.3x3"
-            case .kilavuz: return "crop"
-            case .lut: return "square.stack.3d.up"
-            case .olcum: return "waveform.path.ecg"
-            case .ses: return "speaker.wave.2"
             case .kaynak: return "arrow.left.arrow.right"
-            case .kurulum: return "info.circle"
+            case .monitor: return "viewfinder"
+            case .lut: return "camera.filters"
+            case .kompozisyon: return "squareshape.split.3x3"
+            case .olcum: return "waveform.path.ecg"
+            case .kayit: return "record.circle"
             }
         }
     }
@@ -460,7 +458,16 @@ final class Monitor: NSObject, ObservableObject {
 
     private func ayarlariUygula() {
         for i in 0..<2 {
-            if ciziciler[i].ayar != ayarlar[i] { ciziciler[i].ayar = ayarlar[i] }
+            var a = ayarlar[i]
+            // Stil etkinse LUT (varsa) ile tek LUT'ta birleşir, Kamera'daki renkLutu ile aynı
+            if let s = a.stil, s.etkin {
+                let taban = a.lutAcik ? a.lutAdi : ""
+                ciziciler[i].ozelLut(anahtar: "\(taban)#\(s.anahtar)") { s.lut(taban: taban.isEmpty ? nil : Lut.yukle(taban)) }
+                a.lutAcik = true
+            } else {
+                ciziciler[i].ozelLut(anahtar: nil, uret: nil)
+            }
+            if ciziciler[i].ayar != a { ciziciler[i].ayar = a }
             Saklama.yaz("m.ayar\(i)", ayarlar[i])
         }
         olcumBagla()

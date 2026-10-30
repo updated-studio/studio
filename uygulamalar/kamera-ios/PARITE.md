@@ -70,6 +70,11 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | Ses göstergesi (iki kanal) | ✓ | ✓ | |
 | Ekran parlaklığı en yüksek | ✓ | ✓ | |
 
+| **Monitör ayar paneli yeniden (Fatih 30 Ekim 03:12):** 6 sekme, önem sırasıyla KAYNAK · GÖRÜNTÜ · STİLLER · KADRAJ · ÖLÇÜM · KAYIT; her sekmede başlıklı gruplar (GÖRÜNTÜ: Odak / Pozlama / Ekran; KADRAJ: Akıllı kadraj / Kompozisyon / Çerçeve; ÖLÇÜM: Ekranda / Ölçüm paneli; KAYIT: Görüntü / Dosya / Ses / Cihaz). Kılavuz, Ses ve Kurulum sekmeleri bu gruplara girdi | ○ | ✓ (0.14.0, cihazda denenmedi) | MonitorModel `Sekme`, MonitorEkran `baslik` |
+| **Monitör Stiller (LUT yerine):** araç şeridinde STİL; panelde Kamera'daki düzen: TEMEL, FİLM REÇETELERİ, LUT'LARIN (+ .cube ekle, basılı tut sil), Yoğunluk, Doygunluk, Sıcaklık, Ton, Sıfırla. Bölme başına (`BolmeAyari.stil`), LUT'un üstüne biner (Kamera `renkLutu` ile aynı birleştirme), yalnız ekranda | ○ | ✓ (0.14.0) | Stiller.swift `MonitorStilleri` |
+| **Monitör beyaz denge iki çubuk:** Kelvin (2500–10000) + Yeşil–Macenta; OTO ikisini sıfırlar | ✓ (RC, 30 Ekim) | ✓ (0.14.0) | Fatih 30 Ekim 03:12 |
+| **Zebra görünmüyordu:** beyaz alanın üstüne beyaz şerit çiziliyordu; artık koyu/beyaz çapraz şerit | ✓ | ✓ (0.14.0) | Monitor.metal |
+
 Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki kaynak, HLS kaynağı.
 
 ## Masa (çok kamera)
@@ -85,6 +90,12 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 
 | Özellik | Android | iOS | Not |
 |---|---|---|---|
+| **Multi Cam (eski adıyla Masa, UpCam Studio):** giriş ekranında Monitör üstte, Multi Cam altta, logo ve başlık ortada. iPhone yatayda yan raylar (sol: geri + kaynaklar; sağ: ⋯, CUT, REC, AUTO; üstte okuma şeridi, altta düzen şeridi), dikeyde alt alta; iPad yatayda büyük CANLI + kaynak ızgarası, sağ sütunda SIRADAKİ + gruplu panel (Geçiş, Katmanlar, Düzen, Kayıt). Kaynağa dokun = sıradaki, tekrar dokun = AUTO | ✱ RC'de (ad değişti) | ✓ (0.14.0, cihazda denenmedi) | MultiCam.swift, MasaIpad.swift, UpdatedMasaApp.swift |
+| **ATEM benzeri:** geçiş MIX / DIP / WIPE ve süre (0,25–2 sn), CUT / AUTO, PiP (canlının köşesinde ikinci kaynak), logo (Fotoğraflar'dan, sağ üst), alt yazı (başlık + alt satır), FTB (siyaha kararma); hepsi programa ve kayda girer | ○ | ✓ (0.14.0, cihazda denenmedi) | Masa.swift `duzenKaresi` |
+| **Kaynaklar birlikte:** bu cihazın arka/ön kamerası + USB + Wi-Fi telefonlar + Insta360 Luna aynı anda, hepsi eş zamanlı kayıt; "Kaynak ekle" rehberi (Luna Wi-Fi adımları; Ace Pro 2 · GO Ultra, Osmo Pocket 4 · 4P, GoPro: USB webcam adımları; kablosuz RTMP sonra) | ✱ RC'de | ✓ (0.14.0) | Fatih 30 Ekim 03:12 |
+| **Vlog (Kamera):** Genel Ayarlar → "Vlog (çift kamera)": arka + ön kamera birlikte, dikey, PiP aç/kapa, kameraları yer değiştir; program + iki kamera ayrı dosya | ○ | ✓ (0.14.0, cihazda denenmedi) | Vlog.swift (Masa motoru, vlog kipi) |
+| **Genel Ayarlar simgeleri tek renk + iOS 26 cam yüzey:** satır simgeleri beyaz glif, %7 beyaz kutu; iOS 26+ cihazda paneller ve düğmeler sistem camı (glassEffect), eski sürümde eski görünüm | ○ | ✓ (0.14.0) | Fatih 30 Ekim 03:17 |
+
 | Güncelleme | ✓ (uygulama içi) | ✓ (TestFlight) | |
 | Çökme/donma kaydı → Stüdyo | ✓ | ○ | |
 | **Insta360 Luna Ultra canlı görüntü (UCD2 dili):** Genel Ayarlar → Masa → "Insta360 kamerayı dene": kameranın Wi-Fi'ına bağlıyken selam (3 sn nabız) → 39 yetki (kamera ekranda onay sorabilir, 30 sn) → 118 → 1 canlı görüntü; 1280×720 H.265 çözülüp gösterilir. Kendi uygulama kimliği üretilir, kameraya ayar yazılmaz. Dil: uygulamalar/monitor/notlar/insta360-luna.md | ✓ (0.10.2, cihazda denenmedi) | ✓ (0.15.1, cihazda denenmedi): Masa → + Kaynak → "Insta360 Luna": telefon kameranın Wi-Fi'ına bağlıyken aynı sıra, H.265 çözülüp yuvada gösterilir; koparsa yeniden bağlanır, kapanırken 2. Fatih 18:53 "Evet, Android'e de ekle" | 29 Ekim akşam, LunaLive APK incelemesi |

@@ -443,3 +443,109 @@ struct StilPedi: View {
         }
     }
 }
+
+/// Monitör → LUT paneli: Kamera'daki Stiller düzeni (temel, film reçeteleri, LUT'ların, yoğunluk/doygunluk); etkin bölmeye uygulanır.
+/// Stil seçili LUT'un üstüne biner, yalnız ekrana (kayıt temiz kalır)
+struct MonitorStilleri: View {
+    @Binding var stil: Stil
+    @Binding var lutAdi: String
+    @Binding var lutAcik: Bool
+    var lutEkle: () -> Void
+    @State private var lutlar: [String] = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            sira("TEMEL", HazirStil.temel)
+            sira("FİLM REÇETELERİ", HazirStil.receteler)
+            lutSirasi
+            VStack(spacing: 12) {
+                kaydirici("Yoğunluk", "\(Int(stil.yogunluk * 100))", $stil.yogunluk, 0...1)
+                kaydirici("Doygunluk", String(format: "%+d", Int(stil.doygunluk * 100)), $stil.doygunluk, -1...1)
+                kaydirici("Sıcaklık", String(format: "%+d", Int(stil.x * 100)), $stil.x, -1...1)
+                kaydirici("Ton", String(format: "%+d", Int(stil.y * 100)), $stil.y, -1...1)
+            }
+            .padding(.top, 2)
+            if stil != Stil() {
+                Button("Sıfırla") { stil = Stil() }.font(.system(size: 14, weight: .semibold)).foregroundStyle(Tema.sari)
+            }
+        }
+        .padding(.top, 8)
+        .onAppear { lutlar = Lut.kitaplik().map(\.lastPathComponent) }
+        .onChange(of: lutAdi) { _, _ in lutlar = Lut.kitaplik().map(\.lastPathComponent) }
+    }
+
+    private func sira(_ baslik: String, _ liste: [HazirStil]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(baslik).bolumBasligi()
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(liste) { h in
+                        let secili = stil.hazir == h
+                        Button { stil.hazir = secili && h != .standart ? .standart : h } label: {
+                            kutu(h.ad, secili: secili) { LinearGradient(colors: h.renkler, startPoint: .topLeading, endPoint: .bottomTrailing) }
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { if !h.aciklama.isEmpty { Text(h.aciklama) } }
+                    }
+                }
+            }
+        }
+    }
+
+    private var lutSirasi: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("LUT'LARIN").bolumBasligi()
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(lutlar, id: \.self) { ad in
+                        let secili = lutAcik && lutAdi == ad
+                        Button { if secili { lutAcik = false } else { lutAdi = ad; lutAcik = true } } label: {
+                            kutu(ad.replacingOccurrences(of: ".cube", with: ""), secili: secili) {
+                                ZStack {
+                                    LinearGradient(colors: [Color(white: 0.32), Color(white: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    Text("LUT").font(.system(size: 10, weight: .bold)).tracking(1).foregroundStyle(.white.opacity(0.7))
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                try? FileManager.default.removeItem(at: Lut.klasor.appendingPathComponent(ad))
+                                if lutAdi == ad { lutAdi = ""; lutAcik = false }
+                                lutlar = Lut.kitaplik().map(\.lastPathComponent)
+                            } label: { Label("Sil", systemImage: "trash") }
+                        }
+                    }
+                    Button(action: lutEkle) {
+                        kutu(".cube ekle", secili: false) {
+                            ZStack {
+                                Color.white.opacity(0.06)
+                                RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                                Image(systemName: "plus").font(.system(size: 16, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("LUT ekle")
+                }
+            }
+        }
+    }
+
+    private func kutu<V: View>(_ ad: String, secili: Bool, @ViewBuilder _ ic: () -> V) -> some View {
+        VStack(spacing: 5) {
+            ic().frame(width: 64, height: 48)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(secili ? Tema.sari : .clear, lineWidth: 1.5))
+            Text(ad).font(.system(size: 11, weight: .medium)).lineLimit(1).frame(maxWidth: 72)
+                .foregroundStyle(secili ? Tema.sari : .white.opacity(0.85))
+        }
+    }
+
+    private func kaydirici(_ ad: String, _ yazi: String, _ deger: Binding<Float>, _ aralik: ClosedRange<Float>) -> some View {
+        VStack(spacing: 2) {
+            HStack { Text(ad); Spacer(); Text(yazi).monospacedDigit() }.font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.8))
+            Slider(value: deger, in: aralik).tint(Tema.sari)
+        }
+    }
+}

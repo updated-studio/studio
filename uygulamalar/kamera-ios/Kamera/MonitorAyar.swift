@@ -21,6 +21,8 @@ struct BolmeAyari: Codable, Equatable {
     var monokrom = false
     var temiz = false                   // temiz görüntü: odak/zebra/false color/kılavuzlar gizli (LUT kalır)
     var lutAdi = ""
+    /// Kamera'daki Stiller (hazır stil + reçete, yoğunluk, doygunluk); LUT'un üstüne biner. Yalnız ekrana. nil = eski kayıtlar
+    var stil: Stil? = nil
 
     static let peakRenkleri: [(Float, Float, Float)] = [(1, 0.15, 0.15), (0.2, 0.5, 1), (1, 1, 1), (1, 0.9, 0.1)]
 }

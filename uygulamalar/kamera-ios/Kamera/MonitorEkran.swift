@@ -410,9 +410,7 @@ struct MonitorEkran: View {
                 arac("ODAK", "viewfinder", a.peaking) { m.ayarlar[m.etkin].peaking.toggle() }
                 arac("ZEBRA", "square.stack", a.zebra, ozelZebra: true) { m.ayarlar[m.etkin].zebra.toggle() }
                 arac("FALSE", "drop.halffull", a.falseColor) { m.ayarlar[m.etkin].falseColor.toggle() }
-                arac("LUT", "square.3.layers.3d", a.lutAcik) {
-                    if a.lutAdi.isEmpty { panelAc(.lut) } else { m.ayarlar[m.etkin].lutAcik.toggle() }
-                }
+                arac("STİL", "camera.filters", a.lutAcik || a.stil?.etkin == true) { panelAc(.lut) }
                 arac("KILAVUZ", "crop", a.kilavuz > 0 || a.izgara) {
                     if a.kilavuz > 0 || a.izgara { m.ayarlar[m.etkin].kilavuz = 0; m.ayarlar[m.etkin].izgara = false } else { m.ayarlar[m.etkin].kilavuz = 2.39 }
                 }
@@ -541,7 +539,7 @@ struct MonitorEkran: View {
             .background(Color.black)
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
-                    if m.kip == .iki && sekme != .kurulum { aciklama("\(m.etkin + 1). bölmenin ayarları (bölmeye dokunarak değiştir)") }
+                    if m.kip == .iki && sekme != .kayit { aciklama("\(m.etkin + 1). bölmenin ayarları (bölmeye dokunarak değiştir)") }
                     sekmeIcerik
                 }
                 .padding(.horizontal, 28).padding(.top, 12).padding(.bottom, 28)
@@ -559,6 +557,7 @@ struct MonitorEkran: View {
     @ViewBuilder private var sekmeIcerik: some View {
         switch sekme {
         case .kayit:
+            baslik("GÖRÜNTÜ", ilk: true)
             if m.kontrolVar {
                 if m.kayitta { aciklama("Kayıt sürerken çözünürlük ve kare hızı değişmez.") }
                 let b = m.boyutlar
@@ -572,73 +571,69 @@ struct MonitorEkran: View {
             } else {
                 aciklama("USB ve Wi-Fi kaynağında çözünürlük ve kare hızı kaynaktan gelir; kayıt görüntüyü olduğu gibi alır.")
             }
+            baslik("DOSYA")
             secenek("KODEK", ["H.264", "H.265 (HEVC)"], m.hevc ? 1 : 0) { m.hevc = $0 == 1 }
             let hizlar = [10, 20, 35, 50, 80, 100, 150]
             secenek("BİT HIZI", hizlar.map { "\($0) Mb/sn" }, hizlar.firstIndex(of: m.mbps) ?? 3) { m.mbps = hizlar[$0] }
-            anahtar("SES KAYDI", $m.sesKayit)
             if m.kontrolVar {
                 anahtar("GÖRÜNTÜ SABİTLEME", Binding(get: { m.kamAyar.sabitleme }, set: { m.kamAyar.sabitleme = $0; m.kamAyarDegisti(oturumYenile: true) }))
             }
-            aciklama("Kayıtlar: Fotoğraflar. Kayıt temizdir (odak, zebra, kılavuz ve LUT kayda girmez). Kayıt düğmesine basılı tutunca ekran görüntüsü alınır.")
+            baslik("SES")
+            anahtar("SES KAYDI", $m.sesKayit)
+            aciklama("Mikrofon: iPhone/iPad mikrofonu ya da takılı USB ses girişi.")
+            baslik("CİHAZ")
+            anahtar("EKRAN PARLAKLIĞI EN YÜKSEK", $m.parlaklikTam)
+            aciklama("Kayıtlar Fotoğraflar'a gider ve temizdir (odak, zebra, kılavuz, stil kayda girmez). Kayıt düğmesine basılı tutunca ekran görüntüsü alınır. Sürüm \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "")) · güncellemeler TestFlight'tan gelir.")
         case .monitor:
-            secenek("EKRAN DÜZENİ", Monitor.Kip.allCases.map(\.rawValue), Monitor.Kip.allCases.firstIndex(of: m.kip) ?? 0) { m.kipSec(Monitor.Kip.allCases[$0]) }
-            if m.kip == .iki { aciklama("İki kaynak: ikinci bölmeye dokunup KAYNAK'tan seç. Aynı anda iki USB/telefon kamerası cihaz destekliyorsa açılır; Wi-Fi kamera her zaman olur.") }
+            baslik("ODAK", ilk: true)
             anahtar("ODAK YARDIMI", bag(\.peaking))
             secenek("ODAK RENGİ", ["Kırmızı", "Mavi", "Beyaz", "Sarı"], a.peakRenk) { m.ayarlar[m.etkin].peakRenk = $0 }
             let esik: [Float] = [0.1, 0.18, 0.3]
             secenek("ODAK HASSASİYETİ", ["Hassas", "Normal", "Kaba"], esik.firstIndex { abs($0 - a.peakEsik) < 0.01 } ?? 1) { m.ayarlar[m.etkin].peakEsik = esik[$0] }
+            let zum: [Float] = [1, 2, 4]
+            secenek("BÜYÜTME", ["1x", "2x", "4x"], zum.firstIndex(of: a.zoom) ?? 0) { m.ayarlar[m.etkin].zoom = zum[$0] }
+            baslik("POZLAMA")
             anahtar("ZEBRA", bag(\.zebra))
             let zeb: [Float] = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.995]
             secenek("ZEBRA SEVİYESİ", ["%70", "%75", "%80", "%85", "%90", "%95", "%100"], zeb.firstIndex { abs($0 - a.zebraEsik) < 0.01 } ?? 5) { m.ayarlar[m.etkin].zebraEsik = zeb[$0] }
             anahtar("FALSE COLOR", bag(\.falseColor))
             anahtar("SİYAH-BEYAZ", bag(\.monokrom))
+            baslik("EKRAN")
+            secenek("EKRAN DÜZENİ", Monitor.Kip.allCases.map(\.rawValue), Monitor.Kip.allCases.firstIndex(of: m.kip) ?? 0) { m.kipSec(Monitor.Kip.allCases[$0]) }
+            if m.kip == .iki { aciklama("İki kaynak: ikinci bölmeye dokunup KAYNAK'tan seç. Aynı anda iki USB/telefon kamerası cihaz destekliyorsa açılır; Wi-Fi kamera her zaman olur.") }
             anahtar("TEMİZ GÖRÜNTÜ", bag(\.temiz))
-            let zum: [Float] = [1, 2, 4]
-            secenek("BÜYÜTME", ["1x", "2x", "4x"], zum.firstIndex(of: a.zoom) ?? 0) { m.ayarlar[m.etkin].zoom = zum[$0] }
         case .kompozisyon:
-            secenek("KOMPOZİSYON KILAVUZU", KompTur.allCases.map(\.ad), KompTur.allCases.firstIndex(of: m.kompTur) ?? 0) { m.kompTur = KompTur.allCases[$0] }
+            baslik("AKILLI KADRAJ", ilk: true)
+            anahtar("AKILLI YARDIMCI", $m.asistanAcik)
+            aciklama("Yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca ibre yeşile döner. Cihazın içinde çalışır. Büyütme açıkken durur.")
+            anahtar("KOMPOZİSYON ÖNERİSİ", $m.oneriAcik)
+            aciklama("Konuya en az hareketle uyan kılavuzu üstte önerir; dokununca uygulanır.")
+            baslik("KOMPOZİSYON")
+            secenek("KILAVUZ", KompTur.allCases.map(\.ad), KompTur.allCases.firstIndex(of: m.kompTur) ?? 0) { m.kompTur = KompTur.allCases[$0] }
             if m.kompTur == .spiral || m.kompTur == .ucgen {
                 secenek("YÖN", ["Sağ alt", "Sol alt", "Sağ üst", "Sol üst"], m.kompYon) { m.kompYon = $0 }
             }
-            anahtar("AKILLI YARDIMCI", $m.asistanAcik)
-            aciklama("Yardımcı yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca ibre yeşile döner. Telefonun içinde çalışır, internet gerekmez. Büyütme açıkken durur.")
-            anahtar("KOMPOZİSYON ÖNERİSİ", $m.oneriAcik)
-            aciklama("Konuya en az hareketle uyan kılavuzu üstte önerir; dokununca uygulanır.")
             anahtar("TERAZİ (UFUK)", $m.teraziAcik)
-        case .kilavuz:
+            baslik("ÇERÇEVE")
             let oran: [Float] = [0, 2.39, 2.35, 2, 1.85, 16 / 9, 4 / 3, 0.8, 9 / 16, 1]
-            secenek("KADRAJ KILAVUZU", ["Kapalı", "2,39:1", "2,35:1", "2:1", "1,85:1", "16:9", "4:3", "4:5", "9:16", "1:1"], oran.firstIndex { abs($0 - a.kilavuz) < 0.01 } ?? 0) {
+            secenek("KADRAJ ORANI", ["Kapalı", "2,39:1", "2,35:1", "2:1", "1,85:1", "16:9", "4:3", "4:5", "9:16", "1:1"], oran.firstIndex { abs($0 - a.kilavuz) < 0.01 } ?? 0) {
                 m.ayarlar[m.etkin].kilavuz = oran[$0]
             }
-            anahtar("IZGARA (ÜÇTE BİR)", bag(\.izgara))
-            anahtar("MERKEZ İŞARETİ", bag(\.merkez))
             let guv: [Float] = [0, 0.9, 0.8]
             secenek("GÜVENLİ ALAN", ["Kapalı", "%90", "%80"], guv.firstIndex { abs($0 - a.guvenli) < 0.01 } ?? 0) { m.ayarlar[m.etkin].guvenli = guv[$0] }
-            anahtar("TERAZİ (UFUK)", $m.teraziAcik)
+            anahtar("IZGARA (ÜÇTE BİR)", bag(\.izgara))
+            anahtar("MERKEZ İŞARETİ", bag(\.merkez))
         case .lut:
-            anahtar("EKRAN LUT'U", bag(\.lutAcik))
-            let l = Lut.kitaplik()
-            aciklama(l.isEmpty ? "Kitaplık boş. 3D .cube LUT ekle; eklediklerin burada saklanır. LUT yalnız ekrana uygulanır, kayda girmez." : "Kitaplık (\(l.count)). Seçince etkin bölmeye uygulanır:")
-            ForEach(l, id: \.self) { u in
-                satir(u.deletingPathExtension().lastPathComponent, secili: u.lastPathComponent == a.lutAdi && a.lutAcik, simge: "square.3.layers.3d", sil: {
-                    try? FileManager.default.removeItem(at: u)
-                    if a.lutAdi == u.lastPathComponent { m.ayarlar[m.etkin].lutAdi = ""; m.ayarlar[m.etkin].lutAcik = false }
-                    m.objectWillChange.send()
-                }) {
-                    m.ayarlar[m.etkin].lutAdi = u.lastPathComponent
-                    m.ayarlar[m.etkin].lutAcik = true
-                }
-            }
-            Button { lutAl = true } label: {
-                Label("LUT EKLE (.cube)", systemImage: "plus").font(.system(size: 15, weight: .semibold))
-                    .padding(.horizontal, 16).frame(height: 44)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Self.koyu2))
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 12)
+            aciklama("Kamera'daki Stiller: hazır görünüm, film reçetesi ya da kendi .cube LUT'un. Etkin bölmeye uygulanır, yalnız ekrana; kayıt temiz kalır.")
+            MonitorStilleri(stil: Binding(get: { m.ayarlar[m.etkin].stil ?? Stil() }, set: { m.ayarlar[m.etkin].stil = $0 }),
+                            lutAdi: bag(\.lutAdi), lutAcik: bag(\.lutAcik)) { lutAl = true }
         case .olcum:
+            baslik("EKRANDA", ilk: true)
             anahtar("HİSTOGRAM (ALT ŞERİT)", $m.koseHisto)
-            aciklama("Tam ölçüm paneli: MONİTÖR → EKRAN DÜZENİ → Görüntü + ölçümler. Panelde görünecekler:")
+            anahtar("SES GÖSTERGESİ", $m.sesGosterge)
+            aciklama("Ses −60…0 dBFS, yeşil → sarı (−12) → kırmızı (−3).")
+            baslik("ÖLÇÜM PANELİ")
+            aciklama("GÖRÜNTÜ → EKRAN DÜZENİ → Görüntü + ölçümler seçilince yanda açılır. Panelde görünecekler:")
             ForEach(OlcumHesap.Tur.allCases) { t in
                 anahtar(t.rawValue.uppercased(with: Locale(identifier: "tr")), Binding(get: { m.olcum.gorunen.contains(t) }, set: { ac in
                     var g = m.olcum.gorunen.filter { $0 != t }
@@ -646,11 +641,8 @@ struct MonitorEkran: View {
                     m.olcum.gorunen = g
                 }))
             }
-        case .ses:
-            anahtar("SES GÖSTERGESİ", $m.sesGosterge)
-            anahtar("SES KAYDI", $m.sesKayit)
-            aciklama("Gösterge −60…0 dBFS, yeşil → sarı (−12) → kırmızı (−3). Mikrofon: iPhone/iPad mikrofonu ya da takılı USB ses girişi.")
         case .kaynak:
+            baslik("KAYNAKLAR", ilk: true)
             ForEach(Monitor.cihazListesi(), id: \.uniqueID) { d in
                 satir(Monitor.cihazAdi(d), secili: m.kaynaklar[m.etkin] == .cihaz(d.uniqueID) || (m.kaynaklar[m.etkin] == nil && m.etkinCihaz?.uniqueID == d.uniqueID)) { m.cihazSec(d) }
             }
@@ -679,15 +671,22 @@ struct MonitorEkran: View {
             .padding(.vertical, 8)
             if case .ag(let u) = m.kaynaklar[m.etkin] { satir("Ağ yayını: \(u)", secili: true) {} }
             aciklama("Ağ yayını: HLS (…/index.m3u8) ya da http(s) video; iOS RTSP/RTMP açmaz. Wi-Fi kamera: başka bir iPhone'da UPDATED Kamera → Wi-Fi kamera, Android'de Ayarlar → Wi-Fi kamera ol. Aynı ağdaysa burada kendiliğinden listelenir.")
+            baslik("GÖRÜNTÜYÜ ÇEVİR")
             let ana: [Float] = [1, 1.33, 1.5, 1.6, 1.8, 2]
             secenek("ANAMORFİK AÇMA", ["Kapalı", "1,33x", "1,5x", "1,6x", "1,8x", "2x"], ana.firstIndex { abs($0 - a.desqueeze) < 0.01 } ?? 0) { m.ayarlar[m.etkin].desqueeze = ana[$0] }
             secenek("DÖNDÜR", ["0°", "90°", "180°", "270°"], a.dondur / 90) { m.ayarlar[m.etkin].dondur = $0 * 90 }
             anahtar("AYNA", bag(\.ayna))
             anahtar("TERS ÇEVİR", bag(\.cevir))
-        case .kurulum:
-            anahtar("EKRAN PARLAKLIĞI EN YÜKSEK", $m.parlaklikTam)
-            aciklama("UPDATED Kamera \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "")) · güncellemeler TestFlight'tan gelir.")
         }
+    }
+
+    /// Grup başlığı: gruplar arası boşluk, ince çizgi
+    private func baslik(_ ad: String, ilk: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !ilk { Rectangle().fill(Color.white.opacity(0.08)).frame(height: 0.5) }
+            Text(ad).font(.system(size: 12, weight: .semibold)).tracking(1.4).foregroundStyle(Self.gri)
+        }
+        .padding(.top, ilk ? 6 : 26).padding(.bottom, 2)
     }
 
     private func aciklama(_ metin: String) -> some View {
