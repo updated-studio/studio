@@ -184,7 +184,9 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     fun mevcutKelvin(): Int = ayar.kelvin ?: (BeyazDenge.tahmin(oz, sonKazanc) / BeyazDenge.ADIM * BeyazDenge.ADIM)
     /** Diyafram: telefonun mercek açıklıkları (çoğu telefonda tek; değişken diyaframlı telefonda birden çok) */
     val diyaframlar: FloatArray by lazy { oz.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES) ?: FloatArray(0) }
-    private val hdrAcik: Boolean get() = ayar.renk == 1 && hdrVar && !fotoModu
+    /** Wi-Fi kamera yayınında HDR kapalı: görüntü 8 bit SDR'ye çizilip Masa'ya gidiyor, HLG ton eşlemesiz soluk ve kayık görünüyordu */
+    @Volatile var sdrZorla = false
+    private val hdrAcik: Boolean get() = ayar.renk == 1 && hdrVar && !fotoModu && !sdrZorla
     fun secilenFotoBoyut(): Size? = ayar.fotoBoyut?.takeIf { it in fotoBoyutlari } ?: fotoBoyutlari.firstOrNull()
 
     val yetenek: KameraYetenek by lazy {

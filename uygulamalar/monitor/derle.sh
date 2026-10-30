@@ -28,7 +28,7 @@ if [ "${1:-}" = "--yalniz-onizleme" ]; then
   exit 0
 fi
 
-$GRADLE -q assembleRelease --console=plain
+$GRADLE -q :app:assembleRelease --console=plain
 cp app/build/outputs/apk/release/app-release.apk "$K/updated-monitor.apk"
 cp app/build/outputs/apk/release/app-release.apk "$K/updated-monitor-$SURUM.apk"
 # Eski sürümlerin son 5'i kalır (her biri ~45 MB); geri dönüş için hangi commit'ten derlendikleri yayinlar.txt'de (geri-al.sh)

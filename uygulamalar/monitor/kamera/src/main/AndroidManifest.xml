@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Kamera: açılış ekranı, dikey sabit (telefon döndükçe yalnız ikonlar döner) -->
+        <activity
+            android:name="tr.com.updated.monitor.KameraActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:keepScreenOn="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <!-- Ekranı Masa'ya gönder (ekran yansıtma, ön plan hizmeti) -->
+        <service
+            android:name="tr.com.updated.monitor.EkranYayini"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+        <!-- Kayıttan sonra videoya stil (LUT) işleme: ekrandan çıkılsa da sürer -->
+        <service
+            android:name="tr.com.updated.monitor.VideoIsleme"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|mediaProcessing" />
+    </application>
+</manifest>

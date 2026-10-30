@@ -1,68 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.external" android:required="false" />
-    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
-    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <!-- Ekranlar, hizmetler ve izinler modüllerin kendi bildirimlerinde (ortak, kamera, masa); burada yalnız uygulamanın kendisi -->
     <application
         android:label="UPDATED Kamera"
         android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
         android:hardwareAccelerated="true"
-        android:allowBackup="false">
-        <!-- Kamera: açılış ekranı, dikey sabit (telefon döndükçe yalnız ikonlar döner) -->
-        <activity
-            android:name=".KameraActivity"
-            android:exported="true"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
-            android:keepScreenOn="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        <!-- PRO (Blackmagic düzeni) ve Monitör: dikey ve yatay; USB görüntü takılınca Monitör açılır -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:screenOrientation="fullUser"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
-            android:keepScreenOn="true">
-            <intent-filter>
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
-            </intent-filter>
-            <meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" android:resource="@xml/usb_aygit" />
-        </activity>
-        <!-- Masa: çok kameralı kayıt (Wi-Fi kameraları + USB görüntü), dikey ve yatay -->
-        <activity
-            android:name=".MasaActivity"
-            android:exported="false"
-            android:screenOrientation="fullUser"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
-            android:keepScreenOn="true" />
-        <!-- Ekranı Masa'ya gönder (ekran yansıtma, ön plan hizmeti) -->
-        <service
-            android:name=".EkranYayini"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
-        <!-- Kayıttan sonra videoya stil (LUT) işleme: ekrandan çıkılsa da sürer -->
-        <service
-            android:name=".VideoIsleme"
-            android:exported="false"
-            android:foregroundServiceType="dataSync|mediaProcessing" />
-    </application>
+        android:allowBackup="false" />
 </manifest>

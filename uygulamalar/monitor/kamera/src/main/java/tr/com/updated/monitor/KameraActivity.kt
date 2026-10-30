@@ -63,7 +63,7 @@ class KameraActivity : Activity() {
         /** Bu süreçte açılış sorusu soruldu mu (uygulama tamamen kapanınca sıfırlanır) */
         var girisSoruldu = false
         /** Yalnız ekran testi: kamera olmadığında baz ISO işaretini göstermek için örnek değer */
-        internal var ornekBazIso: Int? = null
+        var ornekBazIso: Int? = null
         /*
          * Tasarım dili (Fatih 29 Ekim onayı; iPhone 0.10.0 ile aynı): tek yazı ailesi (Inter, tablo rakamları); metin beyaz / %62 / %28;
          * yüzeyler siyah %34 + 0,5 px beyaz %18 hat; sarı yalnız elle değiştirilmiş değerde, yeşil onay, kırmızı kayıt; başka renk yok.
@@ -1340,7 +1340,7 @@ class KameraActivity : Activity() {
         val (id, ad) = kamListe.getOrNull(kamIndex) ?: return tost("Telefonda kamera bulunamadı.")
         ayar = ayarOku(id)
         val k = runCatching { KameraKaynak(this, id, ad, ayar) }.getOrElse { e -> tost("Kamera açılamadı: ${e.message}"); HataKaydi.not("kamera", e.stackTraceToString()); return }
-        k.fotoModu = mod.foto; k.sahne = mod.sahne; k.pro = proIstek(); k.ekranYonu = (360 - fizikselYon) % 360
+        k.fotoModu = mod.foto; k.sahne = mod.sahne; k.sdrZorla = wifiKamera; k.pro = proIstek(); k.ekranYonu = (360 - fizikselYon) % 360
         @Suppress("DEPRECATION") monitor.otoDondur = windowManager.defaultDisplay.rotation * 90
         kaynak = k
         k.baslat(y, { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); zoomCiz(); flasCiz(); aracCiz() } }, { hata -> runOnUiThread { if (hata == "POLITIKA") engelli() else tost(hata) } })
@@ -2174,7 +2174,7 @@ class KameraActivity : Activity() {
         if (mod == KMod.PRO) {
             val a = proMod.oku(tercih)
             proMod.birlestirme(a, k.yetenek.elleKontrol, k.yetenek.pozlamaAralik?.upper ?: 0L)?.let { return birlestirCek(it, proMod.kareSayisi(a), a.sureSn * 1000L, proMod.ad) }
-            if (a.iso != null && a.enstNs != null && a.enstNs >= 1_000_000_000L) uzunNs = a.enstNs
+            val e = a.enstNs; if (a.iso != null && e != null && e >= 1_000_000_000L) uzunNs = e
         }
         if (mod == KMod.FOTO) {
             val p = ayar.pozlamaNs
@@ -2415,7 +2415,7 @@ class KameraActivity : Activity() {
 
     /* ================= yön: ikonlar döner, düzen sabit ================= */
     /** Yalnız ekran testi: telefon yan tutulmuş gibi ikonlar hemen döner */
-    internal fun testYon(d: Int) { fizikselYon = d; donenler.forEach { it.rotation = -d.toFloat() } }
+    fun testYon(d: Int) { fizikselYon = d; donenler.forEach { it.rotation = -d.toFloat() } }
 
     /** Kayıt zaman kodu: ss:dd:ss:kare */
     private fun zamanKodu(ms: Long): String { val fps = ayar.fps?.upper ?: 30
@@ -2440,7 +2440,7 @@ class KameraActivity : Activity() {
     }
     private fun masayaGec() {
         if (kayitSuruyor()) return tost("Önce kaydı durdur.")
-        startActivity(Intent(this, MasaActivity::class.java))
+        if (!Ekranlar.ac(this, Ekranlar.MASA)) tost("Masa bu uygulamada yok.")
     }
 
     /**
@@ -2449,6 +2449,8 @@ class KameraActivity : Activity() {
      */
     private fun yayinAyarla() {
         val iste = wifiKamera && onde && tlKaydedici == null
+        kaynak?.let { k -> if (onde && k.sdrZorla != wifiKamera) { k.sdrZorla = wifiKamera
+            if (ayar.renk == 1 && k.hdrVar) { oturumuYenile(); if (wifiKamera) tost("Wi-Fi kamera açıkken HDR kapalı: Masa'ya SDR gider.") } } }
         if (!iste) { verici?.let { it.durdur(); verici = null; if (tlKaydedici == null) monitor.kayitYuzeyi = null }; tallyCerceve.visibility = View.GONE; masaCip.visibility = View.GONE; return }
         if (verici != null) return
         val (kw, kh) = monitor.kayitBoyutu()

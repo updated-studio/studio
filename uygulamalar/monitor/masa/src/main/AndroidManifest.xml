@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Masa: çok kameralı kayıt (Wi-Fi kameraları + USB görüntü), dikey ve yatay -->
+        <activity
+            android:name="tr.com.updated.monitor.MasaActivity"
+            android:exported="false"
+            android:screenOrientation="fullUser"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:keepScreenOn="true" />
+    </application>
+</manifest>

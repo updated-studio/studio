@@ -36,8 +36,6 @@ import java.util.Locale
  */
 class MasaActivity : Activity() {
     companion object {
-        /** Masa ön plandayken MainActivity USB takılınca açılmaz */
-        @Volatile var acik = false
         val KIRMIZI = Color.rgb(229, 57, 53); val YESIL = Color.rgb(52, 199, 89); val TURUNCU = Color.rgb(255, 107, 26); val GRI = Color.rgb(169, 175, 184) }
 
     private val dongu = Handler(Looper.getMainLooper())
@@ -260,7 +258,7 @@ class MasaActivity : Activity() {
     }
 
     /** Yalnız ekran testi: kaynak yokken yuvaların görünüşü için örnek adlar */
-    internal fun ornekDoldur() {
+    fun ornekDoldur() {
         listOf("USB: Sony ILCE-7M5", "UPDATED · Pixel 8", "UPDATED · Galaxy S24").forEachIndexed { i, a -> adlar[i] = a }
         masa.dolu = booleanArrayOf(true, true, true, false); masa.canli = 0; if (tablet) masa.siradaki = 1; duzen()
     }
@@ -512,7 +510,7 @@ class MasaActivity : Activity() {
 
     /* ================= yaşam döngüsü ================= */
     override fun onResume() {
-        super.onResume(); acik = true; masa.onResume(); tamEkran()
+        super.onResume(); Ekranlar.masaAcik = true; masa.onResume(); tamEkran()
         // Bazı telefonlar Wi-Fi'da çoklu yayın paketlerini kilit olmadan atar (kameralar bulunmaz)
         cokluYayin = runCatching { (applicationContext.getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager).createMulticastLock("masa").apply { setReferenceCounted(false); acquire() } }.getOrNull()
         bulucu = KameraBulucu(this) { ad, adres, kapi -> runOnUiThread {
@@ -522,7 +520,7 @@ class MasaActivity : Activity() {
         } }.also { it.baslat() }
     }
     override fun onPause() {
-        super.onPause(); acik = false; bulucu?.durdur(); bulucu = null; runCatching { cokluYayin?.release() }; cokluYayin = null
+        super.onPause(); Ekranlar.masaAcik = false; bulucu?.durdur(); bulucu = null; runCatching { cokluYayin?.release() }; cokluYayin = null
         if (kaydedici != null) kayitBitir(true)
         masa.onPause()
     }

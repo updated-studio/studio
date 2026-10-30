@@ -53,6 +53,9 @@ class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, v
         val f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, genislik, yukseklik).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, mbps * 1_000_000); setInteger(MediaFormat.KEY_FRAME_RATE, 60); setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+            // Renk bilgisi akışa yazılır (BT.709, sınırlı aralık, SDR); Masa'daki ayrı kayıt da bunu taşır
+            setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT709); setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+            setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO)
             if (android.os.Build.VERSION.SDK_INT >= 30) setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
         }
         kodlayici = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).also { it.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE) }

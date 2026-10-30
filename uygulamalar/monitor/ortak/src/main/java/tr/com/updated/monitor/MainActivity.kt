@@ -137,7 +137,7 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         // Masa açıkken takılan USB kamera masaya eklenir (MasaActivity kendisi dinler); Monitör üstüne açılmasın
-        if (intent?.action == android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED && MasaActivity.acik) { finish(); return }
+        if (intent?.action == android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED && Ekranlar.masaAcik) { finish(); return }
         HataKaydi.kur(this)
         ayarlariOku()
         kip = runCatching { Kip.valueOf(tercih.getString("kip2", "TEK")!!) }.getOrDefault(Kip.TEK) // Monitör de tam ekran görüntüyle açılır (ölçümler DÜZEN'den)
