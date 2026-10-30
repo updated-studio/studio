@@ -33,7 +33,7 @@ struct AnaEkran: View {
     @State private var giris = !GirisEkran.soruldu && UserDefaults.standard.string(forKey: "giris") == nil
     /// Masa (çok kamera), Wi-Fi kamera ya da Monitör açıkken ana kamera durur
     @State private var ekran: Ekran?
-    enum Ekran: String, Identifiable { case masa, wifi, monitor; var id: String { rawValue } }
+    enum Ekran: String, Identifiable { case masa, wifi, monitor, vlog; var id: String { rawValue } }
     @Environment(\.scenePhase) private var evre
 
     static let mavi = Color(red: 106 / 255, green: 152 / 255, blue: 248 / 255)
@@ -86,10 +86,11 @@ struct AnaEkran: View {
             case .masa: MasaEkran { ekran = nil }
             case .wifi: WifiKameraEkran { ekran = nil }
             case .monitor: MonitorEkran { ekran = nil }
+            case .vlog: VlogEkran { ekran = nil }
             }
         }
         .sheet(isPresented: $ayarlar) {
-            KameraAyarlar(kamera: kamera, wifiKamera: { ekranAc(.wifi) }, masa: { ekranAc(.masa) })
+            KameraAyarlar(kamera: kamera, wifiKamera: { ekranAc(.wifi) }, masa: { ekranAc(.masa) }, vlog: { ekranAc(.vlog) })
         }
     }
 

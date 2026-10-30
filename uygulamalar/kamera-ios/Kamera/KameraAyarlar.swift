@@ -7,6 +7,7 @@ struct KameraAyarlar: View {
     @ObservedObject var kamera: Kamera
     var wifiKamera: () -> Void
     var masa: () -> Void
+    var vlog: () -> Void = {}
     @Environment(\.dismiss) private var kapat
     @State private var girisSor = UserDefaults.standard.string(forKey: "giris") == nil
 
@@ -31,17 +32,21 @@ struct KameraAyarlar: View {
                 } header: { Text("Çözünürlük") } footer: { Text(ozet) }
 
                 Section {
-                    NavigationLink { kayit } label: { satir("film", .orange, "Kayıt", "\(kamera.kodek.kisa) · \(kamera.renkModu.kisa)") }
+                    NavigationLink { kayit } label: { satir("record.circle", .orange, "Kayıt", "\(kamera.kodek.kisa) · \(kamera.renkModu.kisa)") }
                     NavigationLink { pozlama } label: { satir("plusminus.circle", .yellow, "Pozlama", kamera.enstAci ? "Açı" : "Süre") }
-                    NavigationLink { renk } label: { satir("thermometer.sun", .pink, "Renk ve beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto") }
-                    NavigationLink { ses } label: { satir("mic", .red, "Ses", kamera.etkinSesGirdi ?? "Otomatik") }
-                    NavigationLink { fotograf } label: { satir("camera", .blue, "Fotoğraf", kamera.raw && kamera.rawVar ? "RAW" : "JPEG") }
+                    NavigationLink { renk } label: { satir("circle.lefthalf.filled", .pink, "Renk ve beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto") }
+                    NavigationLink { ses } label: { satir("waveform", .red, "Ses", kamera.etkinSesGirdi ?? "Otomatik") }
+                    NavigationLink { fotograf } label: { satir("camera.aperture", .blue, "Fotoğraf", kamera.raw && kamera.rawVar ? "RAW" : "JPEG") }
                     NavigationLink { FavoriDuzenle(kamera: kamera) } label: { satir("pin", .yellow, "Sabitlenenler", "\(kamera.favoriler.count)") }
-                    NavigationLink { gostergeler } label: { satir("chart.bar.xaxis", .green, "Göstergeler", kamera.gostergeEtkin ? "Açık" : (kamera.kompTur == .kapali ? "" : kamera.kompTur.ad)) }
-                    NavigationLink { timelapse } label: { satir("timer", .purple, "Timelapse", Timelapse.aralikYazi(kamera.tlAralik)) }
+                    NavigationLink { gostergeler } label: { satir("chart.bar", .green, "Göstergeler", kamera.gostergeEtkin ? "Açık" : (kamera.kompTur == .kapali ? "" : kamera.kompTur.ad)) }
+                    NavigationLink { timelapse } label: { satir("timelapse", .purple, "Timelapse", Timelapse.aralikYazi(kamera.tlAralik)) }
                 }
                 Section {
-                    NavigationLink { masaBolum } label: { satir("rectangle.split.2x2", .teal, "Masa (çok kamera)", "") }
+                    Button { kapat(); vlog() } label: { satir("person.crop.rectangle.stack", .orange, "Vlog (çift kamera)", "Arka + ön") }
+                        .foregroundStyle(.white)
+                } footer: { Text("Arka ve ön kamera aynı anda; ön kamera köşede. Arka, ön ve birleşik görüntü ayrı dosyalara.") }
+                Section {
+                    NavigationLink { masaBolum } label: { satir("rectangle.split.2x2", .teal, "Multi Cam", "") }
                     NavigationLink { uygulama } label: { satir("info.circle", .gray, "Uygulama", KameraAyarlar.surum) }
                 }
             }
@@ -240,14 +245,19 @@ struct KameraAyarlar: View {
     }
 
     /// Ayarlar uygulamasındaki gibi: renkli kare simge, ad, sağda o anki değer
+    /// Menü satırı (Fatih 30 Ekim: renkli kutulu simgeler "saçma"): kameranın dili, tek renk ince simge, yarım piksel hatlı koyu kutu;
+    /// renk yalnız değer elle değişmişse (sarı). `renk` parametresi eski çağrılar için durur, kullanılmaz.
     private func satir(_ simge: String, _ renk: Color, _ ad: String, _ deger: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: simge).font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
-                .frame(width: 28, height: 28).background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(renk.gradient))
-            Text(ad)
+        HStack(spacing: 13) {
+            Image(systemName: simge).font(.system(size: 14, weight: .regular)).foregroundStyle(.white.opacity(0.92))
+                .frame(width: 30, height: 30)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.07)))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Tema.hat, lineWidth: 0.5))
+            Text(ad).font(.system(size: 16))
             Spacer()
-            Text(deger).foregroundStyle(.secondary).lineLimit(1)
+            Text(deger).font(.system(size: 15).monospacedDigit()).foregroundStyle(Tema.ikincil).lineLimit(1)
         }
+        .padding(.vertical, 1)
     }
 
     /// Tek seçimli satır: ad, altında kısa açıklama, seçiliyse ✓; desteklenmiyorsa soluk

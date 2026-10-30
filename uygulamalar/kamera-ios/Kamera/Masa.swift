@@ -64,6 +64,8 @@ struct Goruntu: UIViewRepresentable {
 final class Yuva: ObservableObject, Identifiable {
     let id = UUID()
     let ad: String
+    /// Ön kamera vlogda ayna gibi (bağlantıda çevrilir)
+    var ayna = false
     let alici: WifiAlici?
     let usbKimlik: String?
     /// Bu cihazın kendi kamerası (arka / ön); USB kaynağıyla aynı yoldan kaydedilir
@@ -112,6 +114,18 @@ final class Yuva: ObservableObject, Identifiable {
 final class Masa: NSObject, ObservableObject {
     static let enCok = 4
 
+    /// Vlog (Kamera uygulaması, Fatih 30 Ekim "çift kamera ile Vlog kayıt"): aynı motor; arka kamera canlı, ön kamera PiP, dikey program,
+    /// Wi-Fi / USB aranmaz, kayıt "UPDATED Vlog/" klasörüne (arka, ön ve birleşik dosya)
+    let vlog: Bool
+    /// Program dikey (9:16): vlogda varsayılan
+    let dikey: Bool
+    init(vlog: Bool = false, dikey: Bool = false) {
+        self.vlog = vlog
+        self.dikey = dikey
+        super.init()
+    }
+    private var klasorAdi: String { vlog ? "UPDATED Vlog" : "UPDATED Masa" }
+
     @Published var yuvalar: [Yuva] = []
     @Published var canli: UUID?
     /// iPad masası: önizlemedeki (sıradaki) kaynak; KES ile canlıya geçer (ATEM'deki PREVIEW)
@@ -154,16 +168,16 @@ final class Masa: NSObject, ObservableObject {
         }
     }
     /// Şu anki düzende dizilen kaynak sayısı (0 = tek)
-    var duzenAdet: Int { duzen.adet(yuvalar.count) }
+    var duzenAdet: Int { vlog ? 0 : duzen.adet(yuvalar.count) }
     private var duzenZamanlayici: DispatchSourceTimer?
     private var onizlemeHavuz: CVPixelBufferPool?
     /// Dizili düzendeki kaynaklar (kilit altında; kayıt kuyruğu okur)
     private var _duzenKaynaklar: [Yuva] = []
     /// Birleştirici çalışırken (kilit altında): geçiş, katmanlar, karartma
     private struct GecisDurumu { let eski: Yuva; let bas: CFTimeInterval; let sure: Double; let tur: Gecis }
-    private var _gecis: GecisDurumu?
+    private var _gecisD: GecisDurumu?
     private var _pipYuva: Yuva?
-    private var _logo: CIImage?
+    private var _logoCI: CIImage?
     private var _altYazi: CIImage?
     private var _ftb: (hedef: Bool, bas: CFTimeInterval, sure: Double) = (false, 0, 0.5)
     /// Ekrandaki program monitörü için küçük tuval (1280×720); kayıt dosyası 4K
@@ -245,6 +259,25 @@ final class Masa: NSObject, ObservableObject {
     func ac() {
         UIApplication.shared.isIdleTimerDisabled = true
         duzenDegisti()
+        if vlog {
+            Task {
+                _ = await AVCaptureDevice.requestAccess(for: .video)
+                _ = await AVCaptureDevice.requestAccess(for: .audio)
+                usbKuyruk.async {
+                    self.oturumKur(coklu: AVCaptureMultiCamSession.isMultiCamSupported)
+                    DispatchQueue.main.async {
+                        self.telefonKamerasiEkle(on: false)
+                        if AVCaptureMultiCamSession.isMultiCamSupported {
+                            self.telefonKamerasiEkle(on: true)
+                            self.pip = true
+                        } else {
+                            self.bildirim = "Bu iPhone iki kamerayı aynı anda açamıyor; yalnız arka kamera"
+                        }
+                    }
+                }
+            }
+            return
+        }
         bulucu.bulundu = { [weak self] ad, hedef in self?.wifiBulundu(ad, hedef) }
         bulucu.izinYok = { [weak self] in self?.aglarIzni = false }
         bulucu.baslat()
@@ -365,7 +398,7 @@ final class Masa: NSObject, ObservableObject {
             bildirim = "Bu cihazda \(on ? "ön" : "arka") kamera yok"; return
         }
         guard !yuvalar.contains(where: { $0.usbKimlik == d.uniqueID }) else { bildirim = "\(on ? "Ön" : "Arka") kamera zaten ekli"; return }
-        usbEkle(d, ad: on ? "Ön kamera" : "Arka kamera", yerlesik: true)
+        usbEkle(d, ad: on ? "Ön kamera" : "Arka kamera", yerlesik: true, ayna: on && vlog)
     }
 
     // MARK: Insta360 Luna (kameranın kendi Wi-Fi'ı, Insta360.swift)
@@ -402,9 +435,10 @@ final class Masa: NSObject, ObservableObject {
         }
     }
 
-    private func usbEkle(_ d: AVCaptureDevice, ad: String? = nil, yerlesik: Bool = false) {
+    private func usbEkle(_ d: AVCaptureDevice, ad: String? = nil, yerlesik: Bool = false, ayna: Bool = false) {
         guard yuvalar.count < Masa.enCok else { bildirim = "En çok \(Masa.enCok) kaynak"; return }
         let y = Yuva(ad: ad ?? d.localizedName, usbKimlik: d.uniqueID, yerlesik: yerlesik)
+        y.ayna = ayna
         yuvalar.append(y)
         if canli == nil { canliYap(y) }
         duzenDegisti()
@@ -465,13 +499,18 @@ final class Masa: NSObject, ObservableObject {
         s.addOutputWithNoConnections(c)
         let b = AVCaptureConnection(inputPorts: [port], output: c)
         guard s.canAddConnection(b) else { s.removeOutput(c); s.removeInput(g); return false }
+        // Vlog: yerleşik kamera dikey çekilir (kareler 9:16 gelir), ön kamera ayna
+        let dik = dikey && y.yerlesik && b.isVideoRotationAngleSupported(90)
+        if dik { b.videoRotationAngle = 90 }
+        if y.ayna, b.isVideoMirroringSupported { b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = true }
         s.addConnection(b)
         if !coklu { bicimSec(d, coklu: false) }
         if let m = s as? AVCaptureMultiCamSession, m.hardwareCost > 1 {
             s.removeConnection(b); s.removeOutput(c); s.removeInput(g); return false
         }
         c.setSampleBufferDelegate(self, queue: kareKuyruk)
-        y.boyut = CMVideoFormatDescriptionGetDimensions(d.activeFormat.formatDescription)
+        let b0 = CMVideoFormatDescriptionGetDimensions(d.activeFormat.formatDescription)
+        y.boyut = dik ? CMVideoDimensions(width: min(b0.width, b0.height), height: max(b0.width, b0.height)) : b0
         kilit.lock(); usbBaglar[ObjectIdentifier(c)] = UsbBag(yuva: y, girdi: g, cikti: c); kilit.unlock()
         return true
     }
@@ -529,18 +568,18 @@ final class Masa: NSObject, ObservableObject {
     func autoYap(_ y: Yuva) {
         guard let eski = yuvalar.first(where: { $0.id == canli }), eski !== y, duzenAdet == 0 else { canliYap(y); return }
         let d = GecisDurumu(eski: eski, bas: CACurrentMediaTime(), sure: gecisSure, tur: gecis)
-        kilit.lock(); _gecis = d; kilit.unlock()
+        kilit.lock(); _gecisD = d; kilit.unlock()
         gecisIlerleme = 0
         duzenDegisti()
         canliYap(y)
         // Çubuk ilerlemesi ve bitiş
         let adim = 1.0 / 30
         func ilerle() {
-            kilit.lock(); let g = _gecis; kilit.unlock()
+            kilit.lock(); let g = _gecisD; kilit.unlock()
             guard let g, g.bas == d.bas else { return }
             let p = (CACurrentMediaTime() - g.bas) / g.sure
             if p >= 1 {
-                kilit.lock(); _gecis = nil; kilit.unlock()
+                kilit.lock(); _gecisD = nil; kilit.unlock()
                 gecisIlerleme = nil
                 duzenDegisti()
             } else {
@@ -602,7 +641,7 @@ final class Masa: NSObject, ObservableObject {
     private var birlestiriciGerek: Bool {
         kilit.lock(); defer { kilit.unlock() }
         let ftbAcik = _ftb.hedef || CACurrentMediaTime() - _ftb.bas < _ftb.sure + 0.1
-        return _gecis != nil || (pip && _pipYuva != nil) || (logoAcik && _logo != nil) || (altYaziAcik && _altYazi != nil) || ftbAcik
+        return _gecisD != nil || (pip && _pipYuva != nil) || (logoAcik && _logoCI != nil) || (altYaziAcik && _altYazi != nil) || ftbAcik
     }
 
     /// Katman durumunu birleştiriciye yazar (ana iş parçacığı) ve gerekirse birleştiriciyi açar / kapatır
@@ -611,7 +650,7 @@ final class Masa: NSObject, ObservableObject {
         let p = pip ? (yuvalar.first { $0.id == siradaki && $0.id != canliId } ?? yuvalar.first { $0.id != canliId }) : nil
         let l = logoAcik ? logo.flatMap { CIImage(image: $0) } : nil
         let a = altYaziAcik && !altYaziBaslik.isEmpty ? Masa.altYaziResmi(altYaziBaslik, altYaziAlt) : nil
-        kilit.lock(); _pipYuva = p; _logo = l; _altYazi = a; kilit.unlock()
+        kilit.lock(); _pipYuva = p; _logoCI = l; _altYazi = a; kilit.unlock()
         duzenDegisti()
         // Karartma bittiğinde birleştirici kapansın
         if !karartma { DispatchQueue.main.asyncAfter(deadline: .now() + gecisSure + 0.2) { [weak self] in self?.duzenDegisti() } }
@@ -620,7 +659,7 @@ final class Masa: NSObject, ObservableObject {
     /// Birleştirici (kayitKuyruk, 30 kare/sn): kaynakların son kareleri tuvale; ekrana 1280×720, kayda program boyutunda
     private func duzenKaresi() {
         kilit.lock()
-        let kaynaklar = _duzenKaynaklar, c = canliYuva, g = _gecis, py = _pipYuva, lg = _logo, ay = _altYazi, ftb = _ftb
+        let kaynaklar = _duzenKaynaklar, c = canliYuva, g = _gecisD, py = _pipYuva, lg = _logoCI, ay = _altYazi, ftb = _ftb
         kilit.unlock()
         let t = CACurrentMediaTime()
         let ftbDeger: CGFloat = {
@@ -640,12 +679,15 @@ final class Masa: NSObject, ObservableObject {
                 }
             }
             if let py, py !== c, let pb = py.sonKare {
-                // Sağ altta, genişliğin %30'u, kenardan %3
-                let w = W * 0.3, h = w * 9 / 16, k = W * 0.03
+                // Yatayda sağ altta genişliğin %30'u; dikeyde (vlog) sağ üstte %34; kutu kaynağın kendi oranında
+                let dik = py.donus % 180 != 0
+                let kw = CGFloat(dik ? CVPixelBufferGetHeight(pb) : CVPixelBufferGetWidth(pb)), kh = CGFloat(dik ? CVPixelBufferGetWidth(pb) : CVPixelBufferGetHeight(pb))
+                let w = W * (H > W ? 0.34 : 0.3), h = w * kh / max(kw, 1), k = W * 0.04
+                let yer = H > W ? H - h - k * 2.2 : k
                 let kucuk = Masa.sigdir(pb, donus: py.donus, W: w, H: h)
-                    .transformed(by: CGAffineTransform(translationX: W - w - k, y: k))
+                    .transformed(by: CGAffineTransform(translationX: W - w - k, y: yer))
                 let cerceve = CIImage(color: CIColor(red: 1, green: 1, blue: 1, alpha: 0.9))
-                    .cropped(to: CGRect(x: W - w - k - 3, y: k - 3, width: w + 6, height: h + 6))
+                    .cropped(to: CGRect(x: W - w - k - 3, y: yer - 3, width: w + 6, height: h + 6))
                 r = kucuk.composited(over: cerceve.composited(over: r))
             }
             if let lg {
@@ -667,14 +709,14 @@ final class Masa: NSObject, ObservableObject {
         }
         // Ekrandaki program monitörü
         if onizlemeHavuz == nil {
-            CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey: 1280,
-                                                                 kCVPixelBufferHeightKey: 720, kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &onizlemeHavuz)
+            CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey: dikey ? 720 : 1280,
+                                                                 kCVPixelBufferHeightKey: dikey ? 1280 : 720, kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &onizlemeHavuz)
         }
         if let havuz = onizlemeHavuz {
             var pb: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, havuz, &pb)
             if let pb {
-                ci.render(resim(W: 1280, H: 720), to: pb)
+                ci.render(resim(W: dikey ? 720 : 1280, H: dikey ? 1280 : 720), to: pb)
                 if let sb = AgYayin.ornek(pb) { program.goster(sb) }
             }
         }
@@ -805,7 +847,7 @@ final class Masa: NSObject, ObservableObject {
         var ssd = false
         if klasor.takili, let kok = klasor.url, kok.startAccessingSecurityScopedResource() {
             erisim = kok
-            dizin = kok.appendingPathComponent("UPDATED Masa", isDirectory: true).appendingPathComponent(damga, isDirectory: true)
+            dizin = kok.appendingPathComponent(klasorAdi, isDirectory: true).appendingPathComponent(damga, isDirectory: true)
             if (try? FileManager.default.createDirectory(at: dizin, withIntermediateDirectories: true)) != nil { ssd = true } else {
                 kok.stopAccessingSecurityScopedResource(); erisim = nil
                 dizin = FileManager.default.temporaryDirectory.appendingPathComponent("masa-\(damga)", isDirectory: true)
@@ -827,6 +869,7 @@ final class Masa: NSObject, ObservableObject {
                 if bw * bh > w * h { w = bw; h = bh }
             }
         }
+        if dikey { swap(&w, &h) }
         let bas = CMClockGetTime(CMClockGetHostTimeClock())
         let o = KayitOturumu(baslangic: bas, klasorUrl: ssd ? dizin : nil, erisim: erisim, dizin: dizin)
         o.programBoyut = (w, h)
@@ -940,7 +983,7 @@ final class Masa: NSObject, ObservableObject {
                 if o.klasorUrl != nil {
                     DispatchQueue.main.async {
                         self.klasor.guncelle()
-                        self.bildirim = "\(tamamlanan.count) dosya SSD'de: UPDATED Masa/\(o.dizin.lastPathComponent)"
+                        self.bildirim = "\(tamamlanan.count) dosya SSD'de: \(self.klasorAdi)/\(o.dizin.lastPathComponent)"
                     }
                 } else {
                     self.fotograflaraKaydet(tamamlanan, dizin: o.dizin)

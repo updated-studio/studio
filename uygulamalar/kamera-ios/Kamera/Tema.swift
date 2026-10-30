@@ -29,26 +29,46 @@ enum Tema {
 }
 
 extension View {
-    /// Yarı saydam siyah yüzey + yarım piksel hat; hafif bulanıklık okunurluk için
+    /// Yüzey: iOS 26 ve sonrasında Apple'ın cam malzemesi (Kamera uygulamasındaki gibi, hafif koyu tonlu); öncesinde yarı saydam siyah
+    /// + yarım piksel hat (Fatih 30 Ekim: "arayüz iOS 27'den uzaklaşmış").
     func yuzey(_ yaricap: CGFloat = 14, dolgu: Color = Tema.koyu) -> some View {
-        background(
-            RoundedRectangle(cornerRadius: yaricap, style: .continuous).fill(.ultraThinMaterial)
-                .overlay(RoundedRectangle(cornerRadius: yaricap, style: .continuous).fill(dolgu))
-                .overlay(RoundedRectangle(cornerRadius: yaricap, style: .continuous).strokeBorder(Tema.hat, lineWidth: 0.5))
-                .environment(\.colorScheme, .dark)
-        )
+        modifier(CamYuzey(sekil: RoundedRectangle(cornerRadius: yaricap, style: .continuous), dolgu: dolgu, vurgu: nil))
     }
 
     /// Yuvarlak düğme zemini (aynı dil)
     func yuvarlakYuzey(_ vurgu: Color? = nil) -> some View {
-        background(
-            Circle().fill(.ultraThinMaterial)
-                .overlay(Circle().fill(Tema.koyu))
-                .overlay(Circle().strokeBorder(vurgu?.opacity(0.6) ?? Tema.hat, lineWidth: vurgu == nil ? 0.5 : 1))
-                .environment(\.colorScheme, .dark)
-        )
+        modifier(CamYuzey(sekil: Circle(), dolgu: Tema.koyu, vurgu: vurgu))
     }
 
     /// Bölüm başlığı metni
     func bolumBasligi() -> some View { font(Tema.bolum).tracking(1.2).foregroundStyle(Color.white.opacity(0.45)) }
+}
+
+struct CamYuzey<S: InsettableShape>: ViewModifier {
+    let sekil: S
+    let dolgu: Color
+    let vurgu: Color?
+
+    @ViewBuilder func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.tint(dolgu), in: sekil)
+                .overlay(sekil.strokeBorder(vurgu?.opacity(0.6) ?? .clear, lineWidth: 1).allowsHitTesting(false))
+        } else {
+            eski(content)
+        }
+        #else
+        eski(content)
+        #endif
+    }
+
+    private func eski(_ content: Content) -> some View {
+        content.background(
+            sekil.fill(.ultraThinMaterial)
+                .overlay(sekil.fill(dolgu))
+                .overlay(sekil.strokeBorder(vurgu?.opacity(0.6) ?? Tema.hat, lineWidth: vurgu == nil ? 0.5 : 1))
+                .environment(\.colorScheme, .dark)
+        )
+    }
 }
