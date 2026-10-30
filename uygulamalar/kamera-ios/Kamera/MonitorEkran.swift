@@ -17,11 +17,12 @@ struct MonitorEkran: View {
     @State private var lutAl = false
     @State private var adres = ""
 
-    private static let sari = Color(red: 1, green: 0.8, blue: 0.1)
+    private static let sari = Tema.sari
     private static let koyu = Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255)
     private static let koyu2 = Color(red: 44 / 255, green: 44 / 255, blue: 44 / 255)
     private static let gri = Color(red: 140 / 255, green: 140 / 255, blue: 140 / 255)
-    private var genis: Bool { boyutSinifi == .regular }
+    private var genis: Bool { boyutSinifi == .regular && UIDevice.current.userInterfaceIdiom == .pad }
+    private static let yay = Animation.spring(response: 0.34, dampingFraction: 0.9)
     private var a: BolmeAyari { m.ayarlar[m.etkin] }
 
     var body: some View {
@@ -30,9 +31,29 @@ struct MonitorEkran: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 bolmeler(yatay, g.size).ignoresSafeArea()
-                if yatay { yatayKatman } else { dikeyKatman }
+                // iPad: masaüstü sınıfı düzen (üst durum çubuğu, sol araç rayı, alt ölçüm çubuğu, sağda denetçi panel);
+                // iPhone: yatayda Blackmagic Camera düzeni, dikeyde tek elle kullanım (MONITOR_TASARIM.md)
+                if genis { ipadKatman } else if yatay { yatayKatman } else { dikeyKatman }
                 if let b = m.bildirim { bildirimKutusu(b) }
-                if panelAcik { panel.transition(.opacity) }
+                if panelAcik {
+                    if genis {
+                        HStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            panel.frame(width: min(420, g.size.width * 0.46))
+                                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                                .padding(12)
+                        }
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    } else {
+                        VStack(spacing: 0) {
+                            Color.black.opacity(0.001).frame(maxHeight: yatay ? 0 : g.size.height * 0.3)
+                                .onTapGesture { withAnimation(Self.yay) { panelAcik = false } }
+                            panel.clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24, style: .continuous))
+                        }
+                        .ignoresSafeArea(edges: .bottom)
+                        .transition(.move(edge: .bottom))
+                    }
+                }
             }
         }
         .foregroundStyle(.white)
@@ -78,9 +99,9 @@ struct MonitorEkran: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if acikParam != nil { withAnimation(.easeOut(duration: 0.15)) { acikParam = nil } }
+            if acikParam != nil { withAnimation(Self.yay) { acikParam = nil } }
             else if m.kip == .iki && m.etkin != i { m.etkinYap(i) }
-            else { withAnimation(.easeOut(duration: 0.15)) { arayuzAcik.toggle() } }
+            else { withAnimation(Self.yay) { arayuzAcik.toggle() } }
         }
     }
 
@@ -162,6 +183,54 @@ struct MonitorEkran: View {
         }
     }
 
+    // MARK: iPad düzeni
+
+    private var ipadKatman: some View {
+        VStack(spacing: 0) {
+            if arayuzAcik {
+                VStack(spacing: 8) {
+                    HStack(spacing: 0) { degerHucreleri(dar: false, tcIle: true) }
+                        .frame(height: 58)
+                        .padding(.horizontal, 8)
+                        .yuzey(20)
+                    if acikParam != nil { paramSeridi.frame(maxWidth: 760) }
+                }
+                .padding(.horizontal, 16).padding(.top, 10)
+            }
+            HStack(alignment: .center, spacing: 0) {
+                if arayuzAcik {
+                    VStack(spacing: 10) { solDugmeler(dikey: true) }
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: 68).padding(8)
+                        .yuzey(22)
+                        .padding(.leading, 16)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+                Spacer()
+                VStack(spacing: 18) {
+                    ayarDugmesi
+                    kayitDugmesi(boy: 72)
+                    sonKayitKutusu(dikey: false)
+                }
+                .padding(.vertical, 16).padding(.horizontal, 10)
+                .yuzey(26)
+                .padding(.trailing, 16)
+            }
+            .frame(maxHeight: .infinity)
+            if arayuzAcik {
+                HStack(spacing: 14) {
+                    if m.koseHisto { KoseHistogram(o: m.kose).frame(width: 168, height: 52) }
+                    if m.sesGosterge { SesGostergesi(sol: m.ses.0, sag: m.ses.1).frame(width: 180, height: 22) }
+                    araclar
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .yuzey(22)
+                .padding(.horizontal, 16).padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+    }
+
     // MARK: dikey düzen
 
     private var dikeyKatman: some View {
@@ -217,15 +286,16 @@ struct MonitorEkran: View {
 
     private func hucre(_ etiket: String, _ deger: String, _ p: Monitor.Param) -> some View {
         Button {
-            withAnimation(.easeOut(duration: 0.15)) { acikParam = acikParam == p ? nil : p }
+            withAnimation(Self.yay) { acikParam = acikParam == p ? nil : p }
         } label: {
             VStack(spacing: 2) {
                 Text(etiket).font(.system(size: 10, weight: .semibold)).tracking(0.8).foregroundStyle(.white.opacity(0.84)).lineLimit(1)
                 Text(deger).font(.system(size: 17, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
             }
             .shadow(color: .black.opacity(0.8), radius: 3, y: 1)
+            .foregroundStyle(acikParam == p ? Self.sari : .white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(acikParam == p ? Self.koyu2 : .clear)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(acikParam == p ? Color.white.opacity(0.1) : .clear).padding(3))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -267,9 +337,11 @@ struct MonitorEkran: View {
             Text(paramBaslik).font(.system(size: 11, weight: .semibold)).tracking(1).foregroundStyle(Self.gri)
             paramIcerik
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 16).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(0.82))
+        .yuzey(20, dolgu: Color.black.opacity(0.5))
+        .padding(.horizontal, genis ? 0 : 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private var paramBaslik: String {
@@ -365,8 +437,8 @@ struct MonitorEkran: View {
         Button(action: eylem) {
             Text(ad).font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(secili ? .black : .white)
-                .padding(.horizontal, 12).frame(minHeight: 36)
-                .background(RoundedRectangle(cornerRadius: 6).fill(secili ? Color.white : Self.koyu2))
+                .padding(.horizontal, 14).frame(minHeight: 36)
+                .background(Capsule().fill(secili ? Self.sari : Color.white.opacity(0.1)))
         }
         .buttonStyle(.plain)
     }
@@ -379,7 +451,7 @@ struct MonitorEkran: View {
             m.ayarlar[m.etkin].zoom = a.zoom == 1 ? 2 : (a.zoom == 2 ? 4 : 1)
         }
         kare(m.kamAyar.odak == nil ? "AF" : "MF", "ODAK", secili: acikParam == .odak) {
-            withAnimation(.easeOut(duration: 0.15)) { acikParam = acikParam == .odak ? nil : .odak }
+            withAnimation(Self.yay) { acikParam = acikParam == .odak ? nil : .odak }
         }
         kare("", "TEMİZ", secili: a.temiz, simge: "eye") { m.ayarlar[m.etkin].temiz.toggle() }
         kare("", "DÜZEN", simge: "square.grid.2x2") { panelAc(.monitor) }
@@ -395,7 +467,10 @@ struct MonitorEkran: View {
             .foregroundStyle(secili ? .black : .white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(minHeight: 44)
-            .background(RoundedRectangle(cornerRadius: 8).fill(secili ? Color.white : Self.koyu.opacity(0.67)))
+            .background {
+                if secili { RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white) }
+                else if !genis { RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.clear).yuzey(14) }
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(alt)
@@ -428,9 +503,13 @@ struct MonitorEkran: View {
                 if genis { Text(ad).font(.system(size: 9, weight: .semibold)).tracking(0.4) }
             }
             .foregroundStyle(secili ? .black : .white)
-            .frame(minWidth: genis ? 58 : 46, minHeight: 46)
-            .padding(.horizontal, 4)
-            .background(RoundedRectangle(cornerRadius: 10).fill(secili ? Self.sari : Self.koyu.opacity(0.67)))
+            .frame(minWidth: genis ? 62 : 44, minHeight: genis ? 50 : 44)
+            .padding(.horizontal, genis ? 4 : 0)
+            .background {
+                if genis { RoundedRectangle(cornerRadius: 14, style: .continuous).fill(secili ? Self.sari : Color.white.opacity(0.06)) }
+                else if secili { Circle().fill(Self.sari) }
+                else { Circle().fill(.clear).yuvarlakYuzey() }
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(ad)
@@ -508,7 +587,7 @@ struct MonitorEkran: View {
     private func panelAc(_ s: Monitor.Sekme) {
         sekme = s
         acikParam = nil
-        withAnimation(.easeOut(duration: 0.15)) { panelAcik = true }
+        withAnimation(Self.yay) { panelAcik = true }
     }
 
     private var panel: some View {
@@ -517,37 +596,42 @@ struct MonitorEkran: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(Monitor.Sekme.allCases) { s in
-                            Button { sekme = s } label: {
-                                VStack(spacing: 6) {
-                                    Label(s.rawValue, systemImage: s.simge).font(.system(size: 14, weight: .semibold)).tracking(0.8)
-                                        .foregroundStyle(s == sekme ? .white : Self.gri)
-                                    Rectangle().fill(s == sekme ? Color.white : .clear).frame(width: 40, height: 3)
-                                }
-                                .padding(.horizontal, 14).padding(.top, 14)
+                            Button { withAnimation(.snappy(duration: 0.22)) { sekme = s } } label: {
+                                Label(s.rawValue, systemImage: s.simge).font(.system(size: 13, weight: .semibold)).tracking(0.6)
+                                    .labelStyle(.titleAndIcon)
+                                    .foregroundStyle(s == sekme ? .black : .white.opacity(0.8))
+                                    .padding(.horizontal, 12).frame(height: 32)
+                                    .background(Capsule().fill(s == sekme ? Color.white : Color.white.opacity(0.08)))
                             }
                             .buttonStyle(.plain)
+                            .padding(.leading, 6)
                         }
                     }
                 }
-                Button { withAnimation(.easeOut(duration: 0.15)) { panelAcik = false } } label: {
+                Button { withAnimation(Self.yay) { panelAcik = false } } label: {
                     Image(systemName: "xmark").font(.system(size: 18, weight: .semibold)).frame(width: 56, height: 48)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Kapat")
             }
-            .frame(height: 52)
-            .background(Color.black)
+            .frame(height: 56)
+            .padding(.leading, 6)
+            .overlay(alignment: .top) {
+                if !genis { Capsule().fill(Color.white.opacity(0.3)).frame(width: 36, height: 5).padding(.top, 5) }
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     if m.kip == .iki && sekme != .kayit { aciklama("\(m.etkin + 1). bölmenin ayarları (bölmeye dokunarak değiştir)") }
                     sekmeIcerik
                 }
-                .padding(.horizontal, 28).padding(.top, 12).padding(.bottom, 28)
+                .padding(.horizontal, genis ? 22 : 24).padding(.top, 8).padding(.bottom, 28)
                 .frame(maxWidth: 760, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(Color(red: 12 / 255, green: 13 / 255, blue: 16 / 255).opacity(0.97).ignoresSafeArea())
+        .background(.ultraThinMaterial)
+        .background(Color(red: 12 / 255, green: 13 / 255, blue: 16 / 255).opacity(genis ? 0.72 : 0.86))
+        .environment(\.colorScheme, .dark)
     }
 
     private func bag<T>(_ k: WritableKeyPath<BolmeAyari, T>) -> Binding<T> {

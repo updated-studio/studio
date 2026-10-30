@@ -52,6 +52,17 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | **Genel Ayarlar simgeleri tek renk** (renkli kutular kalktı): ince beyaz simge, %7 beyaz dolgulu, yarım piksel hatlı kutu; simgeler iOS ile aynı anlam (Kayıt halka+nokta, Pozlama ±, Renk yarım daire, Ses dalga, Fotoğraf diyafram, Timelapse kesik halka, Sabitlenenler raptiye, Multi Cam 2×2) | ✓ | ✓ | 30 Ekim |
 | **Cam yüzeyler** (iOS 26+ cam malzemesi gibi): Android'de üstte açık, altta koyu yarı saydam dolgu + parlak ince kenar (cam(), daire(), sabitlenen çipler) | ✓ | ✓ | Android arkayı bulanıklaştıramaz |
 
+| **10:41 listesi (Fatih 30 Ekim), iOS 0.16.0:** | | | Android için kurallar aynı; RC'ye iletildi |
+| Mercek geçişi: iPhone'un çoklu kamerası (sanal cihaz) ile kesintisiz yakınlaştırma; PRO, elle odak ve uzun pozlamada fiziksel merceğe geçer | | ✓ | Kamera.swift `sanalArka`, `cihazUyumla` |
+| Sabitleme: kayıt dışında önizleme düşük gecikmeli (iOS 17 `previewOptimized`), kayıtta seçilen mod; seçilen modu destekleyen biçim aranır; ekranda gerçekte kullanılan (`etkinSabitleme`) | | ✓ | "en yüksek sabitlemede yavaşlık, kare düşmesi" |
+| Varsayılanlar en yüksek: video 4K 60, fotoğraf kameranın en büyük MP'si | | ✓ | |
+| **Sağ üstte sarı cam biçim denetimi:** video: çözünürlük · kare hızı · sabitleme simgesi; foto: MP · RAW. Dokun: sıradaki, sağa/sola kaydır: sonraki/önceki, basılı tut: seçenekler + Ayrıntılı… | | ✓ | HizliBicim.swift; üst ortadaki okuma şeridinde artık yalnız elle değişmiş değerler |
+| **Vlog alt mod şeridinde** (TIMELAPSE · VİDEO · VLOG · FOTO · PRO · PORTRE); kalite Kamera video ayarlarından (iki kamera kaldırmazsa 1080p'ye iner, ekranda gerçek kalite); çıktı ince yazıyla "Yalnız final" / "3 dosya"; SSD düğmesi yok, harici disk takılınca açılır kart (Diske kaydet / Klasör seç / Telefona) | | ✓ | Vlog.swift, Masa `yalnizFinal` (vlog.yalnizFinal), `diskeYaz`; HEVC ≈ 0,12 bit/piksel |
+| **Kadraj çerçeveleri (kesik çizgi):** 9:16, 4:5, 1:1, 4:3, 16:9, 1,85:1, 2,39:1, güvenli alan; çoklu seçim; yalnız VİDEO/TIMELAPSE'ta; sabitlenebilir (Favori `cerceve`) | | ✓ | Cerceve.swift, k.cerceve |
+| **Foto / video / ortak ayrımı:** kodek, renk, sabitleme, çerçeve, ses girişi yalnız videoda; zamanlayıcı yalnız fotoda; sabitlenenler ve Denetimler o moda göre süzülür | | ✓ | Favori.kapsam |
+| **Stil pedi Apple gibi:** koyu zeminde 13×13 nokta ızgarası, parmağın çevresi büyüyüp aydınlanır; altında TON · RENK değerleri | | ✓ | Stiller.swift `pad` |
+| Menü geçişleri sönümlü yay (`spring 0.34 / 0.9`) | | ✓ | |
+
 ## Monitör ekranı (Android: MainActivity + MonitorGorunum)
 
 | Özellik | Android | iOS | Not |
@@ -102,6 +113,7 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | **Kaynak ekle ekranı** (iOS KaynakEkleSayfasi ile aynı bölümler/metinler): BU CİHAZ (arka/ön), AKSİYON VE 360 (Luna · Ace Pro 2/GO Ultra · Osmo Pocket 4/4P/Action · GoPro; marka → adım adım rehber), DİĞER (Wi-Fi telefon, adresle ekle, USB Ara). Android'de Ace/Osmo/GoPro'ya ek RTMP yolu: rehberde canlı yayın adresi + Kopyala | ✓ | ✓ | Android KaynakEkle.kt; iOS'ta RTMP yok |
 | **Monitör Stiller** (iOS MonitorStilleri): LUT sekmesi yerine STİLLER — TEMEL, FİLM REÇETELERİ, LUT'LARIN (+ .cube ekle, basılı tut → sil), Yoğunluk/Doygunluk/Sıcaklık/Ton, Sıfırla; bölme başına, yalnız ekrana (kayıt temiz). Alt şeritte STİL düğmesi | ✓ | ✓ (Studio 0.3.2) | Stiller.kt :ortak'a taşındı |
 | **Monitör ayarları 6 sekme, başlıklı gruplar** (iOS sekmeIcerik): KAYNAK (KAYNAKLAR · GÖRÜNTÜYÜ ÇEVİR) · GÖRÜNTÜ (ODAK · POZLAMA · EKRAN) · STİLLER · KADRAJ (AKILLI KADRAJ · KOMPOZİSYON · ÇERÇEVE) · ÖLÇÜM (EKRANDA · ÖLÇÜM PANELİ) · KAYIT (GÖRÜNTÜ · DOSYA · SES · CİHAZ) | ✓ | ✓ (Studio 0.3.2, Kamera PRO 0.18.1) | Android dar ekranda ad üstte, seçenekler altta |
+| **Monitör iPhone / iPad ayrı düzen** (MONITOR_TASARIM.md, Blackmagic Camera dili): iPad cam durum çubuğu, sol araç rayı, sağ kayıt sütunu, alt cam çubukta etiketli araçlar + histogram + ses, ayarlar sağda denetçi panel; iPhone yuvarlak cam araçlar, ayarlar alttan sayfa; kapsül sekmeler | | ✓ (Studio 0.16.0) | |
 | **Multi Cam ses** (SES hücresi / tablette SES düğmesi): program sesi faderı −∞…+12 dB (0 dB'ye yapışır, çift dokunuş 0 dB), SUSTUR, giriş OTO · MAKİNE (USB) · MİKROFON (kayıtta da değişir), L/R ölçer (kayıt yokken de). Kayda işlenir | ✓ (Studio 0.3.3) | — | iOS'ta yok. Kaynaklardan ses gelmediği için kaynak başına fader yok |
 
 ## Uygulama
