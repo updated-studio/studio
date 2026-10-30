@@ -59,6 +59,9 @@ class MainActivity : Activity() {
     // Renkler (Blackmagic düzeni: siyah şeritler, gri etiket, beyaz değer, kırmızı kayıt)
     private val SIYAH = Color.BLACK; private val GRI = Color.rgb(140, 140, 140); private val KOYU = Color.rgb(30, 30, 30); private val KOYU2 = Color.rgb(44, 44, 44)
     private val KIRMIZI = Color.rgb(230, 40, 40); private val SARI = Color.rgb(255, 214, 10) /* seçili / elle değişmiş (Kamera ile aynı sarı) */
+    private val inter400: Typeface by lazy { runCatching { resources.getFont(R.font.inter_400) }.getOrDefault(Typeface.DEFAULT) }
+    private val inter500: Typeface by lazy { runCatching { resources.getFont(R.font.inter_500) }.getOrDefault(Typeface.DEFAULT) }
+    private val inter600: Typeface by lazy { runCatching { resources.getFont(R.font.inter_600) }.getOrDefault(Typeface.DEFAULT_BOLD) }
     private val dar: Typeface by lazy { runCatching { resources.getFont(R.font.plex_kosul_600) }.getOrDefault(Typeface.create("sans-serif-condensed", Typeface.BOLD)) }
     /** PRO (telefon kamerası, Blackmagic düzeni) mı, Monitör (dış kamera: USB/HDMI, ağ yayını) mü; ikisi ayrı ayarlar tutar */
     private val proMod by lazy { intent.getStringExtra("mod") == "pro" }
@@ -193,8 +196,8 @@ class MainActivity : Activity() {
         }
         kok.addView(dikey, FrameLayout.LayoutParams(-1, -1))
         if (d) {
-            tcDikey = TextView(this).apply { textSize = 24f; typeface = runCatching { resources.getFont(R.font.plex_mono_500) }.getOrDefault(Typeface.MONOSPACE); setTextColor(Color.WHITE); gravity = Gravity.CENTER; golge(this) }
-            dikey.addView(tcDikey, LinearLayout.LayoutParams(-1, dp(38f)))
+            tcDikey = TextView(this).apply { textSize = 20f; typeface = inter500; fontFeatureSettings = "tnum"; letterSpacing = 0.04f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; golge(this) }
+            dikey.addView(tcDikey, LinearLayout.LayoutParams(-2, dp(38f)).apply { gravity = Gravity.CENTER_HORIZONTAL })
         } else tcDikey = null
         ust = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; if (tablet) { background = cam(dp(16f).toFloat()); setPadding(dp(8f), 0, dp(8f), 0) } }
         dikey.addView(ust, LinearLayout.LayoutParams(-1, dp(if (tablet) 58f else if (d) 48f else 54f)).apply { if (tablet) { setMargins(dp(14f), dp(10f), dp(14f), dp(6f)) } })
@@ -400,12 +403,23 @@ class MainActivity : Activity() {
     }
 
     /* ================= üst parametre şeridi ================= */
+    /**
+     * Değer hücresi (Sentez, iPhone ile aynı): üstte 9 sp ince etiket %60 beyaz, altında eş genişlikli rakamlı değer; genişlik ağırlıkla sabit.
+     * Sarı yalnız elle ayarlı değerde (OTO / — / 0 değilse); açık hücrenin altında 4 dp sarı nokta. Zaman kodu (buyuk) noktalı: kayıtta kırmızı.
+     */
     private fun hucre(etiket: String, deger: String, agirlik: Float = 1f, p: Param? = null, renk: Int = Color.WHITE, buyuk: Boolean = false): TextView? {
         val k = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-            if (p != null) { setOnClickListener { if (acikParam == p) seritKapat() else seritAc(p) }; if (acikParam == p) setBackgroundColor(KOYU2) } }
-        if (etiket.isNotEmpty()) k.addView(TextView(this).apply { text = etiket; textSize = 10f; setTextColor(Color.argb(215, 255, 255, 255)); typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; isSingleLine = true; golge(this) })
-        val v = TextView(this).apply { text = deger; gravity = Gravity.CENTER; textSize = if (buyuk) 24f else 17f; setTextColor(renk); typeface = if (buyuk) Typeface.create("sans-serif-condensed", Typeface.BOLD) else dar; isSingleLine = true; golge(this) }
-        k.addView(v)
+            if (p != null) setOnClickListener { if (acikParam == p) seritKapat() else seritAc(p) } }
+        if (etiket.isNotEmpty()) k.addView(TextView(this).apply { text = etiket; textSize = 9f; setTextColor(Color.argb(153, 255, 255, 255)); typeface = inter400; letterSpacing = 0.12f; gravity = Gravity.CENTER; isSingleLine = true; includeFontPadding = false; golge(this) })
+        val elle = p != null && deger !in setOf("OTO", "—", "0")
+        val v = TextView(this).apply { text = deger; gravity = Gravity.CENTER; textSize = if (buyuk) 18f else 15f; setTextColor(if (buyuk) renk else if (elle) SARI else Color.WHITE)
+            typeface = if (buyuk) inter500 else inter600; fontFeatureSettings = "tnum"; isSingleLine = true; includeFontPadding = false; golge(this)
+            if (buyuk) { letterSpacing = 0.04f; compoundDrawablePadding = dp(7f)
+                setCompoundDrawablesRelative(GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (kayitSuruyor()) KIRMIZI else Color.argb(150, 255, 255, 255)); setBounds(0, 0, dp(7f), dp(7f)) }, null, null, null) }
+            else setPadding(0, dp(3f), 0, 0) }
+        k.addView(v, LinearLayout.LayoutParams(if (buyuk) -2 else -1, -2))
+        if (p != null) k.addView(View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (acikParam == p) SARI else Color.TRANSPARENT) } },
+            LinearLayout.LayoutParams(dp(4f), dp(4f)).apply { topMargin = dp(3f) })
         ust.addView(k, LinearLayout.LayoutParams(0, -1, agirlik))
         return v
     }
@@ -422,8 +436,9 @@ class MainActivity : Activity() {
         hucre(if (d) "ENST." else "ENSTANTANE", ens, p = Param.ENSTANTANE)
         hucre(if (d) "DİYAF." else "DİYAFRAM", k?.yetenek?.diyafram?.let { "f/" + "%.1f".format(it).replace('.', ',') } ?: "—", p = Param.DIYAFRAM)
         val tc = tcDikey
-        if (d && tc != null) { tcYazi = tc; tc.setTextColor(if (kayitSuruyor()) KIRMIZI else Color.WHITE) }
-        else tcYazi = hucre("", "00:00:00:00", 1.9f, renk = if (kayitSuruyor()) KIRMIZI else Color.WHITE, buyuk = true)!!
+        if (d && tc != null) { tcYazi = tc; tc.setTextColor(Color.WHITE); tc.compoundDrawablePadding = dp(8f)
+            tc.setCompoundDrawablesRelative(GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (kayitSuruyor()) KIRMIZI else Color.argb(150, 255, 255, 255)); setBounds(0, 0, dp(8f), dp(8f)) }, null, null, null) }
+        else tcYazi = hucre("", "00:00:00:00", 1.9f, renk = Color.WHITE, buyuk = true)!!
         hucre("ISO", if (ag || k == null) "—" else a.iso?.toString() ?: "OTO", p = Param.ISO)
         hucre(if (d) "BD" else "BEYAZ DENGESİ", if (ag || k == null) "—" else a.kelvin?.let { "${it}K" + if (a.ton != 0) (if (a.ton < 0) " Y${-a.ton}" else " M${a.ton}") else "" } ?: WB_ADLARI[a.awb] ?: "OTO", p = Param.WB)
         hucre(if (d) "POZ." else "POZLAMA", if (ag || k == null) "—" else if (a.ev == 0) "0" else "%+.1f".format(a.ev * (k.yetenek.evAdim.takeIf { it > 0 } ?: 1f)).replace('.', ','), p = Param.EV)

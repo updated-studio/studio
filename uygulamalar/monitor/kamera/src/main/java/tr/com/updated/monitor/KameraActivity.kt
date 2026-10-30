@@ -8,6 +8,8 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Color
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -391,6 +393,7 @@ class KameraActivity : Activity() {
 
         // Mercek durakları ve timelapse aralığı deklanşörün üstünde
         kok.addView(sureSira); kok.addView(zoomSira)
+        cetvel = PozlamaCetveli(); aciklamalar.add(cetvel to "Kaydır: pozlama · çift dokun: sıfır"); kok.addView(cetvel)
         secimSira = FrameLayout(this).apply { visibility = View.GONE }
         kok.addView(secimSira)
 
@@ -455,6 +458,7 @@ class KameraActivity : Activity() {
         altSira.layoutParams = FrameLayout.LayoutParams(-1, dp(44f), Gravity.BOTTOM).apply { bottomMargin = a + dp(10f) }
         deklansorSira.layoutParams = FrameLayout.LayoutParams(-1, dp(76f), Gravity.BOTTOM).apply { bottomMargin = a + dp(60f) }
         zoomSira.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.BOTTOM).apply { bottomMargin = a + dp(146f) }
+        cetvel.layoutParams = FrameLayout.LayoutParams(dp(300f), dp(30f), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = a + dp(188f) }
         secimSira.layoutParams = FrameLayout.LayoutParams(-1, dp(44f), Gravity.BOTTOM).apply { bottomMargin = a + dp(144f); marginStart = dp(12f); marginEnd = dp(12f) }
         duzenSerit.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.TOP).apply { topMargin = u + dp(2f); marginStart = dp(16f); marginEnd = dp(16f) }
         hizliSira.layoutParams = FrameLayout.LayoutParams(-2, dp(34f), Gravity.TOP or Gravity.END).apply { topMargin = u + dp(5f); marginEnd = dp(16f) }
@@ -1141,6 +1145,51 @@ class KameraActivity : Activity() {
     }
     private fun yaziCiz(t: TextView) { val v = ayar.ton; t.text = if (v == 0) "0" else "${if (v < 0) "Y" else "M"}${abs(v)}"; t.setTextColor(if (v == 0) GRI else Color.WHITE) }
 
+    /**
+     * Pozlama cetveli (Sentez, iPhone PozlamaCetveli ile aynı): −2…+2 EV, 1/3 EV çentik, tam sayılar uzun, 0 en uzun; sarı nokta şimdiki EV.
+     * Sağa/sola kaydır: EV (kameranın adımına yuvarlanır); çift dokun: 0. Değer sağda sabit 30 dp (eş genişlikli rakam), elle değiştiyse sarı.
+     */
+    private lateinit var cetvel: PozlamaCetveli
+    private inner class PozlamaCetveli : View(this@KameraActivity) {
+        private val cizgi = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; strokeWidth = dp(1f).toFloat(); setShadowLayer(dp(2f).toFloat(), 0f, 0f, Color.argb(140, 0, 0, 0)) }
+        private val nokta = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = VURGU }
+        private val yazi = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = dp(11f).toFloat(); typeface = kosul; fontFeatureSettings = "tnum"; textAlign = Paint.Align.RIGHT; setShadowLayer(dp(2f).toFloat(), 0f, 0f, Color.argb(160, 0, 0, 0)) }
+        private val adim get() = kaynak?.yetenek?.evAdim?.takeIf { it > 0f } ?: (1f / 3f)
+        private val olcek get() = (width - dp(30f) - dp(8f)).toFloat()
+        private fun x(ev: Float) = dp(4f) + (ev + 2f) / 4f * olcek
+        private var bas = 0f; private var basEv = 0f
+        private val cift = android.view.GestureDetector(context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean { ayarla(0); ayarKaydet(); bilgiCiz(); return true } })
+        init { setLayerType(LAYER_TYPE_SOFTWARE, null); contentDescription = "Pozlama" }
+        private fun ayarla(n: Int) {
+            val r = kaynak?.yetenek?.evAralik ?: return
+            val sinir = Math.round(2f / adim)
+            val d = n.coerceIn(maxOf(r.lower, -sinir), minOf(r.upper, sinir))
+            if (d != ayar.ev) { ayar.ev = d; kaynak?.ayarDegisti(); performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); invalidate() }
+        }
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            cift.onTouchEvent(e)
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { bas = e.x; basEv = ayar.ev * adim; parent.requestDisallowInterceptTouchEvent(true) }
+                MotionEvent.ACTION_MOVE -> ayarla(Math.round((basEv + (e.x - bas) / olcek * 4f) / adim))
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { ayarKaydet(); bilgiCiz() }
+            }
+            return true
+        }
+        override fun onDraw(c: Canvas) {
+            val alt = height - dp(9f).toFloat()
+            for (i in -6..6) { val ev = i / 3f; val xx = x(ev)
+                val boy = when { i == 0 -> dp(12f); i % 3 == 0 -> dp(8f); else -> dp(5f) }
+                cizgi.alpha = when { i == 0 -> 255; i % 3 == 0 -> 160; else -> 100 }
+                c.drawLine(xx, alt - boy, xx, alt, cizgi) }
+            val ev = (ayar.ev * adim).coerceIn(-2f, 2f)
+            c.drawCircle(x(ev), alt + dp(5f), dp(2f).toFloat(), nokta)
+            yazi.color = if (ayar.ev != 0) VURGU else Color.argb(180, 255, 255, 255)
+            c.drawText(evYazi(ayar.ev, adim), width.toFloat(), alt - dp(1f), yazi)
+        }
+    }
+
     private inner class TonCubugu(val ayarla: (Int) -> Unit) : View(this@KameraActivity) {
         private val boya = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
         private val yesil = Color.rgb(48, 209, 88); private val macenta = Color.rgb(255, 55, 210)
@@ -1722,6 +1771,7 @@ class KameraActivity : Activity() {
         vlogCipCiz(); hizliCiz(); cerceveGorunum.invalidate()
         ustSatirCiz(k, metin)
         if (!kayitGorunur) kodGoster(false)
+        if (this::cetvel.isInitialized) cetvel.invalidate()
         bilgiSira.visibility = if (kayitGorunur || bilgiSira.childCount == 0) View.INVISIBLE else View.VISIBLE
         favSira.visibility = View.GONE
     }
@@ -2862,6 +2912,9 @@ class KameraActivity : Activity() {
     private var sonSaniye = -1L
     private fun tik() {
         val k = kaynak
+        if (this::cetvel.isInitialized) { val g = zoomSira.visibility == View.VISIBLE && mod != KMod.PRO && mod != KMod.TIMELAPSE && !duzenleniyor && !kayitSuruyor() &&
+                ayar.iso == null && ayar.pozlamaNs == null && !bulb && (k?.yetenek?.evAralik?.let { it.upper > it.lower } == true)
+            val v = if (g) View.VISIBLE else View.GONE; if (cetvel.visibility != v) cetvel.visibility = v }
         if (k?.kayitta == true || lutKaydedici != null) { val ms = System.currentTimeMillis() - kayitBas; kayitCip.text = zamanKodu(ms) }
         tlKaydedici?.let { y ->
             // Timelapse: geçen süre · çıkacak video süresi; süre sınırı dolunca biter
