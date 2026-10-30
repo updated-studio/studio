@@ -44,7 +44,7 @@ class EkranYayini : Service() {
         @Suppress("DEPRECATION") val veri: Intent? = i?.getParcelableExtra(VERI)
         if (veri == null || calisiyor) return START_NOT_STICKY
         // Android 14: yansıtma izni kullanılmadan önce ön plan hizmeti (mediaProjection türü) başlamış olmalı
-        bildirimGoster("Masa bekleniyor")
+        bildirimGoster("Multi Cam bekleniyor")
         try {
             val y = (getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager).getMediaProjection(sonuc, veri) ?: throw IllegalStateException("izin yok")
             yansitma = y
@@ -65,10 +65,10 @@ class EkranYayini : Service() {
 
     private fun bildirimGoster(d: String) {
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(KANAL, "Ekranı Masa'ya gönder", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(KANAL, "Ekranı Multi Cam'e gönder", NotificationManager.IMPORTANCE_LOW))
         val dur = PendingIntent.getService(this, 1, Intent(this, EkranYayini::class.java).putExtra(DURDUR, true), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val ac = PendingIntent.getActivity(this, 2, Intent(this, KameraActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        val b = Notification.Builder(this, KANAL).setSmallIcon(R.drawable.ic_ag).setContentTitle("Ekran Masa'ya gidiyor").setContentText(d).setOngoing(true)
+        val b = Notification.Builder(this, KANAL).setSmallIcon(R.drawable.ic_ag).setContentTitle("Ekran Multi Cam'e gidiyor").setContentText(d).setOngoing(true)
             .setContentIntent(ac).addAction(Notification.Action.Builder(null, "Durdur", dur).build()).build()
         if (android.os.Build.VERSION.SDK_INT >= 29) startForeground(BILDIRIM, b, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION) else startForeground(BILDIRIM, b)
     }

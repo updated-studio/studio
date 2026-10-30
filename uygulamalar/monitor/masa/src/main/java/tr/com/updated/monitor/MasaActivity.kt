@@ -53,6 +53,8 @@ class MasaActivity : Activity() {
     private val adlar = arrayOfNulls<String>(MasaGorunum.EN_COK)
     private var yuzeyler: List<Surface>? = null
     private var bulucu: KameraBulucu? = null
+    /** RTMP alıcısı: kameralar kendi uygulamalarından canlı yayınla bağlanır (Rtmp.kt); ekran açık oldukça dinler */
+    private var rtmp: RtmpSunucu? = null
     /** Bulunan ama eklenmemiş Wi-Fi kameraları: ad → (adres, kapı) */
     private val bulunan = LinkedHashMap<String, Pair<String, Int>>()
     private var kaydedici: Kaydedici? = null; private var kayitBas = 0L
@@ -74,6 +76,8 @@ class MasaActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         HataKaydi.kur(this)
+        rtmp = RtmpSunucu(yeni = { y -> runOnUiThread { rtmpEkle(y) } }, bitti = { y -> runOnUiThread {
+            kaynaklar.indexOfFirst { it is RtmpKaynak && it.yayin === y }.takeIf { it >= 0 }?.let { i -> tost("${adlar[i]}: yayın bitti"); kaldir(i) } } }).also { it.baslat() }
         if (b == null && Ekranlar.masaUygulamasi(this)) dongu.postDelayed({ Guncelleme.denetle(this, sessiz = true) }, 3000)
         kok = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         masa = MasaGorunum(this)
@@ -86,7 +90,7 @@ class MasaActivity : Activity() {
         // Kamera uygulamasında Kamera'ya döner; ayrı Masa uygulamasında Monitör'ü açar (Monitör'den geri Masa'ya gelinir)
         if (Ekranlar.masaUygulamasi(this)) ust.addView(etiket("Monitör  ›", 15f).apply { setOnClickListener { startActivity(Intent(this@MasaActivity, MainActivity::class.java).putExtra("mod", "monitor")) }; contentDescription = "Monitörü aç" }, LinearLayout.LayoutParams(-2, dp(44f)))
         else ust.addView(etiket("‹  Kamera", 15f).apply { setOnClickListener { finish() }; contentDescription = "Kameraya dön" }, LinearLayout.LayoutParams(-2, dp(44f)))
-        ust.addView(etiket("MASA", 16f, TURUNCU).apply { setPadding(dp(16f), 0, 0, 0) }, LinearLayout.LayoutParams(-2, dp(44f)))
+        ust.addView(etiket("MULTI CAM", 16f, TURUNCU).apply { setPadding(dp(16f), 0, 0, 0) }, LinearLayout.LayoutParams(-2, dp(44f)))
         ust.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         hizli = tercih.getBoolean("masa.hizli", false)
         hizliYazi = etiket("", 14f).apply { setPadding(dp(12f), 0, dp(12f), 0); contentDescription = "Hızlı geçiş"; setOnClickListener { hizli = !hizli; tercih.edit().putBoolean("masa.hizli", hizli).apply(); duzen() } }
@@ -288,6 +292,7 @@ class MasaActivity : Activity() {
         val y = yuzeyler?.getOrNull(i) ?: return // GL hazır olunca yuzeylerHazir başlatır
         val yuva = masa.yuvalar[i]
         if (k is WifiKameraKaynak) k.yonDegisti = { d -> yuva.dondur = d; masa.requestRender() }
+        if (k is KameraKaynak) { yuva.dondur = (360 - ekranDonusu()) % 360; k.ekranYonu = ekranDonusu() }
         k.baslat(y, { w, h -> yuva.tampon(w, h) }, { hata -> runOnUiThread { tost(hata) } })
     }
 
@@ -304,6 +309,59 @@ class MasaActivity : Activity() {
         if (kaynaklar.any { it is WifiKameraKaynak && it.host == adres && it.port == kapi }) return
         bulunan.remove(ad)
         ekle(WifiKameraKaynak(adres, kapi, ad), ad)
+    }
+
+    @Suppress("DEPRECATION") private fun ekranDonusu() = windowManager.defaultDisplay.rotation * 90
+
+    /** Bu cihazın kendi kamerası (arka/ön): Multi Cam'de öteki kaynaklarla birlikte, ayrı kaydıyla. Aynı anda tek telefon kamerası */
+    private fun telefonKamerasiEkle(id: String, ad: String) {
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            bekleyenKamera = id to ad; requestPermissions(arrayOf(Manifest.permission.CAMERA), 4); return
+        }
+        kaynaklar.indexOfFirst { it is KameraKaynak }.takeIf { it >= 0 }?.let { kaldir(it) }
+        val k = runCatching { KameraKaynak(this, id, ad) }.getOrElse { e -> HataKaydi.not("masa", "telefon kamerası: ${e.stackTraceToString()}"); return tost("Kamera açılamadı: ${e.message}") }
+        ekle(k, ad)
+    }
+    private var bekleyenKamera: Pair<String, String>? = null
+
+    override fun onRequestPermissionsResult(istek: Int, izinler: Array<out String>, sonuc: IntArray) {
+        super.onRequestPermissionsResult(istek, izinler, sonuc)
+        if (istek == 4) bekleyenKamera?.let { (id, ad) -> bekleyenKamera = null
+            if (sonuc.firstOrNull() == PackageManager.PERMISSION_GRANTED) telefonKamerasiEkle(id, ad) else tost("Kamera izni verilmedi.") }
+    }
+
+    /** Ekran dönünce telefon kamerasının görüntüsü dik kalır */
+    override fun onConfigurationChanged(c: android.content.res.Configuration) {
+        super.onConfigurationChanged(c)
+        kaynaklar.forEachIndexed { i, k -> if (k is KameraKaynak) { masa.yuvalar[i].dondur = (360 - ekranDonusu()) % 360; k.ekranYonu = ekranDonusu(); masa.requestRender() } }
+    }
+
+    /** RTMP ile gelen yayın: boş yuvaya kendiliğinden kaynak olur */
+    private fun rtmpEkle(y: RtmpYayin) {
+        if (bosYuva() < 0) { y.kapat(); return tost("${y.ad}: yer yok (en çok ${MasaGorunum.EN_COK} kaynak)") }
+        ekle(RtmpKaynak(y), "RTMP: ${y.ad}"); tost("${y.ad} bağlandı (RTMP)")
+    }
+
+    private fun ipAdresi(): String? = runCatching {
+        java.net.NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp && !it.isLoopback }.flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is java.net.Inet4Address && it.isSiteLocalAddress }?.hostAddress
+    }.getOrNull()
+
+    /** Kamera bağlama yardımı: markaya göre en kolay yol (Wi-Fi yayını, USB webcam, Luna) */
+    private fun kameraBagla() {
+        val ip = ipAdresi()
+        val adres = "rtmp://${ip ?: "<bu cihazın IP'si>"}:${Rtmp.KAPI}/${Rtmp.UYGULAMA}/kamera1"
+        AlertDialog.Builder(this).setTitle("Kamera bağla")
+            .setMessage("Canlı yayın yapabilen kameralar (DJI Osmo Pocket / Action, Insta360 Ace Pro 2 / GO Ultra / X serisi, GoPro…):\n" +
+                "1) Kamera ve bu cihaz aynı Wi-Fi'da olsun (telefonun erişim noktası da olur).\n" +
+                "2) Kameranın kendi uygulamasında Canlı yayın → RTMP (özel) seç.\n" +
+                "3) Adres: $adres\n   (her kamera için sondaki adı değiştir: kamera2, osmo…)\n" +
+                "4) Yayını başlat: kamera burada kendiliğinden kaynak olur, ayrı kaydı da tutulur.\n\n" +
+                "USB: çoğu kamerada \"Webcam / USB yayını\" modu var; açıp tak.\n" +
+                "Insta360 Luna: menüdeki Luna satırı (kameranın kendi Wi-Fi'ı).")
+            .setPositiveButton("Adresi kopyala") { _, _ ->
+                getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("RTMP", adres)); tost("Kopyalandı: $adres") }
+            .setNegativeButton("Kapat", null).show()
     }
 
     private fun usbEkle(d: UsbDevice) {
@@ -327,7 +385,12 @@ class MasaActivity : Activity() {
         bulunan.forEach { (ad, a) -> secenekler.add("Wi-Fi kamera: $ad" to { wifiEkle(ad, a.first, a.second) }) }
         UvcKaynak.aygitlar(this).filter { d -> kaynaklar.none { it is UvcKaynak && it.aygit.deviceName == d.deviceName } }
             .forEach { d -> secenekler.add("USB: ${d.productName ?: d.manufacturerName ?: "görüntü aygıtı"}" to { usbEkle(d) }) }
+        // Bu telefonun kameraları (harici USB kamera Camera2'den değil, UVC'den eklenir)
+        runCatching { kameralar(this) }.getOrDefault(emptyList()).filter { !it.second.startsWith("USB") }.take(3)
+            .filter { (id, _) -> kaynaklar.none { it is KameraKaynak && it.id == id } }
+            .forEach { (id, ad) -> secenekler.add("Bu cihaz: $ad" to { telefonKamerasiEkle(id, ad) }) }
         if (kaynaklar.none { it is LunaKaynak }) secenekler.add("Insta360 Luna (kameranın Wi-Fi'ı)" to { lunaEkle() })
+        secenekler.add("Kamera bağla (DJI, Insta360, GoPro… canlı yayınla)" to { kameraBagla() })
         secenekler.add("Adresle bağlan (ör. 192.168.1.20)" to { adresSor() })
         AlertDialog.Builder(this).setTitle("Kaynak ekle")
             .setMessage(if (bulunan.isEmpty()) "Wi-Fi kamerası: öteki telefonda UPDATED Kamera → Ayarlar → \"Wi-Fi kamera ol\". Aynı Wi-Fi'da olunca burada kendiliğinden görünür.\nUSB: makineyi \"USB yayını\" moduna alıp tak." else null)
@@ -450,9 +513,9 @@ class MasaActivity : Activity() {
         tost("Kayıt: ${if (o.harici) "SSD" else "telefon"} · Program ${if (pw > 1920) "4K" else "1080p"}$pfps + $iso kaynak ayrı" + (k.sesKaynagi?.let { " · ses: $it" } ?: ""))
     }
 
-    /** Kaynağın ayrı dosyası: ağdan gelen akış olduğu gibi, USB görüntü H.265 ile kodlanarak */
+    /** Kaynağın ayrı dosyası: ağdan gelen akış olduğu gibi, USB görüntü ve telefon kamerası H.265 ile kodlanarak */
     private fun isoBaslat(o: KayitOturumu, i: Int, k: Kaynak): Boolean {
-        val ad = "${i + 1} - ${(adlar[i] ?: k.ad).substringAfter("USB: ").substringAfter("UPDATED · ")}"
+        val ad = "${i + 1} - ${(adlar[i] ?: k.ad).substringAfter("USB: ").substringAfter("RTMP: ").substringAfter("UPDATED · ")}"
         when (k) {
             is WifiKameraKaynak -> {
                 if (k.genislik <= 0) return false
@@ -461,17 +524,28 @@ class MasaActivity : Activity() {
                 k.sonAyar?.let { a.ayarVer(it) }; k.kayit = a; k.anahtarIste()
                 isolar[i] = { k.kayit = null; a.bitir() } to { a.bozuk }
             }
+            is RtmpKaynak -> {
+                val y = masa.yuvalar[i]
+                val w = k.yayin.genislik.takeIf { it > 0 } ?: y.boyut[0]; val h = k.yayin.yukseklik.takeIf { it > 0 } ?: y.boyut[1]
+                val d = o.ac(ad) ?: return false
+                val a = runCatching { AkisKaydi(d, k.yayin.hevc, w, h, o.bas) }.getOrElse { d.bitti(false); return false }
+                k.yayin.sonAyar?.let { a.ayarVer(it) }; k.kayit = a
+                isolar[i] = { k.kayit = null; a.bitir() } to { a.bozuk }
+            }
             is LunaKaynak -> {
                 val d = o.ac(ad) ?: return false
                 val a = runCatching { AkisKaydi(d, true, 1280, 720, o.bas) }.getOrElse { d.bitti(false); return false }
                 k.kayit = a
                 isolar[i] = { k.kayit = null; a.bitir() } to { a.bozuk }
             }
-            is UvcKaynak -> {
-                val y = masa.yuvalar[i]; val w = y.boyut[0] and 15.inv(); val h = y.boyut[1] and 15.inv()
+            is UvcKaynak, is KameraKaynak -> {
+                // Ekranda göründüğü yönde (telefon kamerası dik dururken dik dosya)
+                val y = masa.yuvalar[i]; val uzun = maxOf(y.boyut[0], y.boyut[1]); val kisa = minOf(y.boyut[0], y.boyut[1])
+                val w = (if (y.oran() >= 1f) uzun else kisa) and 15.inv(); val h = (if (y.oran() >= 1f) kisa else uzun) and 15.inv()
+                val fps = (k as? UvcKaynak)?.fps ?: 30
                 if (w <= 0 || h <= 0) return false
                 val d = o.ac(ad) ?: return false
-                val kd = runCatching { Kaydedici(this, d.pfd, w, h, k.fps, if (minOf(w, h) >= 2160) 60 else 20, true, sesIste = false).also { it.baslat() } }
+                val kd = runCatching { Kaydedici(this, d.pfd, w, h, fps, if (minOf(w, h) >= 2160) 60 else 20, true, sesIste = false).also { it.baslat() } }
                     .getOrElse { e -> d.bitti(false); HataKaydi.not("masa", "ISO kodlayıcı: ${e.message}"); tost("${adlar[i]}: ayrı kayıt açılamadı (cihazın kodlayıcısı yetmiyor)"); return false }
                 masa.isoHedef[i] = Triple(kd.yuzey, w, h); masa.requestRender()
                 isolar[i] = { masa.isoHedef[i] = null; Thread.sleep(100); kd.bitir().also { d.bitti(it) } } to { kd.yazmaHatasi }
@@ -528,7 +602,7 @@ class MasaActivity : Activity() {
         masa.onPause()
     }
     override fun onDestroy() {
-        super.onDestroy(); dongu.removeCallbacksAndMessages(null); runCatching { unregisterReceiver(usbDinle) }
+        super.onDestroy(); dongu.removeCallbacksAndMessages(null); rtmp?.durdur(); runCatching { unregisterReceiver(usbDinle) }
         kaynaklar.forEach { (it as? WifiKameraKaynak)?.tally(false) }
         dongu.postDelayed({ kaynaklar.forEach { it?.durdur() } }, 0)
     }

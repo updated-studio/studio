@@ -33,9 +33,11 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
         internal var tex = 0
         internal val mat = FloatArray(16)
         @Volatile internal var yeni = false
+        /** Android karesini dokuya 90° çevrilmiş veriyor mu (telefon kamerası; getTransformMatrix'ten okunur): en/boy yer değiştirir */
+        @Volatile var dokuDonuk = false
         fun tampon(w: Int, h: Int) { boyut = intArrayOf(w, h); doku?.setDefaultBufferSize(w, h); requestRender() }
         /** Ekranda görünen en/boy (dönüşle) */
-        fun oran(): Float { val d = dondur % 180 != 0; return if (d) boyut[1].toFloat() / boyut[0] else boyut[0].toFloat() / boyut[1] }
+        fun oran(): Float { val d = (dondur % 180 != 0) != dokuDonuk; return if (d) boyut[1].toFloat() / boyut[0] else boyut[0].toFloat() / boyut[1] }
     }
     val yuvalar = List(EN_COK) { Yuva(it) }
     /** GL hazır olunca her yuvanın yüzeyi (kaynaklar bunlara çizer) */
@@ -152,7 +154,7 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
             val hucreler = duzenHucreleri()
             val programYeni = hucreler.any { yuvalar[it.first].yeni }
             val yeniler = BooleanArray(EN_COK) { yuvalar[it].yeni }
-            for (y in yuvalar) if (y.yeni) { y.yeni = false; runCatching { y.doku?.updateTexImage(); y.doku?.getTransformMatrix(y.mat) } }
+            for (y in yuvalar) if (y.yeni) { y.yeni = false; runCatching { y.doku?.updateTexImage(); y.doku?.getTransformMatrix(y.mat); y.dokuDonuk = kotlin.math.abs(y.mat[0]) < 0.5f } }
             GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glViewport(0, 0, gw, gh); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
             GLES30.glUseProgram(program)
             if (tablet) {

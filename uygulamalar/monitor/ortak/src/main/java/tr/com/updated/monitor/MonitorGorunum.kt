@@ -435,8 +435,9 @@ void main() {
   float y = parlak(c);
   if (uFalse == 1) c = sahteRenk(y);
   if (uZebra == 1 && y >= uZebraEsik) {
+    // Koyu + açık şerit: patlamış (zaten beyaz) alanda yalnız beyaz şerit görünmüyordu
     float serit = mod(gl_FragCoord.x + gl_FragCoord.y, 16.0);
-    if (serit < 7.0) c = mix(c, vec3(1.0), 0.85);
+    if (serit < 5.0) c = vec3(0.05); else if (serit < 8.0) c = vec3(1.0);
   }
   if (uPeaking == 1) {
     vec2 d = uPiksel * 1.5 / uZoom;

@@ -91,9 +91,9 @@ class AkisKaydi(private val dosya: KayitOturumu.Dosya, private val hevc: Boolean
     @Volatile var bozuk = false; private set
     private val bilgi = MediaCodec.BufferInfo()
 
-    /** H.264 kodlayıcı ayarı (SPS/PPS, Annex B) ya da anahtar karedeki parametre kümeleri */
+    /** Kodlayıcı ayarı (H.264 SPS/PPS, H.265 VPS/SPS/PPS; Annex B): anahtar kare taşımıyorsa buradan alınır (RTMP) */
     private var ayar: ByteArray? = null
-    fun ayarVer(v: ByteArray) { if (!hevc) ayar = v }
+    fun ayarVer(v: ByteArray) { ayar = v }
 
     @Synchronized fun kare(v: ByteArray, anahtar: Boolean, us: Long? = null) {
         if (bozuk) return
@@ -101,7 +101,7 @@ class AkisKaydi(private val dosya: KayitOturumu.Dosya, private val hevc: Boolean
             if (iz < 0) {
                 if (!anahtar) return
                 val f = MediaFormat.createVideoFormat(if (hevc) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC, w, h)
-                if (hevc) { val ps = nallar(v).filter { it.second in 32..34 }; if (ps.size < 3) return; f.setByteBuffer("csd-0", ByteBuffer.wrap(ps.fold(ByteArray(0)) { a, n -> a + bas4 + n.first })) }
+                if (hevc) { val ps = nallar(v).filter { it.second in 32..34 }.takeIf { it.size >= 3 } ?: ayar?.let { a -> nallar(a).filter { it.second in 32..34 } } ?: return; if (ps.size < 3) return; f.setByteBuffer("csd-0", ByteBuffer.wrap(ps.fold(ByteArray(0)) { a, n -> a + bas4 + n.first })) }
                 else {
                     val ps = nallar(ayar ?: v).map { it.first to (it.first[0].toInt() and 0x1F) }
                     val sps = ps.firstOrNull { it.second == 7 }?.first ?: return; val pps = ps.firstOrNull { it.second == 8 }?.first ?: return

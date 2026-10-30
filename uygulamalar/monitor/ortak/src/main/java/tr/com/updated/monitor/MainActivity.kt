@@ -401,7 +401,7 @@ class MainActivity : Activity() {
         if (d && tc != null) { tcYazi = tc; tc.setTextColor(if (kayitSuruyor()) KIRMIZI else Color.WHITE) }
         else tcYazi = hucre("", "00:00:00:00", 1.9f, renk = if (kayitSuruyor()) KIRMIZI else Color.WHITE, buyuk = true)!!
         hucre("ISO", if (ag || k == null) "—" else a.iso?.toString() ?: "OTO", p = Param.ISO)
-        hucre(if (d) "BD" else "BEYAZ DENGESİ", if (ag || k == null) "—" else WB_ADLARI[a.awb] ?: "OTO", p = Param.WB)
+        hucre(if (d) "BD" else "BEYAZ DENGESİ", if (ag || k == null) "—" else a.kelvin?.let { "${it}K" + if (a.ton != 0) (if (a.ton < 0) " Y${-a.ton}" else " M${a.ton}") else "" } ?: WB_ADLARI[a.awb] ?: "OTO", p = Param.WB)
         hucre(if (d) "POZ." else "POZLAMA", if (ag || k == null) "—" else if (a.ev == 0) "0" else "%+.1f".format(a.ev * (k.yetenek.evAdim.takeIf { it > 0 } ?: 1f)).replace('.', ','), p = Param.EV)
     }
 
@@ -461,9 +461,26 @@ class MainActivity : Activity() {
                 else { c("OTO", a.iso == null) { a.iso = null; k.ayarDegisti() }
                     intArrayOf(50, 64, 100, 125, 200, 250, 400, 640, 800, 1250, 1600, 3200, 6400, 12800).filter { y.isoAralik?.contains(it) == true }.forEach { v -> c("$v", a.iso == v) { a.iso = v; k.ayarDegisti() } } }
             }
-            Param.WB -> listOf(CameraMetadata.CONTROL_AWB_MODE_AUTO, CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT, CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT, CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT,
+            Param.WB -> { listOf(CameraMetadata.CONTROL_AWB_MODE_AUTO, CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT, CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT, CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT,
                 CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT, CameraMetadata.CONTROL_AWB_MODE_SHADE, CameraMetadata.CONTROL_AWB_MODE_TWILIGHT).filter { it in y.awbModlari }
-                .forEach { m -> c(WB_ADLARI[m] ?: "?", a.awb == m) { a.awb = m; k.ayarDegisti() } }
+                .forEach { m -> c(WB_ADLARI[m] ?: "?", a.awb == m && a.kelvin == null) { a.awb = m; a.kelvin = null; a.ton = 0; k.ayarDegisti() } }
+            // Elle: iki çubuk, üstte Kelvin, altta yeşil–macenta (ton); ikisi de canlı uygulanır (Kamera ile aynı motor, BeyazDenge)
+            if (k.elleBdVar) {
+                serit.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(satir) })
+                fun cubuk(baslik: String, max: Int, deger: Int, yazi: (Int) -> String, degis: (Int) -> Unit) {
+                    val etiket = TextView(this).apply { textSize = 12f; typeface = dar; setTextColor(Color.WHITE); text = "$baslik  ${yazi(deger)}"; setPadding(0, dp(4f), 0, 0) }
+                    serit.addView(etiket)
+                    serit.addView(SeekBar(this).apply { this.max = max; progress = deger
+                        setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                            override fun onProgressChanged(s: SeekBar?, v: Int, kullanici: Boolean) { if (kullanici) { degis(v); etiket.text = "$baslik  ${yazi(v)}"; k.ayarDegisti() } }
+                            override fun onStartTrackingTouch(s: SeekBar?) {}; override fun onStopTrackingTouch(s: SeekBar?) { kameraAyarKaydet(); ustCiz() }
+                        }) }, LinearLayout.LayoutParams(-1, dp(36f)))
+                }
+                val adim = BeyazDenge.ADIM
+                cubuk("KELVIN", (BeyazDenge.EN_COK - BeyazDenge.EN_AZ) / adim, ((a.kelvin ?: k.mevcutKelvin()) - BeyazDenge.EN_AZ) / adim, { "${BeyazDenge.EN_AZ + it * adim}K" }) { a.kelvin = BeyazDenge.EN_AZ + it * adim }
+                cubuk("YEŞİL – MACENTA", 100, a.ton + 50, { (it - 50).let { t -> if (t == 0) "0" else if (t < 0) "Y ${-t}" else "M $t" } }) { if (a.kelvin == null) a.kelvin = k.mevcutKelvin(); a.ton = it - 50 }
+                return
+            } }
             Param.EV -> { val r = y.evAralik
                 if (r == null || r.upper == 0) satir.addView(TextView(this).apply { text = "Bu kamerada pozlama telafisi yok."; setTextColor(Color.WHITE) })
                 else (r.lower..r.upper).forEach { v -> c(if (v == 0) "0" else "%+.1f".format(v * y.evAdim).replace('.', ','), a.ev == v) { a.ev = v; k.ayarDegisti() } } }
@@ -1079,7 +1096,7 @@ class MainActivity : Activity() {
         val i = etkin; val id = (kaynaklar[i] as? KameraKaynak)?.id ?: return; val a = kamAyar[i]
         tercih.edit().putString("kam_$id", JSONObject().apply {
             a.boyut?.let { put("w", it.width); put("h", it.height) }; a.fps?.let { put("fl", it.lower); put("fu", it.upper) }
-            a.iso?.let { put("iso", it) }; a.pozlamaNs?.let { put("poz", it) }; put("ev", a.ev); put("awb", a.awb); a.odakMesafe?.let { put("odak", it.toDouble()) }; put("sab", a.sabit > 0)
+            a.iso?.let { put("iso", it) }; a.pozlamaNs?.let { put("poz", it) }; put("ev", a.ev); put("awb", a.awb); a.kelvin?.let { put("kelvin", it) }; put("ton", a.ton); a.odakMesafe?.let { put("odak", it.toDouble()) }; put("sab", a.sabit > 0)
             a.fotoBoyut?.let { put("fw", it.width); put("fh", it.height) }; put("raw", a.raw)
         }.toString()).putBoolean("hevc", hevc).putInt("mbps", mbps).putBoolean("sesKayit", sesKayit).apply()
     }
@@ -1089,7 +1106,7 @@ class MainActivity : Activity() {
         return KameraAyari(
             boyut = if (j.has("w")) Size(j.getInt("w"), j.getInt("h")) else null, fps = if (j.has("fl")) Range(j.getInt("fl"), j.getInt("fu")) else null,
             iso = if (j.has("iso")) j.getInt("iso") else null, pozlamaNs = if (j.has("poz")) j.getLong("poz") else null, ev = j.optInt("ev"),
-            awb = j.optInt("awb", CameraMetadata.CONTROL_AWB_MODE_AUTO), odakMesafe = if (j.has("odak")) j.getDouble("odak").toFloat() else null, sabit = if (j.optBoolean("sab", true)) 1 else 0,
+            awb = j.optInt("awb", CameraMetadata.CONTROL_AWB_MODE_AUTO), kelvin = if (j.has("kelvin")) j.getInt("kelvin") else null, ton = j.optInt("ton").coerceIn(-50, 50), odakMesafe = if (j.has("odak")) j.getDouble("odak").toFloat() else null, sabit = if (j.optBoolean("sab", true)) 1 else 0,
             fotoBoyut = if (j.has("fw")) Size(j.getInt("fw"), j.getInt("fh")) else null, raw = j.optBoolean("raw"))
     }
 

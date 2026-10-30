@@ -910,9 +910,9 @@ class KameraActivity : Activity() {
         val yazi = TextView(this).apply { textSize = 13f; typeface = mono; gravity = Gravity.END }
         lateinit var cubuk: TonCubugu
         fun ayarla(t: Int) {
-            val y = t.coerceIn(-100, 100); val eski = ayar.ton
+            val y = t.coerceIn(-50, 50); val eski = ayar.ton
             if (y == eski) return
-            if ((y == 0) != (eski == 0) || (y != 0 && y % 50 == 0)) satir.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            if ((y == 0) != (eski == 0) || (y != 0 && y % 25 == 0)) satir.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
             degisti(y); yaziCiz(yazi); cubuk.invalidate()
         }
         fun adim(isaret: String, d: Int) = etiket(isaret, 16f).apply { background = Tema.kapsul(Color.argb(92, 120, 120, 120)); contentDescription = if (d < 0) "Yeşile" else "Macentaya"
@@ -940,7 +940,7 @@ class KameraActivity : Activity() {
             boya.shader = android.graphics.LinearGradient(r, 0f, w - r, 0f, intArrayOf(yesil, Color.argb(90, 255, 255, 255), macenta), null, android.graphics.Shader.TileMode.CLAMP)
             val k = dp(2.5f).toFloat(); c.drawRoundRect(RectF(r, cy - k, w - r, cy + k), k, k, boya); boya.shader = null
             boya.color = Color.argb(204, 255, 255, 255); c.drawRect(w / 2 - 1.5f, cy - dp(6f), w / 2 + 1.5f, cy + dp(6f), boya)
-            val v = ayar.ton; val x = r + (v + 100) / 200f * (w - 2 * r)
+            val v = ayar.ton; val x = r + (v + 50) / 100f * (w - 2 * r)
             boya.setShadowLayer(dp(3f).toFloat(), 0f, dp(1f).toFloat(), Color.argb(90, 0, 0, 0)); boya.color = Color.WHITE; c.drawCircle(x, cy, r, boya); boya.clearShadowLayer()
             if (v != 0) { boya.color = (if (v < 0) yesil else macenta).let { Color.argb(((abs(v) / 60f).coerceAtMost(1f) * 255).toInt(), Color.red(it), Color.green(it), Color.blue(it)) }; c.drawCircle(x, cy, r - dp(7f), boya) }
         }
@@ -948,7 +948,7 @@ class KameraActivity : Activity() {
         override fun onTouchEvent(e: MotionEvent): Boolean {
             if (algila.onTouchEvent(e)) return true
             parent?.requestDisallowInterceptTouchEvent(true)
-            val r = dp(12f).toFloat(); val t = ((e.x - r) / (width - 2 * r)).coerceIn(0f, 1f) * 200 - 100
+            val r = dp(12f).toFloat(); val t = ((e.x - r) / (width - 2 * r)).coerceIn(0f, 1f) * 100 - 50
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> ayarla(if (abs(t) < 3) 0 else (Math.round(t / 2) * 2))
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> ayarKaydet()
@@ -1014,7 +1014,7 @@ class KameraActivity : Activity() {
                 }
                 p.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(satir) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10f) })
                 if (k.elleBdVar) {
-                    // Kelvin (2500–10000, 50K adım) ve ton (yeşil − / macenta +); otomatikteyken oynatılırsa o anki Kelvin'de kilitlenir
+                    // Kelvin (2500–10000, 100K adım) ve ton (yeşil − / macenta +); otomatikteyken oynatılırsa o anki Kelvin'de kilitlenir
                     not("Sıcaklık (Kelvin)")
                     cubuk((BeyazDenge.EN_COK - BeyazDenge.EN_AZ) / BeyazDenge.ADIM, ((ayar.kelvin ?: k.mevcutKelvin()) - BeyazDenge.EN_AZ) / BeyazDenge.ADIM) { v ->
                         ayar.kelvin = BeyazDenge.EN_AZ + v * BeyazDenge.ADIM; k.ayarDegisti(); bdYaz() }
@@ -1188,7 +1188,7 @@ class KameraActivity : Activity() {
             }
         } else grup(not = "Kamera açılınca çözünürlük, kayıt, pozlama ve renk ayarları burada görünür.") { deger("Kamera hazır değil", renk = AyarEkrani.IKINCIL) }
         grup {
-            git(R.drawable.ic_ag, Color.rgb(48, 176, 199), "Masa (çok kamera)", if (wifiKamera) "Açık" else "") { e.git("Masa") { masaSayfasi() } }
+            git(R.drawable.ic_ag, Color.rgb(48, 176, 199), "Multi Cam (çok kamera)", if (wifiKamera) "Açık" else "") { e.git("Multi Cam") { masaSayfasi() } }
             git(R.drawable.ic_bilgi, Color.rgb(142, 142, 147), "Uygulama", packageManager.getPackageInfo(packageName, 0).versionName ?: "") { e.git("Uygulama") { uygulamaSayfasi() } }
         }
     }
@@ -1238,8 +1238,8 @@ class KameraActivity : Activity() {
             val kel = ayar.kelvin ?: k.mevcutKelvin()
             kaydirici("Sıcaklık", (BeyazDenge.EN_COK - BeyazDenge.EN_AZ) / BeyazDenge.ADIM, (kel - BeyazDenge.EN_AZ) / BeyazDenge.ADIM, { "${BeyazDenge.EN_AZ + it * BeyazDenge.ADIM}K" },
                 { ayar.kelvin = BeyazDenge.EN_AZ + it * BeyazDenge.ADIM; k.ayarDegisti() }, { ayarKaydet(); ayarEkrani?.yenile() })
-            kaydirici("Ton", 200, ayar.ton + 100, { v -> (v - 100).let { if (it == 0) "0" else if (it < 0) "Y $it" else "M +$it" } },
-                { if (ayar.kelvin == null) ayar.kelvin = k.mevcutKelvin(); ayar.ton = it - 100; k.ayarDegisti() }, { ayarKaydet(); ayarEkrani?.yenile() })
+            kaydirici("Ton", 100, ayar.ton + 50, { v -> (v - 50).let { if (it == 0) "0" else if (it < 0) "Y $it" else "M +$it" } },
+                { if (ayar.kelvin == null) ayar.kelvin = k.mevcutKelvin(); ayar.ton = it - 50; k.ayarDegisti() }, { ayarKaydet(); ayarEkrani?.yenile() })
         }
         grup("Hazır", "Dokununca Kelvin o değere gelir.") {
             listOf(3200 to "Ampul", 4000 to "Floresan", 5600 to "Gün ışığı", 6500 to "Bulutlu", 7500 to "Gölge").forEach { (kv, ad) ->
@@ -1307,12 +1307,12 @@ class KameraActivity : Activity() {
     }
 
     private fun AyarEkrani.Sayfa.masaSayfasi() {
-        grup(not = "Açıkken bu telefonun görüntüsü aynı Wi-Fi'daki masaya gider; masa kendiliğinden bulur. Masada bulunmazsa adres: ${ipAdresi() ?: "Wi-Fi'a bağlı değil"}") {
+        grup(not = "Açıkken bu telefonun görüntüsü aynı Wi-Fi'daki Multi Cam ekranına gider; Multi Cam kendiliğinden bulur. Bulunmazsa adres: ${ipAdresi() ?: "Wi-Fi'a bağlı değil"}") {
             anahtar("Wi-Fi kamera ol", wifiKamera) { wifiKamera = it; tercih.edit().putBoolean("wifiKamera", it).apply(); yayinAyarla() }
         }
-        grup(not = "Kameranın kendi uygulamasındaki görüntüyü (ör. USB'den webcam vermeyen Insta360) masaya kaynak olarak gönderir: aç, kameranın uygulamasına geç, telefonu yan tut. " +
-            "Masada \"Ekran · ${android.os.Build.MODEL}\" adıyla görünür. Durdurmak için buraya ya da bildirimdeki Durdur'a dokun." + (EkranYayini.durum.takeIf { it.isNotEmpty() }?.let { "\nDurum: $it" } ?: "")) {
-            anahtar("Ekranı Masa'ya gönder", EkranYayini.calisiyor) { ac ->
+        grup(not = "Kameranın kendi uygulamasındaki görüntüyü (ör. USB'den webcam vermeyen Insta360) Multi Cam'e kaynak olarak gönderir: aç, kameranın uygulamasına geç, telefonu yan tut. " +
+            "Multi Cam'de \"Ekran · ${android.os.Build.MODEL}\" adıyla görünür. Durdurmak için buraya ya da bildirimdeki Durdur'a dokun." + (EkranYayini.durum.takeIf { it.isNotEmpty() }?.let { "\nDurum: $it" } ?: "")) {
+            anahtar("Ekranı Multi Cam'e gönder", EkranYayini.calisiyor) { ac ->
                 if (ac) {
                     if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
                         requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9)
@@ -1320,7 +1320,7 @@ class KameraActivity : Activity() {
                 } else EkranYayini.durdur(this@KameraActivity)
             }
         }
-        grup { deger("Bu telefonu masa yap", renk = AyarEkrani.MAVI) { ayarEkrani?.kapat(); masayaGec() } }
+        grup { deger("Bu telefonu Multi Cam yap", renk = AyarEkrani.MAVI) { ayarEkrani?.kapat(); masayaGec() } }
     }
 
     private fun AyarEkrani.Sayfa.uygulamaSayfasi() {
@@ -2445,7 +2445,7 @@ class KameraActivity : Activity() {
     }
     private fun masayaGec() {
         if (kayitSuruyor()) return tost("Önce kaydı durdur.")
-        if (!Ekranlar.ac(this, Ekranlar.MASA)) tost("Masa bu uygulamada yok.")
+        if (!Ekranlar.ac(this, Ekranlar.MASA)) tost("Multi Cam bu uygulamada yok.")
     }
 
     /**
@@ -2455,14 +2455,14 @@ class KameraActivity : Activity() {
     private fun yayinAyarla() {
         val iste = wifiKamera && onde && tlKaydedici == null
         kaynak?.let { k -> if (onde && k.sdrZorla != wifiKamera) { k.sdrZorla = wifiKamera
-            if (ayar.renk == 1 && k.hdrVar) { oturumuYenile(); if (wifiKamera) tost("Wi-Fi kamera açıkken HDR kapalı: Masa'ya SDR gider.") } } }
+            if (ayar.renk == 1 && k.hdrVar) { oturumuYenile(); if (wifiKamera) tost("Wi-Fi kamera açıkken HDR kapalı: Multi Cam'e SDR gider.") } } }
         if (!iste) { verici?.let { it.durdur(); verici = null; if (tlKaydedici == null) monitor.kayitYuzeyi = null }; tallyCerceve.visibility = View.GONE; masaCip.visibility = View.GONE; return }
         if (verici != null) return
         val (kw, kh) = monitor.kayitBoyutu()
         val olcek = minOf(1f, 1920f / maxOf(kw, kh)); val w = (kw * olcek).toInt() and 15.inv(); val h = (kh * olcek).toInt() and 15.inv()
         val ad = "UPDATED · ${android.os.Build.MODEL}"
         val v = runCatching { YayinVerici(this, ad, w, h, tally = { acik -> runOnUiThread { tallyCerceve.visibility = if (acik) View.VISIBLE else View.GONE } },
-            durum = { d -> runOnUiThread { masaCip.text = d; masaCip.setTextColor(if (d == "Masaya bağlı") YESIL else GRI) } }).also { it.baslat() } }
+            durum = { d -> runOnUiThread { masaCip.text = d; masaCip.setTextColor(if (d == "Multi Cam'e bağlı") YESIL else GRI) } }).also { it.baslat() } }
             .getOrElse { e -> HataKaydi.not("yayin", e.stackTraceToString()); return tost("Wi-Fi kamera başlamadı: ${e.message}") }
         verici = v; v.yon = fizikselYon
         monitor.kayitYuzeyi = v.yuzey; monitor.yenile()
@@ -2501,7 +2501,7 @@ class KameraActivity : Activity() {
         ic.addView(kart(R.drawable.ic_monitor, MAVI_ACIK, "Monitör", "Dış kamerayı izle: HDMI/USB ya da ağ yayını. Ölçümler, LUT, iki kaynak.") {
             girisSoruldu = true; secimYapildi = true; if (hatirla.isChecked) tercih.edit().putString("giris", "monitor").apply(); kok.removeView(p); monitoreGec()
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
-        ic.addView(kart(R.drawable.ic_ag, YESIL, "Masa", "Çok kamera: Wi-Fi'daki telefonlar ve USB'den takılan kameralar tek ekranda; dokununca geçiş, kayıt.") {
+        ic.addView(kart(R.drawable.ic_ag, YESIL, "Multi Cam", "Çok kamera: Wi-Fi'daki telefonlar ve USB'den takılan kameralar tek ekranda; dokununca geçiş, kayıt.") {
             girisSoruldu = true; secimYapildi = true; kok.removeView(p); masayaGec()
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
         ic.addView(hatirla)
@@ -2534,7 +2534,7 @@ class KameraActivity : Activity() {
         val j = runCatching { JSONObject(tercih.getString("kam_$id", "{}")!!) }.getOrNull() ?: return KameraAyari()
         return KameraAyari(boyut = if (j.has("vw")) Size(j.getInt("vw"), j.getInt("vh")) else null, fps = if (j.has("fps")) Range(j.getInt("fps"), j.getInt("fps")) else null,
             fotoBoyut = if (j.has("fw")) Size(j.getInt("fw"), j.getInt("fh")) else null, raw = j.optBoolean("raw"), flas = j.optInt("flas"),
-            hevc = j.optBoolean("hevc"), renk = j.optInt("renk"), sabit = j.optInt("sabit", 1), kelvin = if (j.has("kelvin")) j.getInt("kelvin") else null, ton = j.optInt("ton"),
+            hevc = j.optBoolean("hevc"), renk = j.optInt("renk"), sabit = j.optInt("sabit", 1), kelvin = if (j.has("kelvin")) j.getInt("kelvin") else null, ton = j.optInt("ton").coerceIn(-50, 50),
             sesGirdi = if (j.has("sesGirdi")) j.getInt("sesGirdi") else null, diyafram = if (j.has("diyafram")) j.getDouble("diyafram").toFloat() else null)
     }
     private fun ayarKaydet() {

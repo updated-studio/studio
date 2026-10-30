@@ -76,6 +76,8 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | **Zebra görünmüyordu:** beyaz alanın üstüne beyaz şerit çiziliyordu; artık koyu/beyaz çapraz şerit | ✓ | ✓ (0.14.0) | Monitor.metal |
 
 Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki kaynak, HLS kaynağı.
+| **Beyaz denge iki çubuk (Kamera ve Monitör):** Kelvin 2500–10000 K, 100 K adım; yeşil–macenta −50…+50 (eksi = yeşil); "Oto" ile ikisi sıfırlanır | ✓ | | 30 Ekim; Android önce 50 K / ±100 idi, ortak kurala çekildi (fiziksel aralık aynı) |
+| **Zebra:** koyu + açık şerit (patlamış beyaz alanda tek beyaz şerit görünmüyordu) | ✓ | | Android MonitorGorunum (Kamera ve Monitör ortak) |
 
 ## Masa (çok kamera)
 
@@ -85,6 +87,9 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | USB kameraları masaya ekle | ✓ | ✓ | iOS'ta yalnız iPad |
 | **Tablet masası (yönetmen masası):** ÖNİZLEME + PROGRAM monitörleri, numaralı kaynaklar, KES, hızlı geçiş, klavye (1–4, boşluk, R) | ✓ | ✓ | 29 Ekim; iOS MasaIpad.swift; Android MasaActivity tabletDuzen (en kısa kenar ≥ 600 dp), telefon düzeni aynı |
 | **Tasarım dili (stüdyo):** tek yazı ailesi Inter (tablo rakamları); okuma 15 sp yarı kalın + 9,5 sp büyük harf etiket; metin beyaz / %62 / %28; yüzeyler siyah %34 + 0,5 px beyaz %18 hat (paneller köşe 30); sarı yalnız elle değişen değerde, yeşil onay, kırmızı kayıt. Üstte tek okuma şeridi, altında 24 dp sabitlenen kapsülleri; AI Kadraj açıkken köşe çentikleri; kayıtta zaman kodu çipi; mercekler 40/34 dp; mod şeridi arkasız (PRO, yanda TL / MON.); deklanşör 74 dp; panellerde 13 sp başlık, 28 dp ✕, 10 sp bölüm başlıkları, seçili kapsül sarı yazı + beyaz %12 + sarı yarım hat | … | ✓ (paneller görüntü bulanıklaştırılamadığı için siyah %84) | Fatih 29 Ekim: "Tasarım daha iyi" |
+| **Masa adı "Multi Cam"** (ekran, bildirim, Wi-Fi durum yazıları); kayıt klasörü "UPDATED Masa/…" aynı kalır | ✓ | | 30 Ekim, Android Kamera 0.17.3 / Studio 0.2.0 |
+| **Kaynak: bu cihazın kendi kamerası** (USB ve Wi-Fi ile birlikte, aynı anda ISO kayıt; bir seferde tek telefon kamerası) | ✓ | | Android KameraKaynak, ekran dönüşüne göre döner |
+| **RTMP girişi (DJI Osmo/Pocket, Insta360 Ace/GO/Luna, GoPro "canlı yayın"):** adres `rtmp://<telefon-ip>:1935/canli/<kaynak-adı>`; H.264, H.265 (FLV kod 12 ve Enhanced RTMP hvc1); her yayın bir kaynak, yayın bitince kaynak düşer; ISO kaydı kameranın kendi sıkıştırılmış akışından (yeniden kodlamasız) | ✓ | | Android Rtmp.kt (+RtmpTest); "Kamera bağla" penceresi adresi gösterir/kopyalar |
 
 ## Uygulama
 

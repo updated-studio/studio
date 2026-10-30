@@ -16,8 +16,8 @@ android {
         applicationId = "tr.com.updated.monitor"
         minSdk = 29            // Android 10: GLES 3, MediaStore klasörleri; Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 33
-        versionName = "0.17.2"
+        versionCode = 34
+        versionName = "0.17.3"
         ndk { abiFilters += listOf("arm64-v8a") } // güncel Android telefonların hepsi; ML Kit kitaplıkları diğer işlemciler için APK'yı 3 kat büyütüyordu
     }
     // İmza anahtarı yalnız sunucuda (/opt/updated/monitor-imza, depoya girmez). Aynı anahtar = sonraki sürümler güncelleme olarak kurulur.

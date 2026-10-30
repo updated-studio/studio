@@ -71,7 +71,7 @@ data class KameraAyari(
     var flas: Int = 0,
     /** Genel Ayarlar: kodek (H.265 / H.264), renk (0 SDR, 1 HDR HLG10), sabitleme (0 kapalı, 1 standart, 2 sinematik = önizleme sabitlemesi) */
     var hevc: Boolean = false, var renk: Int = 0, var sabit: Int = 1,
-    /** Elle beyaz denge: Kelvin (null = beyaz denge modu `awb`) ve ton (yeşil −100 … +100 macenta) */
+    /** Elle beyaz denge: Kelvin (null = beyaz denge modu `awb`) ve ton (yeşil −50 … +50 macenta, iOS ile aynı) */
     var kelvin: Int? = null, var ton: Int = 0,
     /** Ses girişi (AudioDeviceInfo.id; null = otomatik: takılı harici mikrofon varsa o) */
     var sesGirdi: Int? = null,

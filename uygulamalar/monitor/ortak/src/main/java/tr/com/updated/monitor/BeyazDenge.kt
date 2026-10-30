@@ -13,7 +13,7 @@ import kotlin.math.ln
  * kazançlar 5500 K sayılıp sRGB'deki kara cisim oranıyla ölçeklenir (yaklaşık).
  */
 object BeyazDenge {
-    const val EN_AZ = 2500; const val EN_COK = 10000; const val ADIM = 50
+    const val EN_AZ = 2500; const val EN_COK = 10000; const val ADIM = 100
 
     /** Kara cisim / gün ışığı eğrisinde xy (Kim vd., 1667–25000 K) */
     private fun xy(t: Double): Pair<Double, Double> {
@@ -76,7 +76,7 @@ object BeyazDenge {
             (oR / og * (n0[0] / n[0]) * (n[1] / n0[1])) to (oB / og * (n0[2] / n[2]) * (n[1] / n0[1]))
         }
         // Ton: + macenta (yeşil azalır), − yeşil
-        val g = 1.0 - ton * 0.0025
+        val g = 1.0 - ton * 0.005
         val en = minOf(r, b, g); if (en < 1.0) { r /= en; b /= en }
         val gg = if (en < 1.0) g / en else g
         return RggbChannelVector(r.toFloat(), gg.toFloat(), gg.toFloat(), b.toFloat())

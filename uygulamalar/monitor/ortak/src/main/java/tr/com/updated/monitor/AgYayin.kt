@@ -67,7 +67,7 @@ class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, v
         Thread({ kabul(s) }, "yayin-kabul").start()
         Thread({ gonder() }, "yayin-gonder").start()
         duyur(s.localPort)
-        durum("Masa bekleniyor")
+        durum("Multi Cam bekleniyor")
     }
 
     private fun duyur(port: Int) {
@@ -93,7 +93,7 @@ class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, v
             ayarVerisi?.let { kuyruk.offer(Paket(AgYayin.AYAR, 0L, it)) }
             kuyruk.offer(Paket(AgYayin.YON, 0L, byteArrayOf((yon shr 8).toByte(), yon.toByte())))
             anahtarIste()
-            durum("Masaya bağlı")
+            durum("Multi Cam'e bağlı")
             Thread({ dinle(c) }, "yayin-dinle").start()
         }
     }
@@ -104,7 +104,7 @@ class YayinVerici(private val ctx: Context, val ad: String, val genislik: Int, v
         runCatching {
             c.getInputStream().bufferedReader().forEachLine { l -> runCatching { val j = JSONObject(l); if (j.has("tally")) tally(j.getBoolean("tally")); if (j.optBoolean("anahtar")) anahtarIste() } }
         }
-        if (istemci === c) { istemci = null; tally(false); if (calis) durum("Masa bekleniyor") }
+        if (istemci === c) { istemci = null; tally(false); if (calis) durum("Multi Cam bekleniyor") }
     }
 
     private fun bosalt() {
