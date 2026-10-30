@@ -201,3 +201,5 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ### 12 Ekim 2026
 - Stüdyo kuruldu: tek depo, tek giriş; Ekip, Takvim, İçerik (çerçeveyle), Marka Kiti, Haber Masası modülleri. GitHub organizasyonu `updated-studio`, Supabase projesi `updated-panel`.
+
+- **30 Ekim 2026 · Radar otomasyonu beklemede.** Haber masası + Google aramasıyla çıkış radarını kendiliğinden dolduran iş yazıldı (göç 0053, fonksiyon radar-otomatik) ama kullanıcı "önce ana sayfayı bitirelim" dedi; ana dala alınmadı, `radar-otomatik` dalında duruyor. Eksikler: panel tarafı (site deposu apps/cms/src/lib/radar.ts + Products.radarOto alanı), deneme, 0053 onayı.
