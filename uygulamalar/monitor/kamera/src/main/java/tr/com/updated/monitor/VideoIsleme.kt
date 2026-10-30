@@ -23,7 +23,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
  * bitince görünür, işlenemezse özgün renkte görünür. Birden çok video sırayla işlenir; ilerleme bildirimde.
  */
 class VideoIsleme : Service() {
-    class Is(val uri: Uri, val lut: Lut, val hevc: Boolean)
+    /** Stil işleme (özgünün üstüne yazılır) ya da düzenleme (`duzen`: yeni dosya, özgün kalır) */
+    class Is(val uri: Uri, val lut: Lut?, val hevc: Boolean, val duzen: Duzen? = null) {
+        companion object { fun duzenle(d: Duzen) = Is(d.kaynak, null, d.hevc, d) }
+    }
     companion object {
         private const val KANAL = "isleme"; private const val BILDIRIM = 48
         private val sira = ConcurrentLinkedQueue<Is>()
@@ -78,7 +81,9 @@ class VideoIsleme : Service() {
     private fun siradaki() {
         val j = sira.poll() ?: run { yuzde = -1; ana.post { calisiyor = false; stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }; return }
         yuzde = 0
-        val t = StilGom.video(this, j.uri, j.lut, j.hevc, islem.looper,
+        j.duzen?.let { d -> return duzenle(d) }
+        val lut = j.lut ?: run { islem.post { siradaki() }; return }
+        val t = StilGom.video(this, j.uri, lut, j.hevc, islem.looper,
             ilerleme = { p -> if (p != yuzde) { yuzde = p; ana.post { bildirim("Stil videoya işleniyor", p) } } }) { ok ->
             runCatching { contentResolver.update(j.uri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null) }
             ana.post {
@@ -88,6 +93,20 @@ class VideoIsleme : Service() {
             islem.post { siradaki() }
         }
         if (t == null) { runCatching { contentResolver.update(j.uri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null) }; islem.post { siradaki() } }
+    }
+
+    /** Düzenleme: yeni dosya galeriye; `bitti` yeni videonun adresiyle (olmazsa özgünüyle, başarısız) */
+    private fun duzenle(d: Duzen) {
+        bildirim("Video düzenleniyor", 0)
+        val t = DuzenMotoru.disaAktar(this, d, islem.looper,
+            ilerleme = { p -> if (p != yuzde) { yuzde = p; ana.post { bildirim("Video düzenleniyor", p) } } }) { yeni ->
+            ana.post {
+                val b = bitti
+                if (b != null) b(yeni ?: d.kaynak, yeni != null) else bilgi(if (yeni != null) "Düzenlenen video galeride." else "Video düzenlenemedi; özgünü duruyor.")
+            }
+            islem.post { siradaki() }
+        }
+        if (t == null) islem.post { siradaki() }
     }
 
     private fun kanal() = getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(KANAL, "Video işleme", NotificationManager.IMPORTANCE_LOW))
@@ -113,7 +132,7 @@ class VideoIsleme : Service() {
 
     /** Android 15: medya işleme hizmetinin süresi doldu; kalan sıra özgün renkte görünür yapılır */
     override fun onTimeout(startId: Int, fgsType: Int) {
-        generateSequence { sira.poll() }.forEach { j -> runCatching { contentResolver.update(j.uri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null) } }
+        generateSequence { sira.poll() }.filter { it.duzen == null }.forEach { j -> runCatching { contentResolver.update(j.uri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null) } }
         stopSelf()
     }
 
