@@ -154,7 +154,7 @@ struct AnaEkran: View {
                 if panel == nil {
                     if let f = acikSatir { FavoriSatir(f: f, kamera: kamera).padding(.bottom, 14) } else {
                         VStack(spacing: 10) {
-                            if kamera.mod != .pro { PozlamaCetveli(kamera: kamera).yardimBalonu(yardim, "Kaydır: pozlama · çift dokun: sıfırla") }
+                            if kamera.mod != .pro, kamera.mod != .timelapse, !kamera.kayitta, kamera.secilenIso == nil, kamera.secilenEnst == nil { PozlamaCetveli(kamera: kamera).yardimBalonu(yardim, "Kaydır: pozlama · çift dokun: sıfırla") }
                             mercekler(dikey: false)
                         }
                         .padding(.bottom, 20)
