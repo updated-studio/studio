@@ -17,8 +17,8 @@ android {
         applicationId = "tr.com.upcam.studio"
         minSdk = 29
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.4.0"
+        versionCode = 9
+        versionName = "0.4.1"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     signingConfigs {

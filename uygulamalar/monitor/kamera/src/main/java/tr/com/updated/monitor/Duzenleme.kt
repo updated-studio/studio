@@ -126,6 +126,24 @@ object DuzenMotoru {
         }
     }
 
+    /**
+     * Birleşik vlog'un bit hızı (iPhone MasaKayit ile aynı kural): HEVC ≈ 0,12 bit/piksel, H.264 bunun ~1,6 katı; en az 16 Mbit.
+     * Boyut ve kare hızı arka kamera dosyasından (okunamazsa 1080p 30).
+     */
+    private fun vlogBitHizi(ctx: Context, arka: Uri, hevc: Boolean): Int {
+        val m = android.media.MediaMetadataRetriever()
+        val (w, h, fps) = runCatching {
+            m.setDataSource(ctx, arka)
+            fun oku(k: Int) = m.extractMetadata(k)?.toFloatOrNull()
+            Triple(oku(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH) ?: 1920f, oku(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT) ?: 1080f,
+                // Kare hızı: kare sayısı / süre (CAPTURE_FRAMERATE çoğu dosyada yok)
+                (oku(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT)?.let { n -> oku(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.takeIf { it > 0f }?.let { n * 1000f / it } }
+                    ?: oku(android.media.MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE) ?: 30f).coerceIn(24f, 60f))
+        }.getOrDefault(Triple(1920f, 1080f, 30f)).also { runCatching { m.release() } }
+        val bpp = if (hevc) 0.12f else 0.19f
+        return maxOf(16_000_000, (w * h * fps * bpp).toInt())
+    }
+
     /** Vlog: arka ve ön kamera dosyalarından birleşik video ("<ad> vlog.mp4"); iki özgün dosya kalır. `disaAktar` gibi çalışır */
     @OptIn(UnstableApi::class)
     fun vlogBirlestir(ctx: Context, arka: Uri, on: Uri, hevc: Boolean, looper: Looper, ilerleme: (Int) -> Unit = {}, dizin: Uri? = null, bitti: (Uri?) -> Unit): Transformer? {
@@ -139,6 +157,8 @@ object DuzenMotoru {
             var surer = true
             val t = Transformer.Builder(ctx).setLooper(looper)
                 .setVideoMimeType(if (hevc) MimeTypes.VIDEO_H265 else MimeTypes.VIDEO_H264)
+                .setEncoderFactory(androidx.media3.transformer.DefaultEncoderFactory.Builder(ctx).setRequestedVideoEncoderSettings(
+                    androidx.media3.transformer.VideoEncoderSettings.Builder().setBitrate(vlogBitHizi(ctx, arka, hevc)).build()).build())
                 .addListener(object : Transformer.Listener {
                     override fun onCompleted(c: Composition, s: ExportResult) { surer = false; bitti(yayinla(ctx, arka, gecici, "vlog", dizin)); gecici.delete() }
                     override fun onError(c: Composition, s: ExportResult, e: ExportException) {

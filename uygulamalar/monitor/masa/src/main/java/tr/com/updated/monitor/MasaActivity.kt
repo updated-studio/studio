@@ -869,15 +869,36 @@ class MasaActivity : Activity() {
     private fun klasorAdi(u: Uri) = runCatching { android.provider.DocumentsContract.getTreeDocumentId(u).substringAfterLast(':').ifEmpty { "SSD" } }.getOrDefault("SSD")
         .let { if (it.length > 18) it.take(17) + "…" else it }
 
-    private fun yerMenu() {
+    /** Disk takılınca (Android 11+) kayıt yeri sorulur (Kamera ile aynı; iPhone Masa `diskeYaz`) */
+    private var diskGeriCagri: Any? = null
+    private fun diskIzle() {
+        if (android.os.Build.VERSION.SDK_INT < 30 || diskGeriCagri != null) return
+        val sm = getSystemService(android.os.storage.StorageManager::class.java)
+        var onceki = sm.storageVolumes.count { it.isRemovable && it.state == android.os.Environment.MEDIA_MOUNTED }
+        val g = object : android.os.storage.StorageManager.StorageVolumeCallback() {
+            override fun onStateChanged(v: android.os.storage.StorageVolume) {
+                val n = sm.storageVolumes.count { it.isRemovable && it.state == android.os.Environment.MEDIA_MOUNTED }
+                val takildi = n > onceki; onceki = n
+                runOnUiThread { yerGoster(); if (takildi && kaydedici == null) yerMenu(v.getDescription(this@MasaActivity)) }
+            }
+        }
+        runCatching { sm.registerStorageVolumeCallback(mainExecutor, g); diskGeriCagri = g }
+    }
+    private fun diskBirak() {
+        if (android.os.Build.VERSION.SDK_INT < 30) return
+        (diskGeriCagri as? android.os.storage.StorageManager.StorageVolumeCallback)?.let { runCatching { getSystemService(android.os.storage.StorageManager::class.java).unregisterStorageVolumeCallback(it) } }
+        diskGeriCagri = null
+    }
+
+    private fun yerMenu(takilan: String? = null) {
         if (kaydedici != null) return tost("Kayıt sürerken kayıt yeri değişmez.")
         val k = klasor()
-        AlertDialog.Builder(this).setTitle("Kayıt yeri")
+        AlertDialog.Builder(this).setTitle(takilan?.let { "$it takıldı" } ?: "Kayıt yeri")
             .setMessage((if (k != null) "Şu an: ${klasorAdi(k)}\n\n" else "Şu an: telefon (Movies/UPDATED Masa)\n\n") +
                 "Harici SSD için: SSD'yi tak (hub ya da doğrudan), \"SSD seç\"e dokun, SSD'yi ve bir klasörü seç. Her kayıt orada \"UPDATED Masa/<tarih>\" klasörüne gider: Program.mp4 ve her kaynak ayrı dosya.")
-            .setPositiveButton("SSD seç") { _, _ -> runCatching { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION), 7) }.onFailure { tost("Klasör seçici açılmadı.") } }
-            .setNeutralButton("Telefona kaydet") { _, _ -> tercih.edit().remove("masa.klasor").apply(); yerGoster() }
-            .setNegativeButton("Kapat", null).show()
+            .setPositiveButton(if (takilan != null && k != null) "Klasör seç" else "SSD seç") { _, _ -> runCatching { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION), 7) }.onFailure { tost("Klasör seçici açılmadı.") } }
+            .setNeutralButton(if (takilan != null) "Telefona" else "Telefona kaydet") { _, _ -> tercih.edit().remove("masa.klasor").apply(); yerGoster() }
+            .setNegativeButton(if (takilan != null && k != null) "Diske kaydet" else "Kapat", null).show()
     }
 
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
@@ -1011,7 +1032,7 @@ class MasaActivity : Activity() {
 
     /* ================= yaşam döngüsü ================= */
     override fun onResume() {
-        super.onResume(); Ekranlar.masaAcik = true; masa.onResume(); tamEkran()
+        super.onResume(); Ekranlar.masaAcik = true; masa.onResume(); tamEkran(); diskIzle()
         // Bazı telefonlar Wi-Fi'da çoklu yayın paketlerini kilit olmadan atar (kameralar bulunmaz)
         cokluYayin = runCatching { (applicationContext.getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager).createMulticastLock("masa").apply { setReferenceCounted(false); acquire() } }.getOrNull()
         bulucu = KameraBulucu(this) { ad, adres, kapi -> runOnUiThread {
@@ -1021,7 +1042,7 @@ class MasaActivity : Activity() {
         } }.also { it.baslat() }
     }
     override fun onPause() {
-        super.onPause(); Ekranlar.masaAcik = false; bulucu?.durdur(); bulucu = null; runCatching { cokluYayin?.release() }; cokluYayin = null
+        super.onPause(); Ekranlar.masaAcik = false; diskBirak(); bulucu?.durdur(); bulucu = null; runCatching { cokluYayin?.release() }; cokluYayin = null
         if (kaydedici != null) kayitBitir(true)
         masa.onPause()
     }
