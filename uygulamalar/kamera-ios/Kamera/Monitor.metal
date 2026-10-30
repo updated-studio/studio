@@ -68,8 +68,10 @@ fragment float4 monitorParca(KoseCikti g [[stage_in]],
     float y = parlak(c);
     if (a.sahte == 1) c = sahteRenk(y);
     if (a.zebra == 1 && y >= a.zebraEsik) {
-        float serit = fmod(g.konum.x + g.konum.y, 16.0);
-        if (serit < 7.0) c = mix(c, float3(1.0), 0.85);
+        // Patlamış alan zaten beyaz: beyaz şerit görünmüyordu (Fatih 30 Ekim "zebra çalışmıyor"). Koyu + açık şerit, her parlaklıkta seçilir.
+        float serit = fmod(g.konum.x + g.konum.y, 18.0);
+        if (serit < 6.0) c = float3(0.06);
+        else if (serit < 9.0) c = float3(1.0);
     }
     if (a.peaking == 1) {
         float2 d = float2(a.pikselX, a.pikselY) * 1.5 / a.zoom;

@@ -318,9 +318,22 @@ struct MonitorEkran: View {
                 }
             case .wb:
                 cipSatiri {
-                    cip("OTO", m.kamAyar.kelvin == nil) { m.kamAyar.kelvin = nil; m.kamAyarDegisti() }
+                    cip("OTO", m.kamAyar.kelvin == nil) { m.kamAyar.kelvin = nil; m.kamAyar.ton = nil; m.kamAyarDegisti() }
                     ForEach([3200, 4000, 5600, 6500, 7500], id: \.self) { k in cip("\(k)K", m.kamAyar.kelvin == k) { m.kamAyar.kelvin = k; m.kamAyarDegisti() } }
                 }
+                // İki çubuk (Fatih 30 Ekim): üstte Kelvin, altta yeşil-macenta; çubuğa dokununca BD elle olur
+                HStack(spacing: 10) {
+                    Text("K").font(.caption.weight(.bold)).foregroundStyle(Self.gri).frame(width: 18)
+                    Slider(value: Binding(get: { Double(m.kamAyar.kelvin ?? 5600) }, set: { m.kamAyar.kelvin = Int(($0 / 50).rounded() * 50); m.kamAyarDegisti() }), in: 2500...10000)
+                        .tint(LinearGradient(colors: [.orange, .white, .blue], startPoint: .leading, endPoint: .trailing))
+                    Text(m.kamAyar.kelvin.map { "\($0)K" } ?? "OTO").font(.system(size: 13, weight: .semibold).monospacedDigit()).frame(width: 58, alignment: .trailing)
+                }
+                TonCubugu(deger: m.kamAyar.ton ?? 0) { t in
+                    if m.kamAyar.kelvin == nil { m.kamAyar.kelvin = 5600 }
+                    m.kamAyar.ton = t == 0 ? nil : t; m.kamAyarDegisti()
+                }
+                Text("K: ışığın sıcaklığı · alt çubuk: sola yeşil, sağa macenta (LED ve floresandaki yeşili giderir). Ortaya çift dokun: sıfır.")
+                    .font(.caption).foregroundStyle(Self.gri)
             case .ev:
                 let r = m.evAraligi ?? -2...2
                 cipSatiri {

@@ -31,6 +31,7 @@ struct KameraAyari: Codable, Equatable {
     var enstantane: Double?             // saniye
     var iso: Float?
     var kelvin: Int?
+    var ton: Float?                     // yeşil (−) … macenta (+), −100…100; nil = 0
     var ev: Float = 0
     var odak: Float?                    // 0 sonsuz … 1 en yakın
     var boyut: String?                  // "1920x1080"

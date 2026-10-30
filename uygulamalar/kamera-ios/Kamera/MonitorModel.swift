@@ -397,7 +397,7 @@ final class Monitor: NSObject, ObservableObject {
         }
         d.setExposureTargetBias(min(max(a.ev, d.minExposureTargetBias), d.maxExposureTargetBias))
         if let k = a.kelvin, d.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
-            var g = d.deviceWhiteBalanceGains(for: AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: Float(k), tint: 0))
+            var g = d.deviceWhiteBalanceGains(for: AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: Float(k), tint: a.ton ?? 0))
             let m = d.maxWhiteBalanceGain
             g.redGain = min(max(g.redGain, 1), m); g.greenGain = min(max(g.greenGain, 1), m); g.blueGain = min(max(g.blueGain, 1), m)
             d.setWhiteBalanceModeLocked(with: g)

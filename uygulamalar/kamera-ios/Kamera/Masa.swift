@@ -66,6 +66,8 @@ final class Yuva: ObservableObject, Identifiable {
     let ad: String
     let alici: WifiAlici?
     let usbKimlik: String?
+    /// Bu cihazın kendi kamerası (arka / ön); USB kaynağıyla aynı yoldan kaydedilir
+    let yerlesik: Bool
     let gorunum = GoruntuGorunumu()
     @Published var bagli: Bool
     /// Kayıtta bu kaynağın kendi dosyası yazılıyor
@@ -81,12 +83,14 @@ final class Yuva: ObservableObject, Identifiable {
     private var _canlida = false
     private var _sirada = false
 
-    init(ad: String, alici: WifiAlici? = nil, usbKimlik: String? = nil) {
-        self.ad = ad; self.alici = alici; self.usbKimlik = usbKimlik
+    init(ad: String, alici: WifiAlici? = nil, usbKimlik: String? = nil, yerlesik: Bool = false) {
+        self.ad = ad; self.alici = alici; self.usbKimlik = usbKimlik; self.yerlesik = yerlesik
         bagli = alici == nil
     }
 
     var wifi: Bool { alici != nil }
+    /// Küçük simge: Wi-Fi, USB ya da bu cihazın kamerası
+    var simge: String { wifi || usbKimlik == Masa.lunaKimlik ? "wifi" : (yerlesik ? "iphone" : "cable.connector") }
     var sonKare: CVPixelBuffer? { kilit.lock(); defer { kilit.unlock() }; return son }
     var donus: Int { kilit.lock(); defer { kilit.unlock() }; return _donus }
     var canlida: Bool {
@@ -155,9 +159,49 @@ final class Masa: NSObject, ObservableObject {
     private var onizlemeHavuz: CVPixelBufferPool?
     /// Dizili düzendeki kaynaklar (kilit altında; kayıt kuyruğu okur)
     private var _duzenKaynaklar: [Yuva] = []
+    /// Birleştirici çalışırken (kilit altında): geçiş, katmanlar, karartma
+    private struct GecisDurumu { let eski: Yuva; let bas: CFTimeInterval; let sure: Double; let tur: Gecis }
+    private var _gecis: GecisDurumu?
+    private var _pipYuva: Yuva?
+    private var _logo: CIImage?
+    private var _altYazi: CIImage?
+    private var _ftb: (hedef: Bool, bas: CFTimeInterval, sure: Double) = (false, 0, 0.5)
     /// Ekrandaki program monitörü için küçük tuval (1280×720); kayıt dosyası 4K
     @Published var bildirim: String?
     @Published var aglarIzni = true
+
+    // MARK: ATEM benzeri (Fatih 30 Ekim): geçiş türü ve süresi, PiP, logo, alt yazı, karartma (FTB). Program monitörü ve program kaydı
+    // birlikte; kaynak dosyaları temiz kalır. Etkin olunca program 30 kare/sn birleştiriciyle çizilir.
+    enum Gecis: String, CaseIterable, Identifiable {
+        case mix, dip, wipe
+        var id: String { rawValue }
+        var ad: String { switch self { case .mix: return "MIX"; case .dip: return "DIP"; case .wipe: return "WIPE" } }
+    }
+    @Published var gecis = Gecis(rawValue: UserDefaults.standard.string(forKey: "masa.gecis") ?? "") ?? .mix {
+        didSet { UserDefaults.standard.set(gecis.rawValue, forKey: "masa.gecis") }
+    }
+    /// Geçiş süresi (sn)
+    @Published var gecisSure: Double = UserDefaults.standard.object(forKey: "masa.gecisSure") as? Double ?? 0.5 {
+        didSet { UserDefaults.standard.set(gecisSure, forKey: "masa.gecisSure") }
+    }
+    static let gecisSureleri: [Double] = [0.25, 0.5, 1, 1.5, 2]
+    /// Süren geçiş (0…1; nil = yok) — ekrandaki çubuk için
+    @Published var gecisIlerleme: Double?
+    /// Resim içinde resim: sıradaki (yoksa canlı olmayan ilk) kaynak sağ altta
+    @Published var pip = false { didSet { efektYaz() } }
+    @Published var logoAcik = false { didSet { efektYaz() } }
+    @Published var logo: UIImage? = Masa.logoOku() { didSet { Masa.logoYaz(logo); efektYaz() } }
+    @Published var altYaziAcik = false { didSet { efektYaz() } }
+    @Published var altYaziBaslik = UserDefaults.standard.string(forKey: "masa.altYazi1") ?? "" {
+        didSet { UserDefaults.standard.set(altYaziBaslik, forKey: "masa.altYazi1"); efektYaz() }
+    }
+    @Published var altYaziAlt = UserDefaults.standard.string(forKey: "masa.altYazi2") ?? "" {
+        didSet { UserDefaults.standard.set(altYaziAlt, forKey: "masa.altYazi2"); efektYaz() }
+    }
+    /// Karartma (FTB): program yavaşça siyaha iner / geri gelir
+    @Published var karartma = false {
+        didSet { guard karartma != oldValue else { return }; kilit.lock(); _ftb = (karartma, CACurrentMediaTime(), gecisSure); kilit.unlock(); efektYaz() }
+    }
     let program = GoruntuGorunumu()
 
     private let bulucu = KameraBulucu()
@@ -228,6 +272,7 @@ final class Masa: NSObject, ObservableObject {
         gozlemciler.forEach { NotificationCenter.default.removeObserver($0) }
         gozlemciler = []
         for y in yuvalar { y.alici?.tally(false); y.alici?.durdur() }
+        luna?.durdur(); luna?.kare = nil; luna = nil
         yuvalar = []
         canli = nil
         kilit.lock(); canliYuva = nil; kilit.unlock()
@@ -251,7 +296,7 @@ final class Masa: NSObject, ObservableObject {
     func duzenDegisti() {
         let adet = duzenAdet
         kilit.lock(); _duzenKaynaklar = Array(yuvalar.prefix(adet)); kilit.unlock()
-        if adet == 0 {
+        if adet == 0 && !birlestiriciGerek {
             duzenZamanlayici?.cancel(); duzenZamanlayici = nil
             program.temizle()
             programDonus()
@@ -259,6 +304,7 @@ final class Masa: NSObject, ObservableObject {
         }
         program.dondur = 0
         guard duzenZamanlayici == nil else { return }
+        program.temizle()
         let z = DispatchSource.makeTimerSource(queue: kayitKuyruk)
         z.schedule(deadline: .now(), repeating: .milliseconds(33), leeway: .milliseconds(3))
         z.setEventHandler { [weak self] in self?.duzenKaresi() }
@@ -313,9 +359,52 @@ final class Masa: NSObject, ObservableObject {
         for d in ds.devices where !yuvalar.contains(where: { $0.usbKimlik == d.uniqueID }) { usbEkle(d) }
     }
 
-    private func usbEkle(_ d: AVCaptureDevice) {
+    /// Bu cihazın kendi kamerası kaynak olur (Fatih 30 Ekim: USB / Wi-Fi kameralarla birlikte telefon kamerası, eş zamanlı kayıt)
+    func telefonKamerasiEkle(on: Bool) {
+        guard let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: on ? .front : .back) else {
+            bildirim = "Bu cihazda \(on ? "ön" : "arka") kamera yok"; return
+        }
+        guard !yuvalar.contains(where: { $0.usbKimlik == d.uniqueID }) else { bildirim = "\(on ? "Ön" : "Arka") kamera zaten ekli"; return }
+        usbEkle(d, ad: on ? "Ön kamera" : "Arka kamera", yerlesik: true)
+    }
+
+    // MARK: Insta360 Luna (kameranın kendi Wi-Fi'ı, Insta360.swift)
+    static let lunaKimlik = "insta360-luna"
+    private var luna: Insta360Alici?
+
+    func lunaEkle() {
+        guard luna == nil else { bildirim = "Luna zaten ekli"; return }
         guard yuvalar.count < Masa.enCok else { bildirim = "En çok \(Masa.enCok) kaynak"; return }
-        let y = Yuva(ad: d.localizedName, usbKimlik: d.uniqueID)
+        let a = Insta360Alici()
+        let y = Yuva(ad: "Insta360 Luna", usbKimlik: Masa.lunaKimlik)
+        y.bagli = false
+        a.kare = { [weak self, weak y] pb in
+            guard let self, let y else { return }
+            if y.boyut == nil || !y.bagli {
+                let b = CMVideoDimensions(width: Int32(CVPixelBufferGetWidth(pb)), height: Int32(CVPixelBufferGetHeight(pb)))
+                DispatchQueue.main.async { y.boyut = b; y.bagli = true }
+            }
+            self.kareGeldi(y, pb, usb: true)
+        }
+        luna = a
+        yuvalar.append(y)
+        a.baslat()
+        if canli == nil { canliYap(y) }
+        duzenDegisti()
+        bildirim = "Luna'ya bağlanılıyor (bu cihaz Luna'nın Wi-Fi'ında olmalı)"
+    }
+
+    /// Eklenebilecek yerleşik kameralar (Kaynak ekle sayfası)
+    var telefonKameralari: [(on: Bool, ekli: Bool)] {
+        [false, true].compactMap { on in
+            guard let d = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: on ? .front : .back) else { return nil }
+            return (on, yuvalar.contains { $0.usbKimlik == d.uniqueID })
+        }
+    }
+
+    private func usbEkle(_ d: AVCaptureDevice, ad: String? = nil, yerlesik: Bool = false) {
+        guard yuvalar.count < Masa.enCok else { bildirim = "En çok \(Masa.enCok) kaynak"; return }
+        let y = Yuva(ad: ad ?? d.localizedName, usbKimlik: d.uniqueID, yerlesik: yerlesik)
         yuvalar.append(y)
         if canli == nil { canliYap(y) }
         duzenDegisti()
@@ -411,6 +500,7 @@ final class Masa: NSObject, ObservableObject {
     func kaldir(_ y: Yuva) {
         if kayitta, y.id == canli { bildirim = "Kayıt sürerken canlıdaki kaynak kaldırılamaz"; return }
         if let a = y.alici { a.tally(false); a.durdur(); kaldirilanlar.insert(y.ad) }
+        if y.usbKimlik == Masa.lunaKimlik { luna?.durdur(); luna?.kare = nil; luna = nil }
         if y.usbKimlik != nil {
             usbKuyruk.async {
                 self.kilit.lock()
@@ -435,12 +525,50 @@ final class Masa: NSObject, ObservableObject {
         }
     }
 
+    /// Geçişle canlıya al (AUTO): seçili geçiş türü ve süresiyle; düzenli programda ya da aynı kaynakta düz kesme
+    func autoYap(_ y: Yuva) {
+        guard let eski = yuvalar.first(where: { $0.id == canli }), eski !== y, duzenAdet == 0 else { canliYap(y); return }
+        let d = GecisDurumu(eski: eski, bas: CACurrentMediaTime(), sure: gecisSure, tur: gecis)
+        kilit.lock(); _gecis = d; kilit.unlock()
+        gecisIlerleme = 0
+        duzenDegisti()
+        canliYap(y)
+        // Çubuk ilerlemesi ve bitiş
+        let adim = 1.0 / 30
+        func ilerle() {
+            kilit.lock(); let g = _gecis; kilit.unlock()
+            guard let g, g.bas == d.bas else { return }
+            let p = (CACurrentMediaTime() - g.bas) / g.sure
+            if p >= 1 {
+                kilit.lock(); _gecis = nil; kilit.unlock()
+                gecisIlerleme = nil
+                duzenDegisti()
+            } else {
+                gecisIlerleme = p
+                DispatchQueue.main.asyncAfter(deadline: .now() + adim) { ilerle() }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + adim) { ilerle() }
+    }
+
+    /// CUT / AUTO düğmeleri: sıradakini (yoksa sıradaki kaynağı) canlıya alır
+    func gec(otomatik: Bool) {
+        let hedef = yuvalar.first(where: { $0.id == siradaki })
+            ?? yuvalar.firstIndex(where: { $0.id == canli }).map { yuvalar[($0 + 1) % yuvalar.count] }
+            ?? yuvalar.first
+        guard let hedef else { return }
+        let eski = yuvalar.first { $0.id == canli }
+        if otomatik { autoYap(hedef) } else { canliYap(hedef) }
+        if siradaki != nil, let eski, eski !== hedef { siradakiYap(eski) }
+    }
+
     func canliYap(_ y: Yuva) {
         canli = y.id
         for k in yuvalar { k.canlida = k === y; k.alici?.tally(k === y) }
         kilit.lock(); canliYuva = y; kilit.unlock()
-        program.temizle()
+        if duzenZamanlayici == nil { program.temizle() }
         programDonus()
+        efektYaz()
     }
 
     func siradakiYap(_ y: Yuva) {
@@ -448,6 +576,7 @@ final class Masa: NSObject, ObservableObject {
         for k in yuvalar { k.sirada = k === y }
         onizleme.temizle()
         onizleme.dondur = y.dondur
+        efektYaz()
     }
 
     /// KES: önizlemedeki kaynak canlıya, canlıdaki önizlemeye
@@ -465,16 +594,77 @@ final class Masa: NSObject, ObservableObject {
     }
 
     private func programDonus() {
-        guard duzenAdet == 0 else { return }
+        guard duzenZamanlayici == nil else { program.dondur = 0; return }
         if let y = yuvalar.first(where: { $0.id == canli }) { program.dondur = y.dondur }
     }
 
-    /// Dizili düzen (kayitKuyruk, 30 kare/sn): kaynakların son kareleri tuvale; ekrana 1280×720, kayda 3840×2160
+    /// Birleştirici gerekir mi: düzenli program, süren geçiş, katman ya da karartma
+    private var birlestiriciGerek: Bool {
+        kilit.lock(); defer { kilit.unlock() }
+        let ftbAcik = _ftb.hedef || CACurrentMediaTime() - _ftb.bas < _ftb.sure + 0.1
+        return _gecis != nil || (pip && _pipYuva != nil) || (logoAcik && _logo != nil) || (altYaziAcik && _altYazi != nil) || ftbAcik
+    }
+
+    /// Katman durumunu birleştiriciye yazar (ana iş parçacığı) ve gerekirse birleştiriciyi açar / kapatır
+    private func efektYaz() {
+        let canliId = canli
+        let p = pip ? (yuvalar.first { $0.id == siradaki && $0.id != canliId } ?? yuvalar.first { $0.id != canliId }) : nil
+        let l = logoAcik ? logo.flatMap { CIImage(image: $0) } : nil
+        let a = altYaziAcik && !altYaziBaslik.isEmpty ? Masa.altYaziResmi(altYaziBaslik, altYaziAlt) : nil
+        kilit.lock(); _pipYuva = p; _logo = l; _altYazi = a; kilit.unlock()
+        duzenDegisti()
+        // Karartma bittiğinde birleştirici kapansın
+        if !karartma { DispatchQueue.main.asyncAfter(deadline: .now() + gecisSure + 0.2) { [weak self] in self?.duzenDegisti() } }
+    }
+
+    /// Birleştirici (kayitKuyruk, 30 kare/sn): kaynakların son kareleri tuvale; ekrana 1280×720, kayda program boyutunda
     private func duzenKaresi() {
-        kilit.lock(); let kaynaklar = _duzenKaynaklar; kilit.unlock()
-        let adet = kaynaklar.count
-        guard adet > 0 else { return }
-        let kutular = Masa.kutular(adet)
+        kilit.lock()
+        let kaynaklar = _duzenKaynaklar, c = canliYuva, g = _gecis, py = _pipYuva, lg = _logo, ay = _altYazi, ftb = _ftb
+        kilit.unlock()
+        let t = CACurrentMediaTime()
+        let ftbDeger: CGFloat = {
+            let p = CGFloat(min(max((t - ftb.bas) / max(ftb.sure, 0.01), 0), 1))
+            return ftb.hedef ? p : 1 - p
+        }()
+        func resim(W: CGFloat, H: CGFloat) -> CIImage {
+            var r: CIImage
+            if !kaynaklar.isEmpty {
+                r = duzenResmi(kaynaklar, Masa.kutular(kaynaklar.count), W: W, H: H)
+            } else {
+                r = Masa.sigdir(c?.sonKare, donus: c?.donus ?? 0, W: W, H: H)
+                if let g {
+                    let p = CGFloat(min(max((t - g.bas) / g.sure, 0), 1))
+                    let eski = Masa.sigdir(g.eski.sonKare, donus: g.eski.donus, W: W, H: H)
+                    r = Masa.gecisUygula(eski, r, p, g.tur, W: W, H: H)
+                }
+            }
+            if let py, py !== c, let pb = py.sonKare {
+                // Sağ altta, genişliğin %30'u, kenardan %3
+                let w = W * 0.3, h = w * 9 / 16, k = W * 0.03
+                let kucuk = Masa.sigdir(pb, donus: py.donus, W: w, H: h)
+                    .transformed(by: CGAffineTransform(translationX: W - w - k, y: k))
+                let cerceve = CIImage(color: CIColor(red: 1, green: 1, blue: 1, alpha: 0.9))
+                    .cropped(to: CGRect(x: W - w - k - 3, y: k - 3, width: w + 6, height: h + 6))
+                r = kucuk.composited(over: cerceve.composited(over: r))
+            }
+            if let lg {
+                // Sağ üstte, yüksekliğin %10'u
+                let h = H * 0.1, s = h / max(lg.extent.height, 1), k = W * 0.03
+                let l = lg.transformed(by: CGAffineTransform(translationX: -lg.extent.minX, y: -lg.extent.minY))
+                    .transformed(by: CGAffineTransform(scaleX: s, y: s))
+                r = l.transformed(by: CGAffineTransform(translationX: W - l.extent.width - k, y: H - h - k)).composited(over: r)
+            }
+            if let ay {
+                // Sol altta; alt yazı resmi 1920 genişliğe göre çizildi
+                let s = W / 1920
+                r = ay.transformed(by: CGAffineTransform(scaleX: s, y: s)).transformed(by: CGAffineTransform(translationX: W * 0.05, y: H * 0.08)).composited(over: r)
+            }
+            if ftbDeger > 0 {
+                r = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: ftbDeger)).cropped(to: CGRect(x: 0, y: 0, width: W, height: H)).composited(over: r)
+            }
+            return r.cropped(to: CGRect(x: 0, y: 0, width: W, height: H))
+        }
         // Ekrandaki program monitörü
         if onizlemeHavuz == nil {
             CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey: 1280,
@@ -484,7 +674,7 @@ final class Masa: NSObject, ObservableObject {
             var pb: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, havuz, &pb)
             if let pb {
-                duzenCiz(kaynaklar, kutular, hedef: pb, olcek: 1 / 3)
+                ci.render(resim(W: 1280, H: 720), to: pb)
                 if let sb = AgYayin.ornek(pb) { program.goster(sb) }
             }
         }
@@ -495,34 +685,88 @@ final class Masa: NSObject, ObservableObject {
         var cikti: CVPixelBuffer?
         CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, havuz, &cikti)
         guard let cikti else { return }
-        duzenCiz(kaynaklar, kutular, hedef: cikti, olcek: CGFloat(o.programBoyut.w) / Masa.tuvalW)
+        ci.render(resim(W: CGFloat(o.programBoyut.w), H: CGFloat(o.programBoyut.h)), to: cikti)
         p.ekle(kare: cikti, pts: pts)
         o.sonProgramPts = pts
     }
 
-    private func duzenCiz(_ kaynaklar: [Yuva], _ kutular: [CGRect], hedef: CVPixelBuffer, olcek: CGFloat) {
-        let W = CGFloat(CVPixelBufferGetWidth(hedef)), H = CGFloat(CVPixelBufferGetHeight(hedef))
+    /// Dizili düzen: kutular 3840×2160 tuvale göre, W×H'ye ölçeklenir
+    private func duzenResmi(_ kaynaklar: [Yuva], _ kutular: [CGRect], W: CGFloat, H: CGFloat) -> CIImage {
+        let olcek = W / Masa.tuvalW
         var tuval = CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: W, height: H))
         for (i, y) in kaynaklar.enumerated() where i < kutular.count {
             guard let pb = y.sonKare else { continue }
-            var g = CIImage(cvPixelBuffer: pb)
-            switch y.donus {
-            case 90: g = g.oriented(.right)
-            case 180: g = g.oriented(.down)
-            case 270: g = g.oriented(.left)
-            default: break
-            }
             // Core Image'da y aşağıdan yukarı: kutu dikeyde ters çevrilir
             let k = kutular[i]
             let kutu = CGRect(x: k.minX * olcek, y: (Masa.tuvalH - k.maxY) * olcek, width: k.width * olcek, height: k.height * olcek)
-            let e = g.extent
-            let s = min(kutu.width / e.width, kutu.height / e.height)
-            g = g.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
-                .transformed(by: CGAffineTransform(scaleX: s, y: s))
-                .transformed(by: CGAffineTransform(translationX: kutu.minX + (kutu.width - e.width * s) / 2, y: kutu.minY + (kutu.height - e.height * s) / 2))
-            tuval = g.composited(over: tuval)
+            tuval = Masa.sigdir(pb, donus: y.donus, W: kutu.width, H: kutu.height, zemin: false)
+                .transformed(by: CGAffineTransform(translationX: kutu.minX, y: kutu.minY)).composited(over: tuval)
         }
-        ci.render(tuval, to: hedef)
+        return tuval
+    }
+
+    /// Kareyi döndürüp W×H alana ortalayarak sığdırır (zemin: siyah kenarlar)
+    static func sigdir(_ pb: CVPixelBuffer?, donus: Int, W: CGFloat, H: CGFloat, zemin: Bool = true) -> CIImage {
+        let siyah = CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: W, height: H))
+        guard let pb else { return siyah }
+        var g = CIImage(cvPixelBuffer: pb)
+        switch donus {
+        case 90: g = g.oriented(.right)
+        case 180: g = g.oriented(.down)
+        case 270: g = g.oriented(.left)
+        default: break
+        }
+        let e = g.extent
+        let s = min(W / e.width, H / e.height)
+        g = g.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
+            .transformed(by: CGAffineTransform(scaleX: s, y: s))
+            .transformed(by: CGAffineTransform(translationX: (W - e.width * s) / 2, y: (H - e.height * s) / 2))
+        return zemin ? g.composited(over: siyah) : g
+    }
+
+    /// Geçiş: MIX karışım, DIP siyaha inip çıkma, WIPE soldan sağa silme
+    static func gecisUygula(_ eski: CIImage, _ yeni: CIImage, _ p: CGFloat, _ tur: Gecis, W: CGFloat, H: CGFloat) -> CIImage {
+        func saydam(_ r: CIImage, _ a: CGFloat) -> CIImage {
+            r.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: a)])
+        }
+        let siyah = CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: W, height: H))
+        switch tur {
+        case .mix:
+            return saydam(yeni, p).composited(over: eski)
+        case .dip:
+            return p < 0.5 ? saydam(eski, 1 - p * 2).composited(over: siyah) : saydam(yeni, (p - 0.5) * 2).composited(over: siyah)
+        case .wipe:
+            let x = W * p
+            let kenar = CIImage(color: CIColor(red: 1, green: 1, blue: 1, alpha: 1)).cropped(to: CGRect(x: max(0, x - 3), y: 0, width: p > 0 && p < 1 ? 6 : 0, height: H))
+            return kenar.composited(over: yeni.cropped(to: CGRect(x: 0, y: 0, width: x, height: H)).composited(over: eski))
+        }
+    }
+
+    /// Alt yazı (1920 genişliğe göre): yarı saydam siyah şerit, sarı ince çizgi, başlık + alt satır
+    static func altYaziResmi(_ baslik: String, _ alt: String) -> CIImage? {
+        let b = baslik as NSString, a = alt as NSString
+        let f1 = UIFont.systemFont(ofSize: 46, weight: .bold), f2 = UIFont.systemFont(ofSize: 28, weight: .medium)
+        let w1 = b.size(withAttributes: [.font: f1]).width, w2 = a.size(withAttributes: [.font: f2]).width
+        let gen = min(max(w1, w2) + 80, 1600), yuk: CGFloat = alt.isEmpty ? 96 : 140
+        let r = UIGraphicsImageRenderer(size: CGSize(width: gen, height: yuk), format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; f.opaque = false; return f }())
+        let resim = r.image { c in
+            UIColor(white: 0, alpha: 0.62).setFill()
+            UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: gen, height: yuk), cornerRadius: 10).fill()
+            UIColor(red: 1, green: 214 / 255, blue: 10 / 255, alpha: 1).setFill()
+            c.fill(CGRect(x: 0, y: 14, width: 6, height: yuk - 28))
+            b.draw(at: CGPoint(x: 36, y: alt.isEmpty ? 18 : 18), withAttributes: [.font: f1, .foregroundColor: UIColor.white])
+            if !alt.isEmpty { a.draw(at: CGPoint(x: 36, y: 82), withAttributes: [.font: f2, .foregroundColor: UIColor(white: 1, alpha: 0.75)]) }
+        }
+        return CIImage(image: resim)
+    }
+
+    private static var logoUrl: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("masa-logo.png")
+    }
+    static func logoOku() -> UIImage? { UIImage(contentsOfFile: logoUrl.path) }
+    static func logoYaz(_ r: UIImage?) {
+        try? FileManager.default.createDirectory(at: logoUrl.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let d = r?.pngData() { try? d.write(to: logoUrl) } else { try? FileManager.default.removeItem(at: logoUrl) }
     }
 
     private func kareGeldi(_ y: Yuva, _ pb: CVPixelBuffer, usb: Bool = false) {

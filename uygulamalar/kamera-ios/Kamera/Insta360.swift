@@ -1,6 +1,7 @@
 import AVFoundation
 import Network
 import SwiftUI
+import VideoToolbox
 
 /// Insta360 Luna Ultra'nın Wi-Fi canlı görüntüsü. Kamera kendi Wi-Fi'ını açar (192.168.42.1); iPhone o ağa bağlanır.
 /// Dil ("UCD2" çerçevesi, bkz. uygulamalar/monitor/notlar/insta360-luna.md): TCP 6666, her çerçeve
@@ -33,7 +34,33 @@ final class Insta360Alici: ObservableObject {
     private var bozukSayisi = 0
     static let hamDosya = FileManager.default.temporaryDirectory.appendingPathComponent("insta360-ham.bin")
 
+    /// Multi Cam kaynağı olunca: çözülmüş kareler (kuyruk iş parçacığında)
+    var kare: ((CVPixelBuffer) -> Void)?
+    private var cozucu: VTDecompressionSession?
+    private var cozucuBicim: CMVideoFormatDescription?
+
     init() { katman.videoGravity = .resizeAspect }
+
+    private func coz(_ sb: CMSampleBuffer, _ geri: @escaping (CVPixelBuffer) -> Void) {
+        guard let f = CMSampleBufferGetFormatDescription(sb) else { return }
+        if cozucu == nil || cozucuBicim.map({ !CMFormatDescriptionEqual($0, otherFormatDescription: f) }) ?? true {
+            if let c = cozucu { VTDecompressionSessionInvalidate(c) }
+            cozucu = nil
+            let nitelik: [CFString: Any] = [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+                                            kCVPixelBufferIOSurfacePropertiesKey: [String: Any]()]
+            var c: VTDecompressionSession?
+            guard VTDecompressionSessionCreate(allocator: kCFAllocatorDefault, formatDescription: f, decoderSpecification: nil,
+                                               imageBufferAttributes: nitelik as CFDictionary, outputCallback: nil, decompressionSessionOut: &c) == noErr, let c else { return }
+            VTSessionSetProperty(c, key: kVTDecompressionPropertyKey_RealTime, value: kCFBooleanTrue)
+            cozucu = c; cozucuBicim = f
+        }
+        guard let c = cozucu else { return }
+        let st = VTDecompressionSessionDecodeFrame(c, sampleBuffer: sb, flags: [], infoFlagsOut: nil) { durum, _, g, _, _ in
+            guard durum == noErr, let g else { return }
+            geri(g)
+        }
+        if st == OSStatus(kVTInvalidSessionErr) { VTDecompressionSessionInvalidate(c); cozucu = nil }
+    }
 
     func baslat() {
         kuyruk.async {
@@ -360,6 +387,7 @@ final class Insta360Alici: ObservableObject {
         }
         kareSayisi += 1
         if kareSayisi == 1 { yaz("İlk kare çözülüyor"); durumYaz("Canlı") }
+        if let kare { coz(sb, kare); return }
         DispatchQueue.main.async {
             if self.katman.status == .failed { self.katman.flush() }
             self.katman.enqueue(sb)
