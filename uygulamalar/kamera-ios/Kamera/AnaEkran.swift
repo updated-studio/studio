@@ -989,10 +989,10 @@ struct BicimPanel: View {
                 satir("ARALIK", Timelapse.hizli.map { a in (Timelapse.aralikYazi(a), kamera.tlAralik == a, { kamera.tlAralik = a }) })
                 satir("SÜRE", Timelapse.sureler.prefix(5).map { s in (Timelapse.sureYazi(s), kamera.tlSure == s, { kamera.tlSure = s }) })
             default:
-                satir("ÇÖZ.", kamera.fotoBoyutlari.prefix(4).map { b in
-                    (KameraAyarlar.mp(b), kamera.fotoBoyut.map { $0.width == b.width && $0.height == b.height } ?? false, { kamera.fotoBoyutSec(b) })
+                satir("ÇÖZ.", kamera.fotoBoyutlari.map { b in
+                    (HizliBicim.mpAd(b), kamera.fotoBoyut.map { $0.width == b.width && $0.height == b.height } ?? false, { kamera.fotoBoyutSec(b) })
                 })
-                if kamera.rawVar { satir("RAW", [("Kapalı", !kamera.raw, { kamera.raw = false }), ("Açık", kamera.raw, { kamera.raw = true })]) }
+                satir("BİÇİM", kamera.fotoBicimleri.map { f in (f.rawValue, kamera.fotoBicim == f, { kamera.fotoBicim = f }) })
                 if kamera.mod != .pro {
                     satir("ZAMANLAYICI", [0, 3, 10].map { z in (z == 0 ? "Kapalı" : "\(z) sn", kamera.zamanlayici == z, { kamera.zamanlayici = z }) })
                 }

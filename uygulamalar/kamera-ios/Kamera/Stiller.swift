@@ -222,7 +222,7 @@ extension Kamera {
         let baglam = CIContext()
         let alan = resim.colorSpace ?? CGColorSpace(name: CGColorSpace.displayP3)!
         let son = cikti.settingProperties(resim.properties)
-        if let h = baglam.heifRepresentation(of: son, format: .RGBA8, colorSpace: alan, options: [:]) { return h }
+        if heif, let h = baglam.heifRepresentation(of: son, format: .RGBA8, colorSpace: alan, options: [:]) { return h }
         return baglam.jpegRepresentation(of: son, colorSpace: alan, options: [:]) ?? veri
     }
 

@@ -1,8 +1,8 @@
 import AVFoundation
 import SwiftUI
 
-/// Genel Ayarlar (Fatih 29 Ekim, Final Cut Camera gibi): en üstte çözünürlük, altında tek dokunuşla açılan bölümler:
-/// Kayıt (kodek, SDR / HDR / Log, sabitleme) · Pozlama · Fotoğraf · Ses · Göstergeler · Timelapse · Masa · Uygulama
+/// Genel Ayarlar (Fatih 29 Ekim, Final Cut Camera gibi): en üstte o modun ayarları. FOTO: çözünürlük · biçim (HEIF/JPEG/RAW) ·
+/// zamanlayıcı; VİDEO: çözünürlük · kare hızı · Kayıt (kodek, SDR / HDR / Log, sabitleme) · Ses. Altında ortaklar, Masa, Uygulama
 struct KameraAyarlar: View {
     @ObservedObject var kamera: Kamera
     var wifiKamera: () -> Void
@@ -12,41 +12,27 @@ struct KameraAyarlar: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Picker("Video", selection: $kamera.videoYukseklik) {
-                        ForEach(kamera.videoSecenekleri, id: \.self) { h in Text(KameraAyarlar.cozYazi(h)).tag(h) }
-                    }
-                    Picker("Kare hızı", selection: $kamera.videoFps) {
-                        ForEach(kamera.videoFpsler, id: \.self) { f in Text("\(f) fps").tag(f) }
-                    }
-                    if !kamera.fotoBoyutlari.isEmpty {
-                        Picker("Fotoğraf", selection: Binding(get: { kamera.fotoBoyut.map { "\($0.width)x\($0.height)" } ?? "" },
-                                                              set: { k in if let b = kamera.fotoBoyutlari.first(where: { "\($0.width)x\($0.height)" == k }) { kamera.fotoBoyutSec(b) } })) {
-                            ForEach(kamera.fotoBoyutlari.prefix(5).map { "\($0.width)x\($0.height)" }, id: \.self) { k in
-                                Text(kamera.fotoBoyutlari.first { "\($0.width)x\($0.height)" == k }.map(KameraAyarlar.mp) ?? k).tag(k)
-                            }
-                        }
-                    }
-                } header: { Text("Çözünürlük") } footer: { Text(ozet) }
+                // Fatih 30 Ekim 13:33: ayarlar moda göre; fotoğrafta video ayarları (HDR/SDR, kodek, sabitleme, ses) görünmez
+                if kamera.videoModu { videoBolum } else { fotoBolum }
 
                 Section {
-                    NavigationLink { kayit } label: { satir("record.circle", .orange, "Kayıt", "\(kamera.kodek.kisa) · \(kamera.renkModu.kisa)") }
-                    NavigationLink { pozlama } label: { satir("plusminus.circle", .yellow, "Pozlama", kamera.enstAci ? "Açı" : "Süre") }
+                    if kamera.videoModu {
+                        NavigationLink { pozlama } label: { satir("plusminus.circle", .yellow, "Pozlama", kamera.enstAci ? "Açı" : "Süre") }
+                    }
                     NavigationLink { renk } label: { satir("circle.lefthalf.filled", .pink, "Renk ve beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto") }
-                    NavigationLink { ses } label: { satir("waveform", .red, "Ses", kamera.etkinSesGirdi ?? "Otomatik") }
-                    NavigationLink { fotograf } label: { satir("camera.aperture", .blue, "Fotoğraf", kamera.raw && kamera.rawVar ? "RAW" : "JPEG") }
-                    NavigationLink { FavoriDuzenle(kamera: kamera) } label: { satir("pin", .yellow, "Sabitlenenler", "\(kamera.favoriler.count)") }
                     NavigationLink { gostergeler } label: { satir("chart.bar", .green, "Göstergeler", kamera.gostergeEtkin ? "Açık" : (kamera.kompTur == .kapali ? "" : kamera.kompTur.ad)) }
-                    NavigationLink { timelapse } label: { satir("timelapse", .purple, "Timelapse", Timelapse.aralikYazi(kamera.tlAralik)) }
+                    NavigationLink { FavoriDuzenle(kamera: kamera) } label: { satir("pin", .yellow, "Sabitlenenler", "\(kamera.favoriler.count)") }
                 }
-                Section {
-                    Button { kapat(); vlog() } label: { satir("person.crop.rectangle.stack", .orange, "Vlog (çift kamera)", "Arka + ön") }
-                        .foregroundStyle(.white)
-                } footer: { Text("Arka ve ön kamera aynı anda; ön kamera köşede. Arka, ön ve birleşik görüntü ayrı dosyalara.") }
+                if kamera.mod == .video {
+                    Section {
+                        Button { kapat(); vlog() } label: { satir("person.crop.rectangle.stack", .orange, "Vlog (çift kamera)", "Arka + ön") }
+                            .foregroundStyle(.white)
+                    } footer: { Text("Arka ve ön kamera aynı anda; ön kamera köşede.") }
+                }
                 Section {
                     NavigationLink { masaBolum } label: { satir("rectangle.split.2x2", .teal, "Multi Cam'e bağlan", "") }
                     NavigationLink { uygulama } label: { satir("info.circle", .gray, "Uygulama", KameraAyarlar.surum) }
-                }
+                } footer: { Text(kamera.videoModu ? "Fotoğraf ayarları FOTO modunda görünür." : "Video ayarları VİDEO modunda görünür.") }
             }
             .navigationTitle("Genel Ayarlar")
             .navigationBarTitleDisplayMode(.inline)
@@ -60,6 +46,54 @@ struct KameraAyarlar: View {
         .onChange(of: kamera.videoYukseklik) { _, _ in kamera.secenekleriYaz() }
         .onChange(of: kamera.videoFps) { _, _ in kamera.secenekleriYaz() }
         .onChange(of: kamera.renkModu) { _, _ in kamera.secenekleriYaz() }
+    }
+
+    /// Fotoğraf modları: çözünürlük ve dosya biçimi en üstte, tek yerde
+    @ViewBuilder private var fotoBolum: some View {
+        Section {
+            if !kamera.fotoBoyutlari.isEmpty {
+                Picker("Çözünürlük", selection: Binding(get: { kamera.fotoBoyut.map { "\($0.width)x\($0.height)" } ?? "" },
+                                                        set: { k in if let b = kamera.fotoBoyutlari.first(where: { "\($0.width)x\($0.height)" == k }) { kamera.fotoBoyutSec(b) } })) {
+                    ForEach(kamera.fotoBoyutlari.map { "\($0.width)x\($0.height)" }, id: \.self) { k in
+                        Text(kamera.fotoBoyutlari.first { "\($0.width)x\($0.height)" == k }.map(KameraAyarlar.mp) ?? k).tag(k)
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Biçim")
+                Picker("Biçim", selection: Binding(get: { kamera.fotoBicim }, set: { kamera.fotoBicim = $0 })) {
+                    ForEach(kamera.fotoBicimleri) { f in Text(f.rawValue).tag(f) }
+                }
+                .pickerStyle(.segmented).labelsHidden()
+            }
+            .padding(.vertical, 4)
+            if kamera.mod != .pro {
+                Picker("Zamanlayıcı", selection: $kamera.zamanlayici) {
+                    ForEach([0, 3, 10], id: \.self) { z in Text(z == 0 ? "Kapalı" : "\(z) sn").tag(z) }
+                }
+            }
+            if kamera.sesKapatilabilir { Toggle("Deklanşör sesi", isOn: $kamera.deklansorSesi) }
+        } header: { Text("Fotoğraf") } footer: {
+            Text(kamera.fotoBicim.aciklama + (kamera.fotoBicim == .raw ? " (yanında \(kamera.heif ? "HEIF" : "JPEG") de kaydedilir)." : "."))
+        }
+    }
+
+    /// Video modları: çözünürlük, kare hızı, kayıt (kodek · renk · sabitleme), ses
+    @ViewBuilder private var videoBolum: some View {
+        Section {
+            Picker("Çözünürlük", selection: $kamera.videoYukseklik) {
+                ForEach(kamera.videoSecenekleri, id: \.self) { h in Text(KameraAyarlar.cozYazi(h)).tag(h) }
+            }
+            if kamera.mod == .video {
+                Picker("Kare hızı", selection: $kamera.videoFps) {
+                    ForEach(kamera.videoFpsler, id: \.self) { f in Text("\(f) fps").tag(f) }
+                }
+                NavigationLink { kayit } label: { satir("record.circle", .orange, "Kayıt", "\(kamera.kodek.kisa) · \(kamera.renkModu.kisa)") }
+                NavigationLink { ses } label: { satir("waveform", .red, "Ses", kamera.etkinSesGirdi ?? "Otomatik") }
+            } else {
+                NavigationLink { timelapse } label: { satir("timelapse", .purple, "Timelapse", Timelapse.aralikYazi(kamera.tlAralik)) }
+            }
+        } header: { Text("Video") } footer: { if kamera.mod == .video { Text(ozet) } }
     }
 
     private var ozet: String {
@@ -147,21 +181,6 @@ struct KameraAyarlar: View {
         }
         .navigationTitle("Ses")
         .onAppear { kamera.sesGirdileriYaz() }
-    }
-
-    private var fotograf: some View {
-        List {
-            if kamera.rawVar { Toggle("RAW (DNG) da kaydet", isOn: $kamera.raw) }
-            Picker("Zamanlayıcı", selection: $kamera.zamanlayici) {
-                ForEach([0, 3, 10], id: \.self) { z in Text(z == 0 ? "Kapalı" : "\(z) sn").tag(z) }
-            }
-            if kamera.sesKapatilabilir {
-                Toggle("Deklanşör sesi", isOn: $kamera.deklansorSesi)
-            } else {
-                Text("Deklanşör sesini iPhone kendisi çalar (sessiz düğmesine göre).").font(.footnote).foregroundStyle(.secondary)
-            }
-        }
-        .navigationTitle("Fotoğraf")
     }
 
     private var gostergeler: some View {

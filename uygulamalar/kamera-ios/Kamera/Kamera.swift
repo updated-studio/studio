@@ -67,7 +67,30 @@ final class Kamera: NSObject, ObservableObject {
     @Published var fotoBoyutlari: [CMVideoDimensions] = []
     @Published var fotoBoyut: CMVideoDimensions?
     @Published var rawVar = false
-    @Published var raw = Kamera.ud.bool(forKey: "k.raw") { didSet { Kamera.ud.set(raw, forKey: "k.raw"); yenidenKur() } }
+    @Published var raw = Kamera.ud.bool(forKey: "k.raw") { didSet { Kamera.ud.set(raw, forKey: "k.raw"); if raw != oldValue { yenidenKur() } } }
+    @Published var heif = Kamera.ud.object(forKey: "k.heif") as? Bool ?? true { didSet { Kamera.ud.set(heif, forKey: "k.heif"); kuyruk.async { self.bicimYaz() } } }
+
+    /// Fotoğraf dosyası (Fatih 30 Ekim 13:33: "tek ayar ile RAW, JPEG ya da HEIF"); RAW'da yanında HEIF/JPEG önizleme de kaydedilir
+    enum FotoBicim: String, CaseIterable, Identifiable {
+        case heif = "HEIF", jpeg = "JPEG", raw = "RAW"
+        var id: String { rawValue }
+        var aciklama: String {
+            switch self {
+            case .heif: return "Küçük dosya, aynı kalite"
+            case .jpeg: return "Her yerde açılır"
+            case .raw: return "DNG; renk ve pozlama sonradan"
+            }
+        }
+    }
+    var fotoBicim: FotoBicim {
+        get { raw && rawVar ? .raw : (heif ? .heif : .jpeg) }
+        set {
+            if newValue != .raw { heif = newValue == .heif }
+            if raw != (newValue == .raw) { raw = newValue == .raw }
+            objectWillChange.send()
+        }
+    }
+    var fotoBicimleri: [FotoBicim] { rawVar ? FotoBicim.allCases : [.heif, .jpeg] }
     @Published var zamanlayici = Kamera.ud.integer(forKey: "k.zamanlayici") { didSet { Kamera.ud.set(zamanlayici, forKey: "k.zamanlayici") } }
     @Published var deklansorSesi = Kamera.ud.object(forKey: "k.deklansor") as? Bool ?? true { didSet { Kamera.ud.set(deklansorSesi, forKey: "k.deklansor") } }
     @Published var sesKapatilabilir = false
@@ -286,8 +309,27 @@ final class Kamera: NSObject, ObservableObject {
 
     var sanalda: Bool { cihaz?.isVirtualDevice == true }
 
+    /// Sanal cihaz ana merceğin en yüksek fotoğraf çözünürlüğünü (24/48 MP) vermiyorsa foto modlarında ana mercek kullanılır
+    static let sanalFotoKucuk: Bool = {
+        guard let v = sanalArka, let g = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else { return false }
+        return fotoEnBuyuk(v) < fotoEnBuyuk(g)
+    }()
+
+    /// Cihazın fotoğraf biçimleri içinde en büyük fotoğraf (piksel)
+    static func fotoEnBuyuk(_ d: AVCaptureDevice) -> Int {
+        fotoBicimi(d).map { f in f.supportedMaxPhotoDimensions.map { Int($0.width) * Int($0.height) }.max() ?? 0 } ?? 0
+    }
+
+    /// Seçilebilen fotoğraf çözünürlükleri: 12 MP ve üstü (Fatih 30 Ekim 13:33), büyükten küçüğe
+    static func fotoBoyutlariSuz(_ l: [CMVideoDimensions]) -> [CMVideoDimensions] {
+        let s = l.sorted { Int($0.width) * Int($0.height) > Int($1.width) * Int($1.height) }
+        let b = s.filter { Int($0.width) * Int($0.height) >= 11_000_000 }
+        return b.isEmpty ? Array(s.prefix(1)) : b
+    }
+
     /// Tek mercek gereken durumlar
     var fizikselGerek: Bool {
+        if mod.foto && Kamera.sanalFotoKucuk { return true }
         if mod == .pro || odakKonum != nil || uzunSuruyor || uzunPozlama { return true }
         if secilenIso != nil || secilenEnst != nil { return !(Kamera.sanalArka?.isExposureModeSupported(.custom) ?? false) }
         return false
@@ -403,7 +445,7 @@ final class Kamera: NSObject, ObservableObject {
         yuzCikti.metadataObjectTypes = mod == .portre && yuzCikti.availableMetadataObjectTypes.contains(.face) ? [.face] : []
 
         // Fotoğraf çözünürlüğü ve RAW
-        let boyutlar = d.activeFormat.supportedMaxPhotoDimensions.sorted { Int($0.width) * Int($0.height) > Int($1.width) * Int($1.height) }
+        let boyutlar = Kamera.fotoBoyutlariSuz(d.activeFormat.supportedMaxPhotoDimensions)
         let kayitli = Kamera.ud.string(forKey: "k.foto")
         let secili = boyutlar.first { "\($0.width)x\($0.height)" == kayitli }
             ?? boyutlar.first  // varsayılan: kameranın en yüksek çözünürlüğü
@@ -460,19 +502,22 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     /// 16:9 video biçimi (SDR'de 8 bit tercih; HDR / Log için o renk alanını destekleyen 10 bit biçim); bulunamazsa nil
-    /// Fotoğraf için: 4:3, akışı 1080-1512 satır, 30 fps, en büyük fotoğraf boyutu (eşitse tam aralık 420f)
+    /// Fotoğraf için: 4:3, 30 fps, en büyük fotoğraf boyutu (24/48 MP; eski 1512 satır sınırı 12 MP'de bırakıyordu);
+    /// eşitse akışı küçük olan (önizleme hafif kalsın), sonra tam aralık 420f
     static func fotoBicimi(_ d: AVCaptureDevice) -> AVCaptureDevice.Format? {
         func foto(_ f: AVCaptureDevice.Format) -> Int { f.supportedMaxPhotoDimensions.map { Int($0.width) * Int($0.height) }.max() ?? 0 }
+        func akis(_ f: AVCaptureDevice.Format) -> Int32 { CMVideoFormatDescriptionGetDimensions(f.formatDescription).height }
         let adaylar = d.formats.filter { f in
             let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
             let tur = CMFormatDescriptionGetMediaSubType(f.formatDescription)
-            return Int(b.width) * 3 == Int(b.height) * 4 && b.height >= 1080 && b.height <= 1512
+            return Int(b.width) * 3 == Int(b.height) * 4 && b.height >= 1080
                 && (tur == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange || tur == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
                 && f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= 30 }
         }
         return adaylar.max { a, b in
             let fa = foto(a), fb = foto(b)
             if fa != fb { return fa < fb }
+            if akis(a) != akis(b) { return akis(a) > akis(b) }
             let ta = CMFormatDescriptionGetMediaSubType(a.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
             let tb = CMFormatDescriptionGetMediaSubType(b.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
             return !ta && tb
@@ -543,7 +588,7 @@ final class Kamera: NSObject, ObservableObject {
         switch mod {
         case .video: yazi = "\(video) · \(fps)"
         case .timelapse: yazi = "\(video) · \(Timelapse.aralikYazi(tlAralik)) · \(Timelapse.hiz(tlAralik))× hızlı"
-        default: yazi = "\(mp) MP · \(raw && rawVar ? "RAW" : "JPEG")"
+        default: yazi = "\(mp) MP · \(fotoBicim.rawValue)"
         }
         DispatchQueue.main.async { self.cozunurluk = yazi }
     }
@@ -857,16 +902,18 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
-    /// Tek fotoğraf (seri çekimde hızlı); RAW açıksa RAW + JPEG
+    /// Tek fotoğraf (seri çekimde hızlı); biçim HEIF / JPEG, RAW'da DNG + HEIF/JPEG
     func fotoCek(hizli: Bool) {
         let ayar: AVCapturePhotoSettings
         let rawTip = fotoCikti.availableRawPhotoPixelFormatTypes.first { AVCapturePhotoOutput.isAppleProRAWPixelFormat($0) }
             ?? fotoCikti.availableRawPhotoPixelFormatTypes.first
+        let kodek: AVVideoCodecType = heif && fotoCikti.availablePhotoCodecTypes.contains(.hevc) ? .hevc : .jpeg
         if raw, !hizli, let rawTip {
-            ayar = AVCapturePhotoSettings(rawPixelFormatType: rawTip, processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+            ayar = AVCapturePhotoSettings(rawPixelFormatType: rawTip, processedFormat: [AVVideoCodecKey: kodek])
         } else {
-            ayar = AVCapturePhotoSettings()
-            ayar.photoQualityPrioritization = hizli ? .speed : .balanced
+            ayar = AVCapturePhotoSettings(format: [AVVideoCodecKey: kodek])
+            // Tam kalite (24/48 MP birleştirme bunu ister); seri çekimde hız
+            ayar.photoQualityPrioritization = hizli ? .speed : .quality
         }
         ayar.maxPhotoDimensions = fotoCikti.maxPhotoDimensions
         let f: AVCaptureDevice.FlashMode = flas == .oto ? .auto : (flas == .acik ? .on : .off)
@@ -1116,7 +1163,7 @@ extension Kamera: AVCapturePhotoCaptureDelegate {
         }
         let gomulu = p.islenmis.map { fotoyaGom($0) } ?? ana
         let kucuk = p.islenmis.flatMap { Kamera.kucukResim($0) }
-        let mesaj = mod == .pro && proMod.seri ? (seriSayi > 1 ? "\(seriSayi) kare çekildi" : "Fotoğraf kaydedildi") : (p.ham != nil ? "Fotoğraf kaydedildi (RAW + JPEG)" : "Fotoğraf kaydedildi")
+        let mesaj = mod == .pro && proMod.seri ? (seriSayi > 1 ? "\(seriSayi) kare çekildi" : "Fotoğraf kaydedildi") : (p.ham != nil ? "Fotoğraf kaydedildi (RAW + \(heif ? "HEIF" : "JPEG"))" : "Fotoğraf kaydedildi")
         kaydet({
             let istek = PHAssetCreationRequest.forAsset()
             istek.addResource(with: .photo, data: gomulu, options: nil)

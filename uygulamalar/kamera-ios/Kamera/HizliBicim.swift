@@ -2,7 +2,7 @@ import AVFoundation
 import SwiftUI
 
 /// Ana ekranda sağ üstte biçim (Fatih 30 Ekim 10:41: "çözünürlük ve kare hızı için Genel Ayarlar'a girmeyelim; sarı, likit cam"):
-/// video: çözünürlük · kare hızı · sabitleme; fotoğraf: MP · RAW. Dokun: sıradaki değer; sağa/sola kaydır: bir sonraki / önceki;
+/// video: çözünürlük · kare hızı · sabitleme; fotoğraf: MP · HEIF/JPEG/RAW. Dokun: sıradaki değer; sağa/sola kaydır: bir sonraki / önceki;
 /// basılı tut: bütün seçenekler ve "Ayrıntılı…" (diğer basılı tut menüleriyle aynı dil).
 struct HizliBicim: View {
     @ObservedObject var kamera: Kamera
@@ -50,17 +50,21 @@ struct HizliBicim: View {
             }
             return l
         default:
-            var l = [ParcaVeri(id: "mp", yazi: k.fotoBoyut.map { "\(KameraAyarlar.mp($0))" } ?? "", secenekler: k.fotoBoyutlari.prefix(4).map { b in
-                Secenek(ad: KameraAyarlar.mp(b), secili: k.fotoBoyut.map { $0.width == b.width && $0.height == b.height } ?? false) { k.fotoBoyutSec(b) }
-            })]
-            if k.rawVar {
-                l.append(ParcaVeri(id: "raw", yazi: k.raw ? "RAW" : "JPEG", secenekler: [
-                    Secenek(ad: "JPEG / HEIF", secili: !k.raw) { k.raw = false }, Secenek(ad: "RAW", secili: k.raw) { k.raw = true },
-                ]))
+            // Fotoğraf: çözünürlük (12 MP ve üstü) · biçim (HEIF / JPEG / RAW); video ayarları burada görünmez
+            var l: [ParcaVeri] = []
+            if !k.fotoBoyutlari.isEmpty {
+                l.append(ParcaVeri(id: "mp", yazi: k.fotoBoyut.map { HizliBicim.mpAd($0) } ?? "", secenekler: k.fotoBoyutlari.map { b in
+                    Secenek(ad: KameraAyarlar.mp(b), secili: k.fotoBoyut.map { $0.width == b.width && $0.height == b.height } ?? false) { k.fotoBoyutSec(b) }
+                }))
             }
+            l.append(ParcaVeri(id: "bicim", yazi: k.fotoBicim.rawValue, secenekler: k.fotoBicimleri.map { f in
+                Secenek(ad: f.rawValue, secili: k.fotoBicim == f) { k.fotoBicim = f }
+            }))
             return l
         }
     }
+
+    static func mpAd(_ b: CMVideoDimensions) -> String { "\(Int((Double(b.width) * Double(b.height) / 1_000_000).rounded())) MP" }
 
     static func cozAd(_ h: Int) -> String { h >= 2160 ? "4K" : (h >= 1080 ? "HD" : "\(h)p") }
 
