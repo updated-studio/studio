@@ -182,12 +182,14 @@ extension Kamera {
             let renkler = RenkModu.allCases.filter { r in
                 r == .sdr || Kamera.videoBicimi(d, yukseklik: h, fps: f, renk: r).map { $0.supportedColorSpaces.contains(r == .log ? .appleLog : .HLG_BT2020) } ?? false
             }
-            let kodekler: [Kodek]
-            if self.oturum.outputs.contains(self.videoCikti) {
+            // ProRes: bu çözünürlük/kare hızı/renkte 10 bit 4:2:2 biçim varsa (etkin biçim ne olursa olsun; seçilince biçim o olur)
+            let x422 = Kamera.videoBicimi(d, yukseklik: h, fps: f, renk: self.renkModu, prores: true)
+                .map { CMFormatDescriptionGetMediaSubType($0.formatDescription) == Kamera.x422 } ?? false
+            var kodekler: [Kodek] = [.hevc, .h264]
+            if x422 { kodekler += [.proresHQ, .prores, .proresLT, .proresProxy] }
+            if self.oturum.outputs.contains(self.videoCikti), self.cihaz.map({ CMFormatDescriptionGetMediaSubType($0.activeFormat.formatDescription) == Kamera.x422 }) == true {
                 let var_ = self.videoCikti.availableVideoCodecTypes
-                kodekler = Kodek.allCases.filter { var_.contains($0.tur) }
-            } else {
-                kodekler = [.hevc, .h264]
+                kodekler = kodekler.filter { !$0.prores || var_.contains($0.tur) }
             }
             let sabit = Sabitleme.allCases.filter { d.activeFormat.isVideoStabilizationModeSupported($0.mod) }
             let fpsler = [24, 25, 30, 60].filter { Kamera.videoBicimi(d, yukseklik: h, fps: $0) != nil }
@@ -243,12 +245,15 @@ extension Kamera {
 
     /// Kuyrukta: kodek, sabitleme, ses biçimi. Değişmediyse dokunmaz (kayıt başında yeniden kurulum olmasın)
     func kayitBicimiUygula() {
-        let imza = "\(kodek.rawValue)|\(sabitleme.rawValue)|\(sesBicimi.rawValue)|\(harici)"
+        let ssdVar = ssdKayit && ssd.takili
+        let imza = "\(kodek.rawValue)|\(sabitleme.rawValue)|\(sesBicimi.rawValue)|\(harici)|\(ssdVar)"
         guard imza != kayitImza else { return }
         kayitImza = imza
         if let b = videoCikti.connection(with: .video) {
             let var_ = videoCikti.availableVideoCodecTypes
             var k = kodek.tur
+            // Apple kuralı: ProRes 4K 60 yalnız harici SSD'ye; SSD yoksa HEVC
+            if proresSsdGerek, !ssdVar { k = .hevc }
             if !var_.contains(k) { k = var_.contains(.hevc) ? .hevc : (var_.first ?? .h264) }
             videoCikti.setOutputSettings([AVVideoCodecKey: k], for: b)
             if b.isVideoStabilizationSupported { b.preferredVideoStabilizationMode = sabitleme.mod }

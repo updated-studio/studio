@@ -174,8 +174,9 @@ struct KisayolOge: View {
             if let iki = ikiSatir, d.etkin {
                 VStack(spacing: 0) {
                     Text(iki.0).font(.system(size: 17, weight: .semibold, design: .rounded))
-                    Text(iki.1).font(.system(size: 10, weight: .bold, design: .rounded))
+                    if !iki.1.isEmpty { Text(iki.1).font(.system(size: 10, weight: .bold, design: .rounded)) }
                 }
+                .frame(height: 32)
             } else {
                 Image(systemName: f.simge).font(.system(size: 17, weight: .medium)).frame(height: 32)
             }
@@ -213,9 +214,10 @@ struct DenetimDaire: View {
                 Circle().fill(Color.black.opacity(0.45))
                 if let ic = icYazi {
                     VStack(spacing: 0) {
-                        Text(ic.0).font(.system(size: kucuk ? 13 : 16, weight: .semibold, design: .rounded))
-                        Text(ic.1).font(.system(size: kucuk ? 9 : 11, weight: .semibold, design: .rounded))
+                        Text(ic.0).font(.system(size: kucuk ? 13 : 16, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.7)
+                        if !ic.1.isEmpty { Text(ic.1).font(.system(size: kucuk ? 9 : 11, weight: .semibold, design: .rounded)) }
                     }
+                    .padding(.horizontal, 4)
                 } else {
                     Image(systemName: f.simge).font(.system(size: kucuk ? 17 : 22, weight: .regular))
                 }

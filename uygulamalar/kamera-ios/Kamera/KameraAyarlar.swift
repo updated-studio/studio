@@ -56,6 +56,7 @@ struct KameraAyarlar: View {
         .onAppear { kamera.secenekleriYaz() }
         .onChange(of: kamera.videoYukseklik) { _, _ in kamera.secenekleriYaz() }
         .onChange(of: kamera.videoFps) { _, _ in kamera.secenekleriYaz() }
+        .onChange(of: kamera.renkModu) { _, _ in kamera.secenekleriYaz() }
     }
 
     private var ozet: String {
@@ -73,8 +74,21 @@ struct KameraAyarlar: View {
                     secimSatiri(k.ad, k.aciklama, secili: kamera.kodek == k, destek: kamera.kodekler.contains(k)) { kamera.kodek = k }
                 }
             } header: { Text("Kodek") } footer: {
-                Text(kamera.mod == .video ? "Soluk olanları bu iPhone bu çözünürlük ve kare hızında kaydedemiyor. ProRes 4K 60 için iPhone'a harici SSD gerekebilir."
+                Text(kamera.mod == .video ? "ProRes seçilince kamera 10 bit 4:2:2 biçime geçer. Soluk olanları bu iPhone bu çözünürlük, kare hızı ve renkte kaydedemiyor. ProRes 4K 60 yalnız harici SSD'ye yazılır."
                                           : "ProRes seçenekleri VİDEO modundayken görünür.")
+            }
+            Section {
+                Toggle("Harici SSD'ye kaydet", isOn: $kamera.ssdKayit).tint(Tema.sari)
+                HStack {
+                    Text("Durum")
+                    Spacer()
+                    if let ad = kamera.ssd.ad {
+                        Text(kamera.ssd.bosAlan.map { "\(ad) · \(HariciDisk.boyutYazisi($0)) boş" } ?? ad).foregroundStyle(kamera.ssd.izin ? .secondary : .orange)
+                    } else { Text("Takılı değil").foregroundStyle(.secondary) }
+                }
+                if kamera.ssd.takili, !kamera.ssd.izin { Text("Harici disk izni verilmedi; iPhone sorunca İzin Ver'e dokunun.").font(.footnote).foregroundStyle(.orange) }
+            } header: { Text("Harici SSD") } footer: {
+                Text("USB-C'ye takılı SSD'ye doğrudan kayıt (iPhone 15 Pro ve sonrası). Dosya SSD'de kalır, Fotoğraflar'a kopyalanmaz. ProRes 4K 60 ancak böyle kaydedilir; SSD yoksa HEVC'ye düşer.")
             }
             Section {
                 ForEach(RenkModu.allCases) { r in

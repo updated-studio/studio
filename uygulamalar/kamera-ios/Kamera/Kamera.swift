@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import CoreMotion
 import Photos
 import UIKit
@@ -77,7 +78,13 @@ final class Kamera: NSObject, ObservableObject {
     @Published var fps60Var = false
     @Published var videoFpsler: [Int] = [30]
     // Genel ayarlar: kayıt biçimi, renk, sabitleme, enstantane gösterimi, ses (KayitAyarlari.swift)
-    @Published var kodek = Kodek(rawValue: Kamera.ud.string(forKey: "k.kodek") ?? "") ?? .hevc { didSet { Kamera.ud.set(kodek.rawValue, forKey: "k.kodek"); bicimYaz(); kayitHazirla() } }
+    @Published var kodek = Kodek(rawValue: Kamera.ud.string(forKey: "k.kodek") ?? "") ?? .hevc { didSet { Kamera.ud.set(kodek.rawValue, forKey: "k.kodek"); if kodek.prores != oldValue.prores { yenidenKur() } else { bicimYaz(); kayitHazirla() } } }
+    /// Harici SSD takılıysa video oraya kaydedilir (ProRes 4K 60 için zorunlu)
+    @Published var ssdKayit = Kamera.ud.object(forKey: "k.ssd") as? Bool ?? true { didSet { Kamera.ud.set(ssdKayit, forKey: "k.ssd"); kayitHazirla() } }
+    let ssd = HariciDisk()
+    /// Süren kaydın SSD'deki dosyası
+    var ssdDosya: URL?
+    private var ssdGozlem: AnyCancellable?
     @Published var renkModu = RenkModu(rawValue: Kamera.ud.string(forKey: "k.renk") ?? "") ?? .sdr { didSet { Kamera.ud.set(renkModu.rawValue, forKey: "k.renk"); yenidenKur() } }
     @Published var sabitleme = Sabitleme(rawValue: Kamera.ud.string(forKey: "k.sabit") ?? "") ?? .standart { didSet { Kamera.ud.set(sabitleme.rawValue, forKey: "k.sabit"); kayitHazirla() } }
     /// Video enstantanesi açı (180°) olarak mı gösterilsin
@@ -207,6 +214,13 @@ final class Kamera: NSObject, ObservableObject {
     // MARK: oturum
 
     func baslat() {
+        // SSD takılıp çıkınca ekran (rozet, ayarlar) yenilensin; kayıt biçimi SSD'ye göre değişir
+        if ssdGozlem == nil {
+            ssdGozlem = ssd.objectWillChange.receive(on: DispatchQueue.main).sink { [weak self] _ in
+                self?.objectWillChange.send()
+                DispatchQueue.main.async { self?.kayitHazirla() }
+            }
+        }
         Task {
             let kamera = await AVCaptureDevice.requestAccess(for: .video)
             _ = await AVCaptureDevice.requestAccess(for: .audio)
@@ -296,7 +310,8 @@ final class Kamera: NSObject, ObservableObject {
         if videolu {
             let fps = mod == .video ? videoFps : 30
             let renk = mod == .video ? renkModu : .sdr
-            if let b = Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps, renk: renk) ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps)
+            let prores = mod == .video && kodek.prores
+            if let b = Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps, renk: renk, prores: prores) ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps)
                 ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: 30) ?? Kamera.videoBicimi(d, yukseklik: 1080, fps: 30), (try? d.lockForConfiguration()) != nil {
                 d.activeFormat = b
                 let gercekFps = b.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(fps) } ? fps : 30
@@ -391,18 +406,32 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
-    static func videoBicimi(_ d: AVCaptureDevice, yukseklik: Int, fps: Int, renk: RenkModu = .sdr) -> AVCaptureDevice.Format? {
+    /// ProRes 4:2:2 kaydı yalnız 10 bit 4:2:2 ('x422') biçimde açılır (Apple TN3121): kodek ProRes ise o biçim seçilir;
+    /// yoksa SDR'de 8 bit 4:2:0, HDR / Log'da 10 bit 4:2:0. Kodek listesi (`secenekleriYaz`) de bu seçimden türer.
+    static func videoBicimi(_ d: AVCaptureDevice, yukseklik: Int, fps: Int, renk: RenkModu = .sdr, prores: Bool = false) -> AVCaptureDevice.Format? {
         let adaylar = d.formats.filter { f in
             let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
             return Int(b.height) == yukseklik && Int(b.width) * 9 == Int(b.height) * 16
                 && f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(fps) }
         }
+        func tur(_ f: AVCaptureDevice.Format) -> OSType { CMFormatDescriptionGetMediaSubType(f.formatDescription) }
+        let uygun: [AVCaptureDevice.Format]
         switch renk {
-        case .log: return adaylar.first { $0.supportedColorSpaces.contains(.appleLog) }
-        case .hdr: return adaylar.first { $0.supportedColorSpaces.contains(.HLG_BT2020) }
-        case .sdr: return adaylar.first { CMFormatDescriptionGetMediaSubType($0.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange } ?? adaylar.first
+        case .log: uygun = adaylar.filter { $0.supportedColorSpaces.contains(.appleLog) }
+        case .hdr: uygun = adaylar.filter { $0.supportedColorSpaces.contains(.HLG_BT2020) }
+        case .sdr: uygun = adaylar
+        }
+        if prores, let f = uygun.first(where: { tur($0) == Kamera.x422 }) { return f }
+        switch renk {
+        case .sdr: return uygun.first { tur($0) == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange } ?? uygun.first { tur($0) != Kamera.x422 } ?? uygun.first
+        default: return uygun.first { tur($0) != Kamera.x422 } ?? uygun.first
         }
     }
+
+    static let x422 = kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange
+
+    /// ProRes 4K 60 Apple kuralıyla yalnız harici SSD'ye yazılır; SSD yoksa kayıt HEVC'ye düşer
+    var proresSsdGerek: Bool { kodek.prores && videoYukseklik >= 2160 && videoFps >= 60 }
 
     /// Ayarlar değişince oturum yeniden kurulur
     func yenidenKur() {
@@ -714,7 +743,12 @@ final class Kamera: NSObject, ObservableObject {
                     }
                 }
                 self.kayitBicimiUygula()
-                let url = FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-\(Int(Date().timeIntervalSince1970)).mov")
+                let ssd = self.ssdKayit ? self.ssd.yeniDosya(uzanti: "mov") : nil
+                self.ssdDosya = ssd
+                let url = ssd ?? FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-\(Int(Date().timeIntervalSince1970)).mov")
+                if ssd == nil, self.proresSsdGerek {
+                    DispatchQueue.main.async { self.bildirim = "ProRes 4K 60 yalnız harici SSD'ye kaydedilir; SSD takılı değil, HEVC kaydediliyor." }
+                }
                 self.videoCikti.startRecording(to: url, recordingDelegate: self)
             }
         case .timelapse:
@@ -1013,7 +1047,9 @@ extension Kamera {
         var k = kodek.tur
         if !var_.isEmpty, !var_.contains(k) { k = var_.contains(.hevc) ? .hevc : .h264 }
         let fps = cihaz.map { Int((1 / $0.activeVideoMinFrameDuration.seconds).rounded()) } ?? 30
-        let c = CanliKaydedici(suzgec: suzgec, kodek: k, fps: fps, sesAyari: canliSesAyari())
+        let ssd = ssdKayit ? self.ssd.yeniDosya(uzanti: "mov") : nil
+        ssdDosya = ssd
+        let c = CanliKaydedici(suzgec: suzgec, kodek: k, fps: fps, sesAyari: canliSesAyari(), url: ssd)
         kuyruk.async { self.canliKayit = c }
     }
 
@@ -1022,10 +1058,28 @@ extension Kamera {
         kayitBasi = nil
         kuyruk.async { self.canliKayit = nil }
         c.bitir { url in
-            guard let url else { DispatchQueue.main.async { self.bildirim = "Kayıt başarısız: \(c.hata ?? "")" }; return }
+            guard let url else {
+                if let s = self.ssdDosya { self.ssd.birak(s); self.ssdDosya = nil }
+                DispatchQueue.main.async { self.bildirim = "Kayıt başarısız: \(c.hata ?? "")" }; return
+            }
+            if self.ssdBitti(url) { return }
             let kucuk = Kamera.kucukResim(video: url)
             self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil) }, mesaj: "Video kaydedildi", kucuk: kucuk)
         }
+    }
+
+    /// Kayıt SSD'ye yapıldıysa dosya orada kalır (Fotoğraflar'a kopyalanmaz, stil sonradan işlenmez); true = SSD dosyasıydı
+    func ssdBitti(_ url: URL) -> Bool {
+        guard let s = ssdDosya, s == url else { return false }
+        ssdDosya = nil
+        let kucuk = Kamera.kucukResim(video: url)
+        let ad = ssd.ad ?? "SSD"
+        ssd.birak(s)
+        DispatchQueue.main.async {
+            self.bildirim = "Video \(ad) diskine kaydedildi: \(url.lastPathComponent)"
+            if let kucuk { self.sonResim = kucuk }
+        }
+        return true
     }
 
     /// Ses çıkış ayarı: Genel Ayarlar'daki ses biçimi (Oto: harici mikrofonda 24 bit PCM, telefonda AAC)
@@ -1049,6 +1103,12 @@ extension Kamera {
 extension Kamera: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo url: URL, from connections: [AVCaptureConnection], error: Error?) {
         DispatchQueue.main.async { self.kayitta = false; self.kayitBasi = nil }
+        if let e = error as NSError?, (e.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool) != true {
+            if let s = ssdDosya, s == url { ssd.birak(s); ssdDosya = nil }
+            DispatchQueue.main.async { self.bildirim = "Kayıt başarısız: \(e.localizedDescription)" }
+            return
+        }
+        if ssdBitti(url) { return }
         videoyaGom(url) { url in
             let kucuk = Kamera.kucukResim(video: url)
             self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil) }, mesaj: "Video kaydedildi", kucuk: kucuk)

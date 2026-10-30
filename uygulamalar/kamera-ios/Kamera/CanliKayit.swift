@@ -25,8 +25,9 @@ final class CanliKaydedici {
     var hata: String?
 
     /// - sesAyari: nil = ses yok; AAC ya da PCM çıkış ayarları (KayitAyarlari.sesAyari)
-    init(suzgec: CIFilter, kodek: AVVideoCodecType, fps: Int, sesAyari: [String: Any]?) {
-        url = FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-\(Int(Date().timeIntervalSince1970)).mov")
+    /// - url: harici SSD'deki hedef; nil = geçici klasör (sonra Fotoğraflar'a)
+    init(suzgec: CIFilter, kodek: AVVideoCodecType, fps: Int, sesAyari: [String: Any]?, url: URL? = nil) {
+        self.url = url ?? FileManager.default.temporaryDirectory.appendingPathComponent("UPDATED-\(Int(Date().timeIntervalSince1970)).mov")
         self.suzgec = suzgec; self.kodek = kodek; self.fps = fps; self.sesAyari = sesAyari
     }
 

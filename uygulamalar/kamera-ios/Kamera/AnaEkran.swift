@@ -420,6 +420,7 @@ struct AnaEkran: View {
         if kamera.mod == .video {
             if kamera.kodek.prores { l.append((kamera.kodek.kisa, "PRORES", true)) }
             if kamera.renkModu != .sdr { l.append((kamera.renkModu.kisa, "", true)) }
+            if kamera.ssdKayit, kamera.ssd.takili { l.append(("SSD", "", true)) }
         }
         if kamera.stil.etkin { l.append((kamera.stil.hazir == .standart ? "Özel" : kamera.stil.hazir.ad, "STİL", true)) }
         if kamera.mod.foto, kamera.zamanlayici > 0 { l.append(("\(kamera.zamanlayici)", "SN", true)) }

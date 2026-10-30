@@ -27,9 +27,14 @@ extension Kamera {
     /// VİDEO'da Apple Log seçiliyken ekranda Rec.709'a çevrilmiş görüntü
     var logDuzelt: Bool { mod == .video && renkModu == .log && logOnizleme }
 
+    /// VİDEO'da HDR: kare çıkışı HLG/BT.2020 kareyi 8 bit BGRA'ya düşürür; Rec.709 LUT bu kareye uygulanınca renkler bozuluyordu.
+    /// HDR'de stil ve LUT ekranda gösterilmez (iPhone'un kendi önizlemesi doğru renkte), stil kayıttan sonra işlenir.
+    var hdrOnizleme: Bool { mod == .video && renkModu == .hdr }
+
     var gostergeEtkin: Bool {
         let g = gosterge
-        return g.falseColor || g.zebra || g.peaking || g.monokrom || g.lutAcik || histogram || logDuzelt || stil.etkin
+        let renk = !hdrOnizleme && (g.lutAcik || stil.etkin)
+        return g.falseColor || g.zebra || g.peaking || g.monokrom || histogram || logDuzelt || renk
     }
 
     /// Ana iş parçacığında: çizici ayarları; oturumda kare çıkışı gerekiyorsa eklenir (kayıt sürerken oturuma dokunulmaz)
@@ -50,10 +55,11 @@ extension Kamera {
         var a = gosterge
         a.temiz = false
         // Renk: taban LUT (kullanıcının ya da Log → Rec.709) ve stil tek LUT'ta birleşir
-        if let r = renkLutu() {
+        if !hdrOnizleme, let r = renkLutu() {
             a.lutAcik = true
             cizici.ozelLut(anahtar: r.anahtar, uret: r.uret)
         } else {
+            a.lutAcik = false
             cizici.ozelLut(anahtar: nil, uret: nil)
         }
         cizici.doldur = true  // önizleme ekranı doldurur (Onizleme aspect fill ile aynı)
