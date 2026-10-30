@@ -907,7 +907,7 @@ final class Masa: NSObject, ObservableObject {
         o.programBoyut = (w, h)
         let kaynaklarYaz = !(vlog && yalnizFinal)
         for (i, y) in yuvalar.enumerated() {
-            if kaynaklarYaz { o.kaynakUrl[y.id] = dizin }.appendingPathComponent("\(i + 1) - \(Masa.dosyaAdi(y.ad)).mp4")
+            if kaynaklarYaz { o.kaynakUrl[y.id] = dizin.appendingPathComponent("\(i + 1) - \(Masa.dosyaAdi(y.ad)).mp4") }
             y.alici?.anahtarIste()
             y.kaydediyor = true
         }
