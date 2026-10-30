@@ -53,15 +53,15 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | **Cam yüzeyler** (iOS 26+ cam malzemesi gibi): Android'de üstte açık, altta koyu yarı saydam dolgu + parlak ince kenar (cam(), daire(), sabitlenen çipler) | ✓ | ✓ | Android arkayı bulanıklaştıramaz |
 
 | **10:41 listesi (Fatih 30 Ekim), iOS 0.16.0:** | | | Android için kurallar aynı; RC'ye iletildi |
-| Mercek geçişi: iPhone'un çoklu kamerası (sanal cihaz) ile kesintisiz yakınlaştırma; PRO, elle odak ve uzun pozlamada fiziksel merceğe geçer | | ✓ | Kamera.swift `sanalArka`, `cihazUyumla` |
-| Sabitleme: kayıt dışında önizleme düşük gecikmeli (iOS 17 `previewOptimized`), kayıtta seçilen mod; seçilen modu destekleyen biçim aranır; ekranda gerçekte kullanılan (`etkinSabitleme`) | | ✓ | "en yüksek sabitlemede yavaşlık, kare düşmesi" |
-| Varsayılanlar en yüksek: video 4K 60, fotoğraf kameranın en büyük MP'si | | ✓ | |
-| **Sağ üstte sarı cam biçim denetimi:** video: çözünürlük · kare hızı · sabitleme simgesi; foto: MP · RAW. Dokun: sıradaki, sağa/sola kaydır: sonraki/önceki, basılı tut: seçenekler + Ayrıntılı… | | ✓ | HizliBicim.swift; üst ortadaki okuma şeridinde artık yalnız elle değişmiş değerler |
-| **Vlog alt mod şeridinde** (TIMELAPSE · VİDEO · VLOG · FOTO · PRO · PORTRE); kalite Kamera video ayarlarından (iki kamera kaldırmazsa 1080p'ye iner, ekranda gerçek kalite); çıktı ince yazıyla "Yalnız final" / "3 dosya"; SSD düğmesi yok, harici disk takılınca açılır kart (Diske kaydet / Klasör seç / Telefona) | | ✓ | Vlog.swift, Masa `yalnizFinal` (vlog.yalnizFinal), `diskeYaz`; HEVC ≈ 0,12 bit/piksel |
-| **Kadraj çerçeveleri (kesik çizgi):** 9:16, 4:5, 1:1, 4:3, 16:9, 1,85:1, 2,39:1, güvenli alan; çoklu seçim; yalnız VİDEO/TIMELAPSE'ta; sabitlenebilir (Favori `cerceve`) | | ✓ | Cerceve.swift, k.cerceve |
-| **Foto / video / ortak ayrımı:** kodek, renk, sabitleme, çerçeve, ses girişi yalnız videoda; zamanlayıcı yalnız fotoda; sabitlenenler ve Denetimler o moda göre süzülür | | ✓ | Favori.kapsam |
-| **Stil pedi Apple gibi:** koyu zeminde 13×13 nokta ızgarası, parmağın çevresi büyüyüp aydınlanır; altında TON · RENK değerleri | | ✓ | Stiller.swift `pad` |
-| Menü geçişleri sönümlü yay (`spring 0.34 / 0.9`) | | ✓ | |
+| Mercek geçişi: iPhone'un çoklu kamerası (sanal cihaz) ile kesintisiz yakınlaştırma; PRO, elle odak ve uzun pozlamada fiziksel merceğe geçer | ✓ (0.19.0: CONTROL_ZOOM_RATIO ile 240 ms kayan yakınlaştırma, `zoomKay`) | ✓ | Kamera.swift `sanalArka`, `cihazUyumla` |
+| Sabitleme: kayıt dışında önizleme düşük gecikmeli (iOS 17 `previewOptimized`), kayıtta seçilen mod; seçilen modu destekleyen biçim aranır; ekranda gerçekte kullanılan (`etkinSabitleme`) | ✓ (0.19.0: Kaynaklar `etkinSabitleme`; Güçlü yalnız kayıtta ve ≤1080p 30) | ✓ | "en yüksek sabitlemede yavaşlık, kare düşmesi" |
+| Varsayılanlar en yüksek: video 4K 60, fotoğraf kameranın en büyük MP'si | ✓ (0.19.0, kodlayıcı 4K60 yazamıyorsa 4K30; 4K60 80 Mbit) | ✓ | |
+| **Sağ üstte sarı cam biçim denetimi:** video: çözünürlük · kare hızı · sabitleme simgesi; foto: MP · RAW. Dokun: sıradaki, sağa/sola kaydır: sonraki/önceki, basılı tut: seçenekler + Ayrıntılı… | ✓ (0.19.0, `hizliSira`) | ✓ | HizliBicim.swift; üst ortadaki okuma şeridinde artık yalnız elle değişmiş değerler |
+| **Vlog alt mod şeridinde** (TIMELAPSE · VİDEO · VLOG · FOTO · PRO · PORTRE); kalite Kamera video ayarlarından (iki kamera kaldırmazsa 1080p'ye iner, ekranda gerçek kalite); çıktı ince yazıyla "Yalnız final" / "3 dosya"; SSD düğmesi yok, harici disk takılınca açılır kart (Diske kaydet / Klasör seç / Telefona) | ✓ (0.19.0; disk: SAF klasör, Android 11+ takılınca kart; birleşik video bit hızı kuralı henüz eski) | ✓ | Vlog.swift, Masa `yalnizFinal` (vlog.yalnizFinal), `diskeYaz`; HEVC ≈ 0,12 bit/piksel |
+| **Kadraj çerçeveleri (kesik çizgi):** 9:16, 4:5, 1:1, 4:3, 16:9, 1,85:1, 2,39:1, güvenli alan; çoklu seçim; yalnız VİDEO/TIMELAPSE'ta; sabitlenebilir (Favori `cerceve`) | ✓ (0.19.0) | ✓ | Cerceve.swift, k.cerceve |
+| **Foto / video / ortak ayrımı:** kodek, renk, sabitleme, çerçeve, ses girişi yalnız videoda; zamanlayıcı yalnız fotoda; sabitlenenler ve Denetimler o moda göre süzülür | ✓ (0.19.0, `favUygun`) | ✓ | Favori.kapsam |
+| **Stil pedi Apple gibi:** koyu zeminde 13×13 nokta ızgarası, parmağın çevresi büyüyüp aydınlanır; altında TON · RENK değerleri | ✓ (0.19.0) | ✓ | Stiller.swift `pad` |
+| Menü geçişleri sönümlü yay (`spring 0.34 / 0.9`) | ✓ (0.19.0, hafif aşmalı açılış, 150 ms kapanış) | ✓ | |
 
 ## Monitör ekranı (Android: MainActivity + MonitorGorunum)
 
@@ -84,9 +84,10 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | Ses göstergesi (iki kanal) | ✓ | ✓ | |
 | Ekran parlaklığı en yüksek | ✓ | ✓ | |
 
-| **Monitör ayar paneli yeniden (Fatih 30 Ekim 03:12):** 6 sekme, önem sırasıyla KAYNAK · GÖRÜNTÜ · STİLLER · KADRAJ · ÖLÇÜM · KAYIT; her sekmede başlıklı gruplar (GÖRÜNTÜ: Odak / Pozlama / Ekran; KADRAJ: Akıllı kadraj / Kompozisyon / Çerçeve; ÖLÇÜM: Ekranda / Ölçüm paneli; KAYIT: Görüntü / Dosya / Ses / Cihaz). Kılavuz, Ses ve Kurulum sekmeleri bu gruplara girdi | ○ | ✓ (0.14.0, cihazda denenmedi) | MonitorModel `Sekme`, MonitorEkran `baslik` |
-| **Monitör Stiller (LUT yerine):** araç şeridinde STİL; panelde Kamera'daki düzen: TEMEL, FİLM REÇETELERİ, LUT'LARIN (+ .cube ekle, basılı tut sil), Yoğunluk, Doygunluk, Sıcaklık, Ton, Sıfırla. Bölme başına (`BolmeAyari.stil`), LUT'un üstüne biner (Kamera `renkLutu` ile aynı birleştirme), yalnız ekranda | ○ | ✓ (0.14.0) | Stiller.swift `MonitorStilleri` |
+| **Monitör ayar paneli yeniden (Fatih 30 Ekim 03:12):** 6 sekme, önem sırasıyla KAYNAK · GÖRÜNTÜ · STİLLER · KADRAJ · ÖLÇÜM · KAYIT; her sekmede başlıklı gruplar (GÖRÜNTÜ: Odak / Pozlama / Ekran; KADRAJ: Akıllı kadraj / Kompozisyon / Çerçeve; ÖLÇÜM: Ekranda / Ölçüm paneli; KAYIT: Görüntü / Dosya / Ses / Cihaz). Kılavuz, Ses ve Kurulum sekmeleri bu gruplara girdi | ✓ (30 Ekim) | ✓ (0.14.0, cihazda denenmedi) | MonitorModel `Sekme`, MonitorEkran `baslik` |
+| **Monitör Stiller (LUT yerine):** araç şeridinde STİL; panelde Kamera'daki düzen: TEMEL, FİLM REÇETELERİ, LUT'LARIN (+ .cube ekle, basılı tut sil), Yoğunluk, Doygunluk, Sıcaklık, Ton, Sıfırla. Bölme başına (`BolmeAyari.stil`), LUT'un üstüne biner (Kamera `renkLutu` ile aynı birleştirme), yalnız ekranda | ✓ (30 Ekim) | ✓ (0.14.0) | Stiller.swift `MonitorStilleri` |
 | **Monitör beyaz denge iki çubuk:** Kelvin (2500–10000) + Yeşil–Macenta; OTO ikisini sıfırlar | ✓ (RC, 30 Ekim) | ✓ (0.14.0) | Fatih 30 Ekim 03:12 |
+| **Monitör tasarımı (MONITOR_TASARIM.md):** telefonda yuvarlak cam düğmeler, ayarlar alttan sayfa (yatayda sağdan); tablette cam durum çubuğu, solda etiketli ray, sağda kayıt sütunu, altta etiketli cam araç çubuğu + histogram + ses, ayarlar sağ denetçi; kapsül sekmeler | ✓ (Kamera 0.19.0 / Studio 0.4.0) | | cihazda denenmedi |
 | **Zebra görünmüyordu:** beyaz alanın üstüne beyaz şerit çiziliyordu; artık koyu/beyaz çapraz şerit | ✓ | ✓ (0.14.0) | Monitor.metal |
 
 Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki kaynak, HLS kaynağı.
