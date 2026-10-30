@@ -64,6 +64,8 @@ data class KameraAyari(
     var iso: Int? = null, var pozlamaNs: Long? = null, var ev: Int = 0,
     var awb: Int = CameraMetadata.CONTROL_AWB_MODE_AUTO, var odakMesafe: Float? = null,
     var fotoBoyut: Size? = null, var raw: Boolean = false,
+    /** Fotoğraf HEIF (HEIC) olarak: telefon kamerası HEIC veriyorsa; RAW açıkken yanındaki dosya da HEIF */
+    var heif: Boolean = false,
     var zoomOrani: Float = 1f,
     /** Kamera ekranında 1/10 sn'den uzun elle enstantane: önizleme kareleri 1/10 sn'de tutulur (0 kapalı, 1 ISO aradaki fark kadar artar, 2 artmaz) */
     var uzunOnizleme: Int = 0,
@@ -159,7 +161,23 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     private var rawDustu = false // bu telefonda RAW + JPEG + önizleme birlikte kurulamadı
     private var cekiliyor = false
     private val harita get() = oz.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-    val fotoBoyutlari: List<Size> by lazy { harita?.getOutputSizes(ImageFormat.JPEG)?.sortedByDescending { it.width * it.height }.orEmpty() }
+    /**
+     * Yüksek çözünürlük sensörü (Android 12+, ör. 50 MP): tam boyut ayrı haritada; o boyutta fotoğraf yalnız
+     * SENSOR_PIXEL_MODE = MAXIMUM_RESOLUTION isteğiyle çekilir (önizleme normal kalır). Kurulamazsa bir kez normale düşülür.
+     */
+    private val buyukHarita: android.hardware.camera2.params.StreamConfigurationMap? by lazy {
+        if (android.os.Build.VERSION.SDK_INT >= 31 && CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR in yetenekler)
+            runCatching { oz.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION) }.getOrNull() else null
+    }
+    private val normalJpeg: List<Size> by lazy { harita?.getOutputSizes(ImageFormat.JPEG)?.toList().orEmpty() }
+    private var buyukDustu = false
+    val fotoBoyutlari: List<Size> get() = (normalJpeg + (if (buyukDustu) emptyList() else buyukHarita?.getOutputSizes(ImageFormat.JPEG)?.toList().orEmpty()))
+        .distinct().sortedByDescending { it.width * it.height }
+    /** Bu boyut yalnız yüksek çözünürlük kipinde mi */
+    fun buyukMu(b: Size) = b !in normalJpeg
+    /** Kamera doğrudan HEIF (HEIC) veriyor mu (Android 10+) */
+    val heifVar: Boolean by lazy { android.os.Build.VERSION.SDK_INT >= 29 && harita?.getOutputSizes(ImageFormat.HEIC)?.isNotEmpty() == true }
+    private var fotoBuyuk = false; private var fotoHeif = false
     val rawVar: Boolean by lazy {
         CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_RAW in (oz.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: IntArray(0)) &&
             harita?.getOutputSizes(ImageFormat.RAW_SENSOR)?.isNotEmpty() == true
@@ -201,7 +219,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     /** Wi-Fi kamera yayınında HDR kapalı: görüntü 8 bit SDR'ye çizilip Masa'ya gidiyor, HLG ton eşlemesiz soluk ve kayık görünüyordu */
     @Volatile var sdrZorla = false
     private val hdrAcik: Boolean get() = ayar.renk == 1 && hdrVar && !fotoModu && !sdrZorla
-    fun secilenFotoBoyut(): Size? = ayar.fotoBoyut?.takeIf { it in fotoBoyutlari } ?: fotoBoyutlari.firstOrNull()
+    fun secilenFotoBoyut(): Size? { val l = fotoBoyutlari; return ayar.fotoBoyut?.takeIf { it in l } ?: l.firstOrNull() }
 
     val yetenek: KameraYetenek by lazy {
         val harita = oz.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
@@ -263,13 +281,16 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         okuyuculariKur()
         val hedefler = listOfNotNull(onizleme, kaydedici?.surface, jpegOkuyucu?.surface, rawOkuyucu?.surface)
         val hdr = hdrAcik; val kayitYuzeyi = kaydedici?.surface
+        val buyukYuzey = if (fotoBuyuk) jpegOkuyucu?.surface else null
         val ciktilar = hedefler.map { y -> android.hardware.camera2.params.OutputConfiguration(y).apply {
-            if (hdr && android.os.Build.VERSION.SDK_INT >= 33 && (y === onizleme || y === kayitYuzeyi)) dynamicRangeProfile = android.hardware.camera2.params.DynamicRangeProfiles.HLG10 } }
+            if (hdr && android.os.Build.VERSION.SDK_INT >= 33 && (y === onizleme || y === kayitYuzeyi)) dynamicRangeProfile = android.hardware.camera2.params.DynamicRangeProfiles.HLG10
+            if (y === buyukYuzey && android.os.Build.VERSION.SDK_INT >= 31) addSensorPixelModeUsed(CameraMetadata.SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) } }
         try {
             c.createCaptureSession(android.hardware.camera2.params.SessionConfiguration(android.hardware.camera2.params.SessionConfiguration.SESSION_REGULAR, ciktilar,
                 java.util.concurrent.Executor { h.post(it) }, object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(s: CameraCaptureSession) { oturum = s; istekGonder(); if (kaydedici != null) runCatching { kaydedici?.start() }.onFailure { hataGeri("Kayıt başlatılamadı: ${it.message}"); HataKaydi.not("kayit", it.stackTraceToString()); kayitBirak() } }
                 override fun onConfigureFailed(s: CameraCaptureSession) {
+                    if (fotoBuyuk) { buyuktenDus(); return }
                     if (rawOkuyucu != null) { rawDustu = true; runCatching { rawOkuyucu?.close() }; rawOkuyucu = null; hataGeri("Bu kamera RAW'ı önizlemeyle birlikte veremiyor; yalnız JPEG çekilecek."); oturumKur(); return }
                     if (hdr) { ayar.renk = 0; hataGeri("Bu çözünürlük/kare hızında HDR kurulamadı; SDR'ye dönüldü."); oturumKur(); return }
                     hataGeri("Görüntü oturumu kurulamadı (bu çözünürlük/kare hızı desteklenmiyor olabilir)."); HataKaydi.not("kamera", "onConfigureFailed $ad ${secilenBoyut()} ${ayar.fps}") }
@@ -277,11 +298,23 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         } catch (e: Exception) { hataGeri(e.message ?: "Oturum kurulamadı"); HataKaydi.not("kamera", e.stackTraceToString()) }
     }
 
+    /** Yüksek çözünürlük kipi bu telefonda kurulamadı/çekemedi: normal en büyük boyuta dönülür */
+    private fun buyuktenDus() {
+        buyukDustu = true; ayar.fotoBoyut = null; runCatching { jpegOkuyucu?.close() }; jpegOkuyucu = null
+        hataGeri("Bu kamera tam sensör çözünürlüğünü uygulamalara vermiyor; ${fotoBoyutlari.firstOrNull()?.let { "%.0f MP".format(it.width * it.height / 1e6) } ?: "en büyük boyut"} çekilecek.")
+        HataKaydi.not("foto", "yüksek çözünürlük kipi kurulamadı"); oturumKur()
+    }
+
     private fun okuyuculariKur() {
         val foto = fotoModu && kaydedici == null
         val fb = if (foto) secilenFotoBoyut() else null
-        if (fb == null || jpegOkuyucu?.let { it.width != fb.width || it.height != fb.height } == true) { runCatching { jpegOkuyucu?.close() }; jpegOkuyucu = null }
-        if (fb != null && jpegOkuyucu == null) jpegOkuyucu = ImageReader.newInstance(fb.width, fb.height, ImageFormat.JPEG, 2)
+        // HEIF: kameranın HEIC boyutlarından seçilene en yakın (büyük kip HEIC vermez)
+        val heif = fb != null && ayar.heif && heifVar
+        val boy = if (!heif) fb else harita?.getOutputSizes(ImageFormat.HEIC)?.sortedByDescending { it.width * it.height }?.let { l -> l.firstOrNull { it.width * it.height <= fb!!.width * fb.height } ?: l.last() }
+        val bicim = if (heif) ImageFormat.HEIC else ImageFormat.JPEG
+        if (boy == null || jpegOkuyucu?.let { it.width != boy.width || it.height != boy.height || it.imageFormat != bicim } == true) { runCatching { jpegOkuyucu?.close() }; jpegOkuyucu = null }
+        if (boy != null && jpegOkuyucu == null) jpegOkuyucu = ImageReader.newInstance(boy.width, boy.height, bicim, 2)
+        fotoHeif = heif; fotoBuyuk = boy != null && !heif && buyukMu(boy)
         val rawIste = foto && ayar.raw && rawVar && !rawDustu
         if (!rawIste) { runCatching { rawOkuyucu?.close() }; rawOkuyucu = null }
         else if (rawOkuyucu == null) harita?.getOutputSizes(ImageFormat.RAW_SENSOR)?.maxByOrNull { it.width * it.height }?.let { rawOkuyucu = ImageReader.newInstance(it.width, it.height, ImageFormat.RAW_SENSOR, 2) }
@@ -491,7 +524,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             cekiliyor = true
             val no = ++cekimNo
             val ad = "UPDATED_" + java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
-            val rr = rawOkuyucu; val yon = cikisYonu()
+            val rr = rawOkuyucu; val yon = cikisYonu(); val heif = fotoHeif; val buyuk = fotoBuyuk
             var bekleyen = if (rr != null) 2 else 1; var hata: String? = null
             var tamam = false
             fun bitti(e: String?) { if (tamam) return; if (e != null && hata == null) hata = e; if (--bekleyen == 0) { tamam = true; cekiliyor = false; sonuc(hata) } }
@@ -503,7 +536,9 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
                 val b0 = try { val buf = img.planes[0].buffer; ByteArray(buf.remaining()).also { buf.get(it) } } catch (e: Exception) { bitti("JPEG: ${e.message}"); null } finally { img.close() }
                 // Renk işleme ve kaydetme kamera iş parçacığının dışında: büyük fotoğrafta önizleme donmasın
                 if (b0 != null) { val isle = jpegIsle; Thread({
-                    val e = try { val b = isle?.invoke(b0) ?: b0; if (kaydet("$ad.jpg", "image/jpeg") { it.write(b) }) null else "JPEG kaydedilemedi." } catch (t: Throwable) { "JPEG: ${t.message}" }
+                    // HEIF dosyası olduğu gibi yazılır (stil yalnız JPEG'e işlenir)
+                    val e = try { if (heif) { if (kaydet("$ad.heic", "image/heic") { it.write(b0) }) null else "HEIF kaydedilemedi." }
+                        else { val b = isle?.invoke(b0) ?: b0; if (kaydet("$ad.jpg", "image/jpeg") { it.write(b) }) null else "JPEG kaydedilemedi." } } catch (t: Throwable) { "Fotoğraf: ${t.message}" }
                     h.post { bitti(e) } }, "foto-kaydet").start() }
             }, h)
             var meta: TotalCaptureResult? = null; var rawImg: Image? = null
@@ -517,12 +552,17 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             rr?.setOnImageAvailableListener({ r -> rawImg = runCatching { r.acquireNextImage() }.getOrNull(); dng() }, h)
             fun cek() = try {
                 val r = c.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                r.addTarget(jr.surface); rr?.let { r.addTarget(it.surface) }; onizleme?.let { r.addTarget(it) }
+                r.addTarget(jr.surface); rr?.let { r.addTarget(it.surface) }
+                // Tam sensör çözünürlüğü: yalnız fotoğraf yüzeyi (önizleme normal kipte kurulu, bu isteğe girmez)
+                if (buyuk && android.os.Build.VERSION.SDK_INT >= 31) r.set(CaptureRequest.SENSOR_PIXEL_MODE, CameraMetadata.SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION)
+                else onizleme?.let { r.addTarget(it) }
                 ayarUygula(r, foto = true)
                 r.set(CaptureRequest.JPEG_ORIENTATION, yon); r.set(CaptureRequest.JPEG_QUALITY, 95.toByte())
                 s.capture(r.build(), object : CameraCaptureSession.CaptureCallback() {
                     override fun onCaptureCompleted(ss: CameraCaptureSession, q: CaptureRequest, t: TotalCaptureResult) { meta = t; if (rr != null) dng() }
-                    override fun onCaptureFailed(ss: CameraCaptureSession, q: CaptureRequest, f: android.hardware.camera2.CaptureFailure) { bekleyen = 1; bitti("Çekim başarısız oldu.") }
+                    override fun onCaptureFailed(ss: CameraCaptureSession, q: CaptureRequest, f: android.hardware.camera2.CaptureFailure) {
+                        bekleyen = 1; bitti(if (buyuk) null else "Çekim başarısız oldu.")
+                        if (buyuk) { h.post { buyuktenDus() } } }
                 }, h)
             } catch (e: Exception) { tamam = true; cekiliyor = false; sonuc(e.message ?: "Çekim başarısız."); HataKaydi.not("foto", e.stackTraceToString()) }
             // Flaş açık/otomatik: önce pozlama ölçümü (ön flaş), ölçüm bitince ya da 1,5 sn sonra çekim
