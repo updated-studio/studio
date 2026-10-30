@@ -12,10 +12,10 @@ on:
   workflow_dispatch:
     inputs:
       is:
-        description: "testflight: yükle · sertifika-olustur: kalıcı imza sertifikası aç (bir kez; sonucu SERTIFIKA_P12 gizli bilgisine yapıştır)"
+        description: "testflight: yükle · sertifika-olustur: kalıcı imza sertifikası aç (bir kez; sonucu SERTIFIKA_P12 gizli bilgisine yapıştır) · uygulama-listele: App Store Connect'teki uygulamaları ve paket kimliklerini göster"
         type: choice
         default: testflight
-        options: [testflight, sertifika-olustur]
+        options: [testflight, sertifika-olustur, uygulama-listele]
 permissions: { contents: read }
 jobs:
   derle:
@@ -96,6 +96,24 @@ jobs:
               -exportPath build/cikti-$S "${YETKI[@]}" | tail -n 40
             echo "::notice title=TestFlight::$S yapı ${{ github.run_number }} yüklendi; Apple işledikten sonra (10-30 dk) TestFlight'ta görünür."
           done
+          rm -f "$ANAHTAR"
+
+  # App Store Connect'teki uygulamalar ve paket kimlikleri (Fatih'e sormadan görmek için; gizli bilgi yazılmaz)
+  uygulamalar:
+    if: github.event_name == 'workflow_dispatch' && inputs.is == 'uygulama-listele'
+    runs-on: macos-15
+    defaults:
+      run: { shell: bash, working-directory: uygulamalar/kamera-ios }
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          ANAHTAR=$(bash scripts/anahtar_yaz.sh) || exit 1
+          python3 -m venv /tmp/asc && /tmp/asc/bin/pip install -q "pyjwt[crypto]"
+          /tmp/asc/bin/python scripts/uygulama_listesi.py "$ANAHTAR"
           rm -f "$ANAHTAR"
 
   # Bir kez: kalıcı imza sertifikası açar (Apple her yüklemede sertifika aç/iptal e-postası göndermesin).
