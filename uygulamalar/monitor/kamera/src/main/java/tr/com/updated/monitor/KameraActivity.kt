@@ -1822,13 +1822,15 @@ class KameraActivity : Activity() {
     }
 
     /** Başlıklı seçenek kapsülleri satırı (KODEK, RENK, GİRİŞ…); seçili sarı, olmayan soluk */
-    private fun cipSatiri(p: LinearLayout, ad: String, l: List<Triple<String, Boolean, (() -> Unit)?>>) {
+    /** Seçenek çipleri; seçilemeyen çip soluk görünür, dokununca `neden`deki açıklama çıkar */
+    private fun cipSatiri(p: LinearLayout, ad: String, l: List<Triple<String, Boolean, (() -> Unit)?>>, neden: Map<String, String> = emptyMap()) {
         val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6f), dp(4f), 0, dp(4f)) }
         s.addView(bolumBasligi(ad), LinearLayout.LayoutParams(dp(84f), -2))
         val sira = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         l.forEach { (yazi, secili, is_) -> sira.addView(etiket(yazi, 13f, secenekYazi(secili)).apply {
             setPadding(dp(12f), 0, dp(12f), 0); alpha = if (is_ == null && !secili) 0.35f else 1f
-            background = secenek(secili); is_?.let { f -> setOnClickListener { f() } } },
+            background = secenek(secili)
+            if (is_ != null) setOnClickListener { is_() } else neden[yazi]?.let { m -> setOnClickListener { tost(m) } } },
             LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
         s.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(sira) }, LinearLayout.LayoutParams(0, -2, 1f))
         p.addView(s)
@@ -1870,11 +1872,14 @@ class KameraActivity : Activity() {
                         val kayitta = kayitSuruyor()
                         fun f(is_: () -> Unit): (() -> Unit)? = if (kayitta) null else ({ is_(); grupAc(Grup.KAYIT) })
                         cipSatiri(ic, "KODEK", listOf(Triple("HEVC", ayar.hevc || ayar.renk == 1, f { ayar.hevc = true; ayarKaydet() }),
-                            Triple("H.264", !ayar.hevc && ayar.renk != 1, if (ayar.renk == 1) null else f { ayar.hevc = false; ayarKaydet() }), Triple("ProRes", false, null)))
+                            Triple("H.264", !ayar.hevc && ayar.renk != 1, if (ayar.renk == 1) null else f { ayar.hevc = false; ayarKaydet() })),
+                            mapOf("H.264" to "HDR yalnız HEVC ile kaydedilir. H.264 için önce RENK'ten SDR'yi seç."))
                         cipSatiri(ic, "RENK", listOf(Triple("SDR", ayar.renk != 1, f { ayar.renk = 0; ayarKaydet(); oturumuYenile() }),
-                            Triple("HDR", ayar.renk == 1 && k.hdrVar, if (k.hdrVar) f { ayar.renk = 1; ayarKaydet(); oturumuYenile() } else null), Triple("LOG", false, null)))
+                            Triple("HDR", ayar.renk == 1 && k.hdrVar, if (k.hdrVar) f { ayar.renk = 1; ayarKaydet(); oturumuYenile() } else null)),
+                            mapOf("HDR" to "Bu telefonun kamerası 10 bit HDR (HLG) vermiyor."))
                         cipSatiri(ic, "SABİTLEME", listOf(0 to "Kapalı", 1 to "Standart", 2 to "Sinematik").map { (i, ad) ->
-                            Triple(ad, ayar.sabit == i, if (i in k.sabitlemeler) f { ayar.sabit = i; ayarKaydet(); k.ayarDegisti() } else null) })
+                            Triple(ad, ayar.sabit == i, if (i in k.sabitlemeler) f { ayar.sabit = i; ayarKaydet(); k.ayarDegisti() } else null) },
+                            mapOf("Standart" to "Bu kamerada sabitleme yok.", "Sinematik" to "Bu kamerada sinematik sabitleme yok."))
                     }
                     val l = ArrayList<Oge>()
                     if (mod != KMod.PRO) l.add(Oge(if (ayar.flas == 0) R.drawable.ic_flas_yok else R.drawable.ic_flas, null, "Flaş", listOf("Kapalı", "Oto", "Açık", "Fener")[ayar.flas.coerceIn(0, 3)], ayar.flas > 0) { flasDegistir(); grupAc(Grup.KAYIT) })
