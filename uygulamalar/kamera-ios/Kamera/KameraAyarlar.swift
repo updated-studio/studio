@@ -6,10 +6,8 @@ import SwiftUI
 struct KameraAyarlar: View {
     @ObservedObject var kamera: Kamera
     var wifiKamera: () -> Void
-    var masa: () -> Void
     var vlog: () -> Void = {}
     @Environment(\.dismiss) private var kapat
-    @State private var girisSor = UserDefaults.standard.string(forKey: "giris") == nil
 
     var body: some View {
         NavigationStack {
@@ -46,7 +44,7 @@ struct KameraAyarlar: View {
                         .foregroundStyle(.white)
                 } footer: { Text("Arka ve ön kamera aynı anda; ön kamera köşede. Arka, ön ve birleşik görüntü ayrı dosyalara.") }
                 Section {
-                    NavigationLink { masaBolum } label: { satir("rectangle.split.2x2", .teal, "Multi Cam", "") }
+                    NavigationLink { masaBolum } label: { satir("rectangle.split.2x2", .teal, "Multi Cam'e bağlan", "") }
                     NavigationLink { uygulama } label: { satir("info.circle", .gray, "Uygulama", KameraAyarlar.surum) }
                 }
             }
@@ -204,26 +202,22 @@ struct KameraAyarlar: View {
         List {
             Section {
                 Button { kapat(); wifiKamera() } label: { Label("Wi-Fi kamera ol", systemImage: "wifi") }
-            } footer: { Text("Bu telefonun görüntüsü aynı Wi-Fi'daki masaya gider; masa kendiliğinden bulur.") }
+            } footer: { Text("Bu telefonun görüntüsü aynı Wi-Fi'daki UpCam Studio'ya (Multi Cam) kaynak olarak gider; kendiliğinden bulunur.") }
             Section {
                 NavigationLink { Insta360Deneme() } label: { Label("Insta360 kamerayı dene (Wi-Fi)", systemImage: "camera.metering.center.weighted") }
             } footer: { Text("Luna, X ve GO serisi: telefon kameranın kendi Wi-Fi'ına bağlıyken canlı görüntüyü doğrudan alır. Deneme aşamasında.") }
             Section {
                 EkranGonderDugme()
             } footer: { Text("Ekranda ne varsa masaya kaynak olarak gider. Kendi görüntü çıkışı olmayan kameralar (ör. Insta360 Luna Ultra) için: kameranın uygulamasını açıp önizlemeyi tam ekran yap, sonra buradan başlat. Durdurmak için üstteki kırmızı göstergeye dokun.") }
-            Button { kapat(); masa() } label: { Label("Bu cihazı masa yap", systemImage: "rectangle.split.2x2") }
         }
-        .navigationTitle("Masa")
+        .navigationTitle("Multi Cam")
     }
 
     private var uygulama: some View {
         List {
             Section {
-                Toggle("Açılışta Kamera / Monitör / Masa sor", isOn: $girisSor)
-                    .onChange(of: girisSor) { _, acik in
-                        if acik { UserDefaults.standard.removeObject(forKey: "giris") } else { UserDefaults.standard.set("kamera", forKey: "giris") }
-                    }
-            } footer: { Text("UPDATED Kamera \(KameraAyarlar.surum) · güncellemeler TestFlight'tan kendiliğinden gelir.") }
+                LabeledContent("Sürüm", value: KameraAyarlar.surum)
+            } footer: { Text("Multi Cam ve Monitör artık UpCam Studio uygulamasında. Güncellemeler TestFlight'tan kendiliğinden gelir.") }
         }
         .navigationTitle("Uygulama")
     }

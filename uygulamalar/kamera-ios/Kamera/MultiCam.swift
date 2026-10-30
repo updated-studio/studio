@@ -1,7 +1,7 @@
 import PhotosUI
 import SwiftUI
 
-// UpCam Studio Multi Cam arayüzü (Fatih 30 Ekim 03:12 "menü tasarımı çok vasat, komple elden geçir"; tasarım/upcam-studio, öneri 1 "yan raylar").
+// UpCam Studio Multi Cam arayüzü (Fatih 30 Ekim 03:12 "menü tasarımı çok vasat, komple elden geçir"; tasarım/upcam-studio, iPhone'da "Ninja" düzeni, Fatih 30 Ekim 08:24).
 // Kamera uygulamasının dili: görüntü tam ekran, denetimler kenarlarda; tablo rakamları, yarı saydam siyah yüzey + yarım piksel hat;
 // sarı yalnız seçili/elle değişen, kırmızı canlı ve kayıt, yeşil sıradaki. Kaynağa dokun → sıradaki (yeşil); sıradakine bir daha dokun ya da
 // AUTO → seçili geçişle canlı; CUT → hemen canlı. Basılı tut → menü.
@@ -225,16 +225,20 @@ struct McBildirim: View {
 
 // MARK: - iPhone
 
-/// iPhone Multi Cam: yatayda yan raylar (solda kaynaklar, sağda ⋯ CUT REC AUTO), dikeyde üstte program, altta kaynaklar ve denetimler
+/// iPhone Multi Cam, "Ninja" düzeni (Fatih 30 Ekim 08:24, tasarim/upcam-studio/2 · 2): üstte değer hücreleri (dokun → o ayar),
+/// ortada program, altta kaynaklar ve araçlar. Dikeyde hücreler iki satır, kaynaklar 2×2.
 struct MultiCamTelefon: View {
     @ObservedObject var m: Masa
     var kapat: () -> Void
     @Binding var kaynakAcik: Bool
     @State private var panelAcik = false
+    @State private var klasorAcik = false
+
+    private static let serit = Color(red: 10 / 255, green: 10 / 255, blue: 12 / 255).opacity(0.86)
 
     var body: some View {
         GeometryReader { g in
-            if g.size.width > g.size.height { yatay(g.size) } else { dikey }
+            if g.size.width > g.size.height { yatay } else { dikey }
         }
         .background(Color.black.ignoresSafeArea())
         .foregroundStyle(.white)
@@ -248,65 +252,176 @@ struct MultiCamTelefon: View {
             .presentationBackground(.ultraThinMaterial)
             .preferredColorScheme(.dark)
         }
+        .sheet(isPresented: $klasorAcik) { KlasorSecici { m.klasor.sec($0) }.ignoresSafeArea() }
+        .onAppear { m.klasor.guncelle() }
     }
 
-    private func yatay(_ boyut: CGSize) -> some View {
-        ZStack {
-            program
-            HStack(spacing: 0) {
-                VStack(spacing: 7) {
-                    geri
-                    Spacer(minLength: 0)
-                    kaynaklar(kucuk: true)
-                    Spacer(minLength: 0)
-                }
-                .frame(width: 118)
-                Spacer()
-                VStack(spacing: 16) {
-                    Spacer()
-                    Button { panelAcik = true } label: { Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold)).frame(width: 40, height: 40).yuvarlakYuzey() }
-                    GecisDugmesi(ad: "CUT", dolu: true) { m.gec(otomatik: false) }
-                    McKayitDugmesi(m: m, boyut: 58)
-                    GecisDugmesi(ad: "AUTO", ilerleme: m.gecisIlerleme) { m.gec(otomatik: true) }
-                    Spacer()
-                }
-                .frame(width: 70)
+    // MARK: düzenler
+
+    private var yatay: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) { geri; hucreler }
+                .frame(height: 46)
+                .background(Self.serit)
+                .overlay(alignment: .bottom) { Rectangle().fill(Tema.hat).frame(height: 0.5) }
+            ZStack(alignment: .top) {
+                program
+                McBildirim(m: m).padding(.top, 8)
             }
-            .padding(.vertical, 10)
-            VStack {
-                OkumaSeridi(m: m)
-                McBildirim(m: m)
-                Spacer()
-                DuzenSeridi(m: m)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 6) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) { kaynakHucreleri.frame(height: 58) }
+                }
+                araclar
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 130)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .frame(height: 74)
+            .background(Self.serit)
+            .overlay(alignment: .top) { Rectangle().fill(Tema.hat).frame(height: 0.5) }
         }
     }
 
     private var dikey: some View {
-        VStack(spacing: 12) {
-            HStack {
-                geri
-                Spacer()
-                Button { panelAcik = true } label: { Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold)).frame(width: 36, height: 36).yuvarlakYuzey() }
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                HStack(spacing: 0) { geri; hucre("KAYIT", kayit: true) { kayitDegeri }; hucre("CANLI") { Text(canliAdi) } }
+                    .frame(height: 46)
+                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 0.5)
+                HStack(spacing: 0) { gecisHucresi; duzenHucresi; ssdHucresi }
+                    .frame(height: 46)
             }
-            OkumaSeridi(m: m)
-            program.aspectRatio(16 / 9, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(m.canli == nil ? Tema.hat : MC.kirmizi, lineWidth: m.canli == nil ? 0.5 : 2))
-            McBildirim(m: m)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) { kaynakHucreleri(kucuk: false) }
+            .background(Self.serit)
+            .overlay(alignment: .bottom) { Rectangle().fill(Tema.hat).frame(height: 0.5) }
+            ZStack(alignment: .top) {
+                program.aspectRatio(16 / 9, contentMode: .fit)
+                McBildirim(m: m).padding(.top, 8)
+            }
+            .overlay(alignment: .bottom) { Rectangle().fill(m.canli == nil ? .clear : MC.kirmizi).frame(height: 2) }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) { kaynakHucreleri }
+                .padding(12)
             Spacer(minLength: 0)
-            DuzenSeridi(m: m)
-            HStack(spacing: 34) {
-                GecisDugmesi(ad: "CUT", dolu: true) { m.gec(otomatik: false) }
-                McKayitDugmesi(m: m, boyut: 70)
-                GecisDugmesi(ad: "AUTO", ilerleme: m.gecisIlerleme) { m.gec(otomatik: true) }
-            }
-            .padding(.bottom, 6)
+            HStack(spacing: 6) { araclar }
+                .padding(.horizontal, 12).padding(.vertical, 10)
+                .background(Self.serit)
+                .overlay(alignment: .top) { Rectangle().fill(Tema.hat).frame(height: 0.5) }
         }
-        .padding(.horizontal, 14)
+    }
+
+    // MARK: üst hücreler
+
+    private var hucreler: some View {
+        HStack(spacing: 0) {
+            hucre("KAYIT", kayit: true) { kayitDegeri }.frame(maxWidth: 124)
+            hucre("CANLI") { Text(canliAdi) }
+            gecisHucresi
+            duzenHucresi
+            hucre("PROGRAM") { Text(m.duzenAdet > 0 ? "4K" : "HD") }
+            ssdHucresi
+        }
+    }
+
+    private var canliAdi: String { m.yuvalar.first { $0.id == m.canli }?.ad ?? "—" }
+
+    @ViewBuilder private var kayitDegeri: some View {
+        if m.kayitta, let bas = m.kayitBasi {
+            TimelineView(.periodic(from: bas, by: 1)) { an in Text("● " + MC.sure(an.date.timeIntervalSince(bas))) }
+        } else {
+            Text("HAZIR").foregroundStyle(Tema.ikincil)
+        }
+    }
+
+    private var gecisHucresi: some View {
+        Menu {
+            Picker("Geçiş", selection: $m.gecis) { ForEach(Masa.Gecis.allCases) { Text($0.ad).tag($0) } }
+            Picker("Süre", selection: $m.gecisSure) { ForEach(Masa.gecisSureleri, id: \.self) { Text(MC.saniye($0)).tag($0) } }
+        } label: {
+            hucre("GEÇİŞ") { Text("\(m.gecis.ad) \(MC.saniye(m.gecisSure).replacingOccurrences(of: " sn", with: ""))").foregroundStyle(Tema.sari) }
+        }
+    }
+
+    private var duzenHucresi: some View {
+        Menu {
+            Picker("Düzen", selection: $m.duzen) { ForEach(Masa.Duzen.allCases) { Text($0.ad).tag($0) } }
+            Toggle("PiP (resim içinde resim)", isOn: $m.pip)
+        } label: {
+            hucre("DÜZEN") { Text(m.duzen == .oto ? (m.duzenAdet == 0 ? "OTO · TEK" : "OTO · \(m.duzenAdet)") : m.duzen.ad.uppercased(with: Locale(identifier: "tr"))) + Text(m.pip ? " +PiP" : "").foregroundColor(Tema.sari) }
+        }
+    }
+
+    private var ssdHucresi: some View {
+        Button { klasorAcik = true } label: {
+            hucre("SSD") {
+                if let ad = m.klasor.ad {
+                    Text(m.klasor.takili ? (m.klasor.bosAlan.map { KayitKlasoru.boyutYazisi($0) } ?? ad) : "YOK").foregroundStyle(m.klasor.takili ? .white : .orange)
+                } else {
+                    Text("SEÇ").foregroundStyle(Tema.ikincil)
+                }
+            }
+        }
+        .disabled(m.kayitta)
+        .contextMenu { if m.klasor.ad != nil { Button(role: .destructive) { m.klasor.sil() } label: { Label("Klasörü kaldır (Fotoğraflar'a kaydet)", systemImage: "xmark") } } }
+    }
+
+    /// Ninja hücresi: küçük büyük harf etiket + yarı kalın değer; sağda ince ayraç
+    private func hucre<V: View>(_ etiket: String, kayit: Bool = false, @ViewBuilder _ deger: () -> V) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(etiket).font(.system(size: 8.5, weight: .semibold)).tracking(1).foregroundStyle(.white.opacity(0.42))
+            deger().font(.system(size: 14, weight: .semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.7)
+                .foregroundStyle(kayit && m.kayitta ? MC.kirmizi : .white)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(kayit && m.kayitta ? MC.kirmizi.opacity(0.14) : .clear)
+        .overlay(alignment: .trailing) { Rectangle().fill(Color.white.opacity(0.08)).frame(width: 0.5) }
+        .contentShape(Rectangle())
+    }
+
+    private var geri: some View {
+        Button(action: kapat) {
+            Image(systemName: "chevron.left").font(.system(size: 15, weight: .semibold))
+                .frame(width: 46).frame(maxHeight: .infinity)
+                .overlay(alignment: .trailing) { Rectangle().fill(Color.white.opacity(0.08)).frame(width: 0.5) }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(m.kayitta)
+        .opacity(m.kayitta ? 0.35 : 1)
+        .accessibilityLabel(Uygulama.geri)
+    }
+
+    // MARK: alt şerit
+
+    /// Sağdaki araçlar: KATMAN (PiP/logo/alt yazı/FTB), MENÜ, CUT, AUTO, kayıt
+    private var araclar: some View {
+        HStack(spacing: 6) {
+            arac("KATMAN", "square.3.layers.3d", secili: m.logoAcik || m.altYaziAcik || m.karartma || m.pip) { panelAcik = true }
+            arac("FTB", "moon.fill", secili: m.karartma) { m.karartma.toggle() }
+            Spacer(minLength: 0)
+            arac("CUT", nil, dolu: true) { m.gec(otomatik: false) }
+            arac("AUTO", nil, ilerleme: m.gecisIlerleme) { m.gec(otomatik: true) }
+            McKayitDugmesi(m: m, boyut: 54).padding(.leading, 4)
+        }
+    }
+
+    private func arac(_ ad: String, _ simge: String?, secili: Bool = false, dolu: Bool = false, ilerleme: Double? = nil, eylem: @escaping () -> Void) -> some View {
+        Button(action: eylem) {
+            VStack(spacing: 5) {
+                if let simge { Image(systemName: simge).font(.system(size: 14, weight: .medium)) }
+                Text(ad).font(.system(size: simge == nil ? 12 : 9, weight: .bold)).tracking(0.8)
+            }
+            .foregroundStyle(dolu ? .black : (secili ? Tema.sari : .white.opacity(0.85)))
+            .frame(width: 56, height: 58)
+            .background(
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(dolu ? Color.white : Color.white.opacity(0.04))
+                    if let ilerleme { Rectangle().fill(Tema.sari.opacity(0.45)).frame(width: 56 * ilerleme) }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(secili ? Tema.sari.opacity(0.5) : Tema.hat, lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
     }
 
     private var program: some View {
@@ -328,25 +443,11 @@ struct MultiCamTelefon: View {
         }
     }
 
-    private var geri: some View {
-        Button(action: kapat) {
-            HStack(spacing: 4) { Image(systemName: "chevron.left"); Text(Uygulama.geri) }
-                .font(.system(size: 12, weight: .semibold))
-                .padding(.horizontal, 10).frame(height: 30).yuzey(15)
-        }
-        .disabled(m.kayitta)
-        .opacity(m.kayitta ? 0.4 : 1)
-    }
-
-    private func kaynaklar(kucuk: Bool) -> some View {
-        VStack(spacing: 7) { kaynakHucreleri(kucuk: kucuk) }
-    }
-
-    @ViewBuilder private func kaynakHucreleri(kucuk: Bool) -> some View {
+    @ViewBuilder private var kaynakHucreleri: some View {
         ForEach(0..<Masa.enCok, id: \.self) { i in
             if i < m.yuvalar.count {
                 let y = m.yuvalar[i]
-                KaynakKutu(y: y, no: i + 1, canli: y.id == m.canli, sirada: y.id == m.siradaki, kayitBasi: m.kayitBasi, kucuk: kucuk)
+                KaynakKutu(y: y, no: i + 1, canli: y.id == m.canli, sirada: y.id == m.siradaki, kayitBasi: m.kayitBasi, kucuk: true)
                     .modifier(KaynakDokunus(m: m, y: y))
             } else if i == m.yuvalar.count {
                 BosKaynak(no: i + 1) { kaynakAcik = true }

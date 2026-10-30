@@ -30,7 +30,8 @@ struct AnaEkran: View {
     @State private var arayuz: UIInterfaceOrientation = .portrait
     @State private var yardim = false
     @State private var ayarlar = false
-    @State private var giris = !GirisEkran.soruldu && UserDefaults.standard.string(forKey: "giris") == nil
+    /// Masa ve Monitör UpCam Studio'da (Fatih 30 Ekim 08:24 "Kaldır"); Kamera doğrudan açılır, açılış sorusu yok
+    @State private var giris = false
     /// Masa (çok kamera), Wi-Fi kamera ya da Monitör açıkken ana kamera durur
     @State private var ekran: Ekran?
     enum Ekran: String, Identifiable { case masa, wifi, monitor, vlog; var id: String { rawValue } }
@@ -67,9 +68,6 @@ struct AnaEkran: View {
             .onChange(of: g.size) { _, _ in yonBildir() }
         }
         .onAppear {
-            if !GirisEkran.soruldu, let g = UserDefaults.standard.string(forKey: "giris"), g == "monitor" || g == "masa" {
-                GirisEkran.soruldu = true; ekran = g == "masa" ? .masa : .monitor
-            }
             if ekran == nil { kamera.baslat() }
         }
         .onChange(of: evre) { _, yeni in
@@ -90,7 +88,7 @@ struct AnaEkran: View {
             }
         }
         .sheet(isPresented: $ayarlar) {
-            KameraAyarlar(kamera: kamera, wifiKamera: { ekranAc(.wifi) }, masa: { ekranAc(.masa) }, vlog: { ekranAc(.vlog) })
+            KameraAyarlar(kamera: kamera, wifiKamera: { ekranAc(.wifi) }, vlog: { ekranAc(.vlog) })
         }
     }
 
@@ -307,7 +305,6 @@ struct AnaEkran: View {
 
     private var ustDugmeler: some View {
         HStack(spacing: 10) {
-            kucukDaire("display", renk: AnaEkran.mavi, aciklama: "Monitör (harici kamera)") { monitoreGec() }
             Button { withAnimation(.easeOut(duration: 0.15)) { yardim.toggle() } } label: {
                 Text("?").font(.system(size: 14, weight: .bold))
                     .foregroundStyle(yardim ? Tema.sari : .white)
@@ -656,7 +653,6 @@ struct AnaEkran: View {
                         }
                         .id(m.rawValue)
                     }
-                    modDugme(dikey ? "MON." : "MONİTÖR", secili: false, renk: AnaEkran.mavi) { monitoreGec() }
                     if !dikey { Color.clear.frame(width: max(0, genislik / 2 - 60), height: 1) }
                 }
                 .padding(dikey ? .vertical : .horizontal, 6)
@@ -814,7 +810,6 @@ struct AnaEkran: View {
                             kamera.zamanlayici = kamera.zamanlayici == 0 ? 3 : (kamera.zamanlayici == 3 ? 10 : 0)
                         }
                     }
-                    kontrol("display", "Monitör", "Harici", etkin: false) { monitoreGec() }
                     kontrol("gearshape", "Ayarlar", "Tümü", etkin: false) { panel = nil; ayarlar = true }
                 }
             }
@@ -879,7 +874,6 @@ struct AnaEkran: View {
                     }
                 }
                 HStack(spacing: 10) {
-                    kucukGecis("display", "Monitör") { monitoreGec() }
                     kucukGecis("gearshape", "Genel Ayarlar") { panel = nil; ayarlar = true }
                 }
             }
