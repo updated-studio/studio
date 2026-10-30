@@ -150,19 +150,25 @@ struct AnaEkran: View {
                 if panel == nil {
                     if let f = acikSatir { FavoriSatir(f: f, kamera: kamera).padding(.bottom, 14) } else { mercekler(dikey: false).padding(.bottom, 20) }
                 }
-                HStack {
+                // Apple Kamera gibi: mod şeridi tam genişlikte (VLOG dahil hepsi okunur), altında son çekim · deklanşör · ön/arka
+                if panel == nil {
+                    modSecici(dikey: false, genislik: g.size.width).padding(.bottom, 8)
+                }
+                HStack(spacing: 0) {
+                    sonCekim
+                    Spacer()
                     solDugme
                     Spacer()
                     deklansor
                     Spacer()
                     kontrolDugme
+                    Spacer()
+                    cevirDugme
                 }
-                .padding(.horizontal, 36)
-                .padding(.bottom, 16)
+                .padding(.horizontal, 20)
+                .padding(.bottom, panel == nil ? 14 : 10)
                 if let p = panel {
                     panelKabi(p, enYuksek: g.size.height * 0.48)
-                } else {
-                    altBant(genislik: g.size.width).frame(height: alt)
                 }
             }
         }
@@ -393,7 +399,8 @@ struct AnaEkran: View {
     @ViewBuilder private var sabitler: some View {
         if !duzenleme, !kamera.favoriler.isEmpty {
             HStack(spacing: 6) {
-                ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) }) { f in
+                // Biçim zaten sağ üstte (simgeli); burada tekrarlanmaz
+                ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && $0 != .cozunurluk }) { f in
                     Button { kisayolDokun(f) } label: { SabitKapsul(f: f, kamera: kamera) }
                         .buttonStyle(.plain)
                         .sabitlenebilir(f, kamera) { ayrintiAc(f) }
@@ -636,15 +643,6 @@ struct AnaEkran: View {
 
     // MARK: alt bant
 
-    private func altBant(genislik: CGFloat) -> some View {
-        HStack(spacing: 10) {
-            sonCekim
-            modSecici(dikey: false, genislik: genislik - 160)
-            cevirDugme
-        }
-        .padding(.horizontal, 14)
-    }
-
     private var sonCekim: some View {
         Button {
             if let u = URL(string: "photos-redirect://") { UIApplication.shared.open(u) }
@@ -697,8 +695,8 @@ struct AnaEkran: View {
             .onChange(of: kamera.mod) { _, m in withAnimation { kaydir.scrollTo(m.rawValue, anchor: .center) } }
         }
         return icerik
-            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.14),
-                                         .init(color: .black, location: 0.86), .init(color: .clear, location: 1)],
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: dikey ? 0.14 : 0.06),
+                                         .init(color: .black, location: dikey ? 0.86 : 0.94), .init(color: .clear, location: 1)],
                                  startPoint: dikey ? .top : .leading, endPoint: dikey ? .bottom : .trailing))
             .frame(width: dikey ? 76 : nil, height: dikey ? 230 : 42)
             .disabled(kamera.proCalisiyor)

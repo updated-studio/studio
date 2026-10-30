@@ -30,21 +30,35 @@ struct HizliBicim: View {
         let id: String
         let yazi: String
         var simge: String? = nil
+        /// Yazının önündeki küçük simge (Fatih 30 Ekim 13:38: "seçilen ayarları okunaklı, simgelerle")
+        var onSimge: String? = nil
+        var baslik = ""
         let secenekler: [Secenek]
+        /// Sabit genişlik: değer değişince kapsül ve yanındakiler kaymaz (Fatih 30 Ekim 13:38)
+        var genislik: CGFloat {
+            switch id {
+            case "mp": return 76
+            case "bicim": return 70
+            case "zaman": return 58
+            case "coz": return 44
+            case "fps": return 38
+            default: return 38
+            }
+        }
     }
 
     private var parcalar: [ParcaVeri] {
         let k = kamera
         switch k.mod {
         case .video, .timelapse:
-            var l = [ParcaVeri(id: "coz", yazi: HizliBicim.cozAd(k.videoYukseklik), secenekler: k.videoSecenekleri.map { h in
+            var l = [ParcaVeri(id: "coz", yazi: HizliBicim.cozAd(k.videoYukseklik), baslik: "Çözünürlük", secenekler: k.videoSecenekleri.map { h in
                 Secenek(ad: HizliBicim.cozAd(h), secili: k.videoYukseklik == h) { k.videoYukseklik = h }
             })]
             if k.mod == .video {
-                l.append(ParcaVeri(id: "fps", yazi: "\(k.videoFps)", secenekler: k.videoFpsler.map { f in
+                l.append(ParcaVeri(id: "fps", yazi: "\(k.videoFps)", baslik: "Kare hızı", secenekler: k.videoFpsler.map { f in
                     Secenek(ad: "\(f) kare/sn", secili: k.videoFps == f) { k.videoFps = f }
                 }))
-                l.append(ParcaVeri(id: "sab", yazi: "", simge: HizliBicim.sabitlemeSimge(k.etkinSabitleme), secenekler: k.sabitlemeler.map { s in
+                l.append(ParcaVeri(id: "sab", yazi: "", simge: HizliBicim.sabitlemeSimge(k.etkinSabitleme), baslik: "Sabitleme", secenekler: k.sabitlemeler.map { s in
                     Secenek(ad: s.ad, secili: k.sabitleme == s) { k.sabitleme = s }
                 }))
             }
@@ -53,13 +67,19 @@ struct HizliBicim: View {
             // Fotoğraf: çözünürlük (12 MP ve üstü) · biçim (HEIF / JPEG / RAW); video ayarları burada görünmez
             var l: [ParcaVeri] = []
             if !k.fotoBoyutlari.isEmpty {
-                l.append(ParcaVeri(id: "mp", yazi: k.fotoBoyut.map { HizliBicim.mpAd($0) } ?? "", secenekler: k.fotoBoyutlari.map { b in
+                l.append(ParcaVeri(id: "mp", yazi: k.fotoBoyut.map { HizliBicim.mpAd($0) } ?? "", onSimge: "camera.aperture", baslik: "Çözünürlük", secenekler: k.fotoBoyutlari.map { b in
                     Secenek(ad: KameraAyarlar.mp(b), secili: k.fotoBoyut.map { $0.width == b.width && $0.height == b.height } ?? false) { k.fotoBoyutSec(b) }
                 }))
             }
-            l.append(ParcaVeri(id: "bicim", yazi: k.fotoBicim.rawValue, secenekler: k.fotoBicimleri.map { f in
-                Secenek(ad: f.rawValue, secili: k.fotoBicim == f) { k.fotoBicim = f }
+            l.append(ParcaVeri(id: "bicim", yazi: k.fotoBicim.rawValue, onSimge: k.fotoBicim == .raw ? "r.square" : "photo", baslik: "Biçim", secenekler: k.fotoBicimleri.map { f in
+                Secenek(ad: "\(f.rawValue) · \(f.aciklama)", secili: k.fotoBicim == f) { k.fotoBicim = f }
             }))
+            if k.mod != .pro {
+                l.append(ParcaVeri(id: "zaman", yazi: k.zamanlayici > 0 ? "\(k.zamanlayici) sn" : "", simge: k.zamanlayici > 0 ? nil : "timer",
+                                   onSimge: k.zamanlayici > 0 ? "timer" : nil, baslik: "Zamanlayıcı", secenekler: [0, 3, 10].map { z in
+                    Secenek(ad: z == 0 ? "Kapalı" : "\(z) sn", secili: k.zamanlayici == z) { k.zamanlayici = z }
+                }))
+            }
             return l
         }
     }
@@ -78,38 +98,40 @@ struct HizliBicim: View {
         }
     }
 
-    /// Tek değer: dokun / kaydır / basılı tut
+    /// Tek değer: dokun = sıradaki, sağa/sola kaydır = sonraki/önceki, basılı tut = aşağı açılan menü (seçenekler + Ayrıntılı…)
     private struct Parca: View {
         let p: ParcaVeri
         var ayrinti: () -> Void
 
         var body: some View {
-            Group {
-                if let s = p.simge {
-                    Image(systemName: s).font(.system(size: 13, weight: .semibold)).contentTransition(.symbolEffect(.replace))
-                } else {
-                    Text(p.yazi).font(.system(size: 14, weight: .semibold).monospacedDigit()).tracking(0.3).contentTransition(.numericText())
+            Menu {
+                Section(p.baslik) {
+                    ForEach(Array(p.secenekler.enumerated()), id: \.offset) { _, s in
+                        Button(action: s.sec) { if s.secili { Label(s.ad, systemImage: "checkmark") } else { Text(s.ad) } }
+                    }
                 }
-            }
-            .lineLimit(1)
-            .padding(.horizontal, 10).frame(minWidth: 36).frame(height: 34)
-            .contentShape(Rectangle())
-            .onTapGesture { kaydir(1) }
-            .gesture(DragGesture(minimumDistance: 14).onEnded { d in
+                Button(action: ayrinti) { Label("Ayrıntılı…", systemImage: "slider.horizontal.3") }
+            } label: {
+                HStack(spacing: 5) {
+                    if let o = p.onSimge { Image(systemName: o).font(.system(size: 11, weight: .semibold)).opacity(0.85) }
+                    if let s = p.simge {
+                        Image(systemName: s).font(.system(size: 13, weight: .semibold)).contentTransition(.symbolEffect(.replace))
+                    } else {
+                        Text(p.yazi).font(.system(size: 14, weight: .semibold).monospacedDigit()).tracking(0.3).contentTransition(.numericText())
+                    }
+                }
+                .lineLimit(1).minimumScaleFactor(0.8)
+                .frame(width: p.genislik, height: 34)
+                .contentShape(Rectangle())
+            } primaryAction: { kaydir(1) }
+            .menuOrder(.fixed)
+            .foregroundStyle(Tema.sari)
+            .simultaneousGesture(DragGesture(minimumDistance: 14).onEnded { d in
                 guard abs(d.translation.width) > abs(d.translation.height) else { return }
                 kaydir(d.translation.width < 0 ? 1 : -1)
             })
-            .contextMenu {
-                ForEach(Array(p.secenekler.enumerated()), id: \.offset) { _, s in
-                    Button(action: s.sec) { if s.secili { Label(s.ad, systemImage: "checkmark") } else { Text(s.ad) } }
-                }
-                Divider()
-                Button(action: ayrinti) { Label("Ayrıntılı…", systemImage: "slider.horizontal.3") }
-            }
-            .accessibilityElement()
-            .accessibilityLabel(p.secenekler.first { $0.secili }?.ad ?? p.yazi)
-            .accessibilityHint("Dokun: sıradaki")
-            .accessibilityAction { kaydir(1) }
+            .accessibilityLabel("\(p.baslik): \(p.secenekler.first { $0.secili }?.ad ?? p.yazi)")
+            .accessibilityHint("Dokun: sıradaki; basılı tut: seçenekler")
         }
 
         private func kaydir(_ adim: Int) {
