@@ -83,7 +83,7 @@ struct KameraAyarlar: View {
                     Text("Durum")
                     Spacer()
                     if let ad = kamera.ssd.ad {
-                        Text(kamera.ssd.bosAlan.map { "\(ad) · \(HariciDisk.boyutYazisi($0)) boş" } ?? ad).foregroundStyle(kamera.ssd.izin ? .secondary : .orange)
+                        Text(kamera.ssd.bosAlan.map { "\(ad) · \(HariciDisk.boyutYazisi($0)) boş" } ?? ad).foregroundStyle(kamera.ssd.izin ? Color.secondary : Color.orange)
                     } else { Text("Takılı değil").foregroundStyle(.secondary) }
                 }
                 if kamera.ssd.takili, !kamera.ssd.izin { Text("Harici disk izni verilmedi; iPhone sorunca İzin Ver'e dokunun.").font(.footnote).foregroundStyle(.orange) }
