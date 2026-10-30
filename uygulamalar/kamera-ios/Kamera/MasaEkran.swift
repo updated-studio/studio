@@ -57,6 +57,7 @@ struct MasaEkran: View {
             .disabled(m.kayitta)
             Text("MASA").font(.footnote.weight(.heavy)).foregroundStyle(Tema.vurgu)
             SsdCipi(k: m.klasor, kilitli: m.kayitta)
+            DuzenSecici(m: m)
             if m.kayitta, let bas = m.kayitBasi {
                 TimelineView(.periodic(from: bas, by: 1)) { an in
                     Label(sure(an.date.timeIntervalSince(bas)), systemImage: "record.circle.fill")

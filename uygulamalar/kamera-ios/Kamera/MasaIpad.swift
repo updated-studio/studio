@@ -48,6 +48,7 @@ struct MasaIpad: View {
                 Button(action: kapat) { Label("Kamera", systemImage: "chevron.left").font(.body.weight(.semibold)) }
                     .disabled(m.kayitta)
                 SsdCipi(k: m.klasor, kilitli: m.kayitta)
+                DuzenSecici(m: m)
                 Spacer()
                 Toggle(isOn: $hizli) { Text("Hızlı geçiş").font(.subheadline) }
                     .toggleStyle(.switch).tint(MasaIpad.yesil).fixedSize()
@@ -275,5 +276,25 @@ struct SsdCipi: View {
         .sheet(isPresented: $secimAcik) { KlasorSecici { k.sec($0) }.ignoresSafeArea() }
         .onAppear { k.guncelle() }
         .accessibilityLabel("Kayıt klasörü")
+    }
+}
+
+/// Program düzeni: Oto · Tek · 2'li · 3'lü · 2×2 (dizili düzende program 4K tuvaldir, kaynaklar tam boyutuyla oturur)
+struct DuzenSecici: View {
+    @ObservedObject var m: Masa
+
+    var body: some View {
+        Menu {
+            Picker("Düzen", selection: $m.duzen) { ForEach(Masa.Duzen.allCases) { Text($0.ad).tag($0) } }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: m.duzenAdet == 0 ? "rectangle" : "square.grid.2x2")
+                Text(m.duzen == .oto ? "Oto · \(m.duzenAdet == 0 ? "Tek" : "\(m.duzenAdet) kaynak")" : m.duzen.ad)
+            }
+            .font(.footnote.weight(.semibold))
+            .padding(.horizontal, 12).frame(height: 32)
+            .yuzey(9)
+        }
+        .accessibilityLabel("Program düzeni")
     }
 }

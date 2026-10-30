@@ -118,6 +118,44 @@ final class Masa: NSObject, ObservableObject {
     /// Kayıttaki dosyalar, ör. "3 KAMERA + PROGRAM"
     @Published var kayitOzeti = ""
     let klasor = KayitKlasoru()
+    /// Program düzeni (Fatih 29 Ekim gece: Masa kurgu masası gibi): Tek = canlı kaynak; 2/3/4'lü = kaynaklar 4K tuvale tam boyutuyla dizilir;
+    /// Oto = kaynak sayısına göre. Kayıt sürerken değiştirilebilir; program dosyası bu düzeni yazar
+    @Published var duzen = Duzen(rawValue: UserDefaults.standard.string(forKey: "masa.duzen") ?? "") ?? .oto {
+        didSet { UserDefaults.standard.set(duzen.rawValue, forKey: "masa.duzen"); duzenDegisti() }
+    }
+    enum Duzen: String, CaseIterable, Identifiable {
+        case oto, tek, ikili, uclu, dortlu
+        var id: String { rawValue }
+        var ad: String { switch self { case .oto: return "Oto"; case .tek: return "Tek"; case .ikili: return "2'li"; case .uclu: return "3'lü"; case .dortlu: return "2×2" } }
+        /// Kaç kaynak dizilir (0 = tek, canlı)
+        func adet(_ kaynak: Int) -> Int {
+            switch self {
+            case .oto: return kaynak >= 2 ? min(kaynak, 4) : 0
+            case .tek: return 0
+            case .ikili: return 2
+            case .uclu: return 3
+            case .dortlu: return 4
+            }
+        }
+    }
+    /// Düzenli program için tuval (3840×2160) ve kutular: 2'li yan yana ortada, 3'lü üstte iki altta ortada bir, 4'lü 2×2
+    static let tuvalW: CGFloat = 3840, tuvalH: CGFloat = 2160
+    static func kutular(_ adet: Int) -> [CGRect] {
+        let w: CGFloat = 1920, h: CGFloat = 1080
+        switch adet {
+        case 2: return [CGRect(x: 0, y: 540, width: w, height: h), CGRect(x: 1920, y: 540, width: w, height: h)]
+        case 3: return [CGRect(x: 0, y: 0, width: w, height: h), CGRect(x: 1920, y: 0, width: w, height: h), CGRect(x: 960, y: 1080, width: w, height: h)]
+        default: return [CGRect(x: 0, y: 0, width: w, height: h), CGRect(x: 1920, y: 0, width: w, height: h),
+                         CGRect(x: 0, y: 1080, width: w, height: h), CGRect(x: 1920, y: 1080, width: w, height: h)]
+        }
+    }
+    /// Şu anki düzende dizilen kaynak sayısı (0 = tek)
+    var duzenAdet: Int { duzen.adet(yuvalar.count) }
+    private var duzenZamanlayici: DispatchSourceTimer?
+    private var onizlemeHavuz: CVPixelBufferPool?
+    /// Dizili düzendeki kaynaklar (kilit altında; kayıt kuyruğu okur)
+    private var _duzenKaynaklar: [Yuva] = []
+    /// Ekrandaki program monitörü için küçük tuval (1280×720); kayıt dosyası 4K
     @Published var bildirim: String?
     @Published var aglarIzni = true
     let program = GoruntuGorunumu()
@@ -162,6 +200,7 @@ final class Masa: NSObject, ObservableObject {
 
     func ac() {
         UIApplication.shared.isIdleTimerDisabled = true
+        duzenDegisti()
         bulucu.bulundu = { [weak self] ad, hedef in self?.wifiBulundu(ad, hedef) }
         bulucu.izinYok = { [weak self] in self?.aglarIzni = false }
         bulucu.baslat()
@@ -184,6 +223,7 @@ final class Masa: NSObject, ObservableObject {
 
     func kapat() {
         if kayitta { kayitBitir() }
+        duzenZamanlayici?.cancel(); duzenZamanlayici = nil
         bulucu.durdur()
         gozlemciler.forEach { NotificationCenter.default.removeObserver($0) }
         gozlemciler = []
@@ -205,6 +245,25 @@ final class Masa: NSObject, ObservableObject {
         aglarIzni = true
         guard !kaldirilanlar.contains(ad) else { return }
         wifiEkle(ad, hedef)
+    }
+
+    /// Düzen ya da kaynak sayısı değişince: dizili düzende program monitörü ve kaydı zamanlayıcıyla (30 kare/sn) birleştirilir
+    func duzenDegisti() {
+        let adet = duzenAdet
+        kilit.lock(); _duzenKaynaklar = Array(yuvalar.prefix(adet)); kilit.unlock()
+        if adet == 0 {
+            duzenZamanlayici?.cancel(); duzenZamanlayici = nil
+            program.temizle()
+            programDonus()
+            return
+        }
+        program.dondur = 0
+        guard duzenZamanlayici == nil else { return }
+        let z = DispatchSource.makeTimerSource(queue: kayitKuyruk)
+        z.schedule(deadline: .now(), repeating: .milliseconds(33), leeway: .milliseconds(3))
+        z.setEventHandler { [weak self] in self?.duzenKaresi() }
+        z.resume()
+        duzenZamanlayici = z
     }
 
     func wifiEkle(_ ad: String, _ hedef: NWEndpoint) {
@@ -236,6 +295,7 @@ final class Masa: NSObject, ObservableObject {
         yuvalar.append(y)
         a.baslat()
         if canli == nil { canliYap(y) } else { a.tally(false) }
+        duzenDegisti()
     }
 
     /// Elle adresle ekleme (Bonjour engelli ağlarda): "192.168.1.20" ya da "192.168.1.20:47800"
@@ -258,6 +318,7 @@ final class Masa: NSObject, ObservableObject {
         let y = Yuva(ad: d.localizedName, usbKimlik: d.uniqueID)
         yuvalar.append(y)
         if canli == nil { canliYap(y) }
+        duzenDegisti()
         usbKuyruk.async {
             var tamam = self.usbBagla(d, y)
             // Çok kameralı oturum bu kamerayı almadıysa ve başka USB kamera yoksa düz oturumla bir daha dene
@@ -364,6 +425,7 @@ final class Masa: NSObject, ObservableObject {
             }
         }
         yuvalar.removeAll { $0 === y }
+        duzenDegisti()
         if canli == y.id {
             if let ilk = yuvalar.first { canliYap(ilk) } else {
                 canli = nil
@@ -403,7 +465,64 @@ final class Masa: NSObject, ObservableObject {
     }
 
     private func programDonus() {
+        guard duzenAdet == 0 else { return }
         if let y = yuvalar.first(where: { $0.id == canli }) { program.dondur = y.dondur }
+    }
+
+    /// Dizili düzen (kayitKuyruk, 30 kare/sn): kaynakların son kareleri tuvale; ekrana 1280×720, kayda 3840×2160
+    private func duzenKaresi() {
+        kilit.lock(); let kaynaklar = _duzenKaynaklar; kilit.unlock()
+        let adet = kaynaklar.count
+        guard adet > 0 else { return }
+        let kutular = Masa.kutular(adet)
+        // Ekrandaki program monitörü
+        if onizlemeHavuz == nil {
+            CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey: 1280,
+                                                                 kCVPixelBufferHeightKey: 720, kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &onizlemeHavuz)
+        }
+        if let havuz = onizlemeHavuz {
+            var pb: CVPixelBuffer?
+            CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, havuz, &pb)
+            if let pb {
+                duzenCiz(kaynaklar, kutular, hedef: pb, olcek: 1 / 3)
+                if let sb = AgYayin.ornek(pb) { program.goster(sb) }
+            }
+        }
+        // Kayıt
+        guard let o = oturumKaydi, let p = o.program, let havuz = p.havuz else { return }
+        let pts = CMTimeSubtract(CMClockGetTime(CMClockGetHostTimeClock()), o.baslangic)
+        guard pts > o.sonProgramPts else { return }
+        var cikti: CVPixelBuffer?
+        CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, havuz, &cikti)
+        guard let cikti else { return }
+        duzenCiz(kaynaklar, kutular, hedef: cikti, olcek: CGFloat(o.programBoyut.w) / Masa.tuvalW)
+        p.ekle(kare: cikti, pts: pts)
+        o.sonProgramPts = pts
+    }
+
+    private func duzenCiz(_ kaynaklar: [Yuva], _ kutular: [CGRect], hedef: CVPixelBuffer, olcek: CGFloat) {
+        let W = CGFloat(CVPixelBufferGetWidth(hedef)), H = CGFloat(CVPixelBufferGetHeight(hedef))
+        var tuval = CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: W, height: H))
+        for (i, y) in kaynaklar.enumerated() where i < kutular.count {
+            guard let pb = y.sonKare else { continue }
+            var g = CIImage(cvPixelBuffer: pb)
+            switch y.donus {
+            case 90: g = g.oriented(.right)
+            case 180: g = g.oriented(.down)
+            case 270: g = g.oriented(.left)
+            default: break
+            }
+            // Core Image'da y aşağıdan yukarı: kutu dikeyde ters çevrilir
+            let k = kutular[i]
+            let kutu = CGRect(x: k.minX * olcek, y: (Masa.tuvalH - k.maxY) * olcek, width: k.width * olcek, height: k.height * olcek)
+            let e = g.extent
+            let s = min(kutu.width / e.width, kutu.height / e.height)
+            g = g.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
+                .transformed(by: CGAffineTransform(scaleX: s, y: s))
+                .transformed(by: CGAffineTransform(translationX: kutu.minX + (kutu.width - e.width * s) / 2, y: kutu.minY + (kutu.height - e.height * s) / 2))
+            tuval = g.composited(over: tuval)
+        }
+        ci.render(tuval, to: hedef)
     }
 
     private func kareGeldi(_ y: Yuva, _ pb: CVPixelBuffer, usb: Bool = false) {
@@ -411,14 +530,15 @@ final class Masa: NSObject, ObservableObject {
         if kayitta {
             let t = CMClockGetTime(CMClockGetHostTimeClock())
             let canli = y.canlida
+            let dizili = duzenZamanlayici != nil
             kayitKuyruk.async {
                 if usb { self.usbKaresi(y, pb, t) }
-                if canli { self.programKaresi(y, pb, t) }
+                if canli, !dizili { self.programKaresi(y, pb, t) }
             }
         }
         guard let sb = AgYayin.ornek(pb) else { return }
         y.gorunum.goster(sb)
-        if y.canlida { program.goster(sb) }
+        if y.canlida, duzenZamanlayici == nil { program.goster(sb) }
         if y.sirada { onizleme.goster(sb) }
     }
 
@@ -453,9 +573,10 @@ final class Masa: NSObject, ObservableObject {
             try? FileManager.default.createDirectory(at: dizin, withIntermediateDirectories: true)
             if klasor.ad != nil { bildirim = "SSD takılı değil, cihaza kaydediliyor" }
         }
-        // Program boyutu: en büyük kaynak (4K USB kamera varsa 4K), yatay tuval
+        // Program boyutu: dizili düzende 4K tuval; tek'te en büyük kaynak (4K USB kamera varsa 4K), yatay
         var w = 1920, h = 1080
-        for y in yuvalar {
+        if duzenAdet > 0 { w = Int(Masa.tuvalW); h = Int(Masa.tuvalH) }
+        for y in yuvalar where duzenAdet == 0 {
             if y.wifi, let b = y.alici?.boyut { y.boyut = b }
             if let b = y.boyut {
                 let bw = Int(max(b.width, b.height)), bh = Int(min(b.width, b.height))
@@ -472,11 +593,11 @@ final class Masa: NSObject, ObservableObject {
         }
         kayitta = true
         kayitBasi = Date()
-        kayitOzeti = "\(yuvalar.count) KAMERA + PROGRAM"
+        kayitOzeti = "\(yuvalar.count) KAMERA + PROGRAM\(duzenAdet > 0 ? " 4K" : "")"
         let yuvalarSimdi = yuvalar
         let ses = sesBicimi
         kayitKuyruk.async {
-            o.program = DosyaYazici(url: dizin.appendingPathComponent("Program.mp4"), tur: .kodla(w: w, h: h, fps: 60, bgra: true), ses: ses)
+            o.program = DosyaYazici(url: dizin.appendingPathComponent("Program.mp4"), tur: .kodla(w: w, h: h, fps: self.duzenZamanlayici != nil ? 30 : 60, bgra: true), ses: ses)
             // USB kaynakların yazıcıları hemen; Wi-Fi'ninki ilk anahtar kareyle (biçim o zaman belli)
             for y in yuvalarSimdi where !y.wifi {
                 guard let b = y.boyut, let u = o.kaynakUrl[y.id] else { continue }
