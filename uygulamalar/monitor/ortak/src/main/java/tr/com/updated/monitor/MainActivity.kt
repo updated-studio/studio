@@ -28,6 +28,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.view.MotionEvent
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -57,13 +58,25 @@ class MainActivity : Activity() {
 
     // Renkler (Blackmagic düzeni: siyah şeritler, gri etiket, beyaz değer, kırmızı kayıt)
     private val SIYAH = Color.BLACK; private val GRI = Color.rgb(140, 140, 140); private val KOYU = Color.rgb(30, 30, 30); private val KOYU2 = Color.rgb(44, 44, 44)
-    private val KIRMIZI = Color.rgb(230, 40, 40); private val SARI = Color.rgb(255, 107, 26) /* UPDATED turuncusu */
+    private val KIRMIZI = Color.rgb(230, 40, 40); private val SARI = Color.rgb(255, 214, 10) /* seçili / elle değişmiş (Kamera ile aynı sarı) */
     private val dar: Typeface by lazy { runCatching { resources.getFont(R.font.plex_kosul_600) }.getOrDefault(Typeface.create("sans-serif-condensed", Typeface.BOLD)) }
     /** PRO (telefon kamerası, Blackmagic düzeni) mı, Monitör (dış kamera: USB/HDMI, ağ yayını) mü; ikisi ayrı ayarlar tutar */
     private val proMod by lazy { intent.getStringExtra("mod") == "pro" }
     /** Geniş telefon (en dar kenar ≥ 400 dp): düğmelerde simgenin altında küçük ad da yazar; daha küçükte yalnız simge (basılı tutunca ad) */
     private val genisEkran: Boolean get() = resources.configuration.smallestScreenWidthDp >= 400
     private val dikeyEkran: Boolean get() = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+    /**
+     * Tablet (en dar kenar ≥ 600 dp; MONITOR_TASARIM.md, iPad düzeni): cam durum çubuğu, solda etiketli araç rayı, altta cam araç çubuğu,
+     * ayarlar görüntüyü kapatmayan sağ denetçi panelde. Telefonda yuvarlak cam düğmeler, ayarlar alttan açılan sayfada (yatayda sağdan).
+     */
+    private val tablet: Boolean get() = resources.configuration.smallestScreenWidthDp >= 600
+    /** Ayar sayfası: telefon dikeyde alttan (üst %28 görüntü kalır), diğerlerinde sağdan denetçi */
+    private val altSayfa: Boolean get() = !tablet && dikeyEkran
+    private val sayfaEn: Int get() = if (altSayfa) resources.configuration.screenWidthDp else if (tablet) 420 else minOf(480, (resources.configuration.screenWidthDp * 0.62f).toInt())
+    private lateinit var sayfa: FrameLayout
+    /** Cam yüzey (Kamera'daki cam() ile aynı): üstten alta koyulaşan yarı saydam, yarım piksel açık kenar */
+    private fun cam(kose: Float) = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.argb(70, 120, 120, 128), Color.argb(120, 0, 0, 0))).apply { cornerRadius = kose; setStroke(maxOf(1, dp(0.5f)), Color.argb(64, 255, 255, 255)) }
+    private fun camYuvarlak() = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.argb(70, 120, 120, 128), Color.argb(120, 0, 0, 0))).apply { shape = GradientDrawable.OVAL; setStroke(maxOf(1, dp(0.5f)), Color.argb(64, 255, 255, 255)) }
     private var tcDikey: TextView? = null
 
     private lateinit var ust: LinearLayout; private lateinit var alt: LinearLayout; private lateinit var sol: LinearLayout; private lateinit var sag: LinearLayout
@@ -183,14 +196,15 @@ class MainActivity : Activity() {
             tcDikey = TextView(this).apply { textSize = 24f; typeface = runCatching { resources.getFont(R.font.plex_mono_500) }.getOrDefault(Typeface.MONOSPACE); setTextColor(Color.WHITE); gravity = Gravity.CENTER; golge(this) }
             dikey.addView(tcDikey, LinearLayout.LayoutParams(-1, dp(38f)))
         } else tcDikey = null
-        ust = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        dikey.addView(ust, LinearLayout.LayoutParams(-1, dp(if (d) 48f else 54f)))
+        ust = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; if (tablet) { background = cam(dp(16f).toFloat()); setPadding(dp(8f), 0, dp(8f), 0) } }
+        dikey.addView(ust, LinearLayout.LayoutParams(-1, dp(if (tablet) 58f else if (d) 48f else 54f)).apply { if (tablet) { setMargins(dp(14f), dp(10f), dp(14f), dp(6f)) } })
         val yatay = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         dikey.addView(yatay, LinearLayout.LayoutParams(-1, 0, 1f))
         sol = LinearLayout(this).apply { orientation = if (d) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL; gravity = Gravity.CENTER
-            if (d) setPadding(dp(8f), dp(4f), dp(8f), dp(6f)) else setPadding(0, dp(4f), 0, dp(4f)) }
+            if (d) setPadding(dp(8f), 0, dp(8f), 0) else setPadding(0, dp(4f), 0, dp(4f)) }
         // Dikeyde sık kullanılan düğmeler altta, başparmağın ulaştığı yerde (üstte yalnız zaman kodu ve değerler)
-        if (d) dikey.addView(sol, LinearLayout.LayoutParams(-1, dp(if (genisEkran) 58f else 50f))) else yatay.addView(sol, LinearLayout.LayoutParams(dp(72f), -1))
+        if (tablet && !d) { sol.background = cam(dp(18f).toFloat()); sol.setPadding(dp(6f), dp(8f), dp(6f), dp(8f)) }
+        if (d) dikey.addView(sol, LinearLayout.LayoutParams(-1, dp(if (tablet) 66f else 56f))) else yatay.addView(sol, LinearLayout.LayoutParams(dp(if (tablet) 76f else 72f), -1).apply { if (tablet) setMargins(dp(14f), dp(4f), dp(4f), dp(8f)) })
         bolmeler = LinearLayout(this).apply { orientation = if (d) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL }
         orta.addView(bolmeler, FrameLayout.LayoutParams(-1, -1))
         // Şerit, geri sayım ve öneri etiketi şeritlerin arasındaki saydam alanda (dokunuş görüntüye geçer)
@@ -208,10 +222,19 @@ class MainActivity : Activity() {
         katman.addView(sahneCip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { topMargin = dp(10f); marginStart = dp(10f) })
         yatay.addView(katman, LinearLayout.LayoutParams(0, -1, 1f))
         sag = LinearLayout(this).apply { orientation = if (d) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL; gravity = if (d) Gravity.CENTER_VERTICAL else Gravity.CENTER_HORIZONTAL; if (d) setPadding(dp(10f), dp(10f), dp(10f), dp(10f)) else setPadding(dp(10f), dp(2f), dp(10f), dp(2f)) }
-        alt = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(10f), 0, dp(10f), 0) }
-        if (d) { dikey.addView(alt, LinearLayout.LayoutParams(-1, dp(56f))); dikey.addView(sag, LinearLayout.LayoutParams(-1, dp(104f))) }
-        else { yatay.addView(sag, LinearLayout.LayoutParams(dp(96f), -1)); dikey.addView(alt, LinearLayout.LayoutParams(-1, dp(62f))) }
-        panel = FrameLayout(this).apply { visibility = View.GONE; setBackgroundColor(Color.rgb(22, 22, 22)); isClickable = true }
+        alt = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(10f), 0, dp(10f), 0); if (tablet) background = cam(dp(18f).toFloat()) }
+        val altPay = LinearLayout.LayoutParams(-1, dp(if (tablet) 72f else if (d) 56f else 62f)).apply { if (tablet) setMargins(dp(14f), dp(4f), dp(14f), dp(10f)) }
+        if (d) { dikey.addView(alt, altPay); dikey.addView(sag, LinearLayout.LayoutParams(-1, dp(104f))) }
+        else { if (tablet) { sag.background = cam(dp(18f).toFloat()) }
+            yatay.addView(sag, LinearLayout.LayoutParams(dp(96f), -1).apply { if (tablet) setMargins(dp(4f), dp(4f), dp(14f), dp(8f)) }); dikey.addView(alt, altPay) }
+        // Ayarlar: arkada hafif karartma (dokununca kapanır), üstünde cam sayfa; telefon dikeyde alttan, diğerlerinde sağdan
+        panel = FrameLayout(this).apply { visibility = View.GONE; setBackgroundColor(Color.argb(if (tablet) 0 else 90, 0, 0, 0)); isClickable = true; setOnClickListener { panelKapat() } }
+        sayfa = FrameLayout(this).apply { isClickable = true; clipToOutline = true; elevation = dp(12f).toFloat()
+            val k = dp(22f).toFloat()
+            background = GradientDrawable().apply { setColor(Color.rgb(22, 22, 24)); setStroke(maxOf(1, dp(0.5f)), Color.argb(46, 255, 255, 255))
+                cornerRadii = if (altSayfa) floatArrayOf(k, k, k, k, 0f, 0f, 0f, 0f) else floatArrayOf(k, k, 0f, 0f, 0f, 0f, k, k) } }
+        panel.addView(sayfa, if (altSayfa) FrameLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.72f).toInt(), Gravity.BOTTOM)
+            else FrameLayout.LayoutParams(dp(sayfaEn.toFloat()), -1, Gravity.END))
         kok.addView(panel, FrameLayout.LayoutParams(-1, -1))
         // Güvenli alan: çentik / kamera deliği ve gezinme çubuğu payı (her telefonun kendi değeri); Monitör'de görüntüye uygulanmaz
         kok.setOnApplyWindowInsetsListener { v, i ->
@@ -219,7 +242,7 @@ class MainActivity : Activity() {
                 val c = i.getInsets(WindowInsets.Type.displayCutout()); val n = i.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars())
                 listOf(maxOf(c.left, n.left), c.top, maxOf(c.right, n.right), maxOf(c.bottom, n.bottom))
             } else { val c = i.displayCutout; listOf(c?.safeInsetLeft ?: 0, c?.safeInsetTop ?: 0, c?.safeInsetRight ?: 0, c?.safeInsetBottom ?: 0) }
-            dikey.setPadding(l, t, r, b); panel.setPadding(l, t, r, b)
+            dikey.setPadding(l, t, r, b); sayfa.setPadding(if (altSayfa) l else 0, if (altSayfa) 0 else t, r, b)
             i
         }
         setContentView(kok)
@@ -315,7 +338,7 @@ class MainActivity : Activity() {
         if (asistanAcik && asistan == null) asistan = Asistan { r, ad, yuz -> runOnUiThread { sonYuz = yuz; asistanSonuc(r, ad) } }
         if (!asistanAcik) { asistan?.kapat(); asistan = null; kompler.forEach { it?.konu = null; it?.analiz = null; it?.ipucu = null }; oneriCip.forEach { it?.visibility = View.GONE } }
         monitorler.forEachIndexed { i, m -> m?.olcumKaresi = if (i == etkin && (olcum != null || koseHisto || asistanAcik || sahneOto)) { buf, w, h -> olcum?.kare(buf, w, h); if (koseHisto) kose.kare(buf, w, h); if (ayarlar[i].zoom == 1f) { asistan?.kare(buf, w, h); if (asistanAcik) kompler[i]?.let { kk -> analiz.kare(buf, w, h, kk.goruntuOrani()) { s -> runOnUiThread { kk.analiz = s; ipucuGuncelle() } } } }; if (sahneOto) renkOlc(buf, w, h) } else null }
-        if (this::kose.isInitialized) kose.visibility = if (koseHisto) View.VISIBLE else View.INVISIBLE
+        if (this::kose.isInitialized) kose.visibility = if (koseHisto) View.VISIBLE else View.GONE
     }
 
     /** Kabaca ortalama renk (her 8. piksel): gün batımı önerisi için */
@@ -505,17 +528,22 @@ class MainActivity : Activity() {
 
     /* ================= sol sütun ================= */
     private fun kare(ad: String, alt: String = "", secili: Boolean = false, simge: Int? = null, is_: () -> Unit) {
-        sol.addView(LinearLayout(this).apply {
+        // Telefonda yuvarlak cam düğme (yalnız simge/kısa değer; basılı tutunca ad), tablette etiketli cam kare. Açık olan dolu beyaz.
+        val etiketli = tablet && alt.isNotEmpty()
+        val boy = dp(if (tablet) 54f else if (dikeyEkran) 44f else 40f)
+        val dugme = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-            background = Tema.kapsul(if (secili) Color.WHITE else Color.argb(170, 30, 30, 30), dp(8f).toFloat())
+            background = if (secili) (if (etiketli) Tema.kapsul(Color.WHITE, dp(14f).toFloat()) else GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) })
+                else if (etiketli) cam(dp(14f).toFloat()) else camYuvarlak()
             if (simge != null) addView(ImageView(this@MainActivity).apply { setImageResource(simge); setColorFilter(if (secili) Color.BLACK else Color.WHITE) }, LinearLayout.LayoutParams(dp(20f), dp(20f)))
-            else addView(TextView(this@MainActivity).apply { text = ad; textSize = 13f; typeface = dar; setTextColor(if (secili) Color.BLACK else Color.WHITE); gravity = Gravity.CENTER })
-            if (alt.isNotEmpty() && genisEkran) addView(TextView(this@MainActivity).apply { text = alt; textSize = 9f; typeface = dar; setTextColor(if (secili) Color.DKGRAY else Color.argb(200, 255, 255, 255)); gravity = Gravity.CENTER })
+            else addView(TextView(this@MainActivity).apply { text = ad; textSize = if (etiketli) 13f else 12f; typeface = dar; setTextColor(if (secili) Color.BLACK else Color.WHITE); gravity = Gravity.CENTER; isSingleLine = true })
+            if (etiketli) addView(TextView(this@MainActivity).apply { text = alt; textSize = 8.5f; typeface = dar; letterSpacing = 0.06f; setTextColor(if (secili) Color.DKGRAY else Color.argb(170, 255, 255, 255)); gravity = Gravity.CENTER; setPadding(0, dp(3f), 0, 0) })
             contentDescription = alt.ifEmpty { ad }; tooltipText = contentDescription
-            setOnClickListener { is_() }
-        }, // yatayda sütunu, dikeyde satırı eşit paylaşırlar (kısa ekranlarda taşmasınlar)
-            if (dikeyEkran) LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = dp(3f); marginEnd = dp(3f) }
-            else LinearLayout.LayoutParams(dp(56f), 0, 1f).apply { topMargin = dp(4f); bottomMargin = dp(4f) })
+            setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); is_() }
+        }
+        // yatayda sütunu, dikeyde satırı eşit paylaşırlar (kısa ekranlarda taşmasınlar); düğme hücresinin ortasında
+        sol.addView(FrameLayout(this).apply { addView(dugme, FrameLayout.LayoutParams(boy, boy, Gravity.CENTER)) },
+            if (dikeyEkran) LinearLayout.LayoutParams(0, -1, 1f) else LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     private fun solCiz() {
@@ -557,7 +585,7 @@ class MainActivity : Activity() {
     /* ================= alt şerit ================= */
     private fun altCiz() {
         alt.removeAllViews()
-        kose = OlcumGorunum(this).apply { bindirme = true; gorunen = linkedSetOf(OlcumGorunum.Tur.HISTOGRAM); visibility = if (koseHisto) View.VISIBLE else View.INVISIBLE }
+        kose = OlcumGorunum(this).apply { bindirme = true; gorunen = linkedSetOf(OlcumGorunum.Tur.HISTOGRAM); visibility = if (koseHisto) View.VISIBLE else View.GONE }
         val d = dikeyEkran
         alt.addView(kose, LinearLayout.LayoutParams(dp(if (d) 84f else 140f), dp(if (d) 40f else 48f)).apply { marginEnd = dp(if (d) 8f else 12f) })
         olcumBagla()
@@ -565,16 +593,19 @@ class MainActivity : Activity() {
         val orta = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         // Sony makinelerindeki gibi simgeli: dar ekranda yalnız simge (basılı tutunca adı görünür), geniş ekranda altında küçük ad
         val g = genisEkran
+        // Telefon: yuvarlak cam düğme, yalnız simge (basılı tutunca ad). Tablet: alt cam çubukta simge + küçük ad. Açık olan dolu sarı.
+        val etiketli = tablet
         fun c(ad: String, simge: Int, secili: Boolean, is_: () -> Unit) = orta.addView(TextView(this).apply {
-            text = if (g) ad else ""; textSize = 9f; typeface = dar; letterSpacing = 0.04f; isSingleLine = true; setTextColor(if (secili) Color.BLACK else Color.WHITE); gravity = Gravity.CENTER
-            setPadding(dp(6f), dp(if (g) 7f else 0f), dp(6f), dp(if (g) 5f else 0f)); minWidth = dp(if (g) 58f else 46f); minHeight = dp(46f)
-            if (g) Tema.simge(this, simge, if (secili) Color.BLACK else Color.WHITE, boy = 20f, ust = true)
+            text = if (etiketli) ad else ""; textSize = 8.5f; typeface = dar; letterSpacing = 0.06f; isSingleLine = true; setTextColor(if (secili) Color.BLACK else Color.argb(220, 255, 255, 255)); gravity = Gravity.CENTER
             contentDescription = ad; tooltipText = ad
-            val zemin = Tema.kapsul(if (secili) SARI else Color.argb(170, 30, 30, 30), dp(10f).toFloat())
-            if (g) background = zemin else { background = android.graphics.drawable.LayerDrawable(arrayOf(zemin, getDrawable(simge)!!.mutate().apply { setTint(if (secili) Color.BLACK else Color.WHITE) }))
-                .apply { val i = dp(13f); setLayerInset(1, i, i, i, i) } }
-            setOnClickListener { is_(); kaydet(); altCiz(); ustCiz(); yenile() }
-        }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6f) })
+            if (etiketli) { setPadding(dp(8f), dp(7f), dp(8f), dp(5f)); minWidth = dp(64f); minHeight = dp(52f)
+                Tema.simge(this, simge, if (secili) Color.BLACK else Color.WHITE, boy = 20f, ust = true)
+                background = if (secili) Tema.kapsul(SARI, dp(14f).toFloat()) else null }
+            else { val zemin = if (secili) GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(SARI) } else camYuvarlak()
+                background = android.graphics.drawable.LayerDrawable(arrayOf(zemin, getDrawable(simge)!!.mutate().apply { setTint(if (secili) Color.BLACK else Color.WHITE) }))
+                    .apply { val i = dp(12f); setLayerInset(1, i, i, i, i) } }
+            setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); is_(); kaydet(); altCiz(); ustCiz(); yenile() }
+        }, (if (etiketli) LinearLayout.LayoutParams(-2, -2) else LinearLayout.LayoutParams(dp(44f), dp(44f))).apply { marginEnd = dp(if (etiketli) 2f else 8f) })
         c("KAMERA", R.drawable.ic_geri, false) { finish() }
         c("ODAK", R.drawable.ic_odak, a.peaking) { a.peaking = !a.peaking }
         c("ZEBRA", R.drawable.ic_zebra, a.zebra) { a.zebra = !a.zebra }
@@ -585,6 +616,8 @@ class MainActivity : Activity() {
         c("YARDIMCI", R.drawable.ic_yardimci, asistanAcik) { asistanAcik = !asistanAcik; kompUygula() }
         c("TERAZİ", R.drawable.ic_terazi, teraziAcik) { teraziAcik = !teraziAcik; kompUygula() }
         alt.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(orta) }, LinearLayout.LayoutParams(0, -2, 1f))
+        // Tablet: ses göstergesi alt cam çubuğun sağında (histogram solda)
+        if (tablet) { (ses.parent as? android.view.ViewGroup)?.removeView(ses); alt.addView(ses, LinearLayout.LayoutParams(dp(120f), dp(18f)).apply { marginStart = dp(12f) }) }
         ses.visibility = if (sesGosterge && arayuzAcik) View.VISIBLE else View.INVISIBLE
     }
 
@@ -763,8 +796,21 @@ class MainActivity : Activity() {
 
     /* ================= ayarlar paneli ================= */
     private var sekme = Sekme.KAYIT
-    private fun panelAc(s: Sekme) { sekme = s; panel.visibility = View.VISIBLE; panelCiz() }
-    private fun panelKapat() { panel.visibility = View.GONE; kaydet(); arayuzCiz(); yenile() }
+    private fun panelAc(s: Sekme) {
+        sekme = s; val acikti = panel.visibility == View.VISIBLE
+        panel.visibility = View.VISIBLE; panelCiz()
+        if (acikti) return
+        // Sönümlü yay ile kayarak gelir (Kamera ile aynı his)
+        panel.alpha = 0f; panel.animate().alpha(1f).setDuration(180).start()
+        if (altSayfa) sayfa.translationY = resources.displayMetrics.heightPixels * 0.4f else sayfa.translationX = dp(sayfaEn.toFloat()) * 0.6f
+        sayfa.animate().translationX(0f).translationY(0f).setDuration(380).setInterpolator(android.view.animation.OvershootInterpolator(0.7f)).start()
+    }
+    private fun panelKapat() {
+        kaydet()
+        sayfa.animate().translationY(if (altSayfa) sayfa.height.toFloat() else 0f).translationX(if (altSayfa) 0f else sayfa.width.toFloat()).setDuration(200)
+            .setInterpolator(android.view.animation.AccelerateInterpolator(1.5f)).withEndAction { panel.visibility = View.GONE; sayfa.translationX = 0f; sayfa.translationY = 0f; arayuzCiz(); yenile() }.start()
+        panel.animate().alpha(0f).setDuration(200).start()
+    }
 
     /** Panel yeniden çizilince aynı sekmede kaydırma yeri korunur */
     private var panelKaydir: ScrollView? = null; private var panelSonSekme: Sekme? = null
@@ -772,24 +818,36 @@ class MainActivity : Activity() {
     private fun panelCiz() {
         val eskiY = if (panelSonSekme == sekme) panelKaydir?.scrollY ?: 0 else 0
         panelSonSekme = sekme
-        panel.removeAllViews()
+        sayfa.removeAllViews()
         val dk = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        panel.addView(dk, FrameLayout.LayoutParams(-1, -1))
-        // iPhone'daki gibi yalnız ad: seçilende beyaz yazı ve altında beyaz çizgi
-        val sekmeler = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setBackgroundColor(SIYAH); setPadding(dp(8f), 0, dp(8f), 0) }
+        sayfa.addView(dk, FrameLayout.LayoutParams(-1, -1))
+        // Alttan sayfada tutamaç: aşağı sürükleyince kapanır
+        if (altSayfa) dk.addView(FrameLayout(this).apply {
+            addView(View(this@MainActivity).apply { background = Tema.kapsul(Color.argb(90, 255, 255, 255)) }, FrameLayout.LayoutParams(dp(36f), dp(5f), Gravity.CENTER))
+            var y0 = 0f
+            @Suppress("ClickableViewAccessibility")
+            setOnTouchListener { _, e -> when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> y0 = e.rawY
+                MotionEvent.ACTION_MOVE -> sayfa.translationY = maxOf(0f, e.rawY - y0)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (sayfa.translationY > dp(90f)) panelKapat() else sayfa.animate().translationY(0f).setDuration(220).setInterpolator(android.view.animation.OvershootInterpolator(0.8f)).start()
+            }; true }
+        }, LinearLayout.LayoutParams(-1, dp(20f)))
+        // Kapsül sekmeler (MONITOR_TASARIM.md): seçili beyaz kapsül + siyah yazı, diğerleri gri yazı
+        val sekmeler = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(12f), 0, dp(4f), 0) }
         Sekme.values().forEach { s -> sekmeler.addView(TextView(this).apply {
-            text = s.ad; textSize = 14f; typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; setPadding(dp(16f), dp(14f), dp(16f), dp(12f))
-            setTextColor(if (s == sekme) Color.WHITE else GRI)
-            setCompoundDrawablesWithIntrinsicBounds(null, null, null, GradientDrawable().apply { setColor(if (s == sekme) Color.WHITE else Color.TRANSPARENT); setSize(dp(28f), dp(2f)) })
-            compoundDrawablePadding = dp(8f)
-            setOnClickListener { sekme = s; panelCiz() } }) }
-        sekmeler.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        sekmeler.addView(ImageView(this).apply { setImageResource(R.drawable.ic_kapat); scaleType = ImageView.ScaleType.CENTER; contentDescription = "Kapat"; setOnClickListener { panelKapat() } }, LinearLayout.LayoutParams(dp(56f), dp(48f)))
-        dk.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; isFillViewport = true; addView(sekmeler) }, LinearLayout.LayoutParams(-1, dp(52f)))
-        dk.addView(View(this).apply { setBackgroundColor(Color.argb(46, 255, 255, 255)) }, LinearLayout.LayoutParams(-1, 1))
+            text = s.ad; textSize = 12f; typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; setPadding(dp(14f), 0, dp(14f), 0)
+            setTextColor(if (s == sekme) Color.BLACK else Color.argb(170, 255, 255, 255))
+            background = if (s == sekme) Tema.kapsul(Color.WHITE) else null
+            setOnClickListener { if (sekme != s) { sekme = s; panelCiz() } } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(4f) }) }
+        val sekmeSatir = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        sekmeSatir.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(sekmeler) }, LinearLayout.LayoutParams(0, -1, 1f))
+        sekmeSatir.addView(ImageView(this).apply { setImageResource(R.drawable.ic_kapat); scaleType = ImageView.ScaleType.CENTER; contentDescription = "Kapat"; background = camYuvarlak()
+            setOnClickListener { panelKapat() } }, LinearLayout.LayoutParams(dp(36f), dp(36f)).apply { marginEnd = dp(12f); marginStart = dp(4f) })
+        dk.addView(sekmeSatir, LinearLayout.LayoutParams(-1, dp(if (altSayfa) 48f else 60f)))
+        dk.addView(View(this).apply { setBackgroundColor(Color.argb(30, 255, 255, 255)) }, LinearLayout.LayoutParams(-1, maxOf(1, dp(0.5f))))
         val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; val y = dp(if (darPanel) 20f else 28f); setPadding(y, dp(4f), y, dp(36f)) }
         // Geniş ekranda içerik 760 dp sütunda ortalanır
-        val sutun = FrameLayout(this).apply { addView(ic, FrameLayout.LayoutParams(if (resources.displayMetrics.widthPixels > dp(816f)) dp(760f) else -1, -2, Gravity.CENTER_HORIZONTAL)) }
+        val sutun = FrameLayout(this).apply { addView(ic, FrameLayout.LayoutParams(-1, -2)) }
         val sv = ScrollView(this).apply { addView(sutun) }
         panelKaydir = sv
         dk.addView(sv, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -988,7 +1046,7 @@ class MainActivity : Activity() {
     private fun aciklama(ic: LinearLayout, metin: String) = ic.addView(TextView(this).apply { text = metin; textSize = 13f; setTextColor(GRI); setPadding(0, dp(12f), 0, dp(6f)) })
 
     /** Dar ekranda (dikey telefon) ayar adı üstte, seçenekler altında tam genişlikte */
-    private val darPanel: Boolean get() = resources.configuration.screenWidthDp < 560
+    private val darPanel: Boolean get() = sayfaEn < 560
 
     private fun etiket(r: LinearLayout, ad: String) = r.addView(TextView(this).apply { text = ad; textSize = 14f; typeface = dar; letterSpacing = 0.05f; setTextColor(Color.WHITE); Tema.simgeAdi(ad)?.let { Tema.simge(this, it, GRI) }
         if (darPanel) setPadding(0, 0, 0, dp(8f)) }, LinearLayout.LayoutParams(if (darPanel) -1 else dp(220f), -2))
