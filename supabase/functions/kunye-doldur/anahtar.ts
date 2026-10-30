@@ -3,7 +3,7 @@
 // sıradakine geçilir; Google kotayı Pasifik gece yarısı yeniler, ertesi gün yeniden en baştan. Geçersiz anahtar atlanır (Stüdyo'da "Dene" sıfırlar).
 // Sunucudaki ana anahtar (GEMINI_API_KEY) tabloda değeri boş satırdır. Göç uygulanmamışsa eski yol: ana + baglanti_anahtarlari.gemini_yedek.
 // BU DOSYA Gemini kullanan her fonksiyonda AYNIDIR (fonksiyonlar ayrı yüklenir): kunye-otomatik, kunye-doldur, yarisma-bul, gorsel-odak,
-// triyaj-topla, triyaj-taslak. Değişiklikte hepsine kopyalanır.
+// triyaj-topla, triyaj-taslak, gemini-dene, radar-otomatik. Değişiklikte hepsine kopyalanır.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 export type Anahtar = { id: number | null; deger: string; etiket: string };
