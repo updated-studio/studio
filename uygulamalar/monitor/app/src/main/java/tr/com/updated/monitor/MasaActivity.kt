@@ -24,6 +24,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import java.util.Locale
 
 /**
  * Masa: telefon ya da tablet ATEM gibi çalışır. Kaynaklar: aynı ağdaki UPDATED Kamera'lar (Wi-Fi kamera, kendiliğinden bulunur)
@@ -61,6 +62,7 @@ class MasaActivity : Activity() {
     /** Kaynakların ayrı kayıtları: yuva → bitir (dosya sağlamsa true) ve yazma hatası denetimi */
     private val isolar = HashMap<Int, Pair<() -> Boolean, () -> Boolean>>()
     private lateinit var yerYazi: TextView
+    private lateinit var duzenYazi: TextView
     private var ustPay = 0; private var altPay = 0
     private var cokluYayin: android.net.wifi.WifiManager.MulticastLock? = null
     /** Tablet: yönetmen masası düzeni (iPad'deki gibi). Kaynağa dokun → önizleme, KES → canlı, çift dokun → hemen canlı */
@@ -90,11 +92,16 @@ class MasaActivity : Activity() {
         if (tablet) ust.addView(hizliYazi, LinearLayout.LayoutParams(-2, dp(40f)).apply { marginEnd = dp(10f) })
         sure = etiket("", 15f).apply { typeface = mono; setPadding(dp(10f), 0, dp(10f), 0); background = Tema.kapsul(KIRMIZI, dp(12f).toFloat()); visibility = View.GONE }
         ust.addView(sure, LinearLayout.LayoutParams(-2, dp(30f)).apply { marginEnd = dp(10f) })
+        masa.duzen = tercih.getInt("masa.duzen", 1).coerceIn(0, 4)
+        duzenYazi = etiket("", 13f).apply { background = Tema.kapsul(Color.argb(40, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
+            contentDescription = "Program düzeni"; setOnClickListener { duzenMenu() } }
+        ust.addView(duzenYazi, LinearLayout.LayoutParams(-2, dp(34f)).apply { marginEnd = dp(8f) })
+        duzenYazi.text = (if (tablet) "Düzen: " else "") + duzenAdi(masa.duzen)
         yerYazi = etiket("", 13f).apply { background = Tema.kapsul(Color.argb(40, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
             contentDescription = "Kayıt yeri"; setOnClickListener { yerMenu() } }
         ust.addView(yerYazi, LinearLayout.LayoutParams(-2, dp(34f)).apply { marginEnd = dp(10f) })
         yerGoster()
-        ust.addView(etiket("+  Kaynak", 15f).apply { background = Tema.kapsul(Color.argb(60, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(14f), 0, dp(14f), 0); setOnClickListener { kaynakMenu() } },
+        ust.addView(etiket(if (tablet) "+  Kaynak" else "+", if (tablet) 15f else 20f).apply { background = Tema.kapsul(Color.argb(60, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(14f), 0, dp(14f), 0); contentDescription = "Kaynak ekle"; setOnClickListener { kaynakMenu() } },
             LinearLayout.LayoutParams(-2, dp(40f)))
         kok.addView(ust, FrameLayout.LayoutParams(-1, dp(52f), Gravity.TOP))
         kayitDugme = KayitDugmesi(this).apply { contentDescription = "Kayıt"; setOnClickListener { kayitDugmesi() } }
@@ -140,7 +147,7 @@ class MasaActivity : Activity() {
         katman.removeAllViews()
         katman.addView(View(this).apply { background = GradientDrawable().apply { setStroke(dp(2f), if (masa.dolu[masa.canli]) KIRMIZI else Color.argb(60, 255, 255, 255)) } },
             FrameLayout.LayoutParams(canliA.width().toInt(), canliA.height().toInt()).apply { leftMargin = canliA.left.toInt(); topMargin = canliA.top.toInt() })
-        katman.addView(etiket(if (masa.dolu[masa.canli]) "CANLI · ${adlar[masa.canli]}" else "Canlı: kaynak yok", 13f, if (masa.dolu[masa.canli]) KIRMIZI else GRI).apply { gravity = Gravity.START },
+        katman.addView(etiket(if (masa.dolu[masa.canli]) (if (masa.etkinDuzen > 1) "CANLI · ${duzenAdi(masa.etkinDuzen)} düzen" else "CANLI · ${adlar[masa.canli]}") else "Canlı: kaynak yok", 13f, if (masa.dolu[masa.canli]) KIRMIZI else GRI).apply { gravity = Gravity.START },
             FrameLayout.LayoutParams(-2, -2).apply { leftMargin = canliA.left.toInt() + dp(10f); topMargin = canliA.top.toInt() + dp(8f) })
         kucukler.forEachIndexed { i, r ->
             val dolu = masa.dolu[i]; val canlimi = dolu && i == masa.canli
@@ -181,7 +188,7 @@ class MasaActivity : Activity() {
                 FrameLayout.LayoutParams(r.width().toInt(), r.height().toInt()).apply { leftMargin = r.left.toInt(); topMargin = r.top.toInt() })
         }
         monitor(oniz, "ÖNİZLEME", YESIL, masa.siradaki, if (hizli) "Hızlı geçiş açık: kaynağa dokununca doğrudan canlıya geçer" else "Bir kaynağa dokun, burada hazırlanır")
-        monitor(prog, "PROGRAM", KIRMIZI, if (masa.dolu[masa.canli]) masa.canli else -1, "Canlıda kaynak yok")
+        monitor(prog, if (masa.etkinDuzen > 1) "PROGRAM · ${duzenAdi(masa.etkinDuzen).uppercase(Locale("tr"))}" else "PROGRAM", KIRMIZI, if (masa.dolu[masa.canli]) masa.canli else -1, "Canlıda kaynak yok")
         kucukler.forEachIndexed { i, r ->
             val dolu = masa.dolu[i]; val canlimi = dolu && i == masa.canli; val sirada = dolu && i == masa.siradaki
             val k = FrameLayout(this).apply {
@@ -362,8 +369,9 @@ class MasaActivity : Activity() {
 
     private fun yerGoster() {
         val k = klasor()
-        val bos = bosAlan(k)?.let { " · ${"%.0f".format(it / 1e9)} GB boş" } ?: ""
-        yerYazi.text = (if (k != null) "Kayıt: ${klasorAdi(k)}" else "Kayıt: telefon") + bos
+        // Telefonda üst şerit dar: kısa yazı
+        val bos = bosAlan(k)?.let { " · ${"%.0f".format(it / 1e9)} GB" + if (tablet) " boş" else "" } ?: ""
+        yerYazi.text = (if (tablet) "Kayıt: " else "") + (k?.let { klasorAdi(it) } ?: if (tablet) "telefon" else "Telefon") + bos
     }
 
     /** Kayıt yerindeki boş alan (bayt); SSD'nin bölümü bulunamazsa null */
@@ -408,9 +416,21 @@ class MasaActivity : Activity() {
         kayitBaslat(o)
     }
 
-    /** Program boyutu: en büyük kaynak 4K ise 4K (cihaz kodlayabiliyorsa), yoksa 1080p; 60 fps */
+    private fun duzenAdi(d: Int) = when (d) { 0 -> "Oto"; 2 -> "2'li"; 3 -> "3'lü"; 4 -> "4'lü"; else -> "Tek" }
+
+    /** Program düzeni: Tek (canlı kaynak), 2'li, 3'lü, 4'lü; 4K tuvalde her 1080p kaynak kendi yerinde tam boyutta. Kayıt sırasında da değişir */
+    private fun duzenMenu() {
+        val l = listOf(0 to "Oto: kaynak sayısına göre", 1 to "Tek: canlı kaynak tam ekran", 2 to "2'li: yan yana", 3 to "3'lü: üstte iki, altta bir", 4 to "4'lü: 2×2 ızgara")
+        AlertDialog.Builder(this).setTitle("Program düzeni")
+            .setSingleChoiceItems(l.map { it.second }.toTypedArray(), masa.duzen) { d, i ->
+                masa.duzen = l[i].first; tercih.edit().putInt("masa.duzen", masa.duzen).apply(); duzenYazi.text = (if (tablet) "Düzen: " else "") + duzenAdi(masa.duzen); duzen(); d.dismiss()
+                if (kaydedici != null && masa.etkinDuzen > 1 && masa.kayitW < 3840) tost("Bu kayıt ${masa.kayitW}×${masa.kayitH} başladı; 4K çoklu kayıt için düzeni kayıttan önce seç.")
+            }.setNegativeButton("Kapat", null).show()
+    }
+
+    /** Program boyutu: çoklu düzende 4K tuval; tek düzende en büyük kaynak 4K ise 4K, yoksa 1080p (cihaz kodlayabiliyorsa; 60 fps, yoksa 30) */
     private fun programBoyutu(): Triple<Int, Int, Int> {
-        val enBuyuk = masa.yuvalar.filterIndexed { i, _ -> masa.dolu[i] }.maxOfOrNull { minOf(it.boyut[0], it.boyut[1]) } ?: 1080
+        val enBuyuk = if (masa.etkinDuzen > 1) 2160 else masa.yuvalar.filterIndexed { i, _ -> masa.dolu[i] }.maxOfOrNull { minOf(it.boyut[0], it.boyut[1]) } ?: 1080
         if (enBuyuk >= 2160) for (fps in intArrayOf(60, 30)) if (KayitOturumu.kodlayiciVar(android.media.MediaFormat.MIMETYPE_VIDEO_HEVC, 3840, 2160, fps)) return Triple(3840, 2160, fps)
         return Triple(1920, 1080, 60)
     }

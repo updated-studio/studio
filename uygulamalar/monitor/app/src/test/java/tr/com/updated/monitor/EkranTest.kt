@@ -120,6 +120,11 @@ class EkranTest {
             RuntimeEnvironment.setQualifiers(if (yatay) "w1280dp-h800dp-land-xhdpi" else "w800dp-h1280dp-port-xhdpi")
             Robolectric.buildActivity(MasaActivity::class.java).setup().use { c -> val a = c.get(); a.ornekDoldur(); kaydet(a, "masa-tablet-${if (yatay) "land" else "port"}") }
         }
+        // Program düzeni 4'lü (tercih) ile telefon dikey
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        ApplicationProvider.getApplicationContext<android.content.Context>().getSharedPreferences("kamera", android.content.Context.MODE_PRIVATE).edit().putInt("masa.duzen", 4).commit()
+        Robolectric.buildActivity(MasaActivity::class.java).setup().use { c -> val a = c.get(); a.ornekDoldur(); kaydet(a, "masa-duzen4") }
+        ApplicationProvider.getApplicationContext<android.content.Context>().getSharedPreferences("kamera", android.content.Context.MODE_PRIVATE).edit().remove("masa.duzen").commit()
     }
 
     @Test fun katman() {

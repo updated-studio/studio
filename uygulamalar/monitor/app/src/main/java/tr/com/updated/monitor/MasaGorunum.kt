@@ -22,7 +22,7 @@ import javax.microedition.khronos.opengles.GL10
  * kaydı (ISO) için de her yuvanın yeni karesi kendi yüzeyine (isoHedef) tam boyutta çizilir.
  */
 class MasaGorunum(context: Context) : GLSurfaceView(context) {
-    companion object { const val EN_COK = 4; const val KAYIT_W = 1920; const val KAYIT_H = 1080 }
+    companion object { const val EN_COK = 4; const val KAYIT_W = 1920; const val KAYIT_H = 1080; const val TUVAL_W = 3840f; const val TUVAL_H = 2160f }
 
     /** Kaynak yuvası: yüzeyi (kaynak buraya çizer), boyutu, kaç derece döndürülerek gösterileceği */
     inner class Yuva(val no: Int) {
@@ -48,6 +48,22 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
     @Volatile var kayitW = KAYIT_W; @Volatile var kayitH = KAYIT_H
     /** Yuvanın ayrı kayıt yüzeyi ve boyutu (yalnız yeniden kodlanması gereken USB kaynaklar) */
     val isoHedef = arrayOfNulls<Triple<Surface, Int, Int>>(EN_COK)
+    /** Program düzeni (iOS ile ortak): 0 oto (kaynak sayısına göre), 1 tek (canlı kaynak), 2 yan yana, 3 üstte iki altta bir, 4 2×2. Kaynaklar yuva sırasıyla yerleşir */
+    @Volatile var duzen = 1
+        set(v) { field = v; requestRender() }
+    /** Düzende görünen yuvalar ve 3840×2160 tuvaldeki yerleri */
+    val etkinDuzen: Int get() = if (duzen == 0) dolu.count { it }.coerceIn(1, 4) else duzen
+    fun duzenHucreleri(): List<Pair<Int, RectF>> {
+        val duzen = etkinDuzen
+        if (duzen <= 1) return if (dolu[canli]) listOf(canli to RectF(0f, 0f, TUVAL_W, TUVAL_H)) else emptyList()
+        val y = (0 until EN_COK).filter { dolu[it] }.take(duzen)
+        val hucre = when (duzen) {
+            2 -> listOf(RectF(0f, 540f, 1920f, 1620f), RectF(1920f, 540f, 3840f, 1620f))
+            3 -> listOf(RectF(0f, 0f, 1920f, 1080f), RectF(1920f, 0f, 3840f, 1080f), RectF(960f, 1080f, 2880f, 2160f))
+            else -> listOf(RectF(0f, 0f, 1920f, 1080f), RectF(1920f, 0f, 3840f, 1080f), RectF(0f, 1080f, 1920f, 2160f), RectF(1920f, 1080f, 3840f, 2160f))
+        }
+        return y.zip(hucre)
+    }
 
     init {
         setEGLContextClientVersion(3)
@@ -133,7 +149,8 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
         override fun onFrameAvailable(s: SurfaceTexture?) { yuvalar.firstOrNull { it.doku === s }?.let { it.yeni = true; it.kare++ }; requestRender() }
 
         override fun onDrawFrame(gl: GL10?) {
-            val canliYeni = yuvalar[canli].yeni
+            val hucreler = duzenHucreleri()
+            val programYeni = hucreler.any { yuvalar[it.first].yeni }
             val yeniler = BooleanArray(EN_COK) { yuvalar[it].yeni }
             for (y in yuvalar) if (y.yeni) { y.yeni = false; runCatching { y.doku?.updateTexImage(); y.doku?.getTransformMatrix(y.mat) } }
             GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glViewport(0, 0, gw, gh); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
@@ -141,16 +158,18 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
             if (tablet) {
                 val (oniz, prog, kucukler) = tabletAlanlar(gw.toFloat(), gh.toFloat(), ustPay, altPay)
                 siradaki.takeIf { it in 0 until EN_COK && dolu[it] }?.let { ciz(yuvalar[it], oniz, gh) }
-                if (dolu[canli]) ciz(yuvalar[canli], prog, gh)
+                programCiz(hucreler, prog, gh)
                 kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
             } else {
                 val (canliA, kucukler) = alanlar(gw.toFloat(), gh.toFloat(), ustPay, altPay)
-                if (dolu[canli]) ciz(yuvalar[canli], canliA, gh)
+                programCiz(hucreler, canliA, gh)
                 kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
             }
             egllerTemizle()
-            if (canliYeni && dolu[canli]) kayitYuzeyi?.let { hedefeCiz(it, kayitW, kayitH, canli) }
-            for (i in 0 until EN_COK) if (yeniler[i] && dolu[i]) isoHedef[i]?.let { (s, w, h) -> hedefeCiz(s, w, h, i) }
+            // Program: düzendeki kaynaklardan biri yeni kare verdikçe (en çok ~60/sn)
+            val simdi = System.nanoTime()
+            if (programYeni && hucreler.isNotEmpty() && simdi - sonProgram >= 15_000_000L) kayitYuzeyi?.let { s -> sonProgram = simdi; hedefeCiz(s, kayitW, kayitH) { programCiz(hucreler, RectF(0f, 0f, kayitW.toFloat(), kayitH.toFloat()), kayitH) } }
+            for (i in 0 until EN_COK) if (yeniler[i] && dolu[i]) isoHedef[i]?.let { (s, w, h) -> hedefeCiz(s, w, h) { ciz(yuvalar[i], RectF(0f, 0f, w.toFloat(), h.toFloat()), h) } }
         }
 
         /** Kaynağı alana sığdırarak çizer (alan ekran koordinatında, üstten) */
@@ -182,14 +201,25 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
             EGL14.eglCreateWindowSurface(dpy, l[0], hedef, intArrayOf(EGL14.EGL_NONE), 0).takeIf { it != EGL14.EGL_NO_SURFACE }?.also { egller[hedef] = it }
         }.onFailure { HataKaydi.not("masa", it.stackTraceToString()) }.getOrNull()
 
-        /** Yuvayı kayıt yüzeyine sığdırarak çizer (kenarlar siyah) */
-        private fun hedefeCiz(hedef: Surface, w: Int, h: Int, i: Int) {
+        private var sonProgram = 0L
+
+        /** Program: tek düzende canlı kaynak alana sığar; çoklu düzende 16:9 tuval alana sığdırılıp her kaynak kendi hücresine sığar */
+        private fun programCiz(hucreler: List<Pair<Int, RectF>>, r: RectF, yukseklik: Int) {
+            if (etkinDuzen <= 1) { hucreler.firstOrNull()?.let { ciz(yuvalar[it.first], r, yukseklik) }; return }
+            var tw = r.width(); var th = r.height()
+            if (tw / th > TUVAL_W / TUVAL_H) tw = th * TUVAL_W / TUVAL_H else th = tw * TUVAL_H / TUVAL_W
+            val x0 = r.left + (r.width() - tw) / 2; val y0 = r.top + (r.height() - th) / 2; val k = tw / TUVAL_W
+            for ((i, c) in hucreler) ciz(yuvalar[i], RectF(x0 + c.left * k, y0 + c.top * k, x0 + c.right * k, y0 + c.bottom * k), yukseklik)
+        }
+
+        /** Kayıt yüzeyine çizer (önce siyaha boyanır) */
+        private fun hedefeCiz(hedef: Surface, w: Int, h: Int, cizim: () -> Unit) {
             val es = egl(hedef) ?: return
             val dpy = EGL14.eglGetCurrentDisplay()
             val ciz = EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW); val oku = EGL14.eglGetCurrentSurface(EGL14.EGL_READ); val bag = EGL14.eglGetCurrentContext()
             if (!EGL14.eglMakeCurrent(dpy, es, es, bag)) return
             GLES30.glViewport(0, 0, w, h); GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-            ciz(yuvalar[i], RectF(0f, 0f, w.toFloat(), h.toFloat()), h)
+            cizim()
             EGLExt.eglPresentationTimeANDROID(dpy, es, System.nanoTime())
             EGL14.eglSwapBuffers(dpy, es)
             EGL14.eglMakeCurrent(dpy, ciz, oku, bag)
