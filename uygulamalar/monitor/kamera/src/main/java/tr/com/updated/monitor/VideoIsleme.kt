@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
  */
 class VideoIsleme : Service() {
     /** Stil işleme (özgünün üstüne yazılır) ya da düzenleme (`duzen`: yeni dosya, özgün kalır) */
-    class Is(val uri: Uri, val lut: Lut?, val hevc: Boolean, val duzen: Duzen? = null, val vlogOn: Uri? = null) {
+    class Is(val uri: Uri, val lut: Lut?, val hevc: Boolean, val duzen: Duzen? = null, val vlogOn: Uri? = null, val vlogSil: Boolean = false, val dizin: Uri? = null) {
         companion object { fun duzenle(d: Duzen) = Is(d.kaynak, null, d.hevc, d) }
     }
     companion object {
@@ -83,7 +83,7 @@ class VideoIsleme : Service() {
     private fun siradaki() {
         val j = sira.poll() ?: run { yuzde = -1; ana.post { calisiyor = false; stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }; return }
         yuzde = 0
-        j.vlogOn?.let { o -> return vlog(j.uri, o, j.hevc) }
+        j.vlogOn?.let { o -> return vlog(j.uri, o, j.hevc, j.vlogSil, j.dizin) }
         j.duzen?.let { d -> return duzenle(d) }
         val lut = j.lut ?: run { islem.post { siradaki() }; return }
         val t = StilGom.video(this, j.uri, lut, j.hevc, islem.looper,
@@ -113,10 +113,12 @@ class VideoIsleme : Service() {
     }
 
     /** Vlog: arka + ön kamera dosyalarından birleşik video (yeni dosya; ikisi de kalır) */
-    private fun vlog(arka: Uri, on: Uri, hevc: Boolean) {
+    private fun vlog(arka: Uri, on: Uri, hevc: Boolean, sil: Boolean, dizin: Uri?) {
         bildirim("Vlog videosu birleştiriliyor", 0)
         val t = DuzenMotoru.vlogBirlestir(this, arka, on, hevc, islem.looper,
-            ilerleme = { p -> if (p != yuzde) { yuzde = p; ana.post { bildirim("Vlog videosu birleştiriliyor", p) } } }) { yeni ->
+            ilerleme = { p -> if (p != yuzde) { yuzde = p; ana.post { bildirim("Vlog videosu birleştiriliyor", p) } } }, dizin = dizin) { yeni ->
+            // "Yalnız final": birleşik dosya hazırsa ön ve arka kamera dosyaları silinir (birleşemezse ikisi kalır)
+            if (sil && yeni != null) { Disk.sil(this, arka); Disk.sil(this, on) }
             ana.post {
                 val b = bitti; sonTur = "vlog"
                 if (b != null) b(yeni ?: arka, yeni != null) else bilgi(if (yeni != null) "Vlog videosu galeride." else "Vlog videosu birleştirilemedi; iki kamera dosyası duruyor.")

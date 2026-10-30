@@ -88,6 +88,19 @@ class EkranTest {
             }
             tercih("kamera").edit().putString("mod", "TIMELAPSE").commit()
             Robolectric.buildActivity(KameraActivity::class.java).setup().use { c -> val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-timelapse-$ad") }
+            // Video: çerçeve kılavuzları (1:1 + 2,39:1 + güvenli alan); Stil pedi tek başına
+            tercih("kamera").edit().putString("mod", "VIDEO").putInt("k.cerceve", (1 shl 2) or (1 shl 6) or (1 shl 7)).commit()
+            Robolectric.buildActivity(KameraActivity::class.java).setup().use { c -> val a = c.get(); ornekGoruntu(a); kaydet(a, "kamera-cerceve-$ad")
+                if (ad == "orta") {
+                    val sinif = Class.forName("tr.com.updated.monitor.KameraActivity\$StilPad")
+                    val okuma = android.widget.TextView(a).apply { setTextColor(android.graphics.Color.WHITE); gravity = android.view.Gravity.CENTER; textSize = 10f; isSingleLine = true }
+                    val pad = sinif.getDeclaredConstructor(KameraActivity::class.java, android.widget.TextView::class.java).apply { isAccessible = true }.newInstance(a, okuma) as android.view.View
+                    val kutu = android.widget.LinearLayout(a).apply { orientation = android.widget.LinearLayout.VERTICAL; setBackgroundColor(android.graphics.Color.rgb(28, 28, 30)); setPadding(60, 60, 60, 60)
+                        addView(pad, android.widget.LinearLayout.LayoutParams(420, 420)); addView(okuma, android.widget.LinearLayout.LayoutParams(420, -2)) }
+                    (a.window.decorView as android.view.ViewGroup).addView(kutu, android.widget.FrameLayout.LayoutParams(-2, -2, android.view.Gravity.CENTER))
+                    kaydet(a, "kamera-stilpad-$ad")
+                }
+            }
         }
     }
 

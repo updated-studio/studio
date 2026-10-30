@@ -178,6 +178,20 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         listOfNotNull(0, 1.takeIf { CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON in m },
             2.takeIf { android.os.Build.VERSION.SDK_INT >= 33 && CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION in m })
     }
+    /**
+     * Gerçekte kullanılan sabitleme (iPhone etkinSabitleme ile aynı kural; Fatih 30 Ekim: "en yüksek sabitlemede görüntü yavaş geliyor, kare düşüyor"):
+     * Güçlü (önizleme sabitlemesi) yalnız kayıtta ve 1080p 30 fps'e kadar; kayıt dışında önizleme düşük gecikmeli Standart'ta kalır.
+     * `kayitIcin` true: kayıtta ne olacağı (ekranda gösterilen).
+     */
+    fun etkinSabitleme(kayitIcin: Boolean = kayitta): Int {
+        if (fotoModu || ayar.sabit !in sabitlemeler) return 0
+        val b = secilenBoyut(); val f = ayar.fps?.upper ?: 30
+        if (ayar.sabit == 2 && (b.height > 1080 || f > 30 || android.os.Build.VERSION.SDK_INT < 33)) return 1.takeIf { it in sabitlemeler } ?: 0
+        if (ayar.sabit == 2 && !kayitIcin) return 1.takeIf { it in sabitlemeler } ?: 0
+        return ayar.sabit
+    }
+    /** Optik sabitleme (OIS) var mı */
+    private val oisVar: Boolean by lazy { CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_ON in (oz.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION) ?: IntArray(0)) }
     /** Elle Kelvin: beyaz denge kapatılıp renk kazançları verilebiliyorsa */
     val elleBdVar: Boolean by lazy { CameraMetadata.CONTROL_AWB_MODE_OFF in yetenek.awbModlari && CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_POST_PROCESSING in yetenekler }
     /** Beyaz denge şu an kaç Kelvin (otomatikse son kazançlardan tahmin) */
@@ -371,12 +385,13 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             3 -> { r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON); r.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_TORCH) }
             else -> r.set(CaptureRequest.FLASH_MODE, CameraMetadata.FLASH_MODE_OFF)
         }
+        val sabit = if (foto) 0 else etkinSabitleme()
         r.set(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, when {
-            foto || fotoModu || ayar.sabit !in sabitlemeler -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF
-            ayar.sabit == 2 && android.os.Build.VERSION.SDK_INT >= 33 -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
-            ayar.sabit >= 1 -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON
+            sabit == 2 && android.os.Build.VERSION.SDK_INT >= 33 -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION
+            sabit >= 1 -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON
             else -> CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_OFF
         })
+        if (oisVar) r.set(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, if (sabit > 0 || foto || fotoModu) CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_ON else CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_OFF)
         sahneUygula(r, foto)
     }
 

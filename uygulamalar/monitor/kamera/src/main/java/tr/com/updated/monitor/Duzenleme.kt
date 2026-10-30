@@ -128,7 +128,7 @@ object DuzenMotoru {
 
     /** Vlog: arka ve ön kamera dosyalarından birleşik video ("<ad> vlog.mp4"); iki özgün dosya kalır. `disaAktar` gibi çalışır */
     @OptIn(UnstableApi::class)
-    fun vlogBirlestir(ctx: Context, arka: Uri, on: Uri, hevc: Boolean, looper: Looper, ilerleme: (Int) -> Unit = {}, bitti: (Uri?) -> Unit): Transformer? {
+    fun vlogBirlestir(ctx: Context, arka: Uri, on: Uri, hevc: Boolean, looper: Looper, ilerleme: (Int) -> Unit = {}, dizin: Uri? = null, bitti: (Uri?) -> Unit): Transformer? {
         val gecici = File(ctx.cacheDir, "vlog-${System.currentTimeMillis()}.mp4")
         val h = Handler(looper)
         return try {
@@ -140,7 +140,7 @@ object DuzenMotoru {
             val t = Transformer.Builder(ctx).setLooper(looper)
                 .setVideoMimeType(if (hevc) MimeTypes.VIDEO_H265 else MimeTypes.VIDEO_H264)
                 .addListener(object : Transformer.Listener {
-                    override fun onCompleted(c: Composition, s: ExportResult) { surer = false; bitti(yayinla(ctx, arka, gecici, "vlog")); gecici.delete() }
+                    override fun onCompleted(c: Composition, s: ExportResult) { surer = false; bitti(yayinla(ctx, arka, gecici, "vlog", dizin)); gecici.delete() }
                     override fun onError(c: Composition, s: ExportResult, e: ExportException) {
                         surer = false; HataKaydi.not("vlog", e.stackTraceToString()); gecici.delete(); bitti(null)
                     }
@@ -156,10 +156,16 @@ object DuzenMotoru {
         } catch (e: Exception) { HataKaydi.not("vlog", e.stackTraceToString()); gecici.delete(); null }
     }
 
-    /** Geçici dosyayı galeriye yeni video olarak koyar (özgünün yanına); olmazsa null */
-    private fun yayinla(ctx: Context, ozgun: Uri, dosya: File, ek: String = "düzenlendi"): Uri? = runCatching {
+    /** Geçici dosyayı galeriye yeni video olarak koyar (özgünün yanına; `dizin` verildiyse diskteki o klasöre); olmazsa null */
+    private fun yayinla(ctx: Context, ozgun: Uri, dosya: File, ek: String = "düzenlendi", dizin: Uri? = null): Uri? = runCatching {
         val r = ctx.contentResolver
         val ad = runCatching { r.query(ozgun, arrayOf(MediaStore.Video.Media.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null } }.getOrNull()
+        val diskte = dizin?.let { d -> runCatching {
+            val u = android.provider.DocumentsContract.createDocument(r, d, "video/mp4", yeniAd(ad, ek))!!
+            r.openOutputStream(u, "w")!!.use { o -> dosya.inputStream().use { it.copyTo(o, 1 shl 20) } }
+            u
+        }.onFailure { HataKaydi.not("disk", "birleşik video diske yazılamadı: ${it.message}") }.getOrNull() }
+        if (diskte != null) return@runCatching diskte
         val v = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, yeniAd(ad, ek)); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
             put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/UPDATED Kamera"); put(MediaStore.Video.Media.IS_PENDING, 1)
