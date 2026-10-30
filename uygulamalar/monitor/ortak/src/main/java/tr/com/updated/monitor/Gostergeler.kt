@@ -29,7 +29,7 @@ class KayitDugmesi(c: Context) : View(c) {
         c.drawCircle(cx, cy, r - b, halka)
         if (foto) { c.drawCircle(cx, cy, (if (basili) 26f else 30f) * b, beyaz); return }
         if (kayitta) { val s = 13f * b; c.drawRoundRect(RectF(cx - s, cy - s, cx + s, cy + s), 6f * b, 6f * b, kirmizi) }
-        else c.drawCircle(cx, cy, (if (basili) 26f else 30f) * b, kirmizi)
+        else { val s = (if (basili) 24f else 27f) * b; c.drawRoundRect(RectF(cx - s, cy - s, cx + s, cy + s), s * 0.69f, s * 0.69f, kirmizi) } // Sentez: yuvarlak kare (köşe 22/32)
     }
 }
 
