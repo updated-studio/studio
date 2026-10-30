@@ -199,6 +199,25 @@ class EkranTest {
             if (ad == "orta" && mod == "pro") Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> val a = c.get(); ornekGoruntu(a, parlak = true); ornekSes(a.window.decorView); kaydet(a, "$mod-$yon-parlak") }
         }
     }
+
+    /** Monitör ayarları: 6 sekme, başlıklı gruplar (iPhone'daki sekmeIcerik); STİLLER'de seçili stil ve sıfırla görünür */
+    @Test fun monitorAyarlar() {
+        RuntimeEnvironment.setQualifiers("w1180dp-h820dp-land-xhdpi")
+        val i = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java).putExtra("mod", "monitor")
+        Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> val a = c.get()
+            val ac = MainActivity::class.java.getDeclaredMethod("panelAc", MainActivity.Sekme::class.java).apply { isAccessible = true }
+            val ayar = MainActivity::class.java.getDeclaredField("ayarlar").apply { isAccessible = true }.get(a) as Array<*>
+            (ayar[0] as Ayarlar).stil = Stil(HazirStil.KLASIK_NEGATIF, x = 0.2f, doygunluk = -0.1f)
+            MainActivity.Sekme.values().forEach { s -> ac.invoke(a, s); kaydet(a, "monitor-ayar-${s.name.lowercase()}") }
+            ac.invoke(a, MainActivity.Sekme.STILLER); shadowOf(android.os.Looper.getMainLooper()).idle()
+            check(a.window.decorView.findViewWithText("LUT ekle") != null) { "LUT ekle kutusu yok" }
+        }
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        Robolectric.buildActivity(MainActivity::class.java, i).setup().use { c -> val a = c.get()
+            val ac = MainActivity::class.java.getDeclaredMethod("panelAc", MainActivity.Sekme::class.java).apply { isAccessible = true }
+            listOf(MainActivity.Sekme.STILLER, MainActivity.Sekme.GORUNTU).forEach { s -> ac.invoke(a, s); kaydet(a, "monitor-ayar-tel-${s.name.lowercase()}") }
+        }
+    }
 }
 
 private fun View.findViewWithText(t: String): View? {

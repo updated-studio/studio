@@ -21,6 +21,8 @@ data class Ayarlar(
     var monokrom: Boolean = false,
     var temiz: Boolean = false,           // temiz görüntü: odak/zebra/false color/kılavuzlar gizli (LUT kalır)
     var lutAdi: String = "",
+    /** Stiller (Kamera'daki ile aynı): seçili LUT'un üstüne biner, yalnız ekrana */
+    var stil: Stil = Stil(),
 )
 
 val PEAK_RENKLERI = arrayOf(floatArrayOf(1f, 0.15f, 0.15f), floatArrayOf(0.2f, 0.55f, 1f), floatArrayOf(1f, 1f, 1f), floatArrayOf(1f, 0.9f, 0.1f))

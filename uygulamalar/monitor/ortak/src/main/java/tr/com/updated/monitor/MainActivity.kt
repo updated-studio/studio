@@ -48,12 +48,11 @@ import kotlin.math.max
  * UPDATED Monitör — yerleşim Blackmagic Camera düzeninde (ekip kendi tasarımına dönüştürecek; dağıtım yok, iç kullanım):
  * üstte parametre şeridi (KARE HIZI · ENSTANTANE · DİYAFRAM · zaman kodu · ISO · BEYAZ DENGESİ · EV; dokununca altta ayar şeridi),
  * solda kaynak/büyütme/odak/temiz sütunu, sağda ayarlar · kayıt düğmesi · son çekim · kalan süre, altta histogram · hızlı araçlar ·
- * ses göstergesi. Ayarlar üstte sekmeli tam ekran panel: KAYIT · MONİTÖR · KILAVUZ · LUT · ÖLÇÜM · SES · KAYNAK · KURULUM.
+ * ses göstergesi. Ayarlar üstte sekmeli tam ekran panel (iPhone'daki gibi başlıklı gruplar): KAYNAK · GÖRÜNTÜ · STİLLER · KADRAJ · ÖLÇÜM · KAYIT.
  */
 class MainActivity : Activity() {
     enum class Kip(val ad: String) { TEK("Tek ekran"), OLCUM("Görüntü + ölçümler"), KARSILASTIR("LUT karşılaştırma"), IKI("İki kaynak") }
-    enum class Sekme(val ad: String, val simge: Int) { KAYIT("KAYIT", R.drawable.ic_kayit), MONITOR("MONİTÖR", R.drawable.ic_monitor), KOMPOZISYON("KOMPOZİSYON", R.drawable.ic_kilavuz), KILAVUZ("KILAVUZ", R.drawable.ic_kadraj),
-        LUT("LUT", R.drawable.ic_lut), OLCUM("ÖLÇÜM", R.drawable.ic_olcum), SES("SES", R.drawable.ic_ses), KAYNAK("KAYNAK", R.drawable.ic_kaynak), KURULUM("KURULUM", R.drawable.ic_bilgi) }
+    enum class Sekme(val ad: String) { KAYNAK("KAYNAK"), GORUNTU("GÖRÜNTÜ"), STILLER("STİLLER"), KADRAJ("KADRAJ"), OLCUM("ÖLÇÜM"), KAYIT("KAYIT") }
     enum class Param { FPS, ENSTANTANE, DIYAFRAM, ISO, WB, EV, ODAK, SAHNE }
 
     // Renkler (Blackmagic düzeni: siyah şeritler, gri etiket, beyaz değer, kırmızı kayıt)
@@ -275,7 +274,7 @@ class MainActivity : Activity() {
                 "uvc" -> UvcKaynak.aygitlar(this).firstOrNull { "%04x:%04x".format(it.vendorId, it.productId) == tercih.getString("uvc$i", null) }?.let { uvcAc(i, it) }
                     ?: if (i == 0) UvcKaynak.aygitlar(this).firstOrNull()?.let { uvcAc(i, it) } else null
             }
-            ayarlar[i].takeIf { it.lutAcik && it.lutAdi.isNotEmpty() }?.let { a -> runCatching { File(lutKlasoru, a.lutAdi).inputStream().use { Lut.oku(a.lutAdi, it) } }.getOrNull()?.let { monitorler[i]?.lutYukle(it) } }
+            renkGuncelle(i)
         }
     }
 
@@ -527,7 +526,7 @@ class MainActivity : Activity() {
         kare(if (ka.odakMesafe == null) "AF" else "MF", "ODAK", acikParam == Param.ODAK) { if (acikParam == Param.ODAK) seritKapat() else seritAc(Param.ODAK) }
         if (proMod) kare(if (sahne == Sahne.KAPALI) (if (sahneOto) "OTO" else "") else sahne.ad.uppercase(Locale("tr")).take(6), "SAHNE", acikParam == Param.SAHNE || sahne != Sahne.KAPALI, if (sahne == Sahne.KAPALI && !sahneOto) R.drawable.ic_sahne else null) { if (acikParam == Param.SAHNE) seritKapat() else seritAc(Param.SAHNE) }
         kare("", "TEMİZ", a.temiz, R.drawable.ic_temiz) { a.temiz = !a.temiz; kaydet(); solCiz(); yenile() }
-        kare("", "DÜZEN", simge = R.drawable.ic_duzen) { panelAc(Sekme.MONITOR) }
+        kare("", "DÜZEN", simge = R.drawable.ic_duzen) { panelAc(Sekme.GORUNTU) }
     }
 
     /* ================= sağ sütun ================= */
@@ -580,7 +579,7 @@ class MainActivity : Activity() {
         c("ODAK", R.drawable.ic_odak, a.peaking) { a.peaking = !a.peaking }
         c("ZEBRA", R.drawable.ic_zebra, a.zebra) { a.zebra = !a.zebra }
         c("FALSE", R.drawable.ic_renk, a.falseColor) { a.falseColor = !a.falseColor }
-        c("LUT", R.drawable.ic_lut, a.lutAcik) { if (a.lutAdi.isEmpty()) panelAc(Sekme.LUT) else a.lutAcik = !a.lutAcik }
+        c("STİL", R.drawable.ic_lut, a.lutAcik || a.stil.etkin) { panelAc(Sekme.STILLER) }
         c("KILAVUZ", R.drawable.ic_kadraj, a.kilavuz > 0f || a.izgara) { if (a.kilavuz > 0f || a.izgara) { a.kilavuz = 0f; a.izgara = false } else a.kilavuz = 2.39f }
         c(if (kompTur == KompTur.KAPALI) "KOMPOZİSYON" else kompTur.ad.uppercase(Locale("tr")), R.drawable.ic_kilavuz, kompTur != KompTur.KAPALI) { if (kompTur == KompTur.KAPALI) kompTur = sonKomp else { sonKomp = kompTur; kompTur = KompTur.KAPALI }; kompUygula() }
         c("YARDIMCI", R.drawable.ic_yardimci, asistanAcik) { asistanAcik = !asistanAcik; kompUygula() }
@@ -767,26 +766,103 @@ class MainActivity : Activity() {
     private fun panelAc(s: Sekme) { sekme = s; panel.visibility = View.VISIBLE; panelCiz() }
     private fun panelKapat() { panel.visibility = View.GONE; kaydet(); arayuzCiz(); yenile() }
 
+    /** Panel yeniden çizilince aynı sekmede kaydırma yeri korunur */
+    private var panelKaydir: ScrollView? = null; private var panelSonSekme: Sekme? = null
+
     private fun panelCiz() {
+        val eskiY = if (panelSonSekme == sekme) panelKaydir?.scrollY ?: 0 else 0
+        panelSonSekme = sekme
         panel.removeAllViews()
         val dk = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         panel.addView(dk, FrameLayout.LayoutParams(-1, -1))
+        // iPhone'daki gibi yalnız ad: seçilende beyaz yazı ve altında beyaz çizgi
         val sekmeler = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setBackgroundColor(SIYAH); setPadding(dp(8f), 0, dp(8f), 0) }
         Sekme.values().forEach { s -> sekmeler.addView(TextView(this).apply {
-            text = s.ad; textSize = 14f; typeface = dar; letterSpacing = 0.06f; gravity = Gravity.CENTER; setPadding(dp(16f), dp(14f), dp(16f), dp(12f))
-            setTextColor(if (s == sekme) Color.WHITE else GRI); Tema.simge(this, s.simge, boy = 16f)
-            background = if (s == sekme) GradientDrawable().apply { setColor(SIYAH); setStroke(0, 0) }.also { } else null
-            if (s == sekme) setCompoundDrawablesWithIntrinsicBounds(null, null, null, GradientDrawable().apply { setColor(Color.WHITE); setSize(dp(40f), dp(3f)) })
+            text = s.ad; textSize = 14f; typeface = dar; letterSpacing = 0.08f; gravity = Gravity.CENTER; setPadding(dp(16f), dp(14f), dp(16f), dp(12f))
+            setTextColor(if (s == sekme) Color.WHITE else GRI)
+            setCompoundDrawablesWithIntrinsicBounds(null, null, null, GradientDrawable().apply { setColor(if (s == sekme) Color.WHITE else Color.TRANSPARENT); setSize(dp(28f), dp(2f)) })
+            compoundDrawablePadding = dp(8f)
             setOnClickListener { sekme = s; panelCiz() } }) }
         sekmeler.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         sekmeler.addView(ImageView(this).apply { setImageResource(R.drawable.ic_kapat); scaleType = ImageView.ScaleType.CENTER; contentDescription = "Kapat"; setOnClickListener { panelKapat() } }, LinearLayout.LayoutParams(dp(56f), dp(48f)))
         dk.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; isFillViewport = true; addView(sekmeler) }, LinearLayout.LayoutParams(-1, dp(52f)))
-        val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(28f), dp(12f), dp(28f), dp(28f)) }
-        dk.addView(ScrollView(this).apply { addView(ic) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        dk.addView(View(this).apply { setBackgroundColor(Color.argb(46, 255, 255, 255)) }, LinearLayout.LayoutParams(-1, 1))
+        val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; val y = dp(if (darPanel) 20f else 28f); setPadding(y, dp(4f), y, dp(36f)) }
+        // Geniş ekranda içerik 760 dp sütunda ortalanır
+        val sutun = FrameLayout(this).apply { addView(ic, FrameLayout.LayoutParams(if (resources.displayMetrics.widthPixels > dp(816f)) dp(760f) else -1, -2, Gravity.CENTER_HORIZONTAL)) }
+        val sv = ScrollView(this).apply { addView(sutun) }
+        panelKaydir = sv
+        dk.addView(sv, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (eskiY > 0) sv.post { sv.scrollTo(0, eskiY) }
         val a = ayarlar[etkin]; val k = kamera(); val ka = kamAyar[etkin]
-        if (kip == Kip.IKI && sekme != Sekme.KURULUM) aciklama(ic, "${etkin + 1}. bölmenin ayarları (bölmeye dokunarak değiştir)")
+        if (kip == Kip.IKI) aciklama(ic, "${etkin + 1}. bölmenin ayarları (bölmeye dokunarak değiştir)")
         when (sekme) {
+            Sekme.KAYNAK -> {
+                if (proMod) baslik(ic, "KAMERA") else baslik(ic, "KAYNAKLAR")
+                val kamlar = kaynakKameralari()
+                kamlar.forEach { kk -> satir(ic, kk.second, kaynakAdi[etkin] == kk.second) { kameraAc(etkin, kk); panelCiz() } }
+                if (!proMod) UvcKaynak.aygitlar(this).forEach { d -> val ad = "USB görüntü (doğrudan): " + (d.productName ?: d.manufacturerName ?: "aygıt")
+                    satir(ic, ad, (kaynaklar[etkin] as? UvcKaynak)?.aygit?.deviceName == d.deviceName) { uvcAc(etkin, d); panelCiz() } }
+                if (!proMod) satir(ic, "Ağ yayını (RTSP · RTMP · HLS)…", kaynaklar[etkin] is AgKaynak) { agSor() }
+                if (!proMod) wifiKameralar.forEach { (ad, h) -> satir(ic, "Wi-Fi kamera: $ad", (kaynaklar[etkin] as? WifiKameraKaynak)?.ad == ad) { wifiAc(etkin, ad, h.first, h.second); panelCiz() } }
+                if (!proMod) aciklama(ic, "Wi-Fi kamera: başka telefonda UPDATED Kamera → Ayarlar → Wi-Fi kamera ol (iPhone'da üstteki Wi-Fi simgesi). Aynı ağdaysa burada kendiliğinden listelenir.")
+                if (!proMod && kamlar.none { it.second.startsWith("USB") } && UvcKaynak.aygitlar(this).isEmpty()) { aciklama(ic, "USB görüntü kaynağı yok. HDMI→USB çeviriciyi ya da kamerayı USB-C ile tak; fotoğraf makinesini \"USB yayını\" (USB Streaming) moduna al."); satir(ic, "Takılı USB aygıtını denetle", false) { taniGosterildi = false; usbTani() } }
+                baslik(ic, "GÖRÜNTÜYÜ ÇEVİR")
+                val ana = floatArrayOf(1f, 1.33f, 1.5f, 1.6f, 1.8f, 2f)
+                secenek(ic, "ANAMORFİK AÇMA", listOf("Kapalı", "1,33x", "1,5x", "1,6x", "1,8x", "2x"), ana.indexOfFirst { abs(it - a.desqueeze) < 0.01f }.coerceAtLeast(0)) { a.desqueeze = ana[it] }
+                secenek(ic, "DÖNDÜR", listOf("0°", "90°", "180°", "270°"), a.dondur / 90) { a.dondur = it * 90; monitorler[etkin]?.let { m -> m.tampon(m.kaynakBoyut[0], m.kaynakBoyut[1]) } }
+                anahtar(ic, "AYNA", a.ayna) { a.ayna = it }
+                anahtar(ic, "TERS ÇEVİR", a.cevir) { a.cevir = it }
+            }
+            Sekme.GORUNTU -> {
+                baslik(ic, "ODAK")
+                anahtar(ic, "ODAK YARDIMI", a.peaking) { a.peaking = it }
+                secenek(ic, "ODAK RENGİ", listOf("Kırmızı", "Mavi", "Beyaz", "Sarı"), a.peakRenk) { a.peakRenk = it }
+                secenek(ic, "ODAK HASSASİYETİ", listOf("Hassas", "Normal", "Kaba"), when (a.peakEsik) { 0.1f -> 0; 0.3f -> 2; else -> 1 }) { a.peakEsik = floatArrayOf(0.1f, 0.18f, 0.3f)[it] }
+                secenek(ic, "BÜYÜTME", listOf("1x", "2x", "4x"), when (a.zoom) { 2f -> 1; 4f -> 2; else -> 0 }) { a.zoom = floatArrayOf(1f, 2f, 4f)[it] }
+                baslik(ic, "POZLAMA")
+                anahtar(ic, "ZEBRA", a.zebra) { a.zebra = it }
+                val zeb = floatArrayOf(0.7f, 0.75f, 0.8f, 0.85f, 0.9f, 0.95f, 0.995f)
+                secenek(ic, "ZEBRA SEVİYESİ", listOf("%70", "%75", "%80", "%85", "%90", "%95", "%100"), zeb.indexOfFirst { abs(it - a.zebraEsik) < 0.01f }.coerceAtLeast(0)) { a.zebraEsik = zeb[it] }
+                anahtar(ic, "FALSE COLOR", a.falseColor) { a.falseColor = it }
+                anahtar(ic, "SİYAH-BEYAZ", a.monokrom) { a.monokrom = it }
+                baslik(ic, "EKRAN")
+                secenek(ic, "EKRAN DÜZENİ", Kip.values().map { it.ad }, kip.ordinal) { kip = Kip.values()[it]; tercih.edit().putString("kip2", kip.name).apply(); kur() }
+                anahtar(ic, "TEMİZ GÖRÜNTÜ", a.temiz) { a.temiz = it }
+            }
+            Sekme.STILLER -> {
+                aciklama(ic, "Kamera'daki Stiller: hazır görünüm, film reçetesi ya da kendi .cube LUT'un. Etkin bölmeye uygulanır, yalnız ekrana; kayıt temiz kalır.")
+                stilPanosu(ic)
+            }
+            Sekme.KADRAJ -> {
+                baslik(ic, "AKILLI KADRAJ")
+                anahtar(ic, "AKILLI YARDIMCI", asistanAcik) { asistanAcik = it; kompUygula() }
+                aciklama(ic, "Yardımcı yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca ibre yeşile döner. Telefonun içinde çalışır, internet gerekmez.")
+                anahtar(ic, "KOMPOZİSYON ÖNERİSİ", oneriAcik) { oneriAcik = it; kompUygula() }
+                aciklama(ic, "Konuya en az hareketle uyan kılavuzu üstte önerir; dokununca uygulanır.")
+                baslik(ic, "KOMPOZİSYON")
+                secenek(ic, "KILAVUZ", KompTur.values().map { it.ad }, kompTur.ordinal) { kompTur = KompTur.values()[it]; if (kompTur != KompTur.KAPALI) sonKomp = kompTur; kompUygula() }
+                if (kompTur == KompTur.SPIRAL || kompTur == KompTur.UCGEN) secenek(ic, "YÖN", listOf("Sağ alt", "Sol alt", "Sağ üst", "Sol üst"), kompYon) { kompYon = it; kompUygula() }
+                anahtar(ic, "TERAZİ (UFUK)", teraziAcik) { teraziAcik = it; kompUygula() }
+                baslik(ic, "ÇERÇEVE")
+                val oran = floatArrayOf(0f, 2.39f, 2.35f, 2f, 1.85f, 16f / 9f, 4f / 3f, 0.8f, 9f / 16f, 1f)
+                secenek(ic, "KADRAJ ORANI", listOf("Kapalı", "2,39:1", "2,35:1", "2:1", "1,85:1", "16:9", "4:3", "4:5", "9:16", "1:1"), oran.indexOfFirst { abs(it - a.kilavuz) < 0.01f }.coerceAtLeast(0)) { a.kilavuz = oran[it] }
+                secenek(ic, "GÜVENLİ ALAN", listOf("Kapalı", "%90", "%80"), when (a.guvenli) { 0.9f -> 1; 0.8f -> 2; else -> 0 }) { a.guvenli = floatArrayOf(0f, 0.9f, 0.8f)[it] }
+                anahtar(ic, "IZGARA (ÜÇTE BİR)", a.izgara) { a.izgara = it }
+                anahtar(ic, "MERKEZ İŞARETİ", a.merkez) { a.merkez = it }
+            }
+            Sekme.OLCUM -> {
+                baslik(ic, "EKRANDA")
+                anahtar(ic, "HİSTOGRAM (ALT ŞERİT)", koseHisto) { koseHisto = it; tercih.edit().putBoolean("koseHisto", it).apply(); olcumBagla() }
+                anahtar(ic, "SES GÖSTERGESİ", sesGosterge) { sesGosterge = it; tercih.edit().putBoolean("sesGosterge", it).apply(); if (it) sesOlcerBaslat() else sesOlcer.durdur(); altCiz() }
+                aciklama(ic, "Ses göstergesi −60…0 dBFS, yeşil → sarı (−12) → kırmızı (−3). Mikrofon: telefonun kamera mikrofonu ya da USB ses girişi.")
+                baslik(ic, "ÖLÇÜM PANELİ")
+                aciklama(ic, "Tam ölçüm paneli: GÖRÜNTÜ → EKRAN DÜZENİ → Görüntü + ölçümler. Panelde görünecekler:")
+                val o = olcum
+                OlcumGorunum.Tur.values().forEach { t -> anahtar(ic, t.ad.uppercase(Locale("tr")), o?.gorunen?.contains(t) ?: true) { ok -> o?.let { it.gorunen = LinkedHashSet(if (ok) it.gorunen + t else it.gorunen - t) } } }
+            }
             Sekme.KAYIT -> {
+                baslik(ic, "GÖRÜNTÜ")
                 if (k == null) aciklama(ic, "Kayıt yalnız kamera ve USB kaynağında. Ağ yayınında kayıt yok.")
                 else if (fotoMod) {
                     secenek(ic, "MOD", listOf("FOTO", "VİDEO"), 0) { modSec(it == 0) }
@@ -797,104 +873,131 @@ class MainActivity : Activity() {
                     else aciklama(ic, "Bu kamera RAW (DNG) vermiyor; fotoğraflar JPEG.")
                     secenek(ic, "ZAMANLAYICI", listOf("Kapalı", "3 sn", "10 sn"), when (zamanlayici) { 3 -> 1; 10 -> 2; else -> 0 }) { zamanlayici = intArrayOf(0, 3, 10)[it]; tercih.edit().putInt("zamanlayici", zamanlayici).apply() }
                     anahtar(ic, "DEKLANŞÖR SESİ", deklansorSesi) { deklansorSesi = it; tercih.edit().putBoolean("deklansorSesi", it).apply() }
-                    aciklama(ic, "Fotoğraflar: Galeri → Pictures/UPDATED Kamera. Önizleme fotoğrafın en/boy oranına geçer. Odak yardımı, zebra, kılavuz ve LUT fotoğrafa girmez. El ile enstantanede uzun pozlama (30 sn'ye kadar, kamera izin veriyorsa) seçilebilir.")
+                    aciklama(ic, "Fotoğraflar: Galeri → Pictures/UPDATED Kamera. Önizleme fotoğrafın en/boy oranına geçer. Odak yardımı, zebra, kılavuz ve stil fotoğrafa girmez. El ile enstantanede uzun pozlama (30 sn'ye kadar, kamera izin veriyorsa) seçilebilir.")
                 } else {
                     secenek(ic, "MOD", listOf("FOTO", "VİDEO"), 1) { modSec(it == 0) }
                     if (k.kayitta) aciklama(ic, "Kayıt sürerken çözünürlük ve kare hızı değişmez.")
                     val boyutlar = k.yetenek.boyutlar; val secili = k.secilenBoyut()
                     secenek(ic, "ÇÖZÜNÜRLÜK", boyutlar.map { "${it.width}×${it.height}" }, boyutlar.indexOf(secili)) { if (!k.kayitta) { ka.boyut = boyutlar[it]; k.oturumYenile { w, h -> monitorler[etkin]?.tampon(w, h) } } }
                     secenek(ic, "KARE HIZI", listOf("OTO") + k.yetenek.fpsler.map { if (it.lower == it.upper) "${it.upper}" else "${it.lower}–${it.upper}" }, ka.fps?.let { k.yetenek.fpsler.indexOf(it) + 1 } ?: 0) { if (!k.kayitta) { ka.fps = if (it == 0) null else k.yetenek.fpsler[it - 1]; k.oturumYenile { w, h -> monitorler[etkin]?.tampon(w, h) } } }
+                    baslik(ic, "DOSYA")
                     secenek(ic, "KODEK", listOf("H.264", "H.265 (HEVC)"), if (hevc) 1 else 0) { hevc = it == 1 }
                     val hizlar = listOf(10, 20, 35, 50, 80, 100, 150)
                     secenek(ic, "BİT HIZI", hizlar.map { "$it Mb/sn" }, hizlar.indexOf(mbps).coerceAtLeast(0)) { mbps = hizlar[it] }
-                    anahtar(ic, "SES KAYDI", sesKayit) { sesKayit = it }
                     anahtar(ic, "GÖRÜNTÜ SABİTLEME", ka.sabit > 0) { ka.sabit = if (it) 1 else 0; k.ayarDegisti() }
-                    aciklama(ic, "Kayıtlar: Galeri → Movies/UPDATED Monitör. Kayıt temizdir (odak, zebra, kılavuz ve LUT kayda girmez). Kayıt düğmesine basılı tutunca ekran görüntüsü alınır.")
+                    aciklama(ic, "Kayıtlar: Galeri → Movies/UPDATED Monitör. Kayıt temizdir (odak, zebra, kılavuz ve stil kayda girmez). Kayıt düğmesine basılı tutunca ekran görüntüsü alınır.")
                 }
-            }
-            Sekme.MONITOR -> {
-                secenek(ic, "EKRAN DÜZENİ", Kip.values().map { it.ad }, kip.ordinal) { kip = Kip.values()[it]; tercih.edit().putString("kip2", kip.name).apply(); kur() }
-                anahtar(ic, "ODAK YARDIMI", a.peaking) { a.peaking = it }
-                secenek(ic, "ODAK RENGİ", listOf("Kırmızı", "Mavi", "Beyaz", "Sarı"), a.peakRenk) { a.peakRenk = it }
-                secenek(ic, "ODAK HASSASİYETİ", listOf("Hassas", "Normal", "Kaba"), when (a.peakEsik) { 0.1f -> 0; 0.3f -> 2; else -> 1 }) { a.peakEsik = floatArrayOf(0.1f, 0.18f, 0.3f)[it] }
-                anahtar(ic, "ZEBRA", a.zebra) { a.zebra = it }
-                val zeb = floatArrayOf(0.7f, 0.75f, 0.8f, 0.85f, 0.9f, 0.95f, 0.995f)
-                secenek(ic, "ZEBRA SEVİYESİ", listOf("%70", "%75", "%80", "%85", "%90", "%95", "%100"), zeb.indexOfFirst { abs(it - a.zebraEsik) < 0.01f }.coerceAtLeast(0)) { a.zebraEsik = zeb[it] }
-                anahtar(ic, "FALSE COLOR", a.falseColor) { a.falseColor = it }
-                anahtar(ic, "SİYAH-BEYAZ", a.monokrom) { a.monokrom = it }
-                anahtar(ic, "TEMİZ GÖRÜNTÜ", a.temiz) { a.temiz = it }
-                secenek(ic, "BÜYÜTME", listOf("1x", "2x", "4x"), when (a.zoom) { 2f -> 1; 4f -> 2; else -> 0 }) { a.zoom = floatArrayOf(1f, 2f, 4f)[it] }
-            }
-            Sekme.KOMPOZISYON -> {
-                secenek(ic, "KOMPOZİSYON KILAVUZU", KompTur.values().map { it.ad }, kompTur.ordinal) { kompTur = KompTur.values()[it]; if (kompTur != KompTur.KAPALI) sonKomp = kompTur; kompUygula() }
-                if (kompTur == KompTur.SPIRAL || kompTur == KompTur.UCGEN) secenek(ic, "YÖN", listOf("Sağ alt", "Sol alt", "Sağ üst", "Sol üst"), kompYon) { kompYon = it; kompUygula() }
-                anahtar(ic, "AKILLI YARDIMCI", asistanAcik) { asistanAcik = it; kompUygula() }
-                aciklama(ic, "Yardımcı yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca ibre yeşile döner. Telefonun içinde çalışır, internet gerekmez.")
-                anahtar(ic, "KOMPOZİSYON ÖNERİSİ", oneriAcik) { oneriAcik = it; kompUygula() }
-                aciklama(ic, "Konuya en az hareketle uyan kılavuzu üstte önerir; dokununca uygulanır.")
-                anahtar(ic, "TERAZİ (UFUK)", teraziAcik) { teraziAcik = it; kompUygula() }
-            }
-            Sekme.KILAVUZ -> {
-                val oran = floatArrayOf(0f, 2.39f, 2.35f, 2f, 1.85f, 16f / 9f, 4f / 3f, 0.8f, 9f / 16f, 1f)
-                secenek(ic, "KADRAJ KILAVUZU", listOf("Kapalı", "2,39:1", "2,35:1", "2:1", "1,85:1", "16:9", "4:3", "4:5", "9:16", "1:1"), oran.indexOfFirst { abs(it - a.kilavuz) < 0.01f }.coerceAtLeast(0)) { a.kilavuz = oran[it] }
-                anahtar(ic, "IZGARA (ÜÇTE BİR)", a.izgara) { a.izgara = it }
-                anahtar(ic, "MERKEZ İŞARETİ", a.merkez) { a.merkez = it }
-                secenek(ic, "GÜVENLİ ALAN", listOf("Kapalı", "%90", "%80"), when (a.guvenli) { 0.9f -> 1; 0.8f -> 2; else -> 0 }) { a.guvenli = floatArrayOf(0f, 0.9f, 0.8f)[it] }
-            }
-            Sekme.LUT -> {
-                anahtar(ic, "EKRAN LUT'U", a.lutAcik) { a.lutAcik = it }
-                val l = lutKlasoru.listFiles { f -> f.name.endsWith(".cube", true) }?.sortedBy { it.name.lowercase() }.orEmpty()
-                aciklama(ic, if (l.isEmpty()) "Kitaplık boş. 3D .cube LUT ekle; eklediklerin burada saklanır. LUT yalnız ekrana uygulanır, kayda girmez." else "Kitaplık (${l.size}). Seçince etkin bölmeye uygulanır:")
-                l.forEach { f -> satir(ic, f.name.removeSuffix(".cube"), f.name == a.lutAdi && a.lutAcik, simge = R.drawable.ic_lut, sil = { f.delete(); if (a.lutAdi == f.name) { a.lutAdi = ""; a.lutAcik = false }; panelCiz() }) {
-                    runCatching { f.inputStream().use { Lut.oku(f.name, it) } }.onSuccess { lut -> a.lutAdi = f.name; monitorler[etkin]?.lutYukle(lut); kaydet(); panelCiz() }.onFailure { tost("LUT okunamadı: ${it.message}") } } }
-                ic.addView(Tema.dugme(this, "LUT EKLE (.cube)").apply { typeface = dar; Tema.simge(this, R.drawable.ic_ekle, boy = 16f); setOnClickListener { lutSec() } }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(12f) })
-            }
-            Sekme.OLCUM -> {
-                anahtar(ic, "HİSTOGRAM (ALT ŞERİT)", koseHisto) { koseHisto = it; tercih.edit().putBoolean("koseHisto", it).apply(); olcumBagla() }
-                aciklama(ic, "Tam ölçüm paneli: MONİTÖR → EKRAN DÜZENİ → Görüntü + ölçümler. Panelde görünecekler:")
-                val o = olcum
-                OlcumGorunum.Tur.values().forEach { t -> anahtar(ic, t.ad.uppercase(Locale("tr")), o?.gorunen?.contains(t) ?: true) { ok -> o?.let { it.gorunen = LinkedHashSet(if (ok) it.gorunen + t else it.gorunen - t) } } }
-            }
-            Sekme.SES -> {
-                anahtar(ic, "SES GÖSTERGESİ", sesGosterge) { sesGosterge = it; tercih.edit().putBoolean("sesGosterge", it).apply(); if (it) sesOlcerBaslat() else sesOlcer.durdur(); altCiz() }
+                baslik(ic, "SES")
                 anahtar(ic, "SES KAYDI", sesKayit) { sesKayit = it }
-                aciklama(ic, "Gösterge −60…0 dBFS, yeşil → sarı (−12) → kırmızı (−3). Mikrofon: telefonun kamera mikrofonu ya da USB ses girişi.")
                 if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) satir(ic, "Mikrofon iznini ver", false) { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 3) }
-            }
-            Sekme.KAYNAK -> {
-                val kamlar = kaynakKameralari()
-                kamlar.forEach { kk -> satir(ic, kk.second, kaynakAdi[etkin] == kk.second) { kameraAc(etkin, kk); panelCiz() } }
-                if (!proMod) UvcKaynak.aygitlar(this).forEach { d -> val ad = "USB görüntü (doğrudan): " + (d.productName ?: d.manufacturerName ?: "aygıt")
-                    satir(ic, ad, (kaynaklar[etkin] as? UvcKaynak)?.aygit?.deviceName == d.deviceName) { uvcAc(etkin, d); panelCiz() } }
-                if (!proMod) satir(ic, "Ağ yayını (RTSP · RTMP · HLS)…", kaynaklar[etkin] is AgKaynak) { agSor() }
-                if (!proMod) wifiKameralar.forEach { (ad, h) -> satir(ic, "Wi-Fi kamera: $ad", (kaynaklar[etkin] as? WifiKameraKaynak)?.ad == ad) { wifiAc(etkin, ad, h.first, h.second); panelCiz() } }
-                if (!proMod) aciklama(ic, "Wi-Fi kamera: başka telefonda UPDATED Kamera → Ayarlar → Wi-Fi kamera ol (iPhone'da üstteki Wi-Fi simgesi). Aynı ağdaysa burada kendiliğinden listelenir.")
-                if (!proMod && kamlar.none { it.second.startsWith("USB") } && UvcKaynak.aygitlar(this).isEmpty()) { aciklama(ic, "USB görüntü kaynağı yok. HDMI→USB çeviriciyi ya da kamerayı USB-C ile tak; fotoğraf makinesini \"USB yayını\" (USB Streaming) moduna al."); satir(ic, "Takılı USB aygıtını denetle", false) { taniGosterildi = false; usbTani() } }
-                val ana = floatArrayOf(1f, 1.33f, 1.5f, 1.6f, 1.8f, 2f)
-                secenek(ic, "ANAMORFİK AÇMA", listOf("Kapalı", "1,33x", "1,5x", "1,6x", "1,8x", "2x"), ana.indexOfFirst { abs(it - a.desqueeze) < 0.01f }.coerceAtLeast(0)) { a.desqueeze = ana[it] }
-                secenek(ic, "DÖNDÜR", listOf("0°", "90°", "180°", "270°"), a.dondur / 90) { a.dondur = it * 90; monitorler[etkin]?.let { m -> m.tampon(m.kaynakBoyut[0], m.kaynakBoyut[1]) } }
-                anahtar(ic, "AYNA", a.ayna) { a.ayna = it }
-                anahtar(ic, "TERS ÇEVİR", a.cevir) { a.cevir = it }
-            }
-            Sekme.KURULUM -> {
+                baslik(ic, "CİHAZ")
                 anahtar(ic, "EKRAN PARLAKLIĞI EN YÜKSEK", parlaklikTam) { parlaklikTam = it; tercih.edit().putBoolean("parlaklik", it).apply(); parlaklik() }
                 satir(ic, "Yardım", false) { yardim() }
-                aciklama(ic, "Çökme ve donmalar kendiliğinden UPDATED'a bildirilir (yalnız hata ayrıntısı ve cihaz modeli).")
                 satir(ic, "Güncellemeleri denetle", false) { Guncelleme.denetle(this, sessiz = false) }
-                aciklama(ic, "UPDATED Kamera ${packageManager.getPackageInfo(packageName, 0).versionName} · açılışta yeni sürüm kendiliğinden denetlenir.")
+                aciklama(ic, "${packageManager.getApplicationLabel(applicationInfo)} ${packageManager.getPackageInfo(packageName, 0).versionName} · açılışta yeni sürüm kendiliğinden denetlenir. Çökme ve donmalar kendiliğinden UPDATED'a bildirilir (yalnız hata ayrıntısı ve cihaz modeli).")
             }
         }
     }
 
+    /** Grup başlığı (iPhone'daki bolumBasligi): küçük, aralıklı, gri; ilk grup dışında üstte boşluk ve ince çizgi */
+    private fun baslik(ic: LinearLayout, ad: String) {
+        val ilk = (0 until ic.childCount).none { (ic.getChildAt(it).tag as? String) == "baslik" }
+        if (!ilk) ic.addView(View(this), LinearLayout.LayoutParams(-1, dp(18f)))
+        ic.addView(TextView(this).apply { tag = "baslik"; text = ad; textSize = 12f; typeface = dar; letterSpacing = 0.12f; setTextColor(GRI); setPadding(0, dp(if (ilk) 16f else 8f), 0, dp(6f)) })
+        ic.addView(View(this).apply { setBackgroundColor(Color.argb(46, 255, 255, 255)) }, LinearLayout.LayoutParams(-1, 1))
+    }
+
+    /* ================= Stiller (bölme başına; Kamera'daki Stiller.kt) ================= */
+    /** Okunmuş kullanıcı LUT'ları (dosya adına göre), her stil değişiminde yeniden okunmasın */
+    private val lutOnbellek = HashMap<String, Lut>()
+
+    /** Bölmenin ekran rengi: seçili LUT (açıksa) taban, stil (etkinse) üstüne; ikisi de yoksa çizici kendiliğinden kapatır */
+    private fun renkGuncelle(i: Int) {
+        val a = ayarlar[i]; val m = monitorler[i] ?: return
+        val taban = if (a.lutAcik && a.lutAdi.isNotEmpty()) lutOnbellek[a.lutAdi] ?: runCatching { File(lutKlasoru, a.lutAdi).inputStream().use { Lut.oku(a.lutAdi, it) } }.getOrNull()?.also { lutOnbellek[a.lutAdi] = it } else null
+        if (a.lutAcik && taban == null) a.lutAcik = false
+        val l = if (a.stil.etkin) a.stil.lut(taban) else taban
+        if (l != null) m.renkYukle(l) else m.requestRender()
+    }
+
+    private fun stilPanosu(ic: LinearLayout) {
+        val a = ayarlar[etkin]; val st = a.stil
+        val acik = Color.argb(217, 255, 255, 255)
+        fun degisti() { renkGuncelle(etkin); kaydet(); panelCiz() }
+        fun kutu(ad: String, secili: Boolean, zemin: android.graphics.drawable.Drawable, icerik: View?) = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; contentDescription = ad
+            addView(FrameLayout(this@MainActivity).apply { background = zemin; icerik?.let { addView(it, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER)) } }, LinearLayout.LayoutParams(dp(64f), dp(48f)))
+            addView(TextView(this@MainActivity).apply { text = ad; textSize = 11f; setTextColor(if (secili) SARI else acik); gravity = Gravity.CENTER; isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(5f), 0, 0) }, LinearLayout.LayoutParams(-1, -2))
+        }
+        fun zemin(renkler: IntArray, secili: Boolean) = GradientDrawable(GradientDrawable.Orientation.TL_BR, renkler).apply { cornerRadius = dp(10f).toFloat(); if (secili) setStroke(dp(1.5f), SARI) }
+        fun sira(ad: String, ogeler: List<View>) {
+            baslik(ic, ad)
+            val s = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(10f), 0, dp(4f)) }
+            ogeler.forEach { s.addView(it, LinearLayout.LayoutParams(dp(72f), -2).apply { marginEnd = dp(10f) }) }
+            ic.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(s) }, LinearLayout.LayoutParams(-1, -2))
+        }
+        fun hazirlar(liste: List<HazirStil>) = liste.map { h -> val secili = st.hazir == h
+            kutu(h.ad, secili, zemin(h.renkler, secili), null).apply {
+                setOnClickListener { st.hazir = if (secili && h != HazirStil.STANDART) HazirStil.STANDART else h; degisti() }
+                if (h.aciklama.isNotEmpty()) setOnLongClickListener { tost("${h.ad}: ${h.aciklama}"); true } } }
+        sira("TEMEL", hazirlar(HazirStil.TEMEL))
+        sira("FİLM REÇETELERİ", hazirlar(HazirStil.RECETELER))
+        val lutlar = lutKlasoru.listFiles { f -> f.name.endsWith(".cube", true) }?.sortedBy { it.name.lowercase() }.orEmpty()
+        sira("LUT'LARIN", lutlar.map { f -> val secili = a.lutAcik && a.lutAdi == f.name
+            kutu(f.name.removeSuffix(".cube"), secili, zemin(intArrayOf(Color.rgb(82, 82, 82), Color.rgb(31, 31, 31)), secili),
+                TextView(this).apply { text = "LUT"; textSize = 10f; letterSpacing = 0.1f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.argb(179, 255, 255, 255)) }).apply {
+                setOnClickListener { if (secili) a.lutAcik = false else { a.lutAdi = f.name; a.lutAcik = true }; degisti() }
+                setOnLongClickListener {
+                    AlertDialog.Builder(this@MainActivity).setTitle(f.name.removeSuffix(".cube")).setMessage("Bu LUT kitaplıktan silinsin mi? (Kamera'yla ortak)")
+                        .setPositiveButton("Sil") { _, _ -> f.delete(); lutOnbellek.remove(f.name); ayarlar.forEachIndexed { i, b -> if (b.lutAdi == f.name) { b.lutAdi = ""; b.lutAcik = false; renkGuncelle(i) } }; kaydet(); panelCiz() }
+                        .setNegativeButton("Vazgeç", null).show()
+                    true }
+            } } + kutu(".cube ekle", false, GradientDrawable().apply { cornerRadius = dp(10f).toFloat(); setColor(Color.argb(15, 255, 255, 255))
+                setStroke(dp(1f), Color.argb(89, 255, 255, 255), dp(3f).toFloat(), dp(3f).toFloat()) },
+                TextView(this).apply { text = "+"; textSize = 18f; setTextColor(acik) }).apply { contentDescription = "LUT ekle"; setOnClickListener { lutSec() } })
+        // Kaydırıcılar: sürüklerken yalnız renk ve değer yazısı değişir, bırakınca saklanır
+        ic.addView(View(this), LinearLayout.LayoutParams(-1, dp(14f)))
+        var sifirla: View? = null
+        fun kaydirici(ad: String, en: Int, simdi: Int, yazi: (Int) -> String, degis: (Int) -> Unit) {
+            val bas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(10f), 0, 0) }
+            bas.addView(TextView(this).apply { text = ad; textSize = 13f; setTextColor(Color.argb(204, 255, 255, 255)) }, LinearLayout.LayoutParams(0, -2, 1f))
+            val d = TextView(this).apply { text = yazi(simdi); textSize = 13f; typeface = dar; fontFeatureSettings = "tnum"; setTextColor(Color.argb(204, 255, 255, 255)) }
+            bas.addView(d); ic.addView(bas)
+            ic.addView(android.widget.SeekBar(this).apply {
+                max = en; progress = simdi; setPadding(dp(2f), dp(8f), dp(2f), dp(8f))
+                progressTintList = android.content.res.ColorStateList.valueOf(SARI); thumbTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.argb(90, 255, 255, 255))
+                setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: android.widget.SeekBar?, v: Int, k: Boolean) { if (k) { d.text = yazi(v); degis(v); renkGuncelle(etkin); sifirla?.visibility = if (st != Stil()) View.VISIBLE else View.GONE } }
+                    override fun onStartTrackingTouch(s: android.widget.SeekBar?) {}
+                    override fun onStopTrackingTouch(s: android.widget.SeekBar?) { kaydet() }
+                }) }, LinearLayout.LayoutParams(-1, -2))
+        }
+        fun isaretli(v: Int) = "%+d".format(v - 100)
+        kaydirici("Yoğunluk", 100, (st.yogunluk * 100).toInt(), { "$it" }) { st.yogunluk = it / 100f }
+        kaydirici("Doygunluk", 200, (st.doygunluk * 100).toInt() + 100, ::isaretli) { st.doygunluk = (it - 100) / 100f }
+        kaydirici("Sıcaklık", 200, (st.x * 100).toInt() + 100, ::isaretli) { st.x = (it - 100) / 100f }
+        kaydirici("Ton", 200, (st.y * 100).toInt() + 100, ::isaretli) { st.y = (it - 100) / 100f }
+        sifirla = TextView(this).apply { text = "Sıfırla"; textSize = 14f; typeface = dar; setTextColor(SARI); setPadding(0, dp(14f), dp(24f), dp(6f))
+            visibility = if (st != Stil()) View.VISIBLE else View.GONE
+            setOnClickListener { a.stil = Stil(); degisti() } }
+        ic.addView(sifirla, LinearLayout.LayoutParams(-2, -2))
+    }
+
     private fun aciklama(ic: LinearLayout, metin: String) = ic.addView(TextView(this).apply { text = metin; textSize = 13f; setTextColor(GRI); setPadding(0, dp(12f), 0, dp(6f)) })
 
-    private fun etiket(r: LinearLayout, ad: String) = r.addView(TextView(this).apply { text = ad; textSize = 14f; typeface = dar; letterSpacing = 0.05f; setTextColor(Color.WHITE); Tema.simgeAdi(ad)?.let { Tema.simge(this, it, GRI) } }, LinearLayout.LayoutParams(dp(220f), -2))
+    /** Dar ekranda (dikey telefon) ayar adı üstte, seçenekler altında tam genişlikte */
+    private val darPanel: Boolean get() = resources.configuration.screenWidthDp < 560
+
+    private fun etiket(r: LinearLayout, ad: String) = r.addView(TextView(this).apply { text = ad; textSize = 14f; typeface = dar; letterSpacing = 0.05f; setTextColor(Color.WHITE); Tema.simgeAdi(ad)?.let { Tema.simge(this, it, GRI) }
+        if (darPanel) setPadding(0, 0, 0, dp(8f)) }, LinearLayout.LayoutParams(if (darPanel) -1 else dp(220f), -2))
 
     private fun anahtar(ic: LinearLayout, ad: String, acik: Boolean, degis: (Boolean) -> Unit) =
         secenek(ic, ad, listOf("KAPALI", "AÇIK"), if (acik) 1 else 0) { degis(it == 1) }
 
     private fun secenek(ic: LinearLayout, ad: String, l: List<String>, secili: Int, degis: (Int) -> Unit) {
-        val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(10f), 0, dp(10f)) }
+        val r = LinearLayout(this).apply { orientation = if (darPanel) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL; gravity = if (darPanel) Gravity.START else Gravity.CENTER_VERTICAL; setPadding(0, dp(10f), 0, dp(10f)) }
         etiket(r, ad)
         val ch = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         l.forEachIndexed { i, s -> ch.addView(TextView(this).apply {
@@ -902,7 +1005,7 @@ class MainActivity : Activity() {
             setTextColor(if (i == secili) Color.BLACK else Color.WHITE); background = Tema.kapsul(if (i == secili) Color.WHITE else KOYU2, dp(5f).toFloat())
             setOnClickListener { degis(i); kaydet(); kameraAyarKaydet(); yenile(); panelCiz() }
         }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6f) }) }
-        r.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(ch) }, LinearLayout.LayoutParams(0, -2, 1f))
+        r.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(ch) }, if (darPanel) LinearLayout.LayoutParams(-1, -2) else LinearLayout.LayoutParams(0, -2, 1f))
         ic.addView(r); ic.addView(View(this).apply { setBackgroundColor(Color.rgb(44, 44, 44)) }, LinearLayout.LayoutParams(-1, 1))
     }
 
@@ -1062,8 +1165,8 @@ class MainActivity : Activity() {
             contentResolver.openInputStream(uri)!!.use { g -> hedef.outputStream().use { g.copyTo(it) } }
             val lut = hedef.inputStream().use { Lut.oku(hedef.name, it) }
             val i = if (kip == Kip.KARSILASTIR) 0 else etkin
-            ayarlar[i].lutAdi = hedef.name; ayarlar[i].lutAcik = true
-            monitorler[i]?.lutYukle(lut); kaydet()
+            ayarlar[i].lutAdi = hedef.name; ayarlar[i].lutAcik = true; lutOnbellek[hedef.name] = lut
+            renkGuncelle(i); kaydet()
             tost("LUT kitaplığa eklendi (${lut.boyut}³)")
             if (panel.visibility == View.VISIBLE) panelCiz() else arayuzCiz()
         } catch (e: Exception) { tost("LUT okunamadı: ${e.message}") }
@@ -1085,8 +1188,8 @@ class MainActivity : Activity() {
             "• Kayıt: sağdaki kırmızı düğme (basılı tut: ekran görüntüsü). Kayıtlar Galeri → Movies/UPDATED Monitör.\n" +
             "• Fotoğraf: düğmenin üstünden FOTO'yu seç. JPEG, istersen RAW (DNG); zamanlayıcı ⚙ → KAYIT. Fotoğraflar Galeri → Pictures/UPDATED Kamera.\n" +
             "• Üst şeritteki değerlere (kare hızı, enstantane, ISO, beyaz dengesi, pozlama) dokununca altta ayar şeridi açılır.\n" +
-            "• Solda: kaynak, büyütme, odak (AF/MF), temiz görüntü, ekran düzeni. Altta: odak yardımı, zebra, false color, LUT, kılavuz.\n" +
-            "• ⚙: KAYIT (çözünürlük, kare hızı, kodek, bit hızı), MONİTÖR, KILAVUZ, LUT, ÖLÇÜM, SES, KAYNAK, KURULUM.\n" +
+            "• Solda: kaynak, büyütme, odak (AF/MF), temiz görüntü, ekran düzeni. Altta: odak yardımı, zebra, false color, stil, kılavuz.\n" +
+            "• ⚙: KAYNAK, GÖRÜNTÜ (odak, zebra, ekran düzeni), STİLLER (hazır görünüm, film reçetesi, LUT), KADRAJ, ÖLÇÜM, KAYIT (çözünürlük, kodek, ses, cihaz).\n" +
             "• HDMI: HDMI→USB çeviriciyle; KAYNAK sekmesinde 'USB görüntü' (Android 14+, harici kamera desteği)."
         ).setPositiveButton("Tamam", null).show()
     }
@@ -1119,7 +1222,7 @@ class MainActivity : Activity() {
                 put("peaking", a.peaking); put("peakEsik", a.peakEsik.toDouble()); put("peakRenk", a.peakRenk); put("zebra", a.zebra); put("zebraEsik", a.zebraEsik.toDouble())
                 put("falseColor", a.falseColor); put("desqueeze", a.desqueeze.toDouble()); put("kilavuz", a.kilavuz.toDouble()); put("izgara", a.izgara); put("merkez", a.merkez)
                 put("guvenli", a.guvenli.toDouble()); put("ayna", a.ayna); put("cevir", a.cevir); put("monokrom", a.monokrom); put("temiz", a.temiz)
-                put("lutAcik", a.lutAcik); put("lutAdi", a.lutAdi)
+                put("lutAcik", a.lutAcik); put("lutAdi", a.lutAdi); put("stil", a.stil.json())
             }.toString())
         }
         e.putBoolean("hevc", hevc).putInt("mbps", mbps).putBoolean("sesKayit", sesKayit).apply()
@@ -1133,7 +1236,7 @@ class MainActivity : Activity() {
                 zebra = j.optBoolean("zebra"); zebraEsik = j.optDouble("zebraEsik", 0.95).toFloat(); falseColor = j.optBoolean("falseColor")
                 desqueeze = j.optDouble("desqueeze", 1.0).toFloat(); kilavuz = j.optDouble("kilavuz", 0.0).toFloat(); izgara = j.optBoolean("izgara"); merkez = j.optBoolean("merkez")
                 guvenli = j.optDouble("guvenli", 0.0).toFloat(); ayna = j.optBoolean("ayna"); cevir = j.optBoolean("cevir"); monokrom = j.optBoolean("monokrom"); temiz = j.optBoolean("temiz")
-                lutAcik = j.optBoolean("lutAcik"); lutAdi = j.optString("lutAdi", "")
+                lutAcik = j.optBoolean("lutAcik"); lutAdi = j.optString("lutAdi", ""); stil = Stil.oku(j.optString("stil").ifEmpty { null })
             }
         }
     }

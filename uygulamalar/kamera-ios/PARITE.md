@@ -100,6 +100,8 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | **UpCam Studio açılışı "A · Sahne":** ışık lekeli koyu zemin, ortada simge + UPCAM STUDIO, alt yarıda Monitör (üstte) ve Multi Cam kartları, "Son kullanılan" (studio.son); tablette ortada 520 dp sütun | ✓ | ✓ | Android StudioGiris |
 | **Multi Cam telefon düzeni "Ninja":** üstte 46 dp şerit, hücreler KAYIT · CANLI · GEÇİŞ (sarı) · DÜZEN · PROGRAM · SSD/TELEFON · SES (iki çubuk), dokununca o ayar; altta kaynaklar (dokun sıradaki, yeniden dokun AUTO, basılı tut menü) + "+", sağda CUT · AUTO · KATMAN · MENÜ, REC; dikeyde hücreler 2 satır, kaynaklar 2×2. Tablet ATEM düzeni aynı | ✓ | ✓ | Android MasaActivity.ninjaDuzen |
 | **Kaynak ekle ekranı** (iOS KaynakEkleSayfasi ile aynı bölümler/metinler): BU CİHAZ (arka/ön), AKSİYON VE 360 (Luna · Ace Pro 2/GO Ultra · Osmo Pocket 4/4P/Action · GoPro; marka → adım adım rehber), DİĞER (Wi-Fi telefon, adresle ekle, USB Ara). Android'de Ace/Osmo/GoPro'ya ek RTMP yolu: rehberde canlı yayın adresi + Kopyala | ✓ | ✓ | Android KaynakEkle.kt; iOS'ta RTMP yok |
+| **Monitör Stiller** (iOS MonitorStilleri): LUT sekmesi yerine STİLLER — TEMEL, FİLM REÇETELERİ, LUT'LARIN (+ .cube ekle, basılı tut → sil), Yoğunluk/Doygunluk/Sıcaklık/Ton, Sıfırla; bölme başına, yalnız ekrana (kayıt temiz). Alt şeritte STİL düğmesi | ✓ | ✓ (Studio 0.3.2) | Stiller.kt :ortak'a taşındı |
+| **Monitör ayarları 6 sekme, başlıklı gruplar** (iOS sekmeIcerik): KAYNAK (KAYNAKLAR · GÖRÜNTÜYÜ ÇEVİR) · GÖRÜNTÜ (ODAK · POZLAMA · EKRAN) · STİLLER · KADRAJ (AKILLI KADRAJ · KOMPOZİSYON · ÇERÇEVE) · ÖLÇÜM (EKRANDA · ÖLÇÜM PANELİ) · KAYIT (GÖRÜNTÜ · DOSYA · SES · CİHAZ) | ✓ | ✓ (Studio 0.3.2, Kamera PRO 0.18.1) | Android dar ekranda ad üstte, seçenekler altta |
 
 ## Uygulama
 

@@ -59,6 +59,8 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
     fun kayitBoyutu(): Pair<Int, Int> { val d = yanDurur(); val w = if (d) kaynakBoyut[1] else kaynakBoyut[0]; val h = if (d) kaynakBoyut[0] else kaynakBoyut[1]; return (w and 1.inv()) to (h and 1.inv()) }
 
     fun lutYukle(lut: Lut) { bekleyenLut = lut; ayarlar.lutAcik = true; requestRender() }
+    /** Renk tablosunu değiştirir, açık/kapalı durumuna dokunmaz (Monitör: kullanıcı LUT'u + stil birleşik) */
+    fun renkYukle(lut: Lut) { bekleyenLut = lut; requestRender() }
     fun ekranGoruntusu(geri: (Bitmap) -> Unit) { ekranGoruntusuIste = geri; requestRender() }
     fun yenile() = requestRender()
 
@@ -332,7 +334,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             GLES30.glActiveTexture(GLES30.GL_TEXTURE1); GLES30.glBindTexture(GLES30.GL_TEXTURE_3D, lutTex); GLES30.glUniform1i(u("uLut"), 1)
             GLES30.glUniformMatrix4fv(u("uTexMat"), 1, false, texMat, 0)
             GLES30.glUniform1f(u("uLutBoyut"), lutBoyut.toFloat())
-            GLES30.glUniform1i(u("uLutAcik"), if ((!ham || lutla) && a.lutAcik) 1 else 0)
+            GLES30.glUniform1i(u("uLutAcik"), if ((!ham || lutla) && (a.lutAcik || a.stil.etkin)) 1 else 0)
             GLES30.glUniform1i(u("uPeaking"), if (!ham && !sade && a.peaking) 1 else 0)
             GLES30.glUniform1f(u("uPeakEsik"), a.peakEsik)
             GLES30.glUniform3fv(u("uPeakRenk"), 1, PEAK_RENKLERI[a.peakRenk], 0)
