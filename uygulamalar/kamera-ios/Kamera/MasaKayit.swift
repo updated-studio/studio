@@ -109,7 +109,8 @@ final class DosyaYazici {
             girdi = AVAssetWriterInput(mediaType: .video, outputSettings: nil, sourceFormatHint: f)
             uyarlayici = nil
         case let .kodla(wd, ht, fps, bgra):
-            let mbps = wd >= 3000 ? 60 : 20
+            // HEVC ≈ 0,12 bit/piksel (4K60 ≈ 60, 4K30 ≈ 30 Mbit/sn; en az 16)
+            let mbps = max(16, Int(Double(wd * ht * fps) * 0.12 / 1_000_000))
             girdi = AVAssetWriterInput(mediaType: .video, outputSettings: [
                 AVVideoCodecKey: AVVideoCodecType.hevc,
                 AVVideoWidthKey: wd, AVVideoHeightKey: ht,

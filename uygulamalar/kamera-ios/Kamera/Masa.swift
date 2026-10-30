@@ -126,6 +126,18 @@ final class Masa: NSObject, ObservableObject {
     }
     private var klasorAdi: String { vlog ? "UPDATED Vlog" : "UPDATED Masa" }
 
+    /// Vlog çıktısı (Fatih 30 Ekim 10:41): yalnız birleşik final ya da üç dosya (arka, ön, final)
+    @Published var yalnizFinal = UserDefaults.standard.bool(forKey: "vlog.yalnizFinal") {
+        didSet { UserDefaults.standard.set(yalnizFinal, forKey: "vlog.yalnizFinal") }
+    }
+    /// Kayıt seçili klasöre (SSD) gitsin mi; harici disk bildiriminde "Telefona kaydet" seçilirse false
+    @Published var diskeYaz = true
+    /// Vlogda arka kameranın gerçekten açılan boyutu (ekrandaki kalite yazısı)
+    @Published var vlogBoyut: CMVideoDimensions?
+    /// Vlog kalitesi Kamera'nın video ayarlarından (çözünürlük, kare hızı); çoklu kamera kaldırmazsa 1080p
+    private var vlogYukseklik: Int32 { Int32(UserDefaults.standard.object(forKey: "k.videoH") as? Int ?? 2160) }
+    var vlogFps: Int { UserDefaults.standard.object(forKey: "k.videoFps") as? Int ?? 30 }
+
     @Published var yuvalar: [Yuva] = []
     @Published var canli: UUID?
     /// iPad masası: önizlemedeki (sıradaki) kaynak; KES ile canlıya geçer (ATEM'deki PREVIEW)
@@ -487,7 +499,7 @@ final class Masa: NSObject, ObservableObject {
     private func usbBagla(_ d: AVCaptureDevice, _ y: Yuva) -> Bool {
         guard let s = oturum, let g = try? AVCaptureDeviceInput(device: d) else { return false }
         let coklu = s is AVCaptureMultiCamSession
-        bicimSec(d, coklu: coklu)
+        bicimSec(d, coklu: coklu, tavan: vlog && y.yerlesik ? vlogYukseklik : nil)
         s.beginConfiguration()
         defer { s.commitConfiguration() }
         guard s.canAddInput(g) else { return false }
@@ -505,19 +517,35 @@ final class Masa: NSObject, ObservableObject {
         if y.ayna, b.isVideoMirroringSupported { b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = true }
         s.addConnection(b)
         if !coklu { bicimSec(d, coklu: false) }
+        // Vlog: iki kamera seçilen kalitede birlikte açılamıyorsa ikisi de 1080p'ye iner
+        if vlog, let m = s as? AVCaptureMultiCamSession, m.hardwareCost > 1 {
+            bicimSec(d, coklu: true, tavan: 1080)
+            if m.hardwareCost > 1 {
+                kilit.lock(); let digerleri = Array(usbBaglar.values); kilit.unlock()
+                for o in digerleri {
+                    bicimSec(o.girdi.device, coklu: true, tavan: 1080)
+                    let b1 = CMVideoFormatDescriptionGetDimensions(o.girdi.device.activeFormat.formatDescription)
+                    let dikti = (o.yuva.boyut.map { $0.height > $0.width } ?? false)
+                    let yeni = dikti ? CMVideoDimensions(width: min(b1.width, b1.height), height: max(b1.width, b1.height)) : b1
+                    let arka = o.yuva.yerlesik && !o.yuva.ayna
+                    DispatchQueue.main.async { o.yuva.boyut = yeni; if arka { self.vlogBoyut = b1 } }
+                }
+            }
+        }
         if let m = s as? AVCaptureMultiCamSession, m.hardwareCost > 1 {
             s.removeConnection(b); s.removeOutput(c); s.removeInput(g); return false
         }
         c.setSampleBufferDelegate(self, queue: kareKuyruk)
         let b0 = CMVideoFormatDescriptionGetDimensions(d.activeFormat.formatDescription)
         y.boyut = dik ? CMVideoDimensions(width: min(b0.width, b0.height), height: max(b0.width, b0.height)) : b0
+        if vlog, y.yerlesik, !y.ayna { DispatchQueue.main.async { self.vlogBoyut = b0 } }
         kilit.lock(); usbBaglar[ObjectIdentifier(c)] = UsbBag(yuva: y, girdi: g, cikti: c); kilit.unlock()
         return true
     }
 
     /// En büyük biçim (tek USB kamerada 4K'ya, çok kamerada 1080p'ye kadar), en az 25 kare/sn; aynı boyutta 60 kare/sn veren öne
-    private func bicimSec(_ d: AVCaptureDevice, coklu: Bool) {
-        let enW: Int32 = coklu ? 1920 : 3840, enH: Int32 = coklu ? 1080 : 2160
+    private func bicimSec(_ d: AVCaptureDevice, coklu: Bool, tavan: Int32? = nil) {
+        let enH: Int32 = tavan ?? (coklu ? 1080 : 2160), enW: Int32 = enH * 16 / 9
         let uygun = d.formats.filter { f in
             let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
             return b.width <= enW && b.height <= enH && (!coklu || f.isMultiCamSupported)
@@ -528,10 +556,14 @@ final class Masa: NSObject, ObservableObject {
             let hiz = f.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0
             return Int(b.width) * Int(b.height) * 4 + (hiz >= 60 ? 3 : hiz >= 50 ? 2 : 1)
         }
-        guard let en = uygun.max(by: { puan($0) < puan($1) }), (try? d.lockForConfiguration()) != nil else { return }
+        // Vlogda yerleşik kamera Kamera'nın kare hızında; diğerlerinde 60 varsa 60
+        let hedef = Double(tavan != nil ? vlogFps : 60)
+        let yeterli = uygun.filter { $0.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= hedef } }
+        guard let en = (yeterli.isEmpty ? uygun : yeterli).max(by: { puan($0) < puan($1) }), (try? d.lockForConfiguration()) != nil else { return }
         d.activeFormat = en
-        if let a = en.videoSupportedFrameRateRanges.first(where: { $0.maxFrameRate >= 60 }) {
-            d.activeVideoMinFrameDuration = a.minFrameDuration; d.activeVideoMaxFrameDuration = a.minFrameDuration
+        if let a = en.videoSupportedFrameRateRanges.first(where: { $0.maxFrameRate >= hedef }) {
+            let sure = CMTime(value: 1, timescale: CMTimeScale(hedef))
+            d.activeVideoMinFrameDuration = max(sure, a.minFrameDuration); d.activeVideoMaxFrameDuration = max(sure, a.minFrameDuration)
         }
         d.unlockForConfiguration()
     }
@@ -845,7 +877,7 @@ final class Masa: NSObject, ObservableObject {
         var erisim: URL?
         var dizin: URL
         var ssd = false
-        if klasor.takili, let kok = klasor.url, kok.startAccessingSecurityScopedResource() {
+        if diskeYaz, klasor.takili, let kok = klasor.url, kok.startAccessingSecurityScopedResource() {
             erisim = kok
             dizin = kok.appendingPathComponent(klasorAdi, isDirectory: true).appendingPathComponent(damga, isDirectory: true)
             if (try? FileManager.default.createDirectory(at: dizin, withIntermediateDirectories: true)) != nil { ssd = true } else {
@@ -857,7 +889,7 @@ final class Masa: NSObject, ObservableObject {
         } else {
             dizin = FileManager.default.temporaryDirectory.appendingPathComponent("masa-\(damga)", isDirectory: true)
             try? FileManager.default.createDirectory(at: dizin, withIntermediateDirectories: true)
-            if klasor.ad != nil { bildirim = "SSD takılı değil, cihaza kaydediliyor" }
+            if diskeYaz, klasor.ad != nil { bildirim = "SSD takılı değil, cihaza kaydediliyor" }
         }
         // Program boyutu: dizili düzende 4K tuval; tek'te en büyük kaynak (4K USB kamera varsa 4K), yatay
         var w = 1920, h = 1080
@@ -873,22 +905,24 @@ final class Masa: NSObject, ObservableObject {
         let bas = CMClockGetTime(CMClockGetHostTimeClock())
         let o = KayitOturumu(baslangic: bas, klasorUrl: ssd ? dizin : nil, erisim: erisim, dizin: dizin)
         o.programBoyut = (w, h)
+        let kaynaklarYaz = !(vlog && yalnizFinal)
         for (i, y) in yuvalar.enumerated() {
-            o.kaynakUrl[y.id] = dizin.appendingPathComponent("\(i + 1) - \(Masa.dosyaAdi(y.ad)).mp4")
+            if kaynaklarYaz { o.kaynakUrl[y.id] = dizin }.appendingPathComponent("\(i + 1) - \(Masa.dosyaAdi(y.ad)).mp4")
             y.alici?.anahtarIste()
             y.kaydediyor = true
         }
         kayitta = true
         kayitBasi = Date()
-        kayitOzeti = "\(yuvalar.count) KAMERA + PROGRAM\(duzenAdet > 0 ? " 4K" : "")"
+        kayitOzeti = vlog ? (kaynaklarYaz ? "3 DOSYA" : "FİNAL") : "\(yuvalar.count) KAMERA + PROGRAM\(duzenAdet > 0 ? " 4K" : "")"
         let yuvalarSimdi = yuvalar
         let ses = sesBicimi
         kayitKuyruk.async {
-            o.program = DosyaYazici(url: dizin.appendingPathComponent("Program.mp4"), tur: .kodla(w: w, h: h, fps: self.duzenZamanlayici != nil ? 30 : 60, bgra: true), ses: ses)
+            let pfps = self.vlog ? self.vlogFps : (self.duzenZamanlayici != nil ? 30 : 60)
+            o.program = DosyaYazici(url: dizin.appendingPathComponent(self.vlog ? "Vlog.mp4" : "Program.mp4"), tur: .kodla(w: w, h: h, fps: pfps, bgra: true), ses: ses)
             // USB kaynakların yazıcıları hemen; Wi-Fi'ninki ilk anahtar kareyle (biçim o zaman belli)
             for y in yuvalarSimdi where !y.wifi {
                 guard let b = y.boyut, let u = o.kaynakUrl[y.id] else { continue }
-                o.kaynaklar[y.id] = DosyaYazici(url: u, tur: .kodla(w: Int(b.width), h: Int(b.height), fps: 60, bgra: false))
+                o.kaynaklar[y.id] = DosyaYazici(url: u, tur: .kodla(w: Int(b.width), h: Int(b.height), fps: self.vlog ? self.vlogFps : 60, bgra: false))
             }
             self.oturumKaydi = o
             if o.program == nil { DispatchQueue.main.async { self.bildirim = "Program kaydı başlamadı" } }

@@ -62,6 +62,14 @@ struct AnaEkran: View {
                 }
                 if let m = uyariMod { ProUyari(mod: m) { uyariMod = nil } }
                 if giris { GirisEkran { e in giris = false; ekran = e } }
+                if ekran == .vlog {
+                    VlogEkran { m in
+                        withAnimation(.easeOut(duration: 0.2)) { ekran = nil }
+                        if m != kamera.mod { kamera.modDegistir(m) }
+                    }
+                    .transition(.opacity)
+                    .zIndex(5)
+                }
             }
             .foregroundStyle(.white)
             .onAppear { yonBildir() }
@@ -79,12 +87,12 @@ struct AnaEkran: View {
         }
         .onChange(of: kamera.mod) { _, m in panel = m == .pro ? .proKartlar : nil }
         .onChange(of: panel) { _, p in if p != .kontroller && duzenleme { duzenleme = false } }
-        .fullScreenCover(item: $ekran) { e in
+        .fullScreenCover(item: Binding(get: { ekran == .vlog ? nil : ekran }, set: { ekran = $0 })) { e in
             switch e {
             case .masa: MasaEkran { ekran = nil }
             case .wifi: WifiKameraEkran { ekran = nil }
             case .monitor: MonitorEkran { ekran = nil }
-            case .vlog: VlogEkran { ekran = nil }
+            case .vlog: EmptyView()
             }
         }
         .sheet(isPresented: $ayarlar) {
@@ -101,6 +109,12 @@ struct AnaEkran: View {
     /// Ayarlar kapandıktan sonra tam ekran açılır (iki sunum üst üste binmesin)
     private func ekranAc(_ e: Ekran) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { ekran = e }
+    }
+
+    private func vlogAc() {
+        guard !kamera.kayitta else { kamera.bildirim = "Kayıt sürerken mod değişmez."; return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        withAnimation(.easeOut(duration: 0.2)) { panel = nil; ekran = .vlog }
     }
 
     private func monitoreGec() {
@@ -652,6 +666,10 @@ struct AnaEkran: View {
                             kamera.modDegistir(m)
                         }
                         .id(m.rawValue)
+                        // Vlog (çift kamera) VİDEO'nun yanında bir mod (Fatih 30 Ekim 10:41)
+                        if m == .video {
+                            modDugme("VLOG", secili: false, renk: .white) { vlogAc() }.id("VLOG")
+                        }
                     }
                     if !dikey { Color.clear.frame(width: max(0, genislik / 2 - 60), height: 1) }
                 }
