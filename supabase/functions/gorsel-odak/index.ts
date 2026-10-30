@@ -3,6 +3,7 @@
 // panel küçük boyutları, site de kendi kırpmalarını bu noktaya göre yapar. Yalnız Stüdyo üyesi çağırır. Anahtar: GEMINI_API_KEY,
 // kotası dolunca Bağlantı anahtarları'ndaki yedek Google anahtarı.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { anahtarlar, isaretle } from "./anahtar.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -52,18 +53,19 @@ Deno.serve(async (req) => {
     let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
     b64 = btoa(s);
   } catch (e) { return yanit({ hata: "Görsel indirilemedi: " + String((e as Error).message ?? e).slice(0, 80) }, 502); }
-  const anahtarlar = [Deno.env.get("GEMINI_API_KEY") ?? ""];
-  const { data: y } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "gemini_yedek").maybeSingle();
-  if (y?.deger) anahtarlar.push(String(y.deger));
-  for (const anahtar of anahtarlar.filter(Boolean)) {
+  // Anahtar havuzu (göç 0052): anahtarlar sırayla; bir anahtarın bütün modelleri 429 verirse "kota dolu" işaretlenir, sıradakine geçilir
+  for (const a of await anahtarlar()) {
+    let hepsiKota = true;
     for (const model of MODELLER) {
-      const r = await gemini(anahtar, model, mime, b64);
+      const r = await gemini(a.deger, model, mime, b64);
       if (r.durum === 200 && r.veri) {
+        await isaretle(a, "calisiyor");
         const yz = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50; };
         return yanit({ x: yz(r.veri.x), y: yz(r.veri.y), neden: String(r.veri.neden ?? "").slice(0, 80) });
       }
-      if (r.durum === 429) break; // bu anahtarın kotası dolu: yedek anahtara geç
+      if (r.durum !== 429) hepsiKota = false;
     }
+    if (hepsiKota) await isaretle(a, "kota_dolu", "Görsel odak: bütün modeller 429");
   }
   return yanit({ hata: "Yapay zekâ yanıt vermedi (kota dolmuş olabilir)" }, 503);
 });

@@ -3,6 +3,7 @@
 // Tahmin yok; her değerin yanında sayfadan kısa kanıt döner. Editör Stüdyo'da tek tek onaylar, kaynak = üretici + bağlantı.
 // Giriş: Stüdyo oturumu (Authorization: Bearer). Gizli: GEMINI_API_KEY, GROQ_API_KEY (functions.env).
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -27,21 +28,28 @@ function metin(html: string) {
 function jsonOku(s: string) { try { return JSON.parse(s); } catch { const m = s.match(/\{[\s\S]*\}/); try { return m ? JSON.parse(m[0]) : null; } catch { return null; } } }
 
 async function yz(sistem: string, kullanici: string) {
-  const key = Deno.env.get("GEMINI_API_KEY");
   let son = "";
-  for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
-    if (!key) break;
+  // Anahtar havuzu (göç 0052): anahtarlar sırayla, her birinde modeller sırayla
+  for (const a of await anahtarlar()) { let hepsiKota = true; for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST", signal: AbortSignal.timeout(60_000), headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        method: "POST", signal: AbortSignal.timeout(60_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: sistem }] }, contents: [{ role: "user", parts: [{ text: kullanici }] }], generationConfig: { temperature: 0.1, responseMimeType: "application/json" } }),
       });
       const g = await r.text();
-      if (!r.ok) { son = `${model} ${r.status}`; continue; }
+      if (!r.ok) {
+        son = `${a.etiket} · ${model} ${r.status}`;
+        const ah = anahtarHatasi(r.status, g);
+        if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
+        if (ah !== "kota_dolu") hepsiKota = false;
+        continue;
+      }
+      hepsiKota = false; await isaretle(a, "calisiyor");
       const t = (JSON.parse(g)?.candidates?.[0]?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
       const v = jsonOku(t); if (v) return v; son = `${model} geçersiz yanıt`;
-    } catch { son = `${model} yanıt vermedi`; }
+    } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
   }
+  if (hepsiKota) await isaretle(a, "kota_dolu", son); }
   const gk = Deno.env.get("GROQ_API_KEY");
   if (gk) for (const model of ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]) {
     try {

@@ -3,6 +3,7 @@
 // Ekip Stüdyo → Site → Yarışmalar'da resmi sayfadan kontrol edip "Yayında" yapar. Haftada bir (göç 0038) ya da Stüdyo'dan elle.
 // Kötüye kullanım: oturumsuz çağrı yalnız son başarılı tarama 6 günden eskiyse çalışır; her durumda en çok saatte bir.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -30,35 +31,35 @@ KURALLAR:
 Yanıtı YALNIZ şu JSON olarak ver:
 {"yarismalar":[{"ad":"...","duzenleyen":"...","tur":"fotograf","kapsam":"turkiye","sonTarih":"2026-12-01","sonucTarihi":null,"ucretsiz":true,"ucret":null,"odul":"...","konu":"...","baglanti":"https://...","kaynak":"https://...","aciklama":"..."}]}`;
 
-/** Gemini anahtarları: önce sunucudaki ana anahtar; kotası dolunca Stüdyo → Bağlantı anahtarları'ndaki yedek (27 Ekim 2026).
- *  Kota proje başına sayılır: yedek anahtar başka bir Google hesabının ya da projesinin olmalı. */
-async function geminiAnahtarlari(sb: ReturnType<typeof createClient>): Promise<string[]> {
-  const l = [Deno.env.get("GEMINI_API_KEY") ?? ""];
-  const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "gemini_yedek").maybeSingle();
-  if (data?.deger) l.push(String(data.deger));
-  return l.filter(Boolean);
-}
-
 async function ara(sb: ReturnType<typeof createClient>, bilinen: string[]) {
-  const anahtarlar = await geminiAnahtarlari(sb);
+  const anahtarlar = await geminiAnahtarlari();
   if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
   const bugun = new Date().toISOString().slice(0, 10);
   const istem = `BUGÜN: ${bugun}\nZATEN BİLİNENLER:\n${bilinen.slice(0, 120).map((x) => "- " + x).join("\n") || "(yok)"}`;
   let son = "";
-  for (const [ai, key] of anahtarlar.entries()) for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+  // Anahtar havuzu (göç 0052): anahtarlar sırayla, her birinde modeller sırayla; bütün modelleri 429 veren anahtar "kota dolu" işaretlenir
+  for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST", signal: AbortSignal.timeout(120_000), headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        method: "POST", signal: AbortSignal.timeout(120_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: SISTEM }] }, contents: [{ role: "user", parts: [{ text: istem }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.2 } }),
       });
       const g = await r.text();
-      if (!r.ok) { son = `${ai ? "yedek anahtar · " : ""}${model} ${r.status} ${g.slice(0, 120)}`; continue; }
+      if (!r.ok) {
+        son = `${a.etiket} · ${model} ${r.status} ${g.slice(0, 120)}`;
+        const ah = anahtarHatasi(r.status, g);
+        if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
+        if (ah !== "kota_dolu") hepsiKota = false;
+        continue;
+      }
+      hepsiKota = false; await isaretle(a, "calisiyor");
       const c = JSON.parse(g)?.candidates?.[0];
       const v = jsonOku((c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join(""));
       if (!v?.yarismalar) { son = `${model} geçersiz yanıt`; continue; }
       return v.yarismalar as Record<string, unknown>[];
-    } catch { son = `${model} yanıt vermedi`; }
+    } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
   }
+  if (hepsiKota) await isaretle(a, "kota_dolu", son); }
   throw new Error("Yapay zekâ yanıt vermedi (" + son + ")");
 }
 

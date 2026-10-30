@@ -8,6 +8,7 @@
 // Dosyalar: uslup.ts (yazım üslubu, insanlaştırma), puan.ts (öncelik puanı, ekranla ortak), secim.ts (otomatik taslak: haber ve editör seçimi), gorsel.ts (öne çıkan görsel), html.ts (Markdown → HTML, ekranla ortak), site.ts (yeni sitenin paneline gönderim; WordPress 23 Ekim 2026'da devreden çıktı).
 // Yayın: main'e gelince Natro sunucusu kendiliğinden yükler (site deposu deploy/altyapi/studyo); dosyalar birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
@@ -89,11 +90,31 @@ function jsonOku(ham: string): Record<string, any> | null { // eslint-disable-li
 // Toplam süre bütçesi: sunucu ~150 sn'de işi öldürür, ondan önce bitirip hata yazmalıyız
 const BUTCE_MS = 115_000;
 
+// Anahtar havuzu (30 Ekim 2026, göç 0052): anahtarlar sırayla; bir anahtarda bütün modeller kota (429) verirse o anahtar "kota dolu"
+// işaretlenir ve aynı iş sıradaki anahtarla denenir. Hepsi biterse Groq yedeği. Anahtar seçimi anahtar.ts'te (bütün Gemini fonksiyonlarında aynı).
 async function gemini(sistem: string, kullanici: string, modeller: string[], bitis = Date.now() + BUTCE_MS, resimler: { mime: string; b64: string; etiket?: string }[] = []) {
-  const kalan = () => bitis - Date.now();
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) throw new Error("GEMINI_API_KEY yok (Supabase Secrets)");
+  const liste = await anahtarlar();
+  if (!liste.length) throw new Error("GEMINI_API_KEY yok (Supabase Secrets)");
   let son = "";
+  for (const a of liste) {
+    const s = await geminiAnahtarla(a.deger, sistem, kullanici, modeller, bitis, resimler);
+    if (s.sonuc) { await isaretle(a, "calisiyor"); return s.sonuc; }
+    son = (liste.length > 1 ? a.etiket + " · " : "") + s.son;
+    const ah = /→ 429/.test(s.son) && s.hepsiKota ? "kota_dolu" : s.gecersiz ? "gecersiz" : null;
+    if (!ah) break;
+    await isaretle(a, ah, s.son);
+  }
+  // Gemini kotası dolduysa ya da yanıt vermiyorsa aynı işi Groq'a yaptır (GROQ_API_KEY, Supabase Secrets)
+  if (Deno.env.get("GROQ_API_KEY") && /geçersiz JSON|yanıt vermedi|→ (429|500|503)/.test(son)) {
+    try { return await groq(sistem, kullanici, bitis); }
+    catch (e) { son += " | Yedek (Groq): " + String((e as Error).message ?? e).slice(0, 200); }
+  }
+  throw new Error("Yapay zeka yanıt vermedi. " + son);
+}
+
+async function geminiAnahtarla(key: string, sistem: string, kullanici: string, modeller: string[], bitis: number, resimler: { mime: string; b64: string; etiket?: string }[]): Promise<{ sonuc?: { veri: Record<string, any>; model: string }; son: string; hepsiKota: boolean; gecersiz: boolean }> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const kalan = () => bitis - Date.now();
+  let son = "", hepsiKota = true, gecersiz = false;
   let dusunme = true; // "düşünme" kısık: yanıt çok daha hızlı gelir; model desteklemezse kapatılır
   for (const model of modeller) {
     for (let deneme = 0; deneme < 2; deneme++) {
@@ -120,22 +141,21 @@ async function gemini(sistem: string, kullanici: string, modeller: string[], bit
         const j = JSON.parse(govde);
         const metin = (j?.candidates?.[0]?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
         const veri = jsonOku(metin);
-        if (veri) return { veri, model };
-        son = model + " → geçersiz JSON döndü";
+        if (veri) return { sonuc: { veri, model }, son, hepsiKota: false, gecersiz };
+        son = model + " → geçersiz JSON döndü"; hepsiKota = false;
         continue;
       }
       if (r.status === 400 && dusunme && /thinking/i.test(govde)) { dusunme = false; deneme--; continue; }
       son = model + " → " + r.status + ": " + govde.slice(0, 200);
+      const ah = anahtarHatasi(r.status, govde);
+      if (ah !== "kota_dolu") hepsiKota = false;
+      if (ah === "gecersiz") { gecersiz = true; return { son, hepsiKota, gecersiz }; }
       break;
     }
+    if (/yanıt vermedi/.test(son)) hepsiKota = false;
     if (!/geçersiz JSON|yanıt vermedi|→ (429|500|503)/.test(son)) break;
   }
-  // Gemini kotası dolduysa ya da yanıt vermiyorsa aynı işi Groq'a yaptır (GROQ_API_KEY, Supabase Secrets)
-  if (Deno.env.get("GROQ_API_KEY") && /geçersiz JSON|yanıt vermedi|→ (429|500|503)/.test(son)) {
-    try { return await groq(sistem, kullanici, bitis); }
-    catch (e) { son += " | Yedek (Groq): " + String((e as Error).message ?? e).slice(0, 200); }
-  }
-  throw new Error("Yapay zeka yanıt vermedi. " + son);
+  return { son, hepsiKota, gecersiz };
 }
 
 // Groq (OpenAI uyumlu). Modeller sırayla denenir; her modelin kotası ayrıdır. Model kalkmışsa (404/400) sonrakine geçer.

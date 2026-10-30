@@ -5,6 +5,7 @@
 // Gizli bilgi: GEMINI_API_KEY (Supabase > Edge Functions > Secrets). Koda yazılmaz.
 // Not: "Verify JWT" kapalı; girdi almaz. 5 dakikada bir defadan sık çalışmaz.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { aktif, aktifDeger, anahtarHatasi, anahtarYukle, isaretle, sonrakine } from "./anahtar.ts";
 
 // Eski TR_AYAR
 const SAAT = 24;          // bundan eski haberler alınmaz
@@ -106,7 +107,7 @@ const GOMME_PARTI = 40;
 let GOMME_HATA = "";
 async function gommeler(metinler: string[]): Promise<{ model: string; v: number[][] } | null> {
   GOMME_HATA = "";
-  const key = Deno.env.get("GEMINI_API_KEY");
+  const key = aktifDeger(); // anahtar havuzu (göç 0052)
   if (!key || !metinler.length) return null;
   if (metinler.length > GOMME_PARTI) { GOMME_HATA = `En fazla ${GOMME_PARTI} metin`; return null; }
   try {
@@ -194,9 +195,14 @@ let YEDEK_MODEL = "openai/gpt-oss-120b"; // tr_settings.model_yedek ile değişt
 async function gemini(model: string, kullanici: string, sistem = SISTEM): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
   let son: unknown = GEMINI_TIKALI;
   // Bu çalıştırmada Gemini kotası dolduysa her partide yeniden denenmez (zaman sınırı için), doğrudan yedeğe geçilir
-  if (!GEMINI_TIKALI) for (const m of [model, "gemini-3.5-flash", "gemini-3.6-flash"].filter((x, i, a) => a.indexOf(x) === i)) {
-    try { return await geminiTek(m, kullanici, sistem); }
-    catch (e) { son = e; if (!/ (429|500|503):/.test(String(e))) throw e; }
+  // Anahtar havuzu (göç 0052): bu anahtarda bütün modeller kota verirse anahtar "kota dolu" işaretlenir, sıradaki anahtarla yeniden denenir
+  while (!GEMINI_TIKALI) {
+    let hepsiKota = true;
+    for (const m of [model, "gemini-3.5-flash", "gemini-3.6-flash"].filter((x, i, a) => a.indexOf(x) === i)) {
+      try { return await geminiTek(m, kullanici, sistem); }
+      catch (e) { son = e; if (!/ 429:/.test(String(e))) hepsiKota = false; if (!/ (429|500|503):/.test(String(e))) throw e; }
+    }
+    if (!(hepsiKota && await sonrakine("kota_dolu", String(son)))) break;
   }
   if (son && / 429:/.test(String(son))) GEMINI_TIKALI = String(son);
   if (Deno.env.get("GROQ_API_KEY")) {
@@ -224,13 +230,13 @@ let YEDEK_KULLANILDI = false;
 let GEMINI_TIKALI = "";
 
 async function geminiTek(model: string, kullanici: string, sistem: string): Promise<Record<string, any>> { // eslint-disable-line @typescript-eslint/no-explicit-any
-  const key = Deno.env.get("GEMINI_API_KEY");
+  const key = aktifDeger(); // anahtar havuzu (göç 0052): bu çalıştırmanın o anki anahtarı
   if (!key) throw new Error("GEMINI_API_KEY yok");
   let son = "";
   for (let deneme = 0; deneme < 3; deneme++) {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": aktifDeger() },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: sistem }] },
         contents: [{ role: "user", parts: [{ text: kullanici }] }],
@@ -242,12 +248,13 @@ async function geminiTek(model: string, kullanici: string, sistem: string): Prom
       const j = JSON.parse(govde);
       const metin = (j?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
       const veri = jsonOku(metin) as Record<string, any> | null; // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (veri) return veri;
+      if (veri) { await isaretle(aktif(), "calisiyor"); return veri; }
       son = "geçersiz JSON döndü";
       await new Promise((x) => setTimeout(x, 2000));
       continue;
     }
     son = r.status + ": " + govde.slice(0, 200);
+    if (anahtarHatasi(r.status, govde) === "gecersiz") { if (await sonrakine("gecersiz", son)) { deneme--; continue; } }
     if (r.status === 429 || ![500, 503].includes(r.status) || deneme >= 1) break; // kota dolu: bekleme, hemen sonraki modele geç
     await new Promise((x) => setTimeout(x, 3000));
   }
@@ -373,7 +380,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   };
 
   // --- Yapay zekâ: sadece etiket ---
-  let hata = Deno.env.get("GEMINI_API_KEY") ? "" : "GEMINI_API_KEY tanımlı değil; haberler yapay zekâ olmadan işlenmiyor.";
+  let hata = aktifDeger() ? "" : "Gemini anahtarı yok (GEMINI_API_KEY ya da Stüdyo → Bağlantı anahtarları); haberler yapay zekâ olmadan işlenmiyor.";
   const etiketler = new Map<number, Etiket>();
   const islenen = new Set<number>();
   if (!hata && adaylar.length) {
@@ -606,7 +613,7 @@ async function kumele(sb: ReturnType<typeof createClient>, model: string) {
     if (!harita.size) {
       // Teşhis: hangi gömme modelleri açık?
       let modeller = "";
-      try { const m = await (await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY") ?? "" } })).json(); modeller = (m.models ?? []).filter((x: { name: string; supportedGenerationMethods?: string[] }) => (x.supportedGenerationMethods ?? []).some((g) => /embed/i.test(g))).map((x: { name: string }) => x.name).join(", "); } catch { /* yok */ }
+      try { const m = await (await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": aktifDeger() } })).json(); modeller = (m.models ?? []).filter((x: { name: string; supportedGenerationMethods?: string[] }) => (x.supportedGenerationMethods ?? []).some((g) => /embed/i.test(g))).map((x: { name: string }) => x.name).join(", "); } catch { /* yok */ }
       ozet.hata = "Gömme (embedding) alınamadı; emin olunamadığı için birleştirme yapılmadı. " + GOMME_HATA + (modeller ? " Açık gömme modelleri: " + modeller : "");
     }
     else {
@@ -674,6 +681,7 @@ const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey());
+  await anahtarYukle().catch(() => {}); // Gemini anahtar havuzu (göç 0052): bu çalıştırmada kullanılacak sıra
   // Dışarıdan (Caddy üzerinden, X-Forwarded-For'lu) gelen çağrı Stüdyo üyesi olmalı; zamanlayıcı sunucu içinden
   // (functions:9000) doğrudan çağırır. Önceden herkes 5 dk'da bir toplama başlatıp yapay zekâ kotasını tüketebiliyordu (27 Ekim 2026).
   if (req.headers.get("x-forwarded-for")) {

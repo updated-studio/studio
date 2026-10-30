@@ -1,29 +1,18 @@
 // Bağlantı anahtarları (27 Ekim 2026, yalnız yöneticiler): dış servis anahtarları burada girilir, sunucuda saklanır.
 // Girilen değer bir daha ekrana gelmez (veritabanında okuma izni yok; yalnız sunucu fonksiyonları okur). Göç 0040.
-// - Yedek Google (Gemini) anahtarı: yarışma tarama ve künye bulma, ana anahtarın kotası dolunca bunu kullanır.
+// - Google (Gemini) anahtarları: 30 Ekim 2026'dan beri birden çok anahtarlı havuz (GeminiHavuzu.tsx, göç 0052).
 // - Instagram erişim anahtarı: instagram-reels fonksiyonu son Reels'leri çeker, anahtarı 60 günü dolmadan kendisi yeniler.
 // - Cloudflare görsel programı (adres + ortak anahtar, göç 0044): künye görsellerinin arka planını siler (public/cloudflare/gorsel-worker.js).
 import { useCallback, useEffect, useState } from "react";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { Ikon } from "../../shared/Ikon";
+import GeminiHavuzu from "./GeminiHavuzu";
 
 type Durum = { ad: string; son4: string; ek: Record<string, string>; updated_at: string };
 const tarih = (s?: string) => (s ? new Date(s).toLocaleString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
 const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; adimlar: { metin: string; link?: string }[] }[] = [
-  {
-    ad: "gemini_yedek", baslik: "Yedek Google (Gemini) anahtarı", ikon: "triyaj",
-    aciklama: "Yarışma tarama ve künye bulma internette arama yapabilen tek model olan Gemini'yi kullanır. Ana anahtarın günlük kotası dolunca bu anahtarla devam eder. Kota proje başına sayılır: anahtar başka bir Google hesabından alınmalı.",
-    adimlar: [
-      { metin: "Bilgisayardan Google AI Studio'nun anahtar sayfasını aç; sağ üstte YEDEK anahtarın sahibi olacak Google hesabı (ana anahtarınkinden farklı) açık olsun", link: "https://aistudio.google.com/apikey" },
-      { metin: "İlk girişse kullanım şartlarını onayla (Terms of Service kutusunu işaretle → Continue)" },
-      { metin: "Sağ üstteki \"Create API key\" (API anahtarı oluştur) düğmesine bas" },
-      { metin: "Proje sorulursa \"Create API key in new project\" (yeni projede oluştur) seç. Var olan bir projeyi seçme: kota proje başına sayılır" },
-      { metin: "Anahtar listesinde yeni anahtarın satırındaki kopyala simgesine bas (proje adını değil), aşağıdaki kutuya yapıştır → Kaydet" },
-      { metin: "Fatura (billing) ekleme; anahtar ücretsiz katmanda çalışır. Kaydettikten sonra durum \"Bağlı\" olur" },
-    ],
-  },
   {
     ad: "instagram", baslik: "Instagram erişim anahtarı (@updated.tr)", ikon: "kamera",
     aciklama: "Sitedeki \"Son videolar\" sütunu bu anahtarla Instagram'daki son Reels'leri çeker. Anahtar yalnız okuma izni taşır, hesaptan paylaşım yapamaz. Süresi 60 gün; sistem dolmadan kendisi yeniler.",
@@ -116,6 +105,7 @@ export default function Baglantilar() {
       <h2>Bağlantı anahtarları</h2>
       <div className="muted">Dış servislerin anahtarları burada girilir ve yalnız sunucuda saklanır. Kaydettikten sonra anahtarın kendisi bir daha görünmez; yalnız son 4 karakteri ve tarihi görünür.</div>
       {hata && <div className="msg err">{hata}</div>}
+      <GeminiHavuzu />
       {ANAHTARLAR.map((a) => {
         const d = durum[a.ad];
         return (

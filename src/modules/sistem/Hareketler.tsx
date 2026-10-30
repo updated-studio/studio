@@ -18,7 +18,7 @@ const ISLEM: Record<string, [string, string]> = {
 const TUR: Record<string, string> = {
   news: "Haber", reviews: "İnceleme", comparisons: "Kıyas yazısı", products: "Künye", categories: "Kategori", authors: "Yazar", media: "Görsel", videos: "Video", reels: "Reels", ads: "Reklam",
   "kulup-tracks": "Kulüp dersi", "kulup-quizzes": "Kulüp alıştırması", pages: "Sayfa", uyeler: "Uper üyesi", yorumlar: "Yorum", yarismalar: "Yarışma", gorevler: "Haftalık görev", "gorev-fotolari": "Görev fotoğrafı", "gorev-gorselleri": "Görev görseli",
-  users: "Kullanıcı hesabı", site: "Site ayarları", home: "Ana sayfa ayarları", "uye-giris": "Üyelik ayarları", baglanti_anahtarlari: "Bağlantı anahtarı", profiles: "Ekip", invites: "Davet", tr_items: "Haber Masası", kunye_oneriler: "Künye önerisi",
+  users: "Kullanıcı hesabı", site: "Site ayarları", home: "Ana sayfa ayarları", "uye-giris": "Üyelik ayarları", baglanti_anahtarlari: "Bağlantı anahtarı", gemini_anahtari: "Gemini anahtarı", profiles: "Ekip", invites: "Davet", tr_items: "Haber Masası", kunye_oneriler: "Künye önerisi",
 };
 // Geri getirilebilen türler: dosyası olanlar (görseller) ve hesaplar hariç
 const GERI = new Set(["news", "reviews", "comparisons", "products", "categories", "authors", "videos", "reels", "ads", "kulup-tracks", "kulup-quizzes", "pages", "yarismalar", "gorevler"]);

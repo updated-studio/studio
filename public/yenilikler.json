@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-30-a",
+    "tarih": "30 Ekim 2026",
+    "baslik": "Birden çok Google (Gemini) anahtarı",
+    "bolumler": [
+      {
+        "ad": "Yönetim",
+        "maddeler": [
+          "Bağlantı anahtarları'nda artık birden çok Gemini anahtarı eklenebilir; her birine hangi Google hesabından olduğu yazılır.",
+          "Kimin eklediği, durumu ve son kullanımı görünür; \"Anahtarları dene\" hepsini kontrol eder.",
+          "Kotası dolan anahtardan sonrakine kendiliğinden geçilir; Haber Masası da bu listeyi kullanır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-29-a",
     "tarih": "29 Ekim 2026",
     "baslik": "Tek kişi: Stüdyo ve Uper",

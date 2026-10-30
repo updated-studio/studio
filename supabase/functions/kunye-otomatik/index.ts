@@ -5,6 +5,7 @@
 // Zamanlayıcı (27 Ekim 2026, kullanıcı: "her gün otomatik"): günde 4 kez sunucu içinden 3'er ürün (göç 0042); oturumsuz çağrı yalnız
 // sunucu içinden (X-Forwarded-For'suz) kabul edilir, arka planda çalışır. Kota dolunca durur, ürünü "hata" diye işaretlemez (ertesi tur yeniden dener).
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -78,38 +79,38 @@ async function gorselBul(marka: string, ad: string, gemini: string | null | unde
   return null;
 }
 
-/** Gemini anahtarları: önce sunucudaki ana anahtar; kotası dolunca Stüdyo → Bağlantı anahtarları'ndaki yedek (27 Ekim 2026).
- *  Kota proje başına sayılır: yedek anahtar başka bir Google hesabının ya da projesinin olmalı. */
-async function geminiAnahtarlari(sb: ReturnType<typeof createClient>): Promise<string[]> {
-  const l = [Deno.env.get("GEMINI_API_KEY") ?? ""];
-  const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "gemini_yedek").maybeSingle();
-  if (data?.deger) l.push(String(data.deger));
-  return l.filter(Boolean);
-}
-
 async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
-  const anahtarlar = await geminiAnahtarlari(sb);
+  const anahtarlar = await geminiAnahtarlari();
   if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
   const liste = (urun.specs ?? []).some((s) => s.key === "Boyutlar") ? urun.specs ?? [] : [...(urun.specs ?? []), { key: "Boyutlar", unit: "mm" }];
   const ozellikler = liste.map((s) => `- ${s.key}${s.unit ? " · " + s.unit : ""}`).join("\n");
   const istem = `ÜRÜN: ${urun.brand} ${urun.name}\nDOLDURULACAK ÖZELLİKLER (ad · birim):\n${ozellikler}`;
   let son = "";
-  for (const [ai, key] of anahtarlar.entries()) for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+  // Anahtarlar sırayla (havuz, göç 0052); her anahtarda modeller sırayla. Bir anahtarın bütün modelleri 429 verirse kotası dolu işaretlenir.
+  for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: SISTEM }] }, contents: [{ role: "user", parts: [{ text: istem }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1 } }),
       });
       const g = await r.text();
-      if (!r.ok) { son = `${ai ? "yedek anahtar · " : ""}${model} ${r.status} ${g.slice(0, 120)}`; continue; }
+      if (!r.ok) {
+        son = `${a.etiket} · ${model} ${r.status} ${g.slice(0, 120)}`;
+        const ah = anahtarHatasi(r.status, g);
+        if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
+        if (ah !== "kota_dolu") hepsiKota = false;
+        continue;
+      }
+      hepsiKota = false; await isaretle(a, "calisiyor");
       const j = JSON.parse(g), c = j?.candidates?.[0];
       const metin = (c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
       const v = jsonOku(metin);
       if (!v) { son = `${model} geçersiz yanıt`; continue; }
       const kaynaklar = (c?.groundingMetadata?.groundingChunks ?? []).map((x: { web?: { uri?: string; title?: string } }) => ({ baslik: x.web?.title ?? "", url: x.web?.uri ?? "" })).filter((x: { url: string }) => x.url).slice(0, 12);
       return { v, kaynaklar };
-    } catch { son = `${model} yanıt vermedi`; }
+    } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
   }
+  if (hepsiKota) await isaretle(a, "kota_dolu", son); }
   throw new Error("Yapay zekâ yanıt vermedi (" + son + ")");
 }
 
