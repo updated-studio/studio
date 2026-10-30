@@ -55,8 +55,7 @@ import kotlin.math.atan2
  */
 class KameraActivity : Activity() {
     enum class KMod(val ad: String, val foto: Boolean, val sahne: Sahne) {
-        TIMELAPSE("TIMELAPSE", false, Sahne.KAPALI), VIDEO("VİDEO", false, Sahne.KAPALI), FOTO("FOTO", true, Sahne.KAPALI), PRO("PRO MODLAR", true, Sahne.KAPALI), PORTRE("PORTRE", true, Sahne.PORTRE),
-        MONITOR("MONİTÖR", false, Sahne.KAPALI)
+        TIMELAPSE("TIMELAPSE", false, Sahne.KAPALI), VIDEO("VİDEO", false, Sahne.KAPALI), FOTO("FOTO", true, Sahne.KAPALI), PRO("PRO MODLAR", true, Sahne.KAPALI), PORTRE("PORTRE", true, Sahne.PORTRE)
     }
 
     companion object {
@@ -229,14 +228,8 @@ class KameraActivity : Activity() {
         iskelet()
         tamEkran()
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO), 1)
-        // Açılış sorusu: uygulama baştan açıldıysa (bu süreçte sorulmadıysa) ve hatırlanan seçim yoksa
-        val hatirlanan = tercih.getString("giris", null)
-        when {
-            girisSoruldu -> secimYapildi = true
-            hatirlanan == "monitor" -> { girisSoruldu = true; secimYapildi = true; monitoreGec() }
-            hatirlanan == "kamera" -> { girisSoruldu = true; secimYapildi = true }
-            else -> girisGoster()
-        }
+        // Fatih 30 Ekim "Kaldır": Monitör ve Multi Cam yalnız UpCam Studio'da; açılış sorusu yok, Kamera doğrudan açılır (eski "giris" ayarı yok sayılır)
+        girisSoruldu = true; secimYapildi = true
         dongu.post(object : Runnable { override fun run() { tik(); dongu.postDelayed(this, 250) } })
     }
 
@@ -347,10 +340,8 @@ class KameraActivity : Activity() {
         kok.addView(tam, FrameLayout.LayoutParams(-1, -1)); kok.addView(kutu)
         dokunmaKur()
 
-        // Üst bant: solda Monitör ve "?", sağda Ayarlar (flaş, biçim ve PRO deklanşör sırasında ve ⋯ kontrollerde)
+        // Üst bant: solda "?", sağda Ayarlar (flaş, biçim ve PRO deklanşör sırasında ve ⋯ kontrollerde)
         ustSerit = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(2f), 0, dp(2f), 0) }
-        ustSerit.addView(ikon(R.drawable.ic_monitor, "Monitör") { monitoreGec() }.apply { setColorFilter(Color.WHITE); background = daire(false); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(8f), dp(8f), dp(8f), dp(8f)); aciklamalar.add(this to "Harici kamera (USB)") },
-            LinearLayout.LayoutParams(dp(34f), dp(34f)).apply { marginEnd = dp(10f) })
         val yardim = etiket("?", 14f).apply { typeface = kosulKalin; background = daire(false); contentDescription = "Açıklamalar"; setOnClickListener { yardimAcKapat() } }
         donenler.add(yardim); ustSerit.addView(yardim, LinearLayout.LayoutParams(dp(34f), dp(34f))); aciklamalar.add(yardim to "Açıklamalar")
         ustSerit.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
@@ -470,14 +461,13 @@ class KameraActivity : Activity() {
         modKaydir.post { (0 until modSerit.childCount).map { modSerit.getChildAt(it) }.firstOrNull { it.tag == mod }?.let { v -> modKaydir.smoothScrollTo(v.left + v.width / 2 - modKaydir.width / 2, 0) } }
     }
 
-    private fun modKisa(m: KMod, yan: Boolean) = when (m) { KMod.PRO -> "PRO"; KMod.TIMELAPSE -> if (yan) "TL" else m.ad; KMod.MONITOR -> if (yan) "MON." else m.ad; else -> m.ad }
+    private fun modKisa(m: KMod, yan: Boolean) = when (m) { KMod.PRO -> "PRO"; KMod.TIMELAPSE -> if (yan) "TL" else m.ad; else -> m.ad }
 
     private fun modSec(m: KMod, kartlar: Boolean = true) {
         secimKapat()
         if (m == mod) { if (m == KMod.PRO && kartlar) proKartlar(); return }
         if (kayitSuruyor()) return tost("Kayıt sürerken mod değişmez.")
         konuBirak()
-        if (m == KMod.MONITOR) { monitoreGec(); return }
         mod = m; tercih.edit().putString("mod", m.name).apply()
         if (ayar.pozlamaNs != null || bulb) { ayar.pozlamaNs = null; ayar.uzunOnizleme = 0; bulb = false; ayarKaydet() }
         modlariCiz(); modUygula(); vlogGuncelle()
@@ -683,7 +673,7 @@ class KameraActivity : Activity() {
             override fun onLongPress(e: MotionEvent) { konuBirak(); kaynak?.odakSerbest(); odakKare.visibility = View.GONE; tost("Otomatik odak") }
             override fun onFling(a: MotionEvent?, b: MotionEvent, vx: Float, vy: Float): Boolean {
                 if (a == null || abs(vx) < abs(vy) * 1.5f || abs(b.x - a.x) < dp(60f)) return false
-                val modlar = KMod.values().filter { it != KMod.MONITOR }; val i = modlar.indexOf(mod)
+                val modlar = KMod.values().toList(); val i = modlar.indexOf(mod)
                 val j = if (vx < 0) i + 1 else i - 1
                 if (j in modlar.indices) modSec(modlar[j]); return true
             }
@@ -1337,12 +1327,11 @@ class KameraActivity : Activity() {
                 } else EkranYayini.durdur(this@KameraActivity)
             }
         }
-        grup { deger("Bu telefonu Multi Cam yap", renk = AyarEkrani.MAVI) { ayarEkrani?.kapat(); masayaGec() } }
+        grup(not = "Multi Cam ekranı (çok kamera, geçiş, kayıt) ve Monitör artık UpCam Studio uygulamasında.") {}
     }
 
     private fun AyarEkrani.Sayfa.uygulamaSayfasi() {
         grup(not = "UPDATED Kamera ${packageManager.getPackageInfo(packageName, 0).versionName} · çökme ve donmalar kendiliğinden bildirilir (yalnız hata ayrıntısı ve cihaz modeli).") {
-            anahtar("Açılışta Kamera / Monitör sor", tercih.getString("giris", null) == null) { if (it) tercih.edit().remove("giris").apply() else tercih.edit().putString("giris", "kamera").apply() }
             deger("Güncellemeleri denetle", renk = AyarEkrani.MAVI) { Guncelleme.denetle(this@KameraActivity, sessiz = false) }
         }
     }
@@ -1986,7 +1975,6 @@ class KameraActivity : Activity() {
                     if (mod != KMod.PRO) l.add(Oge(if (ayar.flas == 0) R.drawable.ic_flas_yok else R.drawable.ic_flas, null, "Flaş", listOf("Kapalı", "Oto", "Açık", "Fener")[ayar.flas.coerceIn(0, 3)], ayar.flas > 0) { flasDegistir(); grupAc(Grup.KAYIT) })
                     if (mod == KMod.FOTO || mod == KMod.PORTRE) l.add(Oge(R.drawable.ic_zaman, null, "Zamanlayıcı", if (zamanlayici == 0) "Kapalı" else "$zamanlayici sn", zamanlayici > 0) {
                         zamanlayici = when (zamanlayici) { 0 -> 3; 3 -> 10; else -> 0 }; tercih.edit().putInt("zamanlayici", zamanlayici).apply(); bilgiCiz(); grupAc(Grup.KAYIT) })
-                    l.add(Oge(R.drawable.ic_monitor, null, "Monitör", "Harici", false) { acilirKapat(); monitoreGec() })
                     l.add(Oge(R.drawable.ic_ayar, null, "Ayarlar", "Tümü", false) { ayarlarAc() })
                     izgara(ic, l)
                 }
@@ -2547,10 +2535,6 @@ class KameraActivity : Activity() {
         if (kayitSuruyor()) return tost("Önce kaydı durdur.")
         startActivity(Intent(this, MainActivity::class.java).putExtra("mod", "pro").putExtra("kamera", kamListe.getOrNull(kamIndex)?.first))
     }
-    private fun masayaGec() {
-        if (kayitSuruyor()) return tost("Önce kaydı durdur.")
-        if (!Ekranlar.ac(this, Ekranlar.MASA)) tost("Multi Cam bu uygulamada yok.")
-    }
 
     /**
      * Wi-Fi kamera: ekrandaki görüntü (en çok 1080p) H.264'e sıkıştırılıp masaya gider. Kodlayıcı boyutu açılışta sabitlenir;
@@ -2579,46 +2563,14 @@ class KameraActivity : Activity() {
             .firstOrNull { it is java.net.Inet4Address && it.isSiteLocalAddress }?.hostAddress
     }.getOrNull()
 
-    private fun monitoreGec() {
-        if (kayitSuruyor()) return tost("Önce kaydı durdur.")
-        startActivity(Intent(this, MainActivity::class.java).putExtra("mod", "monitor"))
-    }
 
-    /** Açılış: Kamera mı Monitör mü (uygulama baştan açılınca bir kez) */
-    private fun girisGoster() {
-        val p = FrameLayout(this).apply { setBackgroundColor(Color.rgb(27, 30, 35)); isClickable = true }
-        val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(24f), dp(48f), dp(24f), dp(48f)) }
-        ic.addView(TextView(this).apply { text = "UPDATED"; textSize = 30f; setTextColor(Color.WHITE); typeface = runCatching { Typeface.create("sans-serif-condensed", Typeface.BOLD) }.getOrNull(); letterSpacing = 0.04f })
-        ic.addView(TextView(this).apply { text = "Ne yapmak istiyorsun?"; textSize = 15f; setTextColor(Color.rgb(201, 205, 211)); setPadding(0, dp(6f), 0, dp(28f)) })
-        val hatirla = CheckBox(this).apply { text = "Seçimimi hatırla (ayarlardan değişir)"; setTextColor(Color.rgb(201, 205, 211)); buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(37, 99, 235)) }
-        fun kart(ikonRes: Int, renk: Int, baslik: String, aciklama: String, sec: () -> Unit) = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(24f), dp(22f), dp(24f), dp(22f))
-            background = GradientDrawable().apply { cornerRadius = dp(26f).toFloat(); setColor(Color.argb(168, 46, 50, 57)); setStroke(1, Color.argb(23, 255, 255, 255)) }
-            addView(ImageView(this@KameraActivity).apply { setImageResource(ikonRes); setColorFilter(renk); scaleX = 1.4f; scaleY = 1.4f }, LinearLayout.LayoutParams(dp(34f), dp(34f)))
-            addView(TextView(this@KameraActivity).apply { text = baslik; textSize = 26f; typeface = kosulKalin; setTextColor(Color.WHITE); setPadding(0, dp(10f), 0, dp(4f)) })
-            addView(TextView(this@KameraActivity).apply { text = aciklama; textSize = 14f; setTextColor(Color.rgb(201, 205, 211)) })
-            setOnClickListener { sec() }
-        }
-        ic.addView(kart(R.drawable.ic_kamera, VURGU, "Kamera", "Fotoğraf, video, timelapse; gece, ışık izi, Samanyolu PRO modlarda.") {
-            girisSoruldu = true; secimYapildi = true; if (hatirla.isChecked) tercih.edit().putString("giris", "kamera").apply(); kok.removeView(p); kameraAc()
-        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16f) })
-        ic.addView(kart(R.drawable.ic_monitor, MAVI_ACIK, "Monitör", "Dış kamerayı izle: HDMI/USB ya da ağ yayını. Ölçümler, LUT, iki kaynak.") {
-            girisSoruldu = true; secimYapildi = true; if (hatirla.isChecked) tercih.edit().putString("giris", "monitor").apply(); kok.removeView(p); monitoreGec()
-        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
-        ic.addView(kart(R.drawable.ic_ag, YESIL, "Multi Cam", "Çok kamera: Wi-Fi'daki telefonlar ve USB'den takılan kameralar tek ekranda; dokununca geçiş, kayıt.") {
-            girisSoruldu = true; secimYapildi = true; kok.removeView(p); masayaGec()
-        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12f) })
-        ic.addView(hatirla)
-        p.addView(ScrollView(this).apply { isFillViewport = true; addView(ic, FrameLayout.LayoutParams(-1, -1)) }, FrameLayout.LayoutParams(-1, -1))
-        kok.addView(p, FrameLayout.LayoutParams(-1, -1))
-    }
 
     /* ================= ayarların saklanması ================= */
     private fun ayarlariOku() {
         // 0.11'e kadar ayrı olan Gece / Işık izi / Samanyolu modları artık PRO MODLAR'ın içinde
         val eski = mapOf("GECE" to ProMod.GECE_SEHIR, "ISIK_IZI" to ProMod.ARAC_IZI, "SAMANYOLU" to ProMod.SAMANYOLU)[tercih.getString("mod", null)]
         if (eski != null) tercih.edit().putString("mod", KMod.PRO.name).putString("proMod", eski.name).apply()
-        mod = runCatching { KMod.valueOf(tercih.getString("mod", "FOTO")!!) }.getOrDefault(KMod.FOTO).let { if (it == KMod.MONITOR) KMod.FOTO else it }
+        mod = runCatching { KMod.valueOf(tercih.getString("mod", "FOTO")!!) }.getOrDefault(KMod.FOTO)
         kamIndex = tercih.getInt("kamIndex", 0)
         kompTur = runCatching { KompTur.valueOf(tercih.getString("komp", "KAPALI")!!) }.getOrDefault(KompTur.KAPALI); kompYon = tercih.getInt("kompYon", 0)
         // 0.14'ten önceki "otomatik kompozisyon" kılavuzu kendisi seçip kaydediyordu; Fatih: "her modda oto çıkmasın" → o kalıntı bir kez kapatılır

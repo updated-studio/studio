@@ -96,6 +96,9 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | **ATEM benzeri geçişler:** KES / MIX / DIP (siyaha) / WIPE (soldan sağa), süre 0,3–2 sn; tablette KES = kesme, AUTO = seçili geçiş; telefonda kaynağa dokunuş seçili geçişle; yalnız tek düzende (çoklu düzende kesme); program ekranında ve kayıtta aynı | ✓ | | Android MasaGorunum.gecis; klavye: boşluk KES, Enter AUTO, F FTB |
 | **Katmanlar:** FTB (programı siyaha indirir), LOGO (galeriden; sağ üst, yükseklik %10), ALT YAZI (ad + unvan; siyah %72 plaka, solda beyaz çizgi; sol alt, yükseklik %15); yumuşak açılıp kapanır, kayda girer | ✓ | | ayarlar: masa.gecis, masa.gecisSure, masa.logo, masa.altYazi1/2 |
 | **Düzen 5 = PiP:** canlı tam, önizlemedeki (yoksa ilk diğer) kaynak sağ altta, genişlik %28, kenar %4 (Vlog ile aynı ölçü) | ✓ | | masa.duzen değeri 5 |
+| **Kamera'da Masa/Monitör yok** (Fatih 30 Ekim "Kaldır"): açılış sorusu, MONİTÖR modu, Monitör kısayolları, "Bu telefonu Multi Cam yap" kalktı; eski "giris" ayarı yok sayılır. Wi-Fi kamera olma, ekranı Multi Cam'e gönderme ve Vlog Kamera'da kalır | ✓ | ✓ | Android: :app artık :masa içermez, USB takılınca Monitör açılmaz |
+| **UpCam Studio açılışı "A · Sahne":** ışık lekeli koyu zemin, ortada simge + UPCAM STUDIO, alt yarıda Monitör (üstte) ve Multi Cam kartları, "Son kullanılan" (studio.son); tablette ortada 520 dp sütun | ✓ | ✓ | Android StudioGiris |
+| **Multi Cam telefon düzeni "Ninja":** üstte 46 dp şerit, hücreler KAYIT · CANLI · GEÇİŞ (sarı) · DÜZEN · PROGRAM · SSD/TELEFON · SES (iki çubuk), dokununca o ayar; altta kaynaklar (dokun sıradaki, yeniden dokun AUTO, basılı tut menü) + "+", sağda CUT · AUTO · KATMAN · MENÜ, REC; dikeyde hücreler 2 satır, kaynaklar 2×2. Tablet ATEM düzeni aynı | ✓ | ✓ | Android MasaActivity.ninjaDuzen |
 
 ## Uygulama
 

@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Ekranlar, hizmetler ve izinler modüllerin kendi bildirimlerinde (ortak, kamera, masa); burada yalnız uygulamanın kendisi -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <!-- Ekranlar, hizmetler ve izinler modüllerin kendi bildirimlerinde (ortak, kamera); burada yalnız uygulamanın kendisi.
+         Multi Cam (:masa) ve Monitör yalnız UpCam Studio'da (Fatih 30 Ekim "Kaldır"): USB takılınca Monitör açılmaz. -->
     <application
         android:label="UPDATED Kamera"
         android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
         android:hardwareAccelerated="true"
-        android:allowBackup="false" />
+        android:allowBackup="false">
+        <activity android:name="tr.com.updated.monitor.MainActivity" tools:node="merge">
+            <intent-filter tools:node="removeAll" />
+            <meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" tools:node="remove" />
+        </activity>
+    </application>
 </manifest>

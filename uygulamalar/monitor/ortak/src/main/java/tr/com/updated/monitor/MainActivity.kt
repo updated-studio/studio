@@ -138,6 +138,8 @@ class MainActivity : Activity() {
         super.onCreate(b)
         // Masa açıkken takılan USB kamera masaya eklenir (MasaActivity kendisi dinler); Monitör üstüne açılmasın
         if (intent?.action == android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED && Ekranlar.masaAcik) { finish(); return }
+        // Kamera uygulamasında Monitör yok (yalnız UpCam Studio'da); burada yalnız PRO ekranı açılır
+        if (!proMod && !Ekranlar.masaUygulamasi(this) && android.os.Build.FINGERPRINT != "robolectric") { finish(); return }
         HataKaydi.kur(this)
         ayarlariOku()
         kip = runCatching { Kip.valueOf(tercih.getString("kip2", "TEK")!!) }.getOrDefault(Kip.TEK) // Monitör de tam ekran görüntüyle açılır (ölçümler DÜZEN'den)

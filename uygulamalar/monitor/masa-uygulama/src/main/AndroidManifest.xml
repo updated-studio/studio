@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- Açılış ekranı Masa (Monitör oradan açılır) -->
+    <!-- Açılış ekranı StudioGiris (Monitör ve Multi Cam kartları; Fatih 30 Ekim "A") -->
     <application
         android:label="UpCam Studio"
         android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
         android:hardwareAccelerated="true"
         android:allowBackup="false">
-        <activity android:name="tr.com.updated.monitor.MasaActivity" android:exported="true" tools:node="merge" tools:replace="android:exported">
+        <activity android:name="tr.com.updated.monitor.StudioGiris" android:exported="true" android:screenOrientation="fullUser">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

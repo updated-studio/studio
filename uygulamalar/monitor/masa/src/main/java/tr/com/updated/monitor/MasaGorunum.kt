@@ -132,6 +132,8 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
         }
     }
     @Volatile var ustPay = 0f; @Volatile var altPay = 0f
+    /** Telefon "Ninja" düzeni: program alanı ve yuva başına küçük alan (boş yuvada RectF()); verilmişse alanlar() yerine bu çizilir */
+    @Volatile var ozelAlan: Pair<RectF, List<RectF>>? = null
 
     /** Tablet (yönetmen masası, iPad'deki MasaIpad gibi): üstte ÖNİZLEME ve PROGRAM yan yana, altta kaynak ızgarası */
     @Volatile var tablet = false
@@ -202,9 +204,9 @@ class MasaGorunum(context: Context) : GLSurfaceView(context) {
                 programCiz(hucreler, prog, gh)
                 kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
             } else {
-                val (canliA, kucukler) = alanlar(gw.toFloat(), gh.toFloat(), ustPay, altPay)
+                val (canliA, kucukler) = ozelAlan ?: alanlar(gw.toFloat(), gh.toFloat(), ustPay, altPay)
                 programCiz(hucreler, canliA, gh)
-                kucukler.forEachIndexed { i, r -> if (dolu[i]) ciz(yuvalar[i], r, gh) }
+                kucukler.forEachIndexed { i, r -> if (dolu[i] && r.width() > 0f) ciz(yuvalar[i], r, gh) }
             }
             egllerTemizle()
             // Program: düzendeki kaynaklardan biri yeni kare verdikçe (en çok ~60/sn)

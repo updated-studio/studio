@@ -16,8 +16,8 @@ android {
         applicationId = "tr.com.updated.monitor"
         minSdk = 29            // Android 10: GLES 3, MediaStore klasörleri; Camera2 harici kamera (UVC) Android 14+ cihazlarda
         targetSdk = 35
-        versionCode = 36
-        versionName = "0.17.5"
+        versionCode = 37
+        versionName = "0.18.0"
         ndk { abiFilters += listOf("arm64-v8a") } // güncel Android telefonların hepsi; ML Kit kitaplıkları diğer işlemciler için APK'yı 3 kat büyütüyordu
     }
     // İmza anahtarı yalnız sunucuda (/opt/updated/monitor-imza, depoya girmez). Aynı anahtar = sonraki sürümler güncelleme olarak kurulur.
@@ -42,9 +42,9 @@ android {
 }
 
 dependencies {
-    // Bugünkü tek uygulama: Kamera ve Masa + Monitör birlikte (ikiye ayrılınca her uygulama kendi modülünü alır)
+    // Kamera uygulaması: yalnız Kamera (Multi Cam ve Monitör UpCam Studio'da, Fatih 30 Ekim); Multi Cam yalnız ekran testleri için
     implementation(project(":kamera"))
-    implementation(project(":masa"))
+    testImplementation(project(":masa"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core:1.6.1")

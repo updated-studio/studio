@@ -91,6 +91,15 @@ class EkranTest {
         }
     }
 
+    /** UpCam Studio açılışı (telefon dikey, tablet) */
+    @Test fun studioGiris() {
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        tercih("kamera").edit().putString("studio.son", "multicam").commit()
+        Robolectric.buildActivity(StudioGiris::class.java).setup().use { c -> kaydet(c.get(), "studio-giris") }
+        RuntimeEnvironment.setQualifiers("w1024dp-h1366dp-port-xhdpi")
+        Robolectric.buildActivity(StudioGiris::class.java).setup().use { c -> kaydet(c.get(), "studio-giris-tablet") }
+    }
+
     /** Genel Ayarlar ana sayfası, kamera varmış gibi bütün satırlar (simgelerin görünüşü için; satırlar KameraActivity.genelAyarlar ile aynı) */
     @Test fun genelAyarlar() {
         RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
