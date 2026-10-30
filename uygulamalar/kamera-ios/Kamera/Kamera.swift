@@ -139,6 +139,10 @@ final class Kamera: NSObject, ObservableObject {
     @Published var tlPozSabit = Kamera.ud.object(forKey: "k.tlPozSabit") as? Bool ?? true { didSet { Kamera.ud.set(tlPozSabit, forKey: "k.tlPozSabit") } }
     @Published var tlKare = 0
     // Kompozisyon, akıllı yardımcı, terazi, sahne önerisi
+    /// Kesik çizgili kadraj çerçeveleri (yalnız video modlarında, Cerceve.swift)
+    @Published var cerceveler: [CerceveOrani] = (try? JSONDecoder().decode([CerceveOrani].self, from: Kamera.ud.data(forKey: "k.cerceve") ?? Data())) ?? [] {
+        didSet { if let d = try? JSONEncoder().encode(cerceveler) { Kamera.ud.set(d, forKey: "k.cerceve") } }
+    }
     @Published var kompTur = KompTur(rawValue: Kamera.ud.string(forKey: "k.komp") ?? "") ?? .kapali { didSet { Kamera.ud.set(kompTur.rawValue, forKey: "k.komp"); if kompTur != .kapali { sonKomp = kompTur } } }
     @Published var kompYon = Kamera.ud.integer(forKey: "k.kompYon") { didSet { Kamera.ud.set(kompYon, forKey: "k.kompYon") } }
     var sonKomp = KompTur(rawValue: Kamera.ud.string(forKey: "k.sonKomp") ?? "") ?? .spiral { didSet { Kamera.ud.set(sonKomp.rawValue, forKey: "k.sonKomp") } }

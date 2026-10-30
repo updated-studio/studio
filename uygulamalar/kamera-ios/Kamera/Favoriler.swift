@@ -8,8 +8,25 @@ import SwiftUI
 /// Değer satıra sığıyorsa merceklerin yerinde tek satır (FavoriSatir), sığmıyorsa küçük panel (FavoriPanel). Anahtar adları Android'le aynı (PARITE.md).
 enum Favori: String, CaseIterable, Identifiable, Codable {
     case iso, enst, bd, ev, odak, cozunurluk, kodek, renk, sabitleme, stil, lut
-    case zebra, falseColor, peaking, histogram, monokrom, flas, zamanlayici, kilavuz, terazi, yardimci, ses
+    case zebra, falseColor, peaking, histogram, monokrom, flas, zamanlayici, kilavuz, cerceve, terazi, yardimci, ses
     var id: String { rawValue }
+
+    /// Hangi modlarda anlamlı (Fatih 30 Ekim 10:41: "fotoğrafa özel, videoya özel, ortak"): menüler yalnız ilgili olanı gösterir
+    enum Kapsam { case foto, video, ortak }
+    var kapsam: Kapsam {
+        switch self {
+        case .kodek, .renk, .sabitleme, .cerceve, .ses: return .video
+        case .zamanlayici: return .foto
+        default: return .ortak
+        }
+    }
+    func uygun(_ m: Kamera.Mod) -> Bool {
+        switch kapsam {
+        case .ortak: return true
+        case .video: return m == .video || (m == .timelapse && self == .cerceve)
+        case .foto: return m.foto
+        }
+    }
 
     static let enCok = 6
     static let varsayilan: [Favori] = [.iso, .enst, .bd, .zebra]
@@ -35,6 +52,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .flas: return "Flaş / fener"
         case .zamanlayici: return "Zamanlayıcı"
         case .kilavuz: return "Kılavuz"
+        case .cerceve: return "Kadraj çerçevesi"
         case .terazi: return "Terazi"
         case .yardimci: return "AI Kadraj"
         case .ses: return "Ses girişi"
@@ -62,6 +80,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .flas: return "bolt"
         case .zamanlayici: return "timer.circle"
         case .kilavuz: return "squareshape.split.3x3"
+        case .cerceve: return "rectangle.dashed"
         case .terazi: return "level"
         case .yardimci: return "sparkles"
         case .ses: return "mic"
@@ -78,7 +97,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .lut: return .purple
         case .zebra, .falseColor, .peaking, .histogram, .monokrom: return .green
         case .flas, .zamanlayici: return .brown
-        case .kilavuz, .terazi, .yardimci: return .teal
+        case .kilavuz, .cerceve, .terazi, .yardimci: return .teal
         case .ses: return .gray
         }
     }
@@ -121,6 +140,7 @@ extension Kamera {
         case .flas: return (["Kapalı", "Oto", "Açık", "Fener"][flas.rawValue], flas != .kapali)
         case .zamanlayici: return (zamanlayici == 0 ? "Kapalı" : "\(zamanlayici) sn", zamanlayici > 0)
         case .kilavuz: return (kompTur == .kapali ? "Kapalı" : kompTur.ad, kompTur != .kapali)
+        case .cerceve: return (cerceveler.isEmpty ? "Kapalı" : (cerceveler.count == 1 ? cerceveler[0].ad : "\(cerceveler.count) oran"), !cerceveler.isEmpty)
         case .terazi: return ("", teraziAcik)
         case .yardimci: return ("", asistanAcik)
         case .ses: return (etkinSesGirdi ?? "Mikrofon", harici)
@@ -264,6 +284,7 @@ struct FavoriSatir: View {
         case .peaking: kisa = "Odak vurgusu"
         case .flas: kisa = "Flaş"
         case .zamanlayici: kisa = "Sayaç"
+        case .cerceve: kisa = "Çerçeve"
         case .yardimci: kisa = "AI Kadraj"
         case .ses: kisa = "Ses"
         case .stil: kisa = "Stiller"
@@ -395,6 +416,7 @@ struct FavoriPanel: View {
         case .stil: StilPedi(kamera: kamera)
         case .lut, .zebra, .falseColor, .peaking, .histogram, .monokrom: GostergeMenu(kamera: kamera)
         case .kilavuz: KilavuzMenu(kamera: kamera)
+        case .cerceve: CerceveMenu(kamera: kamera)
         case .ses: SesHizli(kamera: kamera)
         case .flas, .zamanlayici, .terazi, .yardimci: EmptyView()
         }
@@ -487,6 +509,8 @@ struct HizliMenu: View {
                 ForEach([0, 3, 10], id: \.self) { sn in secenek(sn == 0 ? "Kapalı" : "\(sn) sn", secili: kamera.zamanlayici == sn) { kamera.zamanlayici = sn } }
             case .kilavuz:
                 ForEach(KompTur.allCases) { t in secenek(t.ad, secili: kamera.kompTur == t) { kamera.kompTur = t } }
+            case .cerceve:
+                ForEach(CerceveOrani.allCases) { o in secenek(o.ad, secili: kamera.cerceveler.contains(o)) { kamera.cerceveDegistir(o) } }
             case .zebra, .falseColor, .peaking, .histogram, .monokrom, .terazi, .yardimci:
                 let acik = kamera.favoriDeger(f).etkin
                 Button { kamera.favoriDegistir(f) } label: { Label(acik ? "Kapat" : "Aç", systemImage: acik ? "xmark.circle" : "checkmark.circle") }

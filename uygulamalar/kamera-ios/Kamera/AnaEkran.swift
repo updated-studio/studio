@@ -178,6 +178,7 @@ struct AnaEkran: View {
                         HStack(alignment: .top) {
                             ustDugmeler
                             Spacer()
+                            hizliBicim
                         }
                         .overlay(alignment: .top) { bilgi }
                         .padding(.horizontal, 12).padding(.top, 8)
@@ -260,6 +261,7 @@ struct AnaEkran: View {
                         .position(x: 76, y: tam.size.height * 0.2)
                         .allowsHitTesting(false)
                 }
+                if kamera.videoModu && !kamera.cerceveler.isEmpty { CerceveKatman(oranlar: kamera.cerceveler, alan: alan) }
                 KompozisyonKatman(tur: kamera.kompTur, yon: kamera.kompYon, alan: alan, asistan: kamera.asistanAcik, konu: kamera.asistanAcik ? kamera.konu : nil,
                                   konuAdi: kamera.konuAdi, konuSecili: kamera.konuSecili, analiz: kamera.analiz, egim: kamera.egim, egimTaban: kamera.egimTaban)
                 if let i = kamera.ipucu {
@@ -312,9 +314,18 @@ struct AnaEkran: View {
     private var normalUstBant: some View {
         HStack { ustDugmeler; Spacer() }
             .overlay(alignment: .trailing) {
-                kucukDaire("gearshape.fill", aciklama: "Ayarlar") { ayarlar = true }.disabled(kamera.kayitta)
+                HStack(spacing: 10) {
+                    hizliBicim
+                    kucukDaire("gearshape.fill", aciklama: "Ayarlar") { ayarlar = true }.disabled(kamera.kayitta)
+                }
             }
             .padding(.horizontal, 16)
+    }
+
+    /// Sağ üstte sarı cam biçim denetimi (çözünürlük · kare hızı · sabitleme / MP · RAW)
+    private var hizliBicim: some View {
+        HizliBicim(kamera: kamera) { panelAc(.bicim) }
+            .yardimBalonu(yardim, "Dokun ya da kaydır: değiştir")
     }
 
     private var ustDugmeler: some View {
@@ -358,7 +369,7 @@ struct AnaEkran: View {
                 }
                 .padding(.horizontal, 16).frame(minWidth: 220, minHeight: 44)
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
-            } else {
+            } else if !bilgiOgeleri.isEmpty {
                 Button { panelAc(.bicim) } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         ForEach(Array(bilgiOgeleri.enumerated()), id: \.offset) { _, o in okuma(o) }
@@ -378,7 +389,7 @@ struct AnaEkran: View {
     @ViewBuilder private var sabitler: some View {
         if !duzenleme, !kamera.favoriler.isEmpty {
             HStack(spacing: 6) {
-                ForEach(kamera.favoriler) { f in
+                ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) }) { f in
                     Button { kisayolDokun(f) } label: { SabitKapsul(f: f, kamera: kamera) }
                         .buttonStyle(.plain)
                         .sabitlenebilir(f, kamera) { ayrintiAc(f) }
@@ -415,9 +426,11 @@ struct AnaEkran: View {
     }
 
     private var bilgiOgeleri: [(String, String, Bool)] {
-        let parca = kamera.cozunurluk.components(separatedBy: " · ")
-        var l: [(String, String, Bool)] = [(parca.first ?? "", parca.dropFirst().first ?? "", false)]
+        // Biçim (çözünürlük, kare hızı, MP) sağ üstteki denetimde; burada yalnız elle değişmiş değerler
+        var l: [(String, String, Bool)] = []
         if kamera.mod == .pro {
+            let parca = kamera.cozunurluk.components(separatedBy: " · ")
+            l.append((parca.first ?? "", parca.dropFirst().first ?? "", false))
             let a = kamera.proAyar
             l.append((ProMod.isoYazi(a.iso), "ISO", a.iso != nil))
             if let e = a.enst { l.append((ProMod.enstYazi(e), "S", true)) }
@@ -436,6 +449,7 @@ struct AnaEkran: View {
         }
         if kamera.stil.etkin { l.append((kamera.stil.hazir == .standart ? "Özel" : kamera.stil.hazir.ad, "STİL", true)) }
         if kamera.mod.foto, kamera.zamanlayici > 0 { l.append(("\(kamera.zamanlayici)", "SN", true)) }
+        if kamera.mod == .timelapse { l.append((Timelapse.aralikYazi(kamera.tlAralik), "ARALIK", false)) }
         return l
     }
 
@@ -885,7 +899,7 @@ struct AnaEkran: View {
                 .buttonStyle(.plain)
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 16) {
-                    ForEach(Favori.allCases) { f in
+                    ForEach(Favori.allCases.filter { $0.uygun(kamera.mod) }) { f in
                         Button { kisayolDokun(f) } label: { DenetimDaire(f: f, kamera: kamera) }
                             .buttonStyle(.plain)
                             .sabitlenebilir(f, kamera) { ayrintiAc(f) }
