@@ -20,7 +20,7 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
       { metin: "İlk girişse kullanım şartlarını onayla (Terms of Service kutusunu işaretle → Continue)" },
       { metin: "Sağ üstteki \"Create API key\" (API anahtarı oluştur) düğmesine bas" },
       { metin: "Proje sorulursa \"Create API key in new project\" (yeni projede oluştur) seç. Var olan bir projeyi seçme: kota proje başına sayılır" },
-      { metin: "Çıkan anahtar AIza ile başlar. Yanındaki kopyala simgesine bas, aşağıdaki kutuya yapıştır → Kaydet" },
+      { metin: "Anahtar listesinde yeni anahtarın satırındaki kopyala simgesine bas (proje adını değil), aşağıdaki kutuya yapıştır → Kaydet" },
       { metin: "Fatura (billing) ekleme; anahtar ücretsiz katmanda çalışır. Kaydettikten sonra durum \"Bağlı\" olur" },
     ],
   },
@@ -57,14 +57,14 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
 ];
 
 // Sık karışan değerler kaydetmeden yakalanır: Meta'nın "Uygulama gizli anahtarı" (App Secret) 32 karakterlik 0-9/a-f metnidir,
-// Uygulama Kimliği yalnız rakamdır; Instagram erişim anahtarı "IG" ile başlar ve çok daha uzundur. Gemini anahtarı "AIza" ile başlar.
+// Uygulama Kimliği yalnız rakamdır; Instagram erişim anahtarı "IG" ile başlar ve çok daha uzundur. Gemini anahtarı çoğunlukla "AIza" ile başlar ama Google yeni biçimler de veriyor (30 Ekim 2026).
 function bicimHatasi(ad: string, v: string): string {
   if (ad === "instagram") {
     if (/^[0-9a-f]{32}$/i.test(v)) return "Bu, uygulamanın gizli anahtarı (App Secret) gibi görünüyor; o gerekmiyor. \"Generate token\" ile çıkan, IG ile başlayan uzun anahtarı yapıştır.";
     if (/^\d+$/.test(v)) return "Bu, uygulama ya da hesap kimliği (ID) gibi görünüyor. \"Generate token\" ile çıkan, IG ile başlayan uzun anahtarı yapıştır.";
     if (!/^(IG|EAA)/.test(v) || v.length < 100) return "Bu Instagram erişim anahtarına benzemiyor: anahtar IG ile başlar ve çok uzundur. \"Generate token\" ile çıkanı eksiksiz kopyala.";
   }
-  if (ad === "gemini_yedek" && !/^AIza/.test(v)) return "Bu Google (Gemini) anahtarına benzemiyor: anahtar AIza ile başlar.";
+  if (ad === "gemini_yedek" && (/^gen-lang-client/i.test(v) || /^https?:/i.test(v) || /\s/.test(v) || !/^[A-Za-z0-9._-]{30,200}$/.test(v))) return "Bu Google (Gemini) anahtarına benzemiyor. AI Studio'da anahtarın satırındaki kopyala simgesine bas; proje adını (gen-lang-client…) değil anahtarı yapıştır.";
   if (ad === "cloudflare_adres" && !/^https:\/\/[A-Za-z0-9.-]+\/?$/.test(v)) return "Programın adresi https:// ile başlamalı (ör. https://updated-gorsel.ad.workers.dev).";
   if (ad === "cloudflare_anahtar" && v.length < 24) return "Anahtar en az 24 karakter olmalı.";
   return "";
