@@ -43,7 +43,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations~iphone: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
-  # UPDATED Masa: Masa + Monitör ayrı uygulama (Fatih 30 Ekim). Aynı kaynaklar, kendi girişi (MasaUygulama/) ve simgesi; ekran yayını uzantısı yok.
+  # UpCam Studio (App Store Connect'te Fatih açtı, 30 Ekim): Masa + Monitör ayrı uygulama. Aynı kaynaklar, kendi girişi (MasaUygulama/) ve simgesi; ekran yayını uzantısı yok.
   UpdatedMasa:
     type: application
     platform: iOS
@@ -53,14 +53,14 @@ targets:
       - MasaUygulama
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: tr.com.updated.masa
+        PRODUCT_BUNDLE_IDENTIFIER: tr.com.UpCam.Studio
         PRODUCT_NAME: UpdatedMasa
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: MasaUygulama/Info.plist
       properties:
-        CFBundleDisplayName: UPDATED Masa
+        CFBundleDisplayName: UpCam Studio
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSCameraUsageDescription: Monitör'de iPhone kamerasını göstermek için kamera gerekiyor.

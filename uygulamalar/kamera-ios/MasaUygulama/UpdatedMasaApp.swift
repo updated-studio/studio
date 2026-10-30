@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// UPDATED Masa (iPhone/iPad): Masa (çok kamera) + Monitör. Kamera uygulamasıyla aynı kaynak kümesi, ayrı paket kimliği (tr.com.updated.masa).
+/// UpCam Studio (iPhone/iPad): Masa (çok kamera) + Monitör. Kamera uygulamasıyla aynı kaynak kümesi, ayrı paket kimliği (tr.com.UpCam.Studio).
 /// Fatih 30 Ekim: "uygulamaları ayıracağım". Android karşılığı :masa-uygulama modülü.
 @main
 struct UpdatedMasaApp: App {
@@ -24,13 +24,13 @@ struct MasaKok: View {
             Color(red: 27 / 255, green: 30 / 255, blue: 35 / 255).ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("UPDATED MASA").font(.system(size: 34, weight: .heavy, design: .default).width(.condensed))
+                    Text("UPCAM STUDIO").font(.system(size: 34, weight: .heavy, design: .default).width(.condensed))
                     Text("Ne yapmak istiyorsun?").font(.subheadline).foregroundStyle(Tema.metin2).padding(.bottom, 14)
                     kart("rectangle.split.2x2.fill", Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255), "Masa",
                          "Çok kamera: Wi-Fi'daki telefonlar, USB kameralar ve Luna tek ekranda; dokununca geçiş, her kaynak ve program SSD'ye kayıt.") { ac(.masa) }
                     kart("display", Color(red: 106 / 255, green: 152 / 255, blue: 248 / 255), "Monitör",
                          "Kamerayı izle: USB kamera, ağ yayını. Ölçümler, LUT, iki kaynak.") { ac(.monitor) }
-                    Text("Çekim için UPDATED Kamera uygulamasını kullan; telefonlar oradan Wi-Fi kamera olur.")
+                    Text("Çekim için Updated Camera uygulamasını kullan; telefonlar oradan Wi-Fi kamera olur.")
                         .font(.footnote).foregroundStyle(Tema.metin2).padding(.top, 8)
                 }
                 .padding(24)
