@@ -7,6 +7,7 @@ struct KameraAyarlar: View {
     @ObservedObject var kamera: Kamera
     var wifiKamera: () -> Void
     var vlog: () -> Void = {}
+    var yardimAc: () -> Void = {}
     @Environment(\.dismiss) private var kapat
 
     var body: some View {
@@ -32,6 +33,8 @@ struct KameraAyarlar: View {
                 Section {
                     NavigationLink { masaBolum } label: { satir("rectangle.split.2x2", .teal, "Multi Cam'e bağlan", "") }
                     NavigationLink { uygulama } label: { satir("info.circle", .gray, "Uygulama", KameraAyarlar.surum) }
+                    Button { kapat(); yardimAc() } label: { satir("questionmark.circle", .gray, "Ekrandaki açıklamalar", "") }
+                        .foregroundStyle(.white)
                 } footer: { Text(kamera.videoModu ? "Fotoğraf ayarları FOTO modunda görünür." : "Video ayarları VİDEO modunda görünür.") }
             }
             .navigationTitle("Genel Ayarlar")

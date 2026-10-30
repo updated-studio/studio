@@ -40,6 +40,9 @@ struct AnaEkran: View {
     static let mavi = Color(red: 106 / 255, green: 152 / 255, blue: 248 / 255)
     static let cam = Color(white: 0.16).opacity(0.78)
     /// Menü geçişleri (Fatih 30 Ekim 10:41 "daha smooth"): sönümlü yay; açılış ve kapanış aynı akışta, sekmeden
+    /// Üstte zaten görünenler (biçim kapsülü ve değer hücreleri): sabitlenenlerde tekrarlanmaz
+    static let ustteGorunen: [Favori] = [.cozunurluk, .iso, .enst, .bd, .ev]
+
     static let yay = Animation.spring(response: 0.34, dampingFraction: 0.9, blendDuration: 0.1)
     /// Dairesel düğmeler (Apple Kamera'daki koyu gri)
     static let gri = Color(white: 0.3).opacity(0.78)
@@ -100,7 +103,8 @@ struct AnaEkran: View {
             }
         }
         .sheet(isPresented: $ayarlar) {
-            KameraAyarlar(kamera: kamera, wifiKamera: { ekranAc(.wifi) }, vlog: { ekranAc(.vlog) })
+            KameraAyarlar(kamera: kamera, wifiKamera: { ekranAc(.wifi) }, vlog: { ekranAc(.vlog) },
+                          yardimAc: { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { withAnimation(AnaEkran.yay) { yardim = true } } })
         }
     }
 
@@ -143,7 +147,7 @@ struct AnaEkran: View {
                 ustBant.frame(height: ust)
                 bilgi.padding(.top, 6)
                 sabitler.padding(.top, 8)
-                cipler.padding(.top, 8)
+                cipler(yatay: false).padding(.top, 8)
                 Spacer(minLength: 0)
                 if let b = kamera.bildirim { bildirimKutusu(b) }
                 if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 14) }
@@ -193,7 +197,7 @@ struct AnaEkran: View {
                         .overlay(alignment: .top) { bilgi }
                         .padding(.horizontal, 12).padding(.top, 8)
                         sabitler.padding(.top, 6)
-                        cipler.padding(.top, 6)
+                        cipler(yatay: true).padding(.top, 6)
                         Spacer(minLength: 0)
                         if let b = kamera.bildirim { bildirimKutusu(b) }
                         if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 10) }
@@ -321,15 +325,38 @@ struct AnaEkran: View {
         withAnimation(AnaEkran.yay) { duzenleme = false; panel = nil }
     }
 
+    /// Sentez (Fatih 30 Ekim 13:34 "hepsinin en güzellerini al"): solda Ayarlar, ortada zaman kodu, sağda biçim kapsülü
     private var normalUstBant: some View {
         HStack { ustDugmeler; Spacer() }
-            .overlay(alignment: .trailing) {
-                HStack(spacing: 10) {
-                    hizliBicim
-                    kucukDaire("gearshape.fill", aciklama: "Ayarlar") { ayarlar = true }.disabled(kamera.kayitta)
-                }
-            }
+            .overlay { zamanKodu }
+            .overlay(alignment: .trailing) { hizliBicim }
             .padding(.horizontal, 16)
+    }
+
+    /// Zaman kodu (stüdyo kamerası gibi, sabit genişlik): video modlarında hep görünür, kayıtta kırmızı nokta
+    @ViewBuilder private var zamanKodu: some View {
+        if kamera.videoModu {
+            if kamera.kayitta, let bas = kamera.kayitBasi {
+                TimelineView(.periodic(from: bas, by: kamera.mod == .timelapse ? 1 : 1.0 / 30)) { an in
+                    let gecen = an.date.timeIntervalSince(bas)
+                    let kare = Int((gecen - floor(gecen)) * Double(max(1, kamera.videoFps)))
+                    zamanYazi(kamera.mod == .timelapse ? Kamera.saat(gecen) : Kamera.saat(gecen) + String(format: ":%02d", kare), kayit: true)
+                }
+            } else {
+                zamanYazi(kamera.mod == .timelapse ? "00:00" : "00:00:00", kayit: false)
+            }
+        }
+    }
+
+    private func zamanYazi(_ t: String, kayit: Bool) -> some View {
+        HStack(spacing: 7) {
+            Circle().fill(kayit ? Tema.kirmizi : Color.white.opacity(0.35)).frame(width: 7, height: 7)
+                .shadow(color: kayit ? Tema.kirmizi.opacity(0.9) : .clear, radius: 4)
+            Text(t).font(.system(size: 15, weight: .medium).monospacedDigit()).tracking(0.6)
+                .foregroundStyle(kayit ? .white : .white.opacity(0.75))
+        }
+        .shadow(color: .black.opacity(0.5), radius: 2)
+        .accessibilityLabel(kayit ? "Kayıt süresi \(t)" : "Kayıtta değil")
     }
 
     /// Sağ üstte sarı cam biçim denetimi (çözünürlük · kare hızı · sabitleme / MP · RAW)
@@ -340,13 +367,22 @@ struct AnaEkran: View {
 
     private var ustDugmeler: some View {
         HStack(spacing: 10) {
+            Button { ayarlar = true } label: {
+                Image(systemName: "slider.horizontal.3").font(.system(size: 14, weight: .medium))
+                    .frame(width: 36, height: 36).yuvarlakYuzey()
+            }
+            .disabled(kamera.kayitta)
+            .accessibilityLabel("Ayarlar")
+            // Açıklamalar Genel Ayarlar → "Ekrandaki açıklamalar"dan açılır; açıkken kapatmak için burada
+            if yardim {
             Button { withAnimation(AnaEkran.yay) { yardim.toggle() } } label: {
                 Text("?").font(.system(size: 14, weight: .bold))
                     .foregroundStyle(yardim ? Tema.sari : .white)
                     .frame(width: 34, height: 34)
                     .yuvarlakYuzey(yardim ? Tema.sari : nil)
             }
-            .accessibilityLabel("Açıklamalar")
+            .accessibilityLabel("Açıklamaları kapat")
+            }
         }
     }
 
@@ -379,6 +415,8 @@ struct AnaEkran: View {
                 }
                 .padding(.horizontal, 16).frame(minWidth: 220, minHeight: 44)
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+            } else if kamera.mod != .pro {
+                degerHucreleri
             } else if !bilgiOgeleri.isEmpty {
                 Button { panelAc(.bicim) } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
@@ -395,12 +433,63 @@ struct AnaEkran: View {
         .onLongPressGesture(minimumDuration: 0.5) { if !duzenleme && !kamera.kayitta { duzenlemeBasla() } }
     }
 
+    /// Sinema kameraları gibi üstte etiketli değer hücreleri (ISO · ENST. · BEYAZ · EV), her biri sabit genişlikte (değer değişince
+    /// yanındakiler kaymaz); sarı = elle değişmiş. Dokununca o ayarın satırı açılır. Sonda yalnız açık olan özel durumlar (stil, HDR…)
+    private var degerHucreleri: some View {
+        let enst = kamera.secilenEnst.map { kamera.enstGoster($0) }
+        let hucreler: [(Favori, String, String, Bool)] = [
+            (.iso, "ISO", kamera.secilenIso.map { "\(Int($0))" } ?? "OTO", kamera.secilenIso != nil),
+            (.enst, kamera.mod == .video && kamera.enstAci ? "AÇI" : "ENST.", enst ?? "OTO", enst != nil),
+            (.bd, "BEYAZ", kamera.bd.map { "\(Int($0))K" } ?? "OTO", kamera.bd != nil),
+            (.ev, "EV", Cetvel.evYazi(kamera.ev), abs(kamera.ev) >= 0.05),
+        ]
+        return HStack(spacing: 0) {
+            ForEach(hucreler, id: \.0) { h in
+                Button { kisayolDokun(h.0) } label: { hucre(h.1, h.2, h.3).frame(width: 64) }
+                    .buttonStyle(.plain)
+                    .overlay(alignment: .bottom) { if acikSatir == h.0 { Circle().fill(Tema.sari).frame(width: 3, height: 3).offset(y: 4) } }
+                    .accessibilityLabel("\(h.1) \(h.2)")
+            }
+            ForEach(Array(ozelDurumlar.enumerated()), id: \.offset) { _, o in
+                Button { panelAc(.bicim) } label: { hucre(o.1, o.0, true).frame(minWidth: 52) }.buttonStyle(.plain)
+            }
+        }
+        .shadow(color: .black.opacity(0.5), radius: 2)
+        .disabled(kamera.proCalisiyor)
+        .yardimBalonu(yardim, "Dokun: değiştir")
+    }
+
+    private func hucre(_ etiket: String, _ deger: String, _ elle: Bool) -> some View {
+        VStack(spacing: 2) {
+            Text(etiket).font(.system(size: 9, weight: .medium)).tracking(1.2).foregroundStyle(.white.opacity(0.6))
+            Text(deger).font(.system(size: 15, weight: .semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.7)
+                .foregroundStyle(elle ? Tema.sari : .white)
+                .contentTransition(.numericText())
+        }
+        .frame(height: 36)
+        .contentShape(Rectangle())
+    }
+
+    /// Hücrelerin yanında yalnız açık olan özel durumlar
+    private var ozelDurumlar: [(String, String)] {
+        var l: [(String, String)] = []
+        if kamera.flas == .fener { l.append(("Açık", "FENER")) }
+        if kamera.mod == .video {
+            if kamera.kodek.prores { l.append((kamera.kodek.kisa, "KODEK")) }
+            if kamera.renkModu != .sdr { l.append((kamera.renkModu.kisa, "RENK")) }
+            if kamera.ssdKayit, kamera.ssd.takili { l.append(("SSD", "KAYIT")) }
+        }
+        if kamera.stil.etkin { l.append((kamera.stil.hazir == .standart ? "Özel" : kamera.stil.hazir.ad, "STİL")) }
+        if kamera.mod == .timelapse { l.append((Timelapse.aralikYazi(kamera.tlAralik), "ARALIK")) }
+        return l
+    }
+
     /// Şeridin altında sabitlenenler: küçük kapsüller; dokununca satır ya da panel açılır
     @ViewBuilder private var sabitler: some View {
         if !duzenleme, !kamera.favoriler.isEmpty {
             HStack(spacing: 6) {
                 // Biçim zaten sağ üstte (simgeli); burada tekrarlanmaz
-                ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && $0 != .cozunurluk }) { f in
+                ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) }) { f in
                     Button { kisayolDokun(f) } label: { SabitKapsul(f: f, kamera: kamera) }
                         .buttonStyle(.plain)
                         .sabitlenebilir(f, kamera) { ayrintiAc(f) }
@@ -465,10 +554,10 @@ struct AnaEkran: View {
     }
 
     /// Kayıt süresi, PRO mod özeti, kılavuz ve sahne önerileri
-    private var cipler: some View {
+    private func cipler(yatay: Bool) -> some View {
         VStack(spacing: 8) {
-            if kamera.kayitta, let bas = kamera.kayitBasi {
-                // Zaman kodu (stüdyo kamerası gibi): kırmızı nokta + ss:dd:ss:kare
+            if kamera.kayitta, yatay, let bas = kamera.kayitBasi {
+                // Zaman kodu (stüdyo kamerası gibi): kırmızı nokta + ss:dd:ss:kare; dikeyde üst bantta
                 TimelineView(.periodic(from: bas, by: kamera.mod == .timelapse ? 1 : 1.0 / 30)) { an in
                     let gecen = an.date.timeIntervalSince(bas)
                     let kare = Int((gecen - floor(gecen)) * Double(max(1, kamera.videoFps)))
@@ -540,6 +629,8 @@ struct AnaEkran: View {
                 .accessibilityLabel("Mercek \(AnaEkran.fmt(z))×")
             }
         }
+        .padding(dikey ? 0 : 3)
+        .background { if !dikey { Capsule().fill(Color.black.opacity(0.28)).overlay(Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)) } }
         .disabled(kamera.kayitta || kamera.proCalisiyor)
         .yardimBalonu(yardim, kamera.mod == .pro ? "Mercek (moda kaydedilir)" : "Mercek")
     }
@@ -623,10 +714,10 @@ struct AnaEkran: View {
                 } else if kamera.mod.foto {
                     Circle().fill(.white).frame(width: 60, height: 60)
                 } else {
-                    Circle().fill(Tema.kirmizi).frame(width: 60, height: 60)
+                    RoundedRectangle(cornerRadius: 21, style: .continuous).fill(Tema.kirmizi).frame(width: 60, height: 60)
                 }
             }
-            .animation(.easeOut(duration: 0.15), value: kamera.kayitta)
+            .animation(AnaEkran.yay, value: kamera.kayitta)
         }
         // Seri çekim hareketleri yalnız seri PRO modda (diğer modlarda düğmenin dokunuşunu yutmasın)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in kamera.seriBasla(yon: ekranYonu) }, including: seriAcik ? .all : .subviews)
@@ -704,11 +795,14 @@ struct AnaEkran: View {
 
     private func modDugme(_ ad: String, secili: Bool, renk: Color, eylem: @escaping () -> Void) -> some View {
         Button(action: eylem) {
-            Text(ad).font(.system(size: 12, weight: .semibold)).tracking(1.4).lineLimit(1)
+            Text(ad).font(.system(size: 11.5, weight: .semibold)).tracking(1.6).lineLimit(1)
                 .foregroundStyle(secili ? renk : (renk == .white ? Tema.ikincil : renk.opacity(0.8)))
-                .padding(.horizontal, 11).frame(height: 30)
-                .background(Capsule().fill(secili ? Color.white.opacity(0.12) : .clear))
+                .padding(.horizontal, 10).frame(height: 30)
+                .overlay(alignment: .bottom) {
+                    Circle().fill(Tema.sari).frame(width: 4, height: 4).opacity(secili ? 1 : 0).offset(y: 2)
+                }
                 .shadow(color: .black.opacity(0.5), radius: 2)
+                .animation(AnaEkran.yay, value: secili)
         }
     }
 
