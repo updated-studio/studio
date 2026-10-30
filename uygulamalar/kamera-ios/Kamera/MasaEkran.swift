@@ -52,7 +52,7 @@ struct MasaEkran: View {
     private var ustCubuk: some View {
         HStack(spacing: 12) {
             Button(action: kapat) {
-                Label("Kamera", systemImage: "chevron.left").font(.footnote.weight(.bold))
+                Label(Uygulama.geri, systemImage: "chevron.left").font(.footnote.weight(.bold))
             }
             .disabled(m.kayitta)
             Text("MASA").font(.footnote.weight(.heavy)).foregroundStyle(Tema.vurgu)

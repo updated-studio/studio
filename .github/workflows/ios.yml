@@ -45,17 +45,23 @@ jobs:
       - name: Derleme denetimi (imzasız, simülatör)
         run: |
           # Derleme hataları en sonda ayrıca listelenir (uzun günlükte kaybolmasın)
-          xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > derleme.log 2>&1 || {
-            grep -E "error:" derleme.log | sort -u | head -n 40
-            grep -E "error:" derleme.log | sort -u | head -n 10 | sed 's/^/::error::/'
-            exit 1
-          }
-          tail -n 5 derleme.log
-      # Her gönderimde değil, yalnız sürüm gönderimlerinde ("iOS Kamera x.y.z:" ile başlayan ileti) ya da elle başlatınca:
+          for S in UpdatedKamera UpdatedMasa; do
+            xcodebuild -project UpdatedKamera.xcodeproj -scheme $S -configuration Debug \
+              -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > derleme.log 2>&1 || {
+              grep -E "error:" derleme.log | sort -u | head -n 40
+              grep -E "error:" derleme.log | sort -u | head -n 10 | sed 's/^/::error::/'
+              exit 1
+            }
+            tail -n 3 derleme.log
+          done
+      # Her gönderimde değil, yalnız sürüm gönderimlerinde ya da elle başlatınca. İleti "iOS Kamera x.y.z:" → Kamera, "iOS Masa x.y.z:" → Masa,
+      # "iOS Kamera+Masa x.y.z:" → ikisi (elle başlatınca ikisi).
       # Fatih her yüklemede TestFlight e-postası alıyordu (29 Ekim). CI, Android ve not değişiklikleri yüklenmez
       - name: TestFlight'a yükle
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && env.ASC_KEY_P8 != '' && startsWith(github.event.head_commit.message, 'iOS Kamera '))
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && env.ASC_KEY_P8 != '' && (startsWith(github.event.head_commit.message, 'iOS Kamera ') || startsWith(github.event.head_commit.message, 'iOS Masa ') || startsWith(github.event.head_commit.message, 'iOS Kamera+Masa ')))
+        env:
+          ILETI: ${{ github.event.head_commit.message }}
+          OLAY: ${{ github.event_name }}
         run: |
           ANAHTAR=$(bash scripts/anahtar_yaz.sh) || exit 1
           if [ -n "$SERTIFIKA_P12" ]; then
@@ -77,14 +83,20 @@ jobs:
               && /tmp/asc/bin/python scripts/sertifika_temizle.py "$ANAHTAR" || echo "::warning title=Sertifika::Eski sertifikalar temizlenemedi"
           fi
           YETKI=(-allowProvisioningUpdates -authenticationKeyPath "$ANAHTAR" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
-          xcodebuild -project UpdatedKamera.xcodeproj -scheme UpdatedKamera -configuration Release \
-            -destination 'generic/platform=iOS' -archivePath build/UpdatedKamera.xcarchive archive \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION=${{ github.run_number }} "${YETKI[@]}" | tail -n 60
           plutil -replace teamID -string "$APPLE_TEAM_ID" ExportOptions.plist
-          xcodebuild -exportArchive -archivePath build/UpdatedKamera.xcarchive -exportOptionsPlist ExportOptions.plist \
-            -exportPath build/cikti "${YETKI[@]}" | tail -n 60
+          ILETI=${ILETI%%$'\n'*}
+          HEDEFLER=""
+          [[ "$OLAY" == "workflow_dispatch" || "$ILETI" == "iOS Kamera "* || "$ILETI" == "iOS Kamera+Masa "* ]] && HEDEFLER="UpdatedKamera"
+          [[ "$OLAY" == "workflow_dispatch" || "$ILETI" == "iOS Masa "* || "$ILETI" == "iOS Kamera+Masa "* ]] && HEDEFLER="$HEDEFLER UpdatedMasa"
+          for S in $HEDEFLER; do
+            xcodebuild -project UpdatedKamera.xcodeproj -scheme $S -configuration Release \
+              -destination 'generic/platform=iOS' -archivePath build/$S.xcarchive archive \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION=${{ github.run_number }} "${YETKI[@]}" | tail -n 40
+            xcodebuild -exportArchive -archivePath build/$S.xcarchive -exportOptionsPlist ExportOptions.plist \
+              -exportPath build/cikti-$S "${YETKI[@]}" | tail -n 40
+            echo "::notice title=TestFlight::$S yapı ${{ github.run_number }} yüklendi; Apple işledikten sonra (10-30 dk) TestFlight'ta görünür."
+          done
           rm -f "$ANAHTAR"
-          echo "::notice title=TestFlight::Yapı ${{ github.run_number }} yüklendi; Apple işledikten sonra (10-30 dk) TestFlight'ta görünür."
 
   # Bir kez: kalıcı imza sertifikası açar (Apple her yüklemede sertifika aç/iptal e-postası göndermesin).
   # Sonuç "sertifika" yapıtındaki SERTIFIKA_P12.txt; içeriği GitHub Secrets'a SERTIFIKA_P12 adıyla yapıştırılır. .p12 şifresi ASC_KEY_ID+ASC_ISSUER_ID.

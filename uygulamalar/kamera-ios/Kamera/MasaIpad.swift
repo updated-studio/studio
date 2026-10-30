@@ -45,7 +45,7 @@ struct MasaIpad: View {
     private var ustCubuk: some View {
         ZStack {
             HStack(spacing: 16) {
-                Button(action: kapat) { Label("Kamera", systemImage: "chevron.left").font(.body.weight(.semibold)) }
+                Button(action: kapat) { Label(Uygulama.geri, systemImage: "chevron.left").font(.body.weight(.semibold)) }
                     .disabled(m.kayitta)
                 SsdCipi(k: m.klasor, kilitli: m.kayitta)
                 DuzenSecici(m: m)

@@ -393,7 +393,7 @@ struct MonitorEkran: View {
     private var araclar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                arac("KAMERA", "chevron.left", false) { kapat() }
+                arac(Uygulama.geriBuyuk, "chevron.left", false) { kapat() }
                 arac("ODAK", "viewfinder", a.peaking) { m.ayarlar[m.etkin].peaking.toggle() }
                 arac("ZEBRA", "square.stack", a.zebra, ozelZebra: true) { m.ayarlar[m.etkin].zebra.toggle() }
                 arac("FALSE", "drop.halffull", a.falseColor) { m.ayarlar[m.etkin].falseColor.toggle() }
