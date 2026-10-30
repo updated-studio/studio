@@ -99,6 +99,7 @@ class MasaActivity : Activity() {
         ust.addView(sure, LinearLayout.LayoutParams(-2, dp(30f)).apply { marginEnd = dp(10f) })
         masa.duzen = tercih.getInt("masa.duzen", 1).coerceIn(0, 5)
         masa.gecisTuru = tercih.getInt("masa.gecis", 1).coerceIn(0, 3); masa.gecisSure = tercih.getInt("masa.gecisSure", 600)
+        sesKonum = tercih.getFloat("masa.sesKonum", 0.8f).coerceIn(0f, 1f); sesSustur = tercih.getBoolean("masa.sesSustur", false); sesGiris = tercih.getInt("masa.sesGiris", 0).coerceIn(0, 2)
         katmanlariYukle()
         gecisYazi = etiket("", 13f).apply { background = Tema.kapsul(Color.argb(40, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
             contentDescription = "Geçiş ve katmanlar"; setOnClickListener { gecisMenu() } }
@@ -184,7 +185,7 @@ class MasaActivity : Activity() {
         val l = listOf<Triple<String, String, () -> Unit>>(
             Triple("KAYIT", "KAYIT", { kayitDugmesi(); duzen() }), Triple("CANLI", "CANLI", { if (masa.dolu[masa.canli]) yuvaMenu(masa.canli) }),
             Triple("GECIS", "GEÇİŞ", { gecisMenu() }), Triple("DUZEN", "DÜZEN", { duzenMenu() }),
-            Triple("PROGRAM", "PROGRAM", { tost("Program kaydı $programYazi (çoklu düzende 4K tuval).") }), Triple("YER", "SSD", { yerMenu() }), Triple("SES", "SES", {}))
+            Triple("PROGRAM", "PROGRAM", { tost("Program kaydı $programYazi (çoklu düzende 4K tuval).") }), Triple("YER", "SSD", { yerMenu() }), Triple("SES", "SES", { sesPaneli() }))
         val satirlar = if (ikiSatir) listOf(l.take(4), l.drop(4)) else listOf(l)
         satirlar.forEachIndexed { si, s ->
             if (si > 0) ninjaUst.addView(View(this).apply { setBackgroundColor(HAT) }, LinearLayout.LayoutParams(-1, maxOf(1, dp(0.5f))))
@@ -232,7 +233,7 @@ class MasaActivity : Activity() {
             val o = ((db + 60f) / 60f).coerceIn(0f, 1f); val gw = width / 5f
             for (i in 0..1) {
                 val x = i * gw * 2.2f
-                p.color = Color.argb(40, 255, 255, 255); c.drawRoundRect(x, 0f, x + gw, height.toFloat(), gw / 2, gw / 2, p)
+                p.color = if (sesSustur) Color.argb(110, 229, 57, 53) else Color.argb(40, 255, 255, 255); c.drawRoundRect(x, 0f, x + gw, height.toFloat(), gw / 2, gw / 2, p)
                 if (kaydedici != null) { p.color = if (o > 0.92f) KIRMIZI else if (o > 0.75f) SARI else YESIL; c.drawRoundRect(x, height * (1 - o), x + gw, height.toFloat(), gw / 2, gw / 2, p) }
             }
             if (isAttachedToWindow) postInvalidateDelayed(if (kaydedici != null) 80 else 500)
@@ -404,6 +405,9 @@ class MasaActivity : Activity() {
         denetim.addView(etiket("AUTO", 18f, SIYAH_YAZI).apply { typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.06f; setShadowLayer(0f, 0f, 0f, 0)
             background = Tema.kapsul(if (kesVar) Color.WHITE else Color.argb(76, 255, 255, 255), dp(12f).toFloat()); contentDescription = "Önizlemeyi geçişle canlıya al"
             setOnClickListener { oto() } }, LinearLayout.LayoutParams(dp(100f), -1).apply { marginEnd = dp(12f) })
+        denetim.addView(etiket(if (sesSustur) "SES ✕" else "SES", 16f, if (sesSustur) KIRMIZI else Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD; setShadowLayer(0f, 0f, 0f, 0)
+            background = Tema.kapsul(Color.rgb(28, 28, 30), dp(12f).toFloat()); contentDescription = "Ses"
+            setOnClickListener { sesPaneli() } }, LinearLayout.LayoutParams(dp(76f), -1).apply { marginEnd = dp(12f) })
         denetim.addView(etiket("FTB", 16f, if (masa.karart) Color.WHITE else GRI).apply { typeface = Typeface.DEFAULT_BOLD; setShadowLayer(0f, 0f, 0f, 0)
             background = Tema.kapsul(if (masa.karart) KIRMIZI else Color.rgb(28, 28, 30), dp(12f).toFloat()); contentDescription = "Siyaha in"
             setOnClickListener { masa.karart = !masa.karart; gecisGoster(); denetimCiz() } }, LinearLayout.LayoutParams(dp(76f), -1).apply { marginEnd = dp(12f) })
@@ -430,6 +434,138 @@ class MasaActivity : Activity() {
     private fun oto() {
         val s = masa.siradaki; if (s < 0 || !masa.dolu[s]) return
         val eski = masa.canli; canliYap(s, masa.gecisTuru.takeIf { it != 0 } ?: 1); masa.siradaki = if (masa.dolu[eski] && eski != s) eski else -1; duzen()
+    }
+
+    /* ================= ses: program sesi faderı ================= */
+    /** Fader konumu 0…1 (0 = −∞); dB ölçeği ATEM'deki gibi sıfırın üstü sıkışık */
+    private var sesKonum = 0.8f; private var sesSustur = false; private var sesGiris = 0
+    private val FADER_DB = floatArrayOf(-60f, -40f, -30f, -20f, -12f, -6f, 0f, 6f, 12f)
+    private val FADER_KONUM = floatArrayOf(0.05f, 0.2f, 0.3f, 0.42f, 0.55f, 0.68f, 0.8f, 0.9f, 1f)
+    private fun faderDb(p: Float): Float {
+        if (p < FADER_KONUM[0]) return Float.NEGATIVE_INFINITY
+        for (i in 1 until FADER_KONUM.size) if (p <= FADER_KONUM[i]) { val t = (p - FADER_KONUM[i - 1]) / (FADER_KONUM[i] - FADER_KONUM[i - 1]); return FADER_DB[i - 1] + t * (FADER_DB[i] - FADER_DB[i - 1]) }
+        return FADER_DB.last()
+    }
+    private fun dbKonum(db: Float): Float {
+        if (db <= FADER_DB[0]) return if (db.isInfinite()) 0f else FADER_KONUM[0]
+        for (i in 1 until FADER_DB.size) if (db <= FADER_DB[i]) { val t = (db - FADER_DB[i - 1]) / (FADER_DB[i] - FADER_DB[i - 1]); return FADER_KONUM[i - 1] + t * (FADER_KONUM[i] - FADER_KONUM[i - 1]) }
+        return 1f
+    }
+    private fun kazanc() = faderDb(sesKonum).let { if (it.isInfinite()) 0f else Math.pow(10.0, it / 20.0).toFloat() }
+    private fun dbYazi() = faderDb(sesKonum).let { if (it.isInfinite()) "−∞ dB" else "%+.1f dB".format(Locale("tr"), it).replace("-", "−") }
+    private fun sesUygula() {
+        kaydedici?.let { it.kazanc = kazanc(); it.sustur = sesSustur }
+        tercih.edit().putFloat("masa.sesKonum", sesKonum).putBoolean("masa.sesSustur", sesSustur).putInt("masa.sesGiris", sesGiris).apply()
+    }
+
+    /** Kayıt yokken ölçer için girişi dinler (fader ölçere uygulanır); kayıtta kaydedicinin fader sonrası tepeleri */
+    @Volatile private var onSol = -90f; @Volatile private var onSag = -90f
+    private val onOlcer = SesOlcer { l, r -> onSol = l; onSag = r }
+
+    /** Program sesi: giriş, fader (−∞…+12 dB), SUSTUR, L/R ölçer. Kaynakların (Wi-Fi telefon, RTMP, Luna) sesi gelmez; ses seçili girişten */
+    private fun sesPaneli() {
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20f), dp(8f), dp(20f), dp(4f)) }
+        fun baslik(m: String) = p.addView(etiket(m, 11f, GRI).apply { gravity = Gravity.START; letterSpacing = 0.12f; setShadowLayer(0f, 0f, 0f, 0); setPadding(0, dp(14f), 0, dp(6f)) })
+        val usbVar = Kaydedici.usbSesi(this) != null
+        val izin = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        fun dinle() { onOlcer.durdur(); if (kaydedici == null && izin) { onOlcer.cihaz = Kaydedici.sesGirisi(this, sesGiris); onOlcer.baslat() } }
+        lateinit var ciz: () -> Unit
+        val fader = SesFaderi()
+        val dbEtiket = etiket("", 22f).apply { typeface = kosul; fontFeatureSettings = "tnum"; setShadowLayer(0f, 0f, 0f, 0) }
+        lateinit var susturDugme: TextView
+        fun yaz() {
+            dbEtiket.text = dbYazi(); dbEtiket.setTextColor(if (sesSustur) KIRMIZI else Color.WHITE)
+            susturDugme.setTextColor(if (sesSustur) Color.WHITE else Color.argb(217, 255, 255, 255))
+            susturDugme.background = Tema.kapsul(if (sesSustur) KIRMIZI else Color.argb(40, 255, 255, 255), dp(10f).toFloat())
+        }
+        fader.degisti = { sesKonum = it; sesUygula(); yaz(); if (!tablet) hucreleriYaz() }
+        ciz = {
+            p.removeAllViews()
+            baslik("GİRİŞ")
+            p.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL
+                listOf("OTO", "MAKİNE (USB)", "MİKROFON").forEachIndexed { i, ad -> val secili = sesGiris == i; val olur = i != 1 || usbVar
+                    addView(etiket(ad, 12f, if (secili) SIYAH_YAZI else Color.WHITE).apply { setShadowLayer(0f, 0f, 0f, 0); alpha = if (olur) 1f else 0.35f
+                        background = Tema.kapsul(if (secili) Color.WHITE else Color.argb(40, 255, 255, 255), dp(10f).toFloat())
+                        setOnClickListener { if (!olur) tost("USB ses girişi yok. Makineyi USB yayını modunda tak.") else { sesGiris = i; kaydedici?.girisDegistir(i); sesUygula(); dinle(); ciz() } } },
+                        LinearLayout.LayoutParams(0, dp(38f), 1f).apply { if (i > 0) marginStart = dp(6f) }) } })
+            p.addView(etiket(kaydedici?.sesKaynagi?.let { "Şu an: $it" } ?: if (usbVar && sesGiris != 2) "Şu an: makineden (USB)" else "Şu an: telefon mikrofonu", 11f, GRI).apply {
+                gravity = Gravity.START; setShadowLayer(0f, 0f, 0f, 0); setPadding(0, dp(6f), 0, 0) })
+            baslik("PROGRAM")
+            p.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                addView(fader, LinearLayout.LayoutParams(dp(132f), dp(240f)))
+                addView(LinearLayout(this@MasaActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18f), 0, 0, 0)
+                    addView(dbEtiket.apply { gravity = Gravity.START })
+                    addView(etiket(if (kaydedici != null) "kayda işleniyor" else "kayıtta uygulanır", 11f, GRI).apply { gravity = Gravity.START; setShadowLayer(0f, 0f, 0f, 0) })
+                    susturDugme = etiket("SUSTUR", 13f).apply { typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.08f; setShadowLayer(0f, 0f, 0f, 0)
+                        setOnClickListener { sesSustur = !sesSustur; sesUygula(); yaz(); if (tablet) denetimCiz() else hucreleriYaz() } }
+                    addView(susturDugme, LinearLayout.LayoutParams(dp(120f), dp(40f)).apply { topMargin = dp(18f) })
+                    addView(etiket("0 dB", 13f).apply { typeface = Typeface.DEFAULT_BOLD; setShadowLayer(0f, 0f, 0f, 0); background = Tema.kapsul(Color.argb(40, 255, 255, 255), dp(10f).toFloat())
+                        setOnClickListener { sesKonum = dbKonum(0f); fader.invalidate(); sesUygula(); yaz() } }, LinearLayout.LayoutParams(dp(120f), dp(40f)).apply { topMargin = dp(8f) })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+            })
+            p.addView(etiket(if (!izin) "Mikrofon izni yok: kayıt sessiz olur. İzin vermek için dokun."
+                else "Kaynaklardan (Wi-Fi telefon, RTMP, Insta360) ses gelmez; program sesi seçili girişten alınır. Ayrı kaynak kayıtları (ISO) sessizdir. Faderde çift dokunuş 0 dB.", 11f, GRI).apply {
+                isSingleLine = false; gravity = Gravity.START; setShadowLayer(0f, 0f, 0f, 0); setPadding(0, dp(14f), 0, 0)
+                if (!izin) setOnClickListener { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 3) } })
+            yaz()
+        }
+        ciz(); dinle()
+        AlertDialog.Builder(this).setTitle("Ses").setView(android.widget.ScrollView(this).apply { addView(p) }).setPositiveButton("Kapat", null)
+            .setOnDismissListener { onOlcer.durdur() }.show()
+    }
+
+    /** Dikey fader: solda dB ölçeği, ortada ray ve tutamak, sağda L/R ölçer (−60…0 dBFS) */
+    private inner class SesFaderi : View(this@MasaActivity) {
+        var degisti: (Float) -> Unit = {}
+        private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize = dp(10f).toFloat(); typeface = kosul }
+        private var sonDokunus = 0L
+        private val tepe = floatArrayOf(-90f, -90f)
+        init { contentDescription = "Program sesi faderı" }
+        private val ust get() = dp(14f).toFloat(); private val alt get() = height - dp(14f).toFloat()
+        private fun y(k: Float) = alt - k * (alt - ust)
+        override fun onDraw(c: android.graphics.Canvas) {
+            val rayX = width * 0.42f; val olcX = width * 0.74f; val olcW = dp(6f).toFloat()
+            // Ölçek
+            p.textAlign = android.graphics.Paint.Align.RIGHT
+            (FADER_DB.toList().filter { it != -60f } + Float.NEGATIVE_INFINITY).forEach { db ->
+                val yy = y(dbKonum(db)); p.color = if (db == 0f) Color.WHITE else Color.argb(120, 255, 255, 255)
+                c.drawText(if (db.isInfinite()) "−∞" else if (db > 0) "+${db.toInt()}" else "${db.toInt()}".replace("-", "−"), rayX - dp(28f), yy + dp(3.5f), p)
+                p.strokeWidth = maxOf(1f, dp(0.5f).toFloat()); c.drawLine(rayX - dp(23f), yy, rayX - dp(19f), yy, p)
+            }
+            // Ray
+            p.color = Color.argb(46, 255, 255, 255); c.drawRoundRect(rayX - dp(2f), ust, rayX + dp(2f), alt, dp(2f).toFloat(), dp(2f).toFloat(), p)
+            // Ölçer: kayıtta kaydedicinin fader sonrası tepesi, değilse girişin düzeyi + fader
+            val k = kaydedici
+            val ham = if (k != null) floatArrayOf(dbfs(k.sesSol), dbfs(k.sesSag)) else floatArrayOf(onSol, onSag).map { if (sesSustur) -90f else it + faderDb(sesKonum) }.toFloatArray()
+            for (i in 0..1) {
+                tepe[i] = if (ham[i] > tepe[i]) ham[i] else tepe[i] - 1.2f
+                val x = olcX + i * (olcW + dp(3f))
+                p.color = Color.argb(30, 255, 255, 255); c.drawRoundRect(x, ust, x + olcW, alt, olcW / 2, olcW / 2, p)
+                val o = ((tepe[i] + 60f) / 60f).coerceIn(0f, 1f)
+                if (o > 0f) { p.color = if (tepe[i] > -3f) KIRMIZI else if (tepe[i] > -12f) SARI else YESIL; c.drawRoundRect(x, alt - o * (alt - ust), x + olcW, alt, olcW / 2, olcW / 2, p) }
+            }
+            p.textAlign = android.graphics.Paint.Align.CENTER; p.color = Color.argb(120, 255, 255, 255)
+            c.drawText("L", olcX + olcW / 2, alt + dp(12f), p); c.drawText("R", olcX + olcW * 1.5f + dp(3f), alt + dp(12f), p)
+            // Tutamak (ATEM'deki gibi yatay çizgili)
+            val ty = y(sesKonum); val tw = dp(16f).toFloat(); val th = dp(13f).toFloat()
+            p.color = if (sesSustur) KIRMIZI else Color.rgb(232, 232, 236); c.drawRoundRect(rayX - tw, ty - th, rayX + tw, ty + th, dp(4f).toFloat(), dp(4f).toFloat(), p)
+            p.color = Color.argb(150, 0, 0, 0); p.strokeWidth = maxOf(1f, dp(1f).toFloat()); c.drawLine(rayX - tw + dp(4f), ty, rayX + tw - dp(4f), ty, p)
+            if (isAttachedToWindow) postInvalidateDelayed(60)
+        }
+        private fun dbfs(v: Int) = if (v <= 0) -90f else (20 * kotlin.math.log10(v / 32767f))
+        @android.annotation.SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+            if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                parent?.requestDisallowInterceptTouchEvent(true)
+                val simdi = System.currentTimeMillis(); if (simdi - sonDokunus < 300) { degisti(dbKonum(0f)); invalidate(); sonDokunus = 0; return true }; sonDokunus = simdi
+            }
+            if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN || e.actionMasked == android.view.MotionEvent.ACTION_MOVE) {
+                val k = ((alt - e.y) / (alt - ust)).coerceIn(0f, 1f)
+                // 0 dB'ye yakın yapışma
+                degisti(if (kotlin.math.abs(k - dbKonum(0f)) < 0.012f) dbKonum(0f) else k); invalidate()
+            }
+            return true
+        }
     }
 
     /* ================= geçiş ve katmanlar ================= */
@@ -790,7 +926,7 @@ class MasaActivity : Activity() {
         val (pw, ph, pfps) = programBoyutu()
         val d = o.ac("Program") ?: return tost("Kayıt dosyası açılamadı.")
         val ses = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val k = runCatching { Kaydedici(this, d.pfd, pw, ph, pfps, if (pw > 1920) 60 else 20, true, sesIste = ses).also { it.baslat() } }
+        val k = runCatching { Kaydedici(this, d.pfd, pw, ph, pfps, if (pw > 1920) 60 else 20, true, sesIste = ses).also { it.girisDegistir(sesGiris); it.kazanc = kazanc(); it.sustur = sesSustur; it.baslat() } }
             .getOrElse { e -> d.bitti(false); HataKaydi.not("masa", e.stackTraceToString()); return tost("Kayıt başlamadı: ${e.message}") }
         kaydedici = k; programDosya = d; oturum = o; if (kayitBas == 0L) kayitBas = System.currentTimeMillis()
         masa.kayitW = pw; masa.kayitH = ph; masa.kayitYuzeyi = k.yuzey; masa.requestRender()

@@ -102,6 +102,7 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | **Kaynak ekle ekranı** (iOS KaynakEkleSayfasi ile aynı bölümler/metinler): BU CİHAZ (arka/ön), AKSİYON VE 360 (Luna · Ace Pro 2/GO Ultra · Osmo Pocket 4/4P/Action · GoPro; marka → adım adım rehber), DİĞER (Wi-Fi telefon, adresle ekle, USB Ara). Android'de Ace/Osmo/GoPro'ya ek RTMP yolu: rehberde canlı yayın adresi + Kopyala | ✓ | ✓ | Android KaynakEkle.kt; iOS'ta RTMP yok |
 | **Monitör Stiller** (iOS MonitorStilleri): LUT sekmesi yerine STİLLER — TEMEL, FİLM REÇETELERİ, LUT'LARIN (+ .cube ekle, basılı tut → sil), Yoğunluk/Doygunluk/Sıcaklık/Ton, Sıfırla; bölme başına, yalnız ekrana (kayıt temiz). Alt şeritte STİL düğmesi | ✓ | ✓ (Studio 0.3.2) | Stiller.kt :ortak'a taşındı |
 | **Monitör ayarları 6 sekme, başlıklı gruplar** (iOS sekmeIcerik): KAYNAK (KAYNAKLAR · GÖRÜNTÜYÜ ÇEVİR) · GÖRÜNTÜ (ODAK · POZLAMA · EKRAN) · STİLLER · KADRAJ (AKILLI KADRAJ · KOMPOZİSYON · ÇERÇEVE) · ÖLÇÜM (EKRANDA · ÖLÇÜM PANELİ) · KAYIT (GÖRÜNTÜ · DOSYA · SES · CİHAZ) | ✓ | ✓ (Studio 0.3.2, Kamera PRO 0.18.1) | Android dar ekranda ad üstte, seçenekler altta |
+| **Multi Cam ses** (SES hücresi / tablette SES düğmesi): program sesi faderı −∞…+12 dB (0 dB'ye yapışır, çift dokunuş 0 dB), SUSTUR, giriş OTO · MAKİNE (USB) · MİKROFON (kayıtta da değişir), L/R ölçer (kayıt yokken de). Kayda işlenir | ✓ (Studio 0.3.3) | — | iOS'ta yok. Kaynaklardan ses gelmediği için kaynak başına fader yok |
 
 ## Uygulama
 

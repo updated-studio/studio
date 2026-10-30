@@ -103,6 +103,21 @@ class EkranTest {
         }
     }
 
+    /** Multi Cam ses paneli: giriş, fader, SUSTUR, ölçer (pencere ayrı çizilir) */
+    @Test fun studioSes() {
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        tercih("kamera").edit().putFloat("masa.sesKonum", 0.72f).commit()
+        Robolectric.buildActivity(MasaActivity::class.java).setup().use { c ->
+            val a = c.get(); MasaActivity::class.java.getDeclaredMethod("sesPaneli").apply { isAccessible = true }.invoke(a)
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            val v = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().window!!.decorView
+            val w = a.resources.displayMetrics.widthPixels * 9 / 10
+            v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)); v.layout(0, 0, w, v.measuredHeight)
+            val bm = Bitmap.createBitmap(w, v.measuredHeight, Bitmap.Config.ARGB_8888); v.draw(Canvas(bm))
+            File(klasor, "studio-ses.png").outputStream().use { bm.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+    }
+
     /** UpCam Studio açılışı (telefon dikey, tablet) */
     @Test fun studioGiris() {
         RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))

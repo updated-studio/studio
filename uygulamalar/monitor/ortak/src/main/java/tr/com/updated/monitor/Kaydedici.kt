@@ -28,6 +28,21 @@ class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescripto
     /** Sesin geldiği yer (ekranda bildirmek için): "makineden (USB)", "telefon mikrofonu" ya da null (sessiz) */
     var sesKaynagi: String? = null; private set
     @Volatile var sesDuzeyi = 0; private set
+    /** Sol/sağ tepe (0…32767), fader sonrası: kayda giden */
+    @Volatile var sesSol = 0; private set
+    @Volatile var sesSag = 0; private set
+    /** Program sesi faderı (Multi Cam): doğrusal kazanç (1 = 0 dB), susturma; kayıt sürerken değişebilir */
+    @Volatile var kazanc = 1f
+    @Volatile var sustur = false
+    /** Ses girişi: 0 OTO (USB varsa o), 1 makine (USB), 2 telefon mikrofonu; baslat'tan önce ya da girisDegistir ile */
+    var giris = 0; private set
+    fun girisDegistir(t: Int) { giris = t; mikrofon?.let { cihazSec(it) } }
+
+    private fun cihazSec(ar: AudioRecord) {
+        val d = sesGirisi(ctx, giris)
+        ar.setPreferredDevice(d)
+        sesKaynagi = if (d?.type == AudioDeviceInfo.TYPE_USB_DEVICE || d?.type == AudioDeviceInfo.TYPE_USB_HEADSET) "makineden (USB)" else "telefon mikrofonu"
+    }
 
     private lateinit var goruntu: MediaCodec
     private var ses: MediaCodec? = null
@@ -74,10 +89,8 @@ class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescripto
         val boy = max(AudioRecord.getMinBufferSize(ornek, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT), 8192)
         val ar = runCatching { AudioRecord(MediaRecorder.AudioSource.CAMCORDER, ornek, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT, boy * 2) }.getOrNull()
         if (ar == null || ar.state != AudioRecord.STATE_INITIALIZED) { ar?.release(); return }
-        // Fotoğraf makinesi USB'den ses de veriyorsa (USB yayını: UAC) onu tercih et
-        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val usb = am.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET }
-        sesKaynagi = if (usb != null && ar.setPreferredDevice(usb)) "makineden (USB)" else "telefon mikrofonu"
+        // OTO: fotoğraf makinesi USB'den ses de veriyorsa (USB yayını: UAC) onu tercih et
+        cihazSec(ar)
         val f = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, ornek, 2).apply {
             setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC); setInteger(MediaFormat.KEY_BIT_RATE, 192_000); setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384)
         }
@@ -98,7 +111,14 @@ class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescripto
                 val n = ar.read(b, 0, b.size)
                 if (n > 0) {
                     if (bas < 0) bas = System.nanoTime() / 1000
-                    var tepe = 0; for (k in 0 until n) tepe = max(tepe, abs(b[k].toInt())); sesDuzeyi = tepe
+                    val g = if (sustur) 0f else kazanc
+                    var tl = 0; var tr = 0
+                    for (k in 0 until n) {
+                        // Fader: kazanç, taşmada kırpma
+                        val v = if (g == 1f) b[k].toInt() else (b[k] * g).toInt().coerceIn(-32768, 32767)
+                        b[k] = v.toShort(); if (k and 1 == 0) tl = max(tl, abs(v)) else tr = max(tr, abs(v))
+                    }
+                    sesSol = tl; sesSag = tr; sesDuzeyi = max(tl, tr)
                     val tb = c.getInputBuffer(i)!!; tb.clear(); tb.order(java.nio.ByteOrder.nativeOrder()).asShortBuffer().put(b, 0, n)
                     c.queueInputBuffer(i, 0, n * 2, zaman(bas, toplam), 0)
                     toplam += n / 2
@@ -109,6 +129,16 @@ class Kaydedici(private val ctx: Context, private val dosya: ParcelFileDescripto
         runCatching { ar.stop() }
         while (sesBosalt(c)) {}
     }
+    companion object {
+        fun usbSesi(ctx: Context): AudioDeviceInfo? = (ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_INPUTS)
+            .firstOrNull { it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET }
+        /** Girişe göre tercih edilen aygıt (null = sistemin varsayılanı, telefon mikrofonu) */
+        fun sesGirisi(ctx: Context, giris: Int): AudioDeviceInfo? = when (giris) {
+            2 -> (ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+            else -> usbSesi(ctx)
+        }
+    }
+
     private fun zaman(bas: Long, ornekSayisi: Long) = max(0L, bas) + ornekSayisi * 1_000_000L / 48000
 
     /** Ses kodlayıcıdan çıkanları yazar; akış bittiyse false */

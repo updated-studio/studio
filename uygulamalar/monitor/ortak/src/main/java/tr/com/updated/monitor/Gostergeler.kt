@@ -74,6 +74,8 @@ class SesGostergesi(c: Context) : View(c) {
 
 /** Kayıt dışında mikrofon düzeyi (AudioRecord); kayıt başlayınca durur (mikrofon kaydediciye geçer) */
 class SesOlcer(private val geri: (Float, Float) -> Unit) {
+    /** Dinlenecek aygıt (null = varsayılan mikrofon); baslat'tan önce */
+    var cihaz: android.media.AudioDeviceInfo? = null
     @Volatile private var calis = false
     private var t: Thread? = null
     @SuppressLint("MissingPermission")
@@ -83,6 +85,7 @@ class SesOlcer(private val geri: (Float, Float) -> Unit) {
             val ornek = 48000; val tampon = max(AudioRecord.getMinBufferSize(ornek, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT), 4096)
             val ar = runCatching { AudioRecord(MediaRecorder.AudioSource.CAMCORDER, ornek, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT, tampon) }.getOrNull()
             if (ar == null || ar.state != AudioRecord.STATE_INITIALIZED) { calis = false; return@Thread }
+            cihaz?.let { ar.setPreferredDevice(it) }
             val b = ShortArray(2048); ar.startRecording()
             while (calis) {
                 val n = ar.read(b, 0, b.size); if (n <= 0) continue
