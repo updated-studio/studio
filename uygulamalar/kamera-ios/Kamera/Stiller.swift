@@ -309,8 +309,7 @@ struct StilPedi: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(spacing: 4) {
                     pad.frame(width: 140, height: 140)
-                    HStack { Text("soğuk"); Spacer(); Text("ton ↕"); Spacer(); Text("sıcak") }
-                        .font(.system(size: 10)).foregroundStyle(.white.opacity(0.6)).frame(width: 140)
+                    padDegerleri
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     kaydirici("Yoğunluk", "\(Int(kamera.stil.yogunluk * 100))", deger: Binding(get: { kamera.stil.yogunluk }, set: { kamera.stil.yogunluk = $0 }), 0...1)
@@ -411,28 +410,67 @@ struct StilPedi: View {
         }
     }
 
-    /// Dokun ya da sürükle; çift dokunuş ortaya döner
+    /// Apple Fotoğraf Stilleri pedi gibi (Fatih 30 Ekim 10:41): koyu zeminde nokta ızgarası; parmağın çevresindeki noktalar büyüyüp
+    /// aydınlanır, renkleri yalnız hafifçe soğuk ↔ sıcak döner. Dokun ya da sürükle; çift dokunuş ortaya döner.
     private var pad: some View {
         GeometryReader { g in
             let w = g.size.width, h = g.size.height
+            let x = CGFloat(kamera.stil.x), y = CGFloat(kamera.stil.y)
+            let nokta = CGPoint(x: (x + 1) / 2 * w, y: (1 - y) / 2 * h)
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(white: 0.85), Color(white: 0.4), Color(white: 0.07)], startPoint: .top, endPoint: .bottom))
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(red: 0.3, green: 0.58, blue: 1).opacity(0.55), .clear, Color(red: 1, green: 0.58, blue: 0.24).opacity(0.6)], startPoint: .leading, endPoint: .trailing))
-                Rectangle().fill(Color.white.opacity(0.25)).frame(width: 1)
-                Rectangle().fill(Color.white.opacity(0.25)).frame(height: 1)
-                Circle().fill(Tema.sari).frame(width: 20, height: 20)
-                    .overlay(Circle().stroke(.white, lineWidth: 2.5))
-                    .shadow(color: .black.opacity(0.6), radius: 3)
-                    .position(x: CGFloat(kamera.stil.x + 1) / 2 * w, y: CGFloat(1 - kamera.stil.y) / 2 * h)
+                RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(white: 0.07))
+                Canvas { c, boyut in
+                    let n = 13
+                    let ara = min(boyut.width, boyut.height) / CGFloat(n)
+                    for i in 0..<n {
+                        for j in 0..<n {
+                            let p = CGPoint(x: (CGFloat(i) + 0.5) * ara, y: (CGFloat(j) + 0.5) * ara)
+                            let u = CGFloat(i) / CGFloat(n - 1) * 2 - 1, v = 1 - CGFloat(j) / CGFloat(n - 1) * 2
+                            let mesafe = hypot(p.x - nokta.x, p.y - nokta.y) / (ara * 3.2)
+                            let yakin = max(0, 1 - mesafe)
+                            let r = ara * (0.09 + 0.17 * yakin)
+                            // Renk ekseni (yatay) soğuk ↔ sıcak, ton ekseni (dikey) koyu ↔ açık; hafif, Apple'daki gibi
+                            let sicak = max(0, u), soguk = max(0, -u)
+                            let parlak = 0.42 + 0.18 * v + 0.4 * yakin
+                            let renk = Color(red: parlak + 0.16 * sicak - 0.06 * soguk, green: parlak + 0.03 * sicak, blue: parlak + 0.16 * soguk - 0.08 * sicak)
+                            c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)), with: .color(renk.opacity(0.55 + 0.45 * yakin)))
+                        }
+                    }
+                }
+                .padding(4)
+                Circle().strokeBorder(Tema.sari, lineWidth: 1.5).frame(width: 26, height: 26)
+                    .background(Circle().fill(Tema.sari.opacity(0.12)))
+                    .position(nokta)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Tema.hat, lineWidth: 0.5))
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { d in
                 kamera.stil.x = Float(min(max(d.location.x / w * 2 - 1, -1), 1))
                 kamera.stil.y = Float(min(max(1 - d.location.y / h * 2, -1), 1))
             })
-            .simultaneousGesture(TapGesture(count: 2).onEnded { kamera.stil.x = 0; kamera.stil.y = 0 })
+            .simultaneousGesture(TapGesture(count: 2).onEnded {
+                withAnimation(.snappy(duration: 0.25)) { kamera.stil.x = 0; kamera.stil.y = 0 }
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            })
+        }
+    }
+
+    /// Pedin altında iki değer (Apple: Ton · Renk)
+    private var padDegerleri: some View {
+        HStack(spacing: 0) {
+            deger("TON", kamera.stil.y)
+            Spacer(minLength: 0)
+            deger("RENK", kamera.stil.x)
+        }
+        .frame(width: 140)
+    }
+
+    private func deger(_ ad: String, _ v: Float) -> some View {
+        HStack(spacing: 4) {
+            Text(ad).font(Tema.etiket).tracking(0.8).foregroundStyle(Tema.ikincil)
+            Text(String(format: "%+d", Int((v * 100).rounded()))).font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(abs(v) > 0.005 ? Tema.sari : .white)
         }
     }
 

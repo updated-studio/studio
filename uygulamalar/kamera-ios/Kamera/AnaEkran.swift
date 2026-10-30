@@ -39,6 +39,8 @@ struct AnaEkran: View {
 
     static let mavi = Color(red: 106 / 255, green: 152 / 255, blue: 248 / 255)
     static let cam = Color(white: 0.16).opacity(0.78)
+    /// Menü geçişleri (Fatih 30 Ekim 10:41 "daha smooth"): sönümlü yay; açılış ve kapanış aynı akışta, sekmeden
+    static let yay = Animation.spring(response: 0.34, dampingFraction: 0.9, blendDuration: 0.1)
     /// Dairesel düğmeler (Apple Kamera'daki koyu gri)
     static let gri = Color(white: 0.3).opacity(0.78)
 
@@ -72,6 +74,8 @@ struct AnaEkran: View {
                 }
             }
             .foregroundStyle(.white)
+            .animation(AnaEkran.yay, value: panel)
+            .animation(AnaEkran.yay, value: acikSatir)
             .onAppear { yonBildir() }
             .onChange(of: g.size) { _, _ in yonBildir() }
         }
@@ -304,11 +308,11 @@ struct AnaEkran: View {
     private func duzenlemeBasla() {
         yedekFavoriler = kamera.favoriler
         acikSatir = nil
-        withAnimation(.easeOut(duration: 0.18)) { duzenleme = true; panel = .kontroller }
+        withAnimation(AnaEkran.yay) { duzenleme = true; panel = .kontroller }
     }
 
     private func duzenlemeBitir() {
-        withAnimation(.easeOut(duration: 0.18)) { duzenleme = false; panel = nil }
+        withAnimation(AnaEkran.yay) { duzenleme = false; panel = nil }
     }
 
     private var normalUstBant: some View {
@@ -330,7 +334,7 @@ struct AnaEkran: View {
 
     private var ustDugmeler: some View {
         HStack(spacing: 10) {
-            Button { withAnimation(.easeOut(duration: 0.15)) { yardim.toggle() } } label: {
+            Button { withAnimation(AnaEkran.yay) { yardim.toggle() } } label: {
                 Text("?").font(.system(size: 14, weight: .bold))
                     .foregroundStyle(yardim ? Tema.sari : .white)
                     .frame(width: 34, height: 34)
@@ -411,17 +415,17 @@ struct AnaEkran: View {
     /// Hızlı menüden "Ayrıntılı…": ayarın tam paneli
     private func ayrintiAc(_ f: Favori) {
         acikSatir = nil
-        withAnimation(.easeOut(duration: 0.18)) { panel = .favori(f) }
+        withAnimation(AnaEkran.yay) { panel = .favori(f) }
     }
 
     /// Kısayola ya da Denetimler dairesine dokununca
     private func kisayolDokun(_ f: Favori) {
         if f.anahtar { kamera.favoriDegistir(f); return }
         if FavoriSatir.satirli(f) {
-            withAnimation(.easeOut(duration: 0.15)) { panel = nil; acikSatir = acikSatir == f ? nil : f }
+            withAnimation(AnaEkran.yay) { panel = nil; acikSatir = acikSatir == f ? nil : f }
         } else {
             acikSatir = nil
-            withAnimation(.easeOut(duration: 0.18)) { panel = panel == .favori(f) ? nil : .favori(f) }
+            withAnimation(AnaEkran.yay) { panel = panel == .favori(f) ? nil : .favori(f) }
         }
     }
 
@@ -724,7 +728,7 @@ struct AnaEkran: View {
                         }
                         .disabled(kamera.kayitta)
                     } else if !duzenleme {
-                        Button { withAnimation(.easeOut(duration: 0.15)) { panel = nil } } label: {
+                        Button { withAnimation(AnaEkran.yay) { panel = nil } } label: {
                             Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
                                 .frame(width: 28, height: 28).background(Circle().fill(Color.white.opacity(0.1)))
                         }
@@ -732,7 +736,7 @@ struct AnaEkran: View {
                     }
                     Spacer()
                     if p == .kontroller && !duzenleme {
-                        Button { withAnimation(.easeOut(duration: 0.15)) { panel = nil } } label: {
+                        Button { withAnimation(AnaEkran.yay) { panel = nil } } label: {
                             Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
                                 .frame(width: 28, height: 28).background(Circle().fill(Color.white.opacity(0.1)))
                         }
@@ -752,7 +756,8 @@ struct AnaEkran: View {
         .environment(\.colorScheme, .dark)
         .padding(.horizontal, 10)
         .padding(.bottom, 4)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.97, anchor: .bottom)),
+                                removal: .move(edge: .bottom).combined(with: .opacity)))
     }
 
     private func panelBaslik(_ p: Panel) -> String {
@@ -795,7 +800,7 @@ struct AnaEkran: View {
     }
 
     private func panelAc(_ p: Panel) {
-        withAnimation(.easeOut(duration: 0.18)) { panel = panel == p ? nil : p }
+        withAnimation(AnaEkran.yay) { panel = panel == p ? nil : p }
     }
 
     /// PRO MODLAR'da pozlama, beyaz denge ve odak modun kendi ayarlarında
@@ -808,7 +813,7 @@ struct AnaEkran: View {
             ForEach(Grup.allCases) { g in
                 Button {
                     sonGrup = g.rawValue
-                    withAnimation(.easeOut(duration: 0.15)) { panel = .grup(g) }
+                    withAnimation(AnaEkran.yay) { panel = .grup(g) }
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: g.simge).font(.system(size: 15, weight: .medium))
@@ -891,7 +896,7 @@ struct AnaEkran: View {
                         .buttonStyle(.plain)
                     }
                 }
-                Button { withAnimation(.easeOut(duration: 0.15)) { kamera.favoriler = Favori.varsayilan } } label: {
+                Button { withAnimation(AnaEkran.yay) { kamera.favoriler = Favori.varsayilan } } label: {
                     Text("Temel Ayarlara Sıfırla").font(.system(size: 14, weight: .semibold))
                         .padding(.horizontal, 18).frame(height: 36)
                         .background(Capsule().fill(Color.white.opacity(0.13)))
