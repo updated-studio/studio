@@ -16,7 +16,7 @@ import android.widget.TextView
 
 /**
  * Genel Ayarlar ekranı (iPhone'daki KameraAyarlar ile aynı düzen; Apple Ayarlar / Final Cut Camera gibi): siyah zemin, gruplu
- * yuvarlak köşeli listeler, renkli simgeli satırlar alt sayfa açar, üstte "‹ Geri" ve "Bitti". Bir ayar değişince sayfa yeniden çizilir
+ * yuvarlak köşeli listeler, tek renk simgeli satırlar alt sayfa açar, üstte "‹ Geri" ve "Bitti". Bir ayar değişince sayfa yeniden çizilir
  * (`yenile`); kaydırma yeri korunur. Desteklenmeyen seçenek soluk görünür, altında nedeni yazar.
  */
 class AyarEkrani(private val a: Activity, private val kok: FrameLayout, private val ust: Int, private val alt: Int, private val kapandi: () -> Unit) {
@@ -98,9 +98,15 @@ class AyarEkrani(private val a: Activity, private val kok: FrameLayout, private 
                 alt?.let { addView(TextView(a).apply { text = it; textSize = 12.5f; setTextColor(IKINCIL); setPadding(0, dp(1f), 0, 0) }) }
             }, LinearLayout.LayoutParams(0, -2, 1f))
         }
+        /**
+         * Satır simgesi (Fatih 30 Ekim: renkli kutulu simgeler "saçma"; iOS KameraAyarlar ile aynı): kameranın dili, tek renk ince simge,
+         * %7 beyaz dolgulu, yarım piksel hatlı koyu kutu. `renk` eski çağrılar için durur, kullanılmaz.
+         */
+        @Suppress("UNUSED_PARAMETER")
         private fun simge(s: LinearLayout, res: Int, renk: Int) {
-            s.addView(ImageView(a).apply { setImageResource(res); setColorFilter(Color.WHITE); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(5f), dp(5f), dp(5f), dp(5f))
-                background = GradientDrawable().apply { setColor(renk); cornerRadius = dp(7f).toFloat() } }, LinearLayout.LayoutParams(dp(29f), dp(29f)).apply { marginEnd = dp(14f) })
+            s.addView(ImageView(a).apply { setImageResource(res); setColorFilter(Color.argb(235, 255, 255, 255)); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(6.5f), dp(6.5f), dp(6.5f), dp(6.5f))
+                background = GradientDrawable().apply { setColor(Color.argb(18, 255, 255, 255)); cornerRadius = dp(8f).toFloat(); setStroke(maxOf(1, dp(0.5f)), Color.argb(46, 255, 255, 255)) } },
+                LinearLayout.LayoutParams(dp(30f), dp(30f)).apply { marginEnd = dp(13f) })
         }
 
         /** Alt sayfa açan satır: renkli simge, ad, sağda değer ve › */
@@ -108,7 +114,7 @@ class AyarEkrani(private val a: Activity, private val kok: FrameLayout, private 
             val s = satirKutu(true, tik)
             res?.let { simge(s, it, renk) }
             yazilar(s, ad, alt)
-            s.addView(TextView(a).apply { text = deger; textSize = 16f; setTextColor(IKINCIL); isSingleLine = true; setPadding(dp(8f), 0, dp(6f), 0) })
+            s.addView(TextView(a).apply { text = deger; textSize = 15f; setTextColor(IKINCIL); isSingleLine = true; fontFeatureSettings = "tnum"; setPadding(dp(8f), 0, dp(6f), 0) })
             s.addView(TextView(a).apply { text = "›"; textSize = 22f; setTextColor(Color.rgb(90, 90, 94)) })
         }
 

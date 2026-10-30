@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UPDATED Kamera ikonu (24×24, çizgi): timelapse (kesik halka, ortada nokta) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M12.00,4.80L12.00,2.60 M15.95,5.16L16.60,4.03 M18.84,8.05L19.97,7.40 M19.20,12.00L21.40,12.00 M18.84,15.95L19.97,16.60 M15.95,18.84L16.60,19.97 M12.00,19.20L12.00,21.40 M8.05,18.84L7.40,19.97 M5.16,15.95L4.03,16.60 M4.80,12.00L2.60,12.00 M5.16,8.05L4.03,7.40 M8.05,5.16L7.40,4.03" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+    <path android:pathData="M10.4,12a1.6,1.6 0 1 0 3.2,0a1.6,1.6 0 1 0 -3.2,0" android:fillColor="#FFFFFFFF"/>
+</vector>

@@ -91,6 +91,27 @@ class EkranTest {
         }
     }
 
+    /** Genel Ayarlar ana sayfası, kamera varmış gibi bütün satırlar (simgelerin görünüşü için; satırlar KameraActivity.genelAyarlar ile aynı) */
+    @Test fun genelAyarlar() {
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        KameraActivity.girisSoruldu = true
+        Robolectric.buildActivity(KameraActivity::class.java).setup().use { c ->
+            val a = c.get(); val kok = a.findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as android.widget.FrameLayout
+            AyarEkrani(a, kok, 0, 0) {}.ac("Ayarlar") {
+                grup("Çözünürlük") {
+                    git(R.drawable.ic_film, 0, "Video", "4K") {}; git(R.drawable.ic_hiz, 0, "Kare hızı", "30 fps") {}; git(R.drawable.ic_foto, 0, "Fotoğraf", "12 MP") {}
+                }
+                grup {
+                    git(R.drawable.ic_kayit_daire, 0, "Kayıt", "HEVC · SDR") {}; git(R.drawable.ic_artieksi, 0, "Pozlama", "Süre") {}; git(R.drawable.ic_pozlama, 0, "Renk ve beyaz denge", "5600K") {}
+                    git(R.drawable.ic_dalga, 0, "Ses", "Otomatik") {}; git(R.drawable.ic_enst, 0, "Fotoğraf", "JPEG") {}; git(R.drawable.ic_olcum, 0, "Göstergeler", "") {}
+                    git(R.drawable.ic_timelapse, 0, "Timelapse", "2 sn") {}; git(R.drawable.ic_raptiye, 0, "Sabitlenenler", "5") {}
+                }
+                grup { git(R.drawable.ic_bolum4, 0, "Multi Cam (çok kamera)", "") {}; git(R.drawable.ic_bilgi, 0, "Uygulama", "0.17.5") {} }
+            }
+            kaydet(a, "kamera-genel-ayarlar")
+        }
+    }
+
     /** PRO MODLAR: mod kartları ve Özelleştir paneli (orta boy dikey) */
     @Test fun proModlar() {
         RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))

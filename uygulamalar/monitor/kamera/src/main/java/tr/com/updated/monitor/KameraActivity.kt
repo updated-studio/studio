@@ -75,6 +75,8 @@ class KameraActivity : Activity() {
         val GRI = METIN2; val CAM = YUZEY; val ZEMIN = Color.rgb(15, 17, 20)
         /** Elle değiştirilmiş değer (Apple Kamera sarısı); dairesel düğmelerin zemini */
         val VURGU = Color.rgb(255, 214, 10); val DAIRE = YUZEY
+        /** Cam yüzeyin üst ve alt tonu, kenarı (cam() ve daire()) */
+        val CAM_UST = Color.argb(70, 120, 120, 128); val CAM_ALT = Color.argb(120, 0, 0, 0); val CAM_KENAR = Color.argb(64, 255, 255, 255)
     }
 
     private val tercih by lazy { getSharedPreferences("kamera", MODE_PRIVATE) }
@@ -248,12 +250,18 @@ class KameraActivity : Activity() {
     /** İnce hat: 0,5 dp (en az 1 piksel) */
     private val ince get() = maxOf(1, (resources.displayMetrics.density * 0.5f).toInt())
     /** Yüzey: siyah %34 + beyaz %18 ince hat (cam değil) */
-    private fun cam(kose: Float) = GradientDrawable().apply { cornerRadius = kose; setColor(YUZEY); setStroke(ince, HAT) }
+    /**
+     * Cam yüzey (Fatih 30 Ekim: "arayüz iOS 27'den uzaklaşmış"; iOS 26+ Apple cam malzemesi gibi, iPhone CamYuzey ile aynı his):
+     * üstte hafif aydınlık, altta koyulaşan yarı saydam dolgu ve parlak ince kenar. Android canlı görüntünün arkasını bulanıklaştıramaz;
+     * okunurluk koyu alt tondan gelir.
+     */
+    private fun cam(kose: Float) = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(CAM_UST, CAM_ALT)).apply { cornerRadius = kose; setStroke(ince, CAM_KENAR) }
     /** Açılır paneller: koyu yüzey (görüntü bulanıklaştırılamadığı için daha koyu), köşe 30, ince hat */
     private fun pano(@Suppress("UNUSED_PARAMETER") kose: Float) = GradientDrawable().apply { cornerRadius = dp(30f).toFloat(); setColor(Color.argb(214, 14, 14, 15)); setStroke(ince, HAT) }
     private fun saydamPano(kose: Float) = pano(kose)
     /** Dairesel düğme zemini (yüzey + ince hat); elle değişmiş bir değer varsa sarı halka */
-    private fun daire(etkin: Boolean, renk: Int = DAIRE) = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(renk); if (etkin) setStroke(dp(1.5f), VURGU) else if (renk == YUZEY) setStroke(ince, HAT) }
+    private fun daire(etkin: Boolean, renk: Int = DAIRE) = (if (renk == YUZEY) GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(CAM_UST, CAM_ALT)) else GradientDrawable().apply { setColor(renk) }).apply {
+        shape = GradientDrawable.OVAL; if (etkin) setStroke(dp(1.5f), VURGU) else if (renk == YUZEY) setStroke(ince, CAM_KENAR) }
     /** Seçenek kapsülü: seçili = beyaz %12 dolgu + sarı yarım hat (sarı dolgu yok), diğerleri beyaz %7 */
     private fun secenek(secili: Boolean, kose: Float = 999f) = GradientDrawable().apply { cornerRadius = kose; setColor(if (secili) SECILI else DOLGU); if (secili) setStroke(ince, Color.argb(128, 255, 214, 10)) }
     private fun secenekYazi(secili: Boolean) = if (secili) VURGU else Color.argb(217, 255, 255, 255)
@@ -1186,18 +1194,18 @@ class KameraActivity : Activity() {
                 } }
             }
             grup {
-                git(R.drawable.ic_kodek, Color.rgb(255, 149, 0), "Kayıt", "${if (ayar.hevc || ayar.renk == 1) "HEVC" else "H.264"} · ${if (ayar.renk == 1 && k.hdrVar) "HDR" else "SDR"}") { e.git("Kayıt") { kayitSayfasi(k) } }
-                git(R.drawable.ic_pozlama, Color.rgb(255, 204, 0), "Pozlama", if (enstAci) "Açı" else "Süre") { e.git("Pozlama") { pozlamaSayfasi(k) } }
-                git(R.drawable.ic_beyaz, Color.rgb(255, 55, 95), "Renk ve beyaz denge", ayar.kelvin?.let { "${it}K" } ?: BD_ADLARI[ayar.awb] ?: "Oto") { e.git("Renk") { renkSayfasi(k) } }
-                git(R.drawable.ic_ses, Color.rgb(255, 59, 48), "Ses", sesGirisleri(this@KameraActivity).firstOrNull { it.first == ayar.sesGirdi }?.second ?: "Otomatik") { e.git("Ses") { sesSayfasi() } }
-                git(R.drawable.ic_dosya, Color.rgb(0, 122, 255), "Fotoğraf", if (ayar.raw && k.rawVar) "RAW + JPEG" else "JPEG") { e.git("Fotoğraf") { fotografSayfasi(k) } }
+                git(R.drawable.ic_kayit_daire, Color.rgb(255, 149, 0), "Kayıt", "${if (ayar.hevc || ayar.renk == 1) "HEVC" else "H.264"} · ${if (ayar.renk == 1 && k.hdrVar) "HDR" else "SDR"}") { e.git("Kayıt") { kayitSayfasi(k) } }
+                git(R.drawable.ic_artieksi, Color.rgb(255, 204, 0), "Pozlama", if (enstAci) "Açı" else "Süre") { e.git("Pozlama") { pozlamaSayfasi(k) } }
+                git(R.drawable.ic_pozlama, Color.rgb(255, 55, 95), "Renk ve beyaz denge", ayar.kelvin?.let { "${it}K" } ?: BD_ADLARI[ayar.awb] ?: "Oto") { e.git("Renk") { renkSayfasi(k) } }
+                git(R.drawable.ic_dalga, Color.rgb(255, 59, 48), "Ses", sesGirisleri(this@KameraActivity).firstOrNull { it.first == ayar.sesGirdi }?.second ?: "Otomatik") { e.git("Ses") { sesSayfasi() } }
+                git(R.drawable.ic_enst, Color.rgb(0, 122, 255), "Fotoğraf", if (ayar.raw && k.rawVar) "RAW + JPEG" else "JPEG") { e.git("Fotoğraf") { fotografSayfasi(k) } }
                 git(R.drawable.ic_olcum, Color.rgb(52, 199, 89), "Göstergeler", if (kompTur == KompTur.KAPALI) "" else kompTur.ad) { e.git("Göstergeler") { gostergeSayfasi() } }
-                git(R.drawable.ic_zaman, Color.rgb(175, 82, 222), "Timelapse", Timelapse.aralikYazi(tlAralik)) { e.git("Timelapse") { timelapseSayfasi() } }
-                git(R.drawable.ic_yildiz, Color.rgb(255, 159, 10), "Sabitlenenler", "${favoriler.size}") { e.git("Sabitlenenler") { sabitlenenSayfasi(e) } }
+                git(R.drawable.ic_timelapse, Color.rgb(175, 82, 222), "Timelapse", Timelapse.aralikYazi(tlAralik)) { e.git("Timelapse") { timelapseSayfasi() } }
+                git(R.drawable.ic_raptiye, Color.rgb(255, 159, 10), "Sabitlenenler", "${favoriler.size}") { e.git("Sabitlenenler") { sabitlenenSayfasi(e) } }
             }
         } else grup(not = "Kamera açılınca çözünürlük, kayıt, pozlama ve renk ayarları burada görünür.") { deger("Kamera hazır değil", renk = AyarEkrani.IKINCIL) }
         grup {
-            git(R.drawable.ic_ag, Color.rgb(48, 176, 199), "Multi Cam (çok kamera)", if (wifiKamera) "Açık" else "") { e.git("Multi Cam") { masaSayfasi() } }
+            git(R.drawable.ic_bolum4, Color.rgb(48, 176, 199), "Multi Cam (çok kamera)", if (wifiKamera) "Açık" else "") { e.git("Multi Cam") { masaSayfasi() } }
             git(R.drawable.ic_bilgi, Color.rgb(142, 142, 147), "Uygulama", packageManager.getPackageInfo(packageName, 0).versionName ?: "") { e.git("Uygulama") { uygulamaSayfasi() } }
         }
     }
@@ -1634,7 +1642,7 @@ class KameraActivity : Activity() {
             val yazi = if (a in degerli && g.ust != null) "${g.alt ?: ""} ${g.ust}".trim() else favKisa(a)
             val f = FrameLayout(this).apply { clipChildren = false; contentDescription = favAd(a); setOnClickListener { favDokun(a) }; setOnLongClickListener { duzenleAc(); true }; rotation = -fizikselYon.toFloat() }
             f.addView(TextView(this).apply { text = yazi; textSize = 11f; typeface = kosulKalin; setTextColor(renk); gravity = Gravity.CENTER_VERTICAL; isSingleLine = true; includeFontPadding = false
-                setPadding(dp(9f), 0, dp(10f), 0); background = GradientDrawable().apply { cornerRadius = dp(12f).toFloat(); setColor(YUZEY); setStroke(ince, if (g.degisik) Color.argb(128, 255, 214, 10) else HAT) }
+                setPadding(dp(9f), 0, dp(10f), 0); background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(CAM_UST, CAM_ALT)).apply { cornerRadius = dp(12f).toFloat(); setStroke(ince, if (g.degisik) Color.argb(128, 255, 214, 10) else CAM_KENAR) }
                 g.ikon?.let { Tema.simge(this, it, renk, 12f); compoundDrawablePadding = dp(5f) } }, FrameLayout.LayoutParams(-2, -1))
             if (duzenleniyor) f.addView(etiket("−", 12f).apply { typeface = kosulKalin; background = daire(false, Color.rgb(99, 99, 102)); setOnClickListener { favoriler.remove(a); favKaydet(); duzenleAc(yeniden = true) } },
                 FrameLayout.LayoutParams(dp(15f), dp(15f), Gravity.TOP or Gravity.START).apply { topMargin = -dp(5f); marginStart = -dp(5f) })

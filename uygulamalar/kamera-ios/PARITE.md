@@ -49,6 +49,8 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | **Kayıt başında oturuma dokunmama:** kodek, sabitleme, ses biçimi VİDEO moduna geçince ve ayar değişince uygulanır; kayıt başında yalnız değişen ayar yazılır | ✓ | — (Android: MediaRecorder kayıt yüzeyi için oturum kayıt başında yeniden kurulmak zorunda; stil kayıttan sonra tüm dosyaya işlendiği için video başında düz renk yok. Kalıcı giriş yüzeyine geçiş cihazda denenince) | video başı düz renk / donma şikâyeti |
 | Açılış ekranı (Kamera / Monitör / Masa) ve "Açılışta sor" | ✓ | ✓ | `GirisEkran`, UserDefaults "giris" (Android ile aynı anahtar) |
 | **Vlog (çift kamera):** VİDEO → KAYIT → VLOG "Ön + arka"; ön kamera sağ altta küçük aynalı pencere; kayıtta iki dosya (ön "<ad>_on.mp4", sessiz) + kayıttan sonra birleşik "<ad> vlog.mp4" (ön pencere genişliğin %28'i, kenardan %4; ses arka kayıttan); HDR'de birleşik yapılmaz; açıkken ana kamera en çok 1080p | ✓ | | Android 11+ ve eşzamanlı kamera desteği (concurrentCameraIds); Media3 çoklu dizi birleştirme |
+| **Genel Ayarlar simgeleri tek renk** (renkli kutular kalktı): ince beyaz simge, %7 beyaz dolgulu, yarım piksel hatlı kutu; simgeler iOS ile aynı anlam (Kayıt halka+nokta, Pozlama ±, Renk yarım daire, Ses dalga, Fotoğraf diyafram, Timelapse kesik halka, Sabitlenenler raptiye, Multi Cam 2×2) | ✓ | ✓ | 30 Ekim |
+| **Cam yüzeyler** (iOS 26+ cam malzemesi gibi): Android'de üstte açık, altta koyu yarı saydam dolgu + parlak ince kenar (cam(), daire(), sabitlenen çipler) | ✓ | ✓ | Android arkayı bulanıklaştıramaz |
 
 ## Monitör ekranı (Android: MainActivity + MonitorGorunum)
 
