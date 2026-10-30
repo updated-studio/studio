@@ -191,7 +191,10 @@ extension Kamera {
                 let var_ = self.videoCikti.availableVideoCodecTypes
                 kodekler = kodekler.filter { !$0.prores || var_.contains($0.tur) }
             }
-            let sabit = Sabitleme.allCases.filter { d.activeFormat.isVideoStabilizationModeSupported($0.mod) }
+            // Bu çözünürlük/kare hızında herhangi bir biçimin desteklediği sabitlemeler (seçilince o biçime geçilir)
+            let sabit = Sabitleme.allCases.filter { s in
+                d.activeFormat.isVideoStabilizationModeSupported(s.mod) || Kamera.videoBicimi(d, yukseklik: h, fps: f, sabit: s.mod)?.isVideoStabilizationModeSupported(s.mod) == true
+            }
             let fpsler = [24, 25, 30, 60].filter { Kamera.videoBicimi(d, yukseklik: h, fps: $0) != nil }
             DispatchQueue.main.async {
                 self.renkModlari = renkler

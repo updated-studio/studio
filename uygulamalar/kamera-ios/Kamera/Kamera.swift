@@ -73,7 +73,7 @@ final class Kamera: NSObject, ObservableObject {
     @Published var sesKapatilabilir = false
     // Video
     @Published var videoYukseklik = Kamera.ud.object(forKey: "k.videoH") as? Int ?? 2160 { didSet { Kamera.ud.set(videoYukseklik, forKey: "k.videoH"); yenidenKur() } }
-    @Published var videoFps = Kamera.ud.object(forKey: "k.videoFps") as? Int ?? 30 { didSet { Kamera.ud.set(videoFps, forKey: "k.videoFps"); yenidenKur() } }
+    @Published var videoFps = Kamera.ud.object(forKey: "k.videoFps") as? Int ?? 60 { didSet { Kamera.ud.set(videoFps, forKey: "k.videoFps"); yenidenKur() } }
     @Published var videoSecenekleri: [Int] = [1080]
     @Published var fps60Var = false
     @Published var videoFpsler: [Int] = [30]
@@ -86,7 +86,9 @@ final class Kamera: NSObject, ObservableObject {
     var ssdDosya: URL?
     private var ssdGozlem: AnyCancellable?
     @Published var renkModu = RenkModu(rawValue: Kamera.ud.string(forKey: "k.renk") ?? "") ?? .sdr { didSet { Kamera.ud.set(renkModu.rawValue, forKey: "k.renk"); yenidenKur() } }
-    @Published var sabitleme = Sabitleme(rawValue: Kamera.ud.string(forKey: "k.sabit") ?? "") ?? .standart { didSet { Kamera.ud.set(sabitleme.rawValue, forKey: "k.sabit"); kayitHazirla() } }
+    @Published var sabitleme = Sabitleme(rawValue: Kamera.ud.string(forKey: "k.sabit") ?? "") ?? .standart { didSet { Kamera.ud.set(sabitleme.rawValue, forKey: "k.sabit"); yenidenKur() } }
+    /// Kaydın gerçekten kullandığı sabitleme (seçilen bu biçimde yoksa iPhone düşürür; ekranda bu gösterilir)
+    @Published var etkinSabitleme: Sabitleme = .standart
     /// Video enstantanesi açı (180°) olarak mı gösterilsin
     @Published var enstAci = Kamera.ud.bool(forKey: "k.enstAci") { didSet { Kamera.ud.set(enstAci, forKey: "k.enstAci") } }
     @Published var sesBicimi = SesBicimi(rawValue: Kamera.ud.string(forKey: "k.ses") ?? "") ?? .oto { didSet { Kamera.ud.set(sesBicimi.rawValue, forKey: "k.ses"); kayitHazirla() } }
@@ -264,8 +266,47 @@ final class Kamera: NSObject, ObservableObject {
         DispatchQueue.main.async { self.zoomDuraklariYaz() }
     }
 
+    /// Arkada sanal çoklu kamera (Apple Kamera gibi; Fatih 30 Ekim "lensler arası geçişlerde takılmalar oluyor"): mercekler arası geçiş
+    /// oturumu yeniden kurmadan, yakınlaştırmayla olur ve kayıt sürerken de yapılabilir. PRO modlar, el ile odak ve sanal cihazın vermediği
+    /// el ile pozlama tek merceğe (fiziksel) geçer.
+    static let sanalArka: AVCaptureDevice? = AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: .back)
+        ?? AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: .back)
+        ?? AVCaptureDevice.default(.builtInDualCamera, for: .video, position: .back)
+
+    /// Sanal cihazda görünen 1× (ana mercek) kaç yakınlaştırma çarpanına denk (geniş açı varsa ilk geçiş noktası)
+    static let sanalTaban: CGFloat = {
+        guard let d = sanalArka, d.constituentDevices.contains(where: { $0.deviceType == .builtInUltraWideCamera }),
+              let f = d.virtualDeviceSwitchOverVideoZoomFactors.first else { return 1 }
+        return CGFloat(f.doubleValue)
+    }()
+
+    var sanalda: Bool { cihaz?.isVirtualDevice == true }
+
+    /// Tek mercek gereken durumlar
+    var fizikselGerek: Bool {
+        if mod == .pro || odakKonum != nil || uzunSuruyor || uzunPozlama { return true }
+        if secilenIso != nil || secilenEnst != nil { return !(Kamera.sanalArka?.isExposureModeSupported(.custom) ?? false) }
+        return false
+    }
+
+    /// Görünen yakınlaştırmaya göre fiziksel mercek
+    private func lensFor(_ z: CGFloat) -> Lens {
+        z < 1 && ultraVar ? .ultra : (teleCarpani.map { z >= $0 } == true ? .tele : .genis)
+    }
+
+    /// Kuyrukta: sanal ↔ fiziksel geçişi gerekiyorsa cihaz değişir (kayıt sürerken değişmez); true = değişti
+    @discardableResult
+    func cihazUyumla() -> Bool {
+        guard !kayitta, !onde, let _ = Kamera.sanalArka else { return false }
+        let sanal = sanalda, gerek = fizikselGerek
+        guard sanal == gerek else { return false }
+        cihazSec(lensFor(zoom), onde: false)
+        return true
+    }
+
     private func lensCihazi(_ l: Lens, onde: Bool) -> AVCaptureDevice? {
         if onde { return AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) }
+        if !fizikselGerek, let v = Kamera.sanalArka { return v }
         switch l {
         case .ultra: return AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
         case .tele: return AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back)
@@ -298,6 +339,15 @@ final class Kamera: NSObject, ObservableObject {
         if oturum.canAddInput(g) { oturum.addInput(g); girdi = g; cihaz = d; lens = yeniOnde ? .genis : l }
         presetUygula()
         oturum.commitConfiguration()
+        // Sanal cihazda görünen yakınlaştırma korunur (fizikselden dönünce aynı kadraj)
+        if d.isVirtualDevice, (try? d.lockForConfiguration()) != nil {
+            d.videoZoomFactor = min(max(zoom * Kamera.sanalTaban, d.minAvailableVideoZoomFactor), d.maxAvailableVideoZoomFactor)
+            d.unlockForConfiguration()
+        } else if !yeniOnde, (try? d.lockForConfiguration()) != nil {
+            // Fiziksel mercekte merceğin içindeki dijital yakınlaştırma (ör. 1,5× geniş açıda)
+            d.videoZoomFactor = min(max(zoom / lensCarpani(lens), 1), d.maxAvailableVideoZoomFactor)
+            d.unlockForConfiguration()
+        }
         let flasli = d.hasFlash || d.hasTorch
         DispatchQueue.main.async { self.onde = yeniOnde; self.flasVar = flasli }
         isoGuncelle()
@@ -311,7 +361,8 @@ final class Kamera: NSObject, ObservableObject {
             let fps = mod == .video ? videoFps : 30
             let renk = mod == .video ? renkModu : .sdr
             let prores = mod == .video && kodek.prores
-            if let b = Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps, renk: renk, prores: prores) ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps)
+            let sm = mod == .video ? sabitleme.mod : nil
+            if let b = Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps, renk: renk, prores: prores, sabit: sm) ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: fps, sabit: sm)
                 ?? Kamera.videoBicimi(d, yukseklik: videoYukseklik, fps: 30) ?? Kamera.videoBicimi(d, yukseklik: 1080, fps: 30), (try? d.lockForConfiguration()) != nil {
                 d.activeFormat = b
                 let gercekFps = b.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(fps) } ? fps : 30
@@ -333,6 +384,10 @@ final class Kamera: NSObject, ObservableObject {
             oturum.sessionPreset = .photo
         }
         renkAlaniUygula(d, video: videolu)
+        // Bu biçimde seçilen sabitleme yoksa en yakın güçlü olan (ekranda gerçekte kullanılan gösterilir)
+        let sira: [Sabitleme] = [.aksiyon, .sinematikGenis, .sinematik, .standart, .kapali]
+        let etkin = sira.drop(while: { $0 != sabitleme }).first { d.activeFormat.isVideoStabilizationModeSupported($0.mod) } ?? .kapali
+        DispatchQueue.main.async { self.etkinSabitleme = etkin }
         // Video kaydı ve kare çıkışı aynı anda oturumda tutulmaz (iOS'ta ikisi birlikte güvenilir değil)
         if mod == .video {
             if !oturum.outputs.contains(videoCikti), oturum.canAddOutput(videoCikti) { oturum.addOutput(videoCikti) }
@@ -347,7 +402,7 @@ final class Kamera: NSObject, ObservableObject {
         let boyutlar = d.activeFormat.supportedMaxPhotoDimensions.sorted { Int($0.width) * Int($0.height) > Int($1.width) * Int($1.height) }
         let kayitli = Kamera.ud.string(forKey: "k.foto")
         let secili = boyutlar.first { "\($0.width)x\($0.height)" == kayitli }
-            ?? boyutlar.first { Int($0.width) * Int($0.height) <= 12_600_000 } ?? boyutlar.last
+            ?? boyutlar.first  // varsayılan: kameranın en yüksek çözünürlüğü
         if let s = secili { fotoCikti.maxPhotoDimensions = s }
         if fotoCikti.isAppleProRAWSupported { fotoCikti.isAppleProRAWEnabled = raw }
         // Art arda dokunuşlarda deklanşör beklemesin (iOS 17)
@@ -381,9 +436,23 @@ final class Kamera: NSObject, ObservableObject {
         if let b = kareCikti.connection(with: .video) {
             if b.isVideoOrientationSupported { b.videoOrientation = Onizleme.yon(arayuzYonu) }
             if b.isVideoMirroringSupported { b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = cihaz?.position == .front }
-            // Stil işlemeli kayıt bu kareleri yazar: sabitleme burada da uygulanır (yalnız videoda; diğer modlarda gecikme olmasın)
-            if b.isVideoStabilizationSupported { b.preferredVideoStabilizationMode = mod == .video ? sabitleme.mod : .off }
+            // Stil işlemeli kayıt bu kareleri yazar: kayıtta seçilen sabitleme; kayıt dışında güçlü sabitleme ekranı
+            // 1 sn'ye yakın geciktirip kare düşürüyordu, o yüzden önizlemeye uygun düşük gecikmeli mod (iOS 17)
+            if b.isVideoStabilizationSupported { b.preferredVideoStabilizationMode = kareSabitleme }
         }
+    }
+
+    /// Kare çıkışının sabitlemesi (kuyrukta okunur)
+    private var kareSabitleme: AVCaptureVideoStabilizationMode {
+        guard mod == .video else { return .off }
+        if canliKayit != nil || sabitleme == .kapali { return sabitleme.mod }
+        if #available(iOS 17.0, *), cihaz?.activeFormat.isVideoStabilizationModeSupported(.previewOptimized) == true { return .previewOptimized }
+        return sabitleme == .standart ? .standard : .off
+    }
+
+    /// Kayıt başında/sonunda kare çıkışı sabitlemesi (kuyrukta)
+    func kareSabitlemeYaz() {
+        if let b = kareCikti.connection(with: .video), b.isVideoStabilizationSupported { b.preferredVideoStabilizationMode = kareSabitleme }
     }
 
     /// 16:9 video biçimi (SDR'de 8 bit tercih; HDR / Log için o renk alanını destekleyen 10 bit biçim); bulunamazsa nil
@@ -408,11 +477,17 @@ final class Kamera: NSObject, ObservableObject {
 
     /// ProRes 4:2:2 kaydı yalnız 10 bit 4:2:2 ('x422') biçimde açılır (Apple TN3121): kodek ProRes ise o biçim seçilir;
     /// yoksa SDR'de 8 bit 4:2:0, HDR / Log'da 10 bit 4:2:0. Kodek listesi (`secenekleriYaz`) de bu seçimden türer.
-    static func videoBicimi(_ d: AVCaptureDevice, yukseklik: Int, fps: Int, renk: RenkModu = .sdr, prores: Bool = false) -> AVCaptureDevice.Format? {
-        let adaylar = d.formats.filter { f in
+    static func videoBicimi(_ d: AVCaptureDevice, yukseklik: Int, fps: Int, renk: RenkModu = .sdr, prores: Bool = false,
+                            sabit: AVCaptureVideoStabilizationMode? = nil) -> AVCaptureDevice.Format? {
+        var adaylar = d.formats.filter { f in
             let b = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
             return Int(b.height) == yukseklik && Int(b.width) * 9 == Int(b.height) * 16
                 && f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(fps) }
+        }
+        // Seçilen sabitlemeyi destekleyen biçim önce (yoksa iPhone sessizce daha zayıf sabitlemeye düşer)
+        if let sabit, sabit != .off {
+            let destekli = adaylar.filter { $0.isVideoStabilizationModeSupported(sabit) }
+            if !destekli.isEmpty { adaylar = destekli }
         }
         func tur(_ f: AVCaptureDevice.Format) -> OSType { CMFormatDescriptionGetMediaSubType(f.formatDescription) }
         let uygun: [AVCaptureDevice.Format]
@@ -475,7 +550,8 @@ final class Kamera: NSObject, ObservableObject {
         let iso = secilenIso
         let enUzun = d.activeFormat.maxExposureDuration.seconds
         let ara = max(d.minExposureTargetBias, -3)...min(d.maxExposureTargetBias, 3)
-        let elle = d.isLockingFocusWithCustomLensPositionSupported
+        // Sanal cihaz mercek konumunu vermez; el ile odak seçilince tek merceğe geçilir
+        let elle = d.isVirtualDevice ? (AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)?.isLockingFocusWithCustomLensPositionSupported ?? false) : d.isLockingFocusWithCustomLensPositionSupported
         DispatchQueue.main.async {
             self.isoDegerleri = liste
             self.bazIso = liste.first ?? 0
@@ -498,6 +574,7 @@ final class Kamera: NSObject, ObservableObject {
         if yeni.foto, flas == .fener { flas = .kapali }
         if !yeni.foto, flas == .oto || flas == .acik { flas = .kapali }
         kuyruk.async {
+            if self.cihazUyumla() { return }
             self.oturum.beginConfiguration()
             self.presetUygula()
             self.oturum.commitConfiguration()
@@ -534,12 +611,23 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     /// Görünen çarpana göre mercek seçilir (0,5× geniş açı, tele ve üstü tele mercek), aradaki kısım dijital
-    func yakinlastir(_ istenen: CGFloat, moda: Bool = true) {
-        guard !kayitta, !proCalisiyor else { return }
+    func yakinlastir(_ istenen: CGFloat, moda: Bool = true, kaydir: Bool = false) {
+        // Sanal cihazda mercek geçişi kayıt sürerken de olur (oturum yeniden kurulmaz)
+        guard !proCalisiyor, !kayitta || sanalda else { return }
         let ust = max(10, (teleCarpani ?? 2) * 2)
         let etkin = min(max(istenen, onde || !ultraVar ? 1 : 0.5), ust)
-        let yeniLens: Lens = onde ? .genis : (etkin < 1 ? .ultra : (teleCarpani.map { etkin >= $0 } == true ? .tele : .genis))
+        let yeniLens: Lens = onde ? .genis : lensFor(etkin)
         zoom = etkin
+        if sanalda, !onde {
+            kuyruk.async {
+                guard let d = self.cihaz, d.isVirtualDevice, (try? d.lockForConfiguration()) != nil else { return }
+                let hedef = min(max(etkin * Kamera.sanalTaban, d.minAvailableVideoZoomFactor), d.maxAvailableVideoZoomFactor)
+                // Mercek düğmesinde kısa, yumuşak geçiş (Apple Kamera gibi); parmakla kaydırırken anında
+                if kaydir { d.videoZoomFactor = hedef } else { d.ramp(toVideoZoomFactor: hedef, withRate: 24) }
+                d.unlockForConfiguration()
+            }
+            return
+        }
         if moda, mod == .pro, proAyar.mercek.map({ abs(CGFloat($0) - etkin) > 0.01 }) ?? true {
             var a = proAyar; a.mercek = Double(etkin); proAyar = a; proMod.yaz(a)
         }
@@ -553,13 +641,13 @@ final class Kamera: NSObject, ObservableObject {
 
     // MARK: pozlama, beyaz denge, odak (PRO dışındaki modlar)
 
-    func isoSec(_ iso: Float?) { secilenIso = iso; kuyruk.async { self.normalUygula() } }
-    func enstSec(_ e: Double?) { secilenEnst = e; kuyruk.async { self.normalUygula() } }
+    func isoSec(_ iso: Float?) { secilenIso = iso; kuyruk.async { self.cihazUyumla(); self.normalUygula() } }
+    func enstSec(_ e: Double?) { secilenEnst = e; kuyruk.async { self.cihazUyumla(); self.normalUygula() } }
     /// Seçilen enstantane tek karede verilemiyor: kareler birleştirilecek
     var uzunPozlama: Bool { secilenEnst.map { $0 > enUzunEnst + 0.01 } ?? false }
     func evSec(_ v: Float) { ev = v; kuyruk.async { self.normalUygula() } }
     func bdSec(_ k: Float?) { bd = k; if k == nil { renkTon = 0 }; kuyruk.async { self.normalUygula() } }
-    func odakSec(_ o: Float?) { odakKonum = o; kuyruk.async { self.normalUygula() } }
+    func odakSec(_ o: Float?) { odakKonum = o; kuyruk.async { self.cihazUyumla(); self.normalUygula() } }
 
     func flasDegistir() {
         guard flasVar else { bildirim = "Bu kamerada flaş yok."; return }
@@ -580,7 +668,7 @@ final class Kamera: NSObject, ObservableObject {
         guard let d = cihaz, (try? d.lockForConfiguration()) != nil else { return }
         defer { d.unlockForConfiguration() }
         d.activeMaxExposureDuration = .invalid
-        if secilenIso != nil || secilenEnst != nil {
+        if secilenIso != nil || secilenEnst != nil, d.isExposureModeSupported(.custom) {
             d.setExposureTargetBias(0)
             let bicim = d.activeFormat
             let enUzun = bicim.maxExposureDuration.seconds
@@ -679,6 +767,7 @@ final class Kamera: NSObject, ObservableObject {
     /// Uzun basınca: odak ve pozlama yeniden otomatik
     func odakSerbest() {
         odakKonum = nil
+        kuyruk.async { self.cihazUyumla() }
         if konuSecili { konuSecili = false; asistan.hedef = nil }
         kuyruk.async {
             guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
@@ -1050,13 +1139,13 @@ extension Kamera {
         let ssd = ssdKayit ? self.ssd.yeniDosya(uzanti: "mov") : nil
         ssdDosya = ssd
         let c = CanliKaydedici(suzgec: suzgec, kodek: k, fps: fps, sesAyari: canliSesAyari(), url: ssd)
-        kuyruk.async { self.canliKayit = c }
+        kuyruk.async { self.canliKayit = c; self.kareSabitlemeYaz() }
     }
 
     private func canliBitir(_ c: CanliKaydedici) {
         kayitta = false
         kayitBasi = nil
-        kuyruk.async { self.canliKayit = nil }
+        kuyruk.async { self.canliKayit = nil; self.kareSabitlemeYaz() }
         c.bitir { url in
             guard let url else {
                 if let s = self.ssdDosya { self.ssd.birak(s); self.ssdDosya = nil }
