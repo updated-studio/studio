@@ -43,6 +43,14 @@ final class GezintiTesti: XCTestCase {
         dokun(app.buttons["VİDEO"], "video")
         panelleriGez(on: "video")
         dokun(app.buttons["FOTO"], "foto-geri")
+        // Vlog modu (simülatörde iki kamera yok; ekran ve çıktı seçimi gezilir, alt şeritten FOTO'ya dönülür)
+        if dokun(app.buttons["VLOG"], "vlog") {
+            sleep(2)
+            dokun(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Vlog çıktısı'")).firstMatch, "vlog-cikti")
+            dokun(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Vlog çıktısı'")).firstMatch, "vlog-cikti-geri")
+            dokun(app.buttons["FOTO"].firstMatch, "vlog-foto")
+            sleep(2)
+        }
         // Yan tutuş
         XCUIDevice.shared.orientation = .landscapeLeft
         sleep(2); ekran("yatay")
@@ -78,7 +86,7 @@ final class GezintiTesti: XCTestCase {
     private func ayarlariGez() {
         let ayar = ["Ayarlar", "Genel Ayarlar"].map { app.buttons[$0].firstMatch }.first { $0.exists }
         guard let ayar, dokun(ayar, "ayarlar") else { kaydet("Ayarlar düğmesi bulunamadı"); return }
-        let baglantilar = app.buttons.allElementsBoundByIndex.filter { $0.isHittable }.map(\.label).filter { !$0.isEmpty }
+        let baglantilar = app.buttons.allElementsBoundByIndex.filter { gorunur($0) }.map(\.label).filter { !$0.isEmpty }
         for ad in baglantilar.prefix(30) where !atla.contains(ad) {
             guard dokun(app.buttons[ad].firstMatch, "ayar-\(ad)") else { continue }
             if app.navigationBars.buttons.firstMatch.exists, app.navigationBars.count > 0, app.navigationBars.buttons.element(boundBy: 0).isHittable {
@@ -88,17 +96,25 @@ final class GezintiTesti: XCTestCase {
         for ad in ["Bitti", "Kapat", "Done"] where app.buttons[ad].exists { app.buttons[ad].firstMatch.tap(); break }
     }
 
-    static let modlar: Set<String> = ["FOTO", "VİDEO", "PORTRE", "PRO", "TİMELAPSE", "MONİTÖR"]
+    static let modlar: Set<String> = ["FOTO", "VİDEO", "PORTRE", "PRO", "TİMELAPSE", "MONİTÖR", "VLOG"]
+
+    /// Ekranda ve dokunulabilir mi (kaydırmalı şeritte kenarda kalan düğmenin isHittable'ı hata veriyordu)
+    private func gorunur(_ e: XCUIElement) -> Bool {
+        guard e.exists else { return false }
+        let f = e.frame
+        guard !f.isEmpty, f.width >= 2, f.height >= 2, app.frame.contains(CGPoint(x: f.midX, y: f.midY)) else { return false }
+        return e.isHittable
+    }
 
     private func adlar() -> [String] {
         var gorulen = Set<String>()
-        return app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }.map(\.label)
+        return app.buttons.allElementsBoundByIndex.filter { gorunur($0) }.map(\.label)
             .filter { !$0.isEmpty && gorulen.insert($0).inserted }
     }
 
     @discardableResult
     private func dokun(_ e: XCUIElement, _ ad: String) -> Bool {
-        guard e.exists, e.isHittable else { return false }
+        guard gorunur(e) else { return false }
         e.tap()
         usleep(700_000)
         guard app.state == .runningForeground else {
