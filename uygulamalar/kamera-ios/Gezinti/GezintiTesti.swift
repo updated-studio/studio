@@ -33,22 +33,22 @@ final class GezintiTesti: XCTestCase {
 
     func testTumEkranlar() {
         ekran("ana-ekran")
-        XCTAssertTrue(app.buttons["FOTO"].waitForExistence(timeout: 5), "Kamera ekranı açılmadı (mod düğmeleri yok)")
+        XCTAssertTrue(dugme("FOTO").waitForExistence(timeout: 5), "Kamera ekranı açılmadı (mod düğmeleri yok)")
         // Modlar
-        for mod in ["FOTO", "VİDEO", "PORTRE", "PRO", "TİMELAPSE", "FOTO"] {
-            dokun(app.buttons[mod], "mod-\(mod)")
+        for mod in ["FOTO", "VİDEO", "PORTRE", "PRO", "TIMELAPSE", "FOTO"] {
+            dokun(dugme(mod), "mod-\(mod)")
             if mod == "PRO" { panelleriGez(on: "pro") }
         }
         panelleriGez(on: "foto")
-        dokun(app.buttons["VİDEO"], "video")
+        dokun(dugme("VİDEO"), "video")
         panelleriGez(on: "video")
-        dokun(app.buttons["FOTO"], "foto-geri")
+        dokun(dugme("FOTO"), "foto-geri")
         // Vlog modu (simülatörde iki kamera yok; ekran ve çıktı seçimi gezilir, alt şeritten FOTO'ya dönülür)
-        if dokun(app.buttons["VLOG"], "vlog") {
+        if dokun(dugme("VLOG"), "vlog") {
             sleep(2)
             dokun(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Vlog çıktısı'")).firstMatch, "vlog-cikti")
             dokun(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Vlog çıktısı'")).firstMatch, "vlog-cikti-geri")
-            dokun(app.buttons["FOTO"].firstMatch, "vlog-foto")
+            dokun(dugme("FOTO"), "vlog-foto")
             sleep(2)
         }
         // Yan tutuş
@@ -59,8 +59,8 @@ final class GezintiTesti: XCTestCase {
         sleep(2); ekran("dikey-geri")
         ayarlariGez()
         // Monitör (en sonda; kamera ekranından çıkar)
-        if dokun(app.buttons["Monitör (harici kamera)"].firstMatch, "monitor") {
-            for ad in adlar().prefix(12) where !atla.contains(ad) { dokun(app.buttons[ad].firstMatch, "monitor-\(ad)"); kapat() }
+        if dokun(dugme("Monitör (harici kamera)"), "monitor") {
+            for ad in adlar().prefix(12) where !atla.contains(ad) { dokun(dugme(ad), "monitor-\(ad)"); kapat() }
         }
         XCTAssertEqual(app.state, .runningForeground, "Uygulama gezinti sonunda açık değil")
     }
@@ -69,34 +69,40 @@ final class GezintiTesti: XCTestCase {
     private func panelleriGez(on: String, sinir: Int = 99) {
         let ana = adlar()
         for ad in ana.prefix(sinir) where !atla.contains(ad) && !Self.modlar.contains(ad) && ad != "Kapat" && !ad.hasPrefix("Fotoğraf çek") && !ad.hasPrefix("Kayd") {
-            guard dokun(app.buttons[ad].firstMatch, "\(on)-\(ad)") else { continue }
+            guard dokun(dugme(ad), "\(on)-\(ad)") else { continue }
             let ic = adlar().filter { !ana.contains($0) && !atla.contains($0) && $0 != "Kapat" }
-            for alt in ic.prefix(14) { dokun(app.buttons[alt].firstMatch, "\(on)-\(ad)-\(alt)") }
+            for alt in ic.prefix(14) { dokun(dugme(alt), "\(on)-\(ad)-\(alt)") }
             kapat()
         }
         // Deklanşör en sonda (simülatörde kamera yok; çökmemeli)
-        if app.buttons["Fotoğraf çek"].exists { dokun(app.buttons["Fotoğraf çek"], "\(on)-deklansor") }
-        if app.buttons["Kaydı başlat"].exists {
-            dokun(app.buttons["Kaydı başlat"], "\(on)-kayit")
+        if dugme("Fotoğraf çek").exists { dokun(dugme("Fotoğraf çek"), "\(on)-deklansor") }
+        if dugme("Kaydı başlat").exists {
+            dokun(dugme("Kaydı başlat"), "\(on)-kayit")
             sleep(2)
-            if app.buttons["Kaydı durdur"].exists { dokun(app.buttons["Kaydı durdur"], "\(on)-kayit-dur") }
+            if dugme("Kaydı durdur").exists { dokun(dugme("Kaydı durdur"), "\(on)-kayit-dur") }
         }
     }
 
     private func ayarlariGez() {
-        let ayar = ["Ayarlar", "Genel Ayarlar"].map { app.buttons[$0].firstMatch }.first { $0.exists }
+        let ayar = ["Ayarlar", "Genel Ayarlar"].map { dugme($0) }.first { $0.exists }
         guard let ayar, dokun(ayar, "ayarlar") else { kaydet("Ayarlar düğmesi bulunamadı"); return }
         let baglantilar = app.buttons.allElementsBoundByIndex.filter { gorunur($0) }.map(\.label).filter { !$0.isEmpty }
         for ad in baglantilar.prefix(30) where !atla.contains(ad) {
-            guard dokun(app.buttons[ad].firstMatch, "ayar-\(ad)") else { continue }
+            guard dokun(dugme(ad), "ayar-\(ad)") else { continue }
             if app.navigationBars.buttons.firstMatch.exists, app.navigationBars.count > 0, app.navigationBars.buttons.element(boundBy: 0).isHittable {
                 app.navigationBars.buttons.element(boundBy: 0).tap(); sleep(1)
             }
         }
-        for ad in ["Bitti", "Kapat", "Done"] where app.buttons[ad].exists { app.buttons[ad].firstMatch.tap(); break }
+        for ad in ["Bitti", "Kapat", "Done"] where dugme(ad).exists { dugme(ad).tap(); break }
     }
 
-    static let modlar: Set<String> = ["FOTO", "VİDEO", "PORTRE", "PRO", "TİMELAPSE", "MONİTÖR", "VLOG"]
+    static let modlar: Set<String> = ["FOTO", "VİDEO", "PORTRE", "PRO", "TİMELAPSE", "TIMELAPSE", "MONİTÖR", "VLOG"]
+
+    /// Aynı adlı düğmelerden ekranda görüneni (Vlog'un kendi mod şeridi ana ekranınkinin üstünde; tek eşleşme beklemek hata veriyordu)
+    private func dugme(_ ad: String) -> XCUIElement {
+        let hepsi = app.buttons.matching(NSPredicate(format: "label == %@", ad)).allElementsBoundByIndex
+        return hepsi.last { gorunur($0) } ?? app.buttons.matching(NSPredicate(format: "label == %@", ad)).firstMatch
+    }
 
     /// Ekranda ve dokunulabilir mi (kaydırmalı şeritte kenarda kalan düğmenin isHittable'ı hata veriyordu)
     private func gorunur(_ e: XCUIElement) -> Bool {
@@ -128,7 +134,7 @@ final class GezintiTesti: XCTestCase {
     }
 
     private func kapat() {
-        if app.buttons["Kapat"].firstMatch.exists, app.buttons["Kapat"].firstMatch.isHittable { app.buttons["Kapat"].firstMatch.tap() }
+        if dugme("Kapat").exists, dugme("Kapat").isHittable { dugme("Kapat").tap() }
         else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap() }
         usleep(400_000)
     }
