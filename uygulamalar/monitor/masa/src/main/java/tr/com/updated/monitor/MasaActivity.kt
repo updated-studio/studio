@@ -655,23 +655,29 @@ class MasaActivity : Activity() {
         }
     }
 
+    /** Kaynak ekle ekranı (KaynakEkle.kt; iOS KaynakEkleSayfasi ile aynı) */
     private fun kaynakMenu() {
-        val secenekler = ArrayList<Pair<String, () -> Unit>>()
-        bulunan.forEach { (ad, a) -> secenekler.add("Wi-Fi kamera: $ad" to { wifiEkle(ad, a.first, a.second) }) }
-        UvcKaynak.aygitlar(this).filter { d -> kaynaklar.none { it is UvcKaynak && it.aygit.deviceName == d.deviceName } }
-            .forEach { d -> secenekler.add("USB: ${d.productName ?: d.manufacturerName ?: "görüntü aygıtı"}" to { usbEkle(d) }) }
-        // Bu telefonun kameraları (harici USB kamera Camera2'den değil, UVC'den eklenir)
-        runCatching { kameralar(this) }.getOrDefault(emptyList()).filter { !it.second.startsWith("USB") }.take(3)
-            .filter { (id, _) -> kaynaklar.none { it is KameraKaynak && it.id == id } }
-            .forEach { (id, ad) -> secenekler.add("Bu cihaz: $ad" to { telefonKamerasiEkle(id, ad) }) }
-        if (kaynaklar.none { it is LunaKaynak }) secenekler.add("Insta360 Luna (kameranın Wi-Fi'ı)" to { lunaEkle() })
-        secenekler.add("Kamera bağla (DJI, Insta360, GoPro… canlı yayınla)" to { kameraBagla() })
-        secenekler.add("Adresle bağlan (ör. 192.168.1.20)" to { adresSor() })
-        AlertDialog.Builder(this).setTitle("Kaynak ekle")
-            .setMessage(if (bulunan.isEmpty()) "Wi-Fi kamerası: öteki telefonda UPDATED Kamera → Ayarlar → \"Wi-Fi kamera ol\". Aynı Wi-Fi'da olunca burada kendiliğinden görünür.\nUSB: makineyi \"USB yayını\" moduna alıp tak." else null)
-            .setItems(secenekler.map { it.first }.toTypedArray()) { _, i -> secenekler[i].second() }
-            .setNegativeButton("Kapat", null).show()
+        val kameralar = runCatching { kameralar(this) }.getOrDefault(emptyList()).filter { !it.second.startsWith("USB") }.mapNotNull { (id, ad) ->
+            val on = runCatching { getSystemService(android.hardware.camera2.CameraManager::class.java).getCameraCharacteristics(id)
+                .get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) == android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT }.getOrDefault(false)
+            Triple(id, ad, on) }.let { l -> listOfNotNull(l.firstOrNull { !it.third }, l.firstOrNull { it.third }) }
+        KaynakEkle(this, kok, KaynakEkle.Veri(
+            telefonKameralari = kameralar,
+            ekliKamera = { id -> kaynaklar.any { it is KameraKaynak && it.id == id } },
+            wifiBagli = kaynaklar.count { it is WifiKameraKaynak },
+            bulunan = bulunan.keys.toList(),
+            rtmpAdresi = { ad -> "rtmp://${ipAdresi() ?: "<bu cihazın IP'si>"}:${Rtmp.KAPI}/${Rtmp.UYGULAMA}/$ad" },
+            kameraEkle = { id, ad -> telefonKamerasiEkle(id, ad) },
+            wifiEkle = { ad -> bulunan[ad]?.let { (a, k) -> wifiEkle(ad, a, k) } },
+            adresleEkle = { t -> val (a, k) = t.split(":").let { it[0] to (it.getOrNull(1)?.toIntOrNull() ?: AgYayin.KAPI) }; wifiEkle(a, a, k) },
+            usbAra = { val l = UvcKaynak.aygitlar(this).filter { d -> kaynaklar.none { it is UvcKaynak && it.aygit.deviceName == d.deviceName } }
+                if (l.isEmpty()) tost("USB görüntü aygıtı bulunamadı. Kamerayı web kamerası / USB yayını moduna al ve tak.") else l.forEach { usbEkle(it) } },
+            lunaEkle = { lunaEkle() },
+            kopyala = { m -> getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("RTMP", m)); tost("Kopyalandı: $m") },
+        )).also { kaynakSayfasi = it }.ac(ustPay, altPay)
     }
+    private var kaynakSayfasi: KaynakEkle? = null
+    @Deprecated("onBackPressed") override fun onBackPressed() { kaynakSayfasi?.takeIf { it.acik }?.let { it.kapat(); return }; @Suppress("DEPRECATION") super.onBackPressed() }
 
     /** Luna: telefon kameranın Wi-Fi'ına bağlıyken doğrudan kaynak (Insta360 uygulaması kapalı olmalı; kamera tek bağlantı kabul eder) */
     private fun lunaEkle() {

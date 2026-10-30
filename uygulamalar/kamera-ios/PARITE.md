@@ -99,6 +99,7 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | **Kamera'da Masa/Monitör yok** (Fatih 30 Ekim "Kaldır"): açılış sorusu, MONİTÖR modu, Monitör kısayolları, "Bu telefonu Multi Cam yap" kalktı; eski "giris" ayarı yok sayılır. Wi-Fi kamera olma, ekranı Multi Cam'e gönderme ve Vlog Kamera'da kalır | ✓ | ✓ | Android: :app artık :masa içermez, USB takılınca Monitör açılmaz |
 | **UpCam Studio açılışı "A · Sahne":** ışık lekeli koyu zemin, ortada simge + UPCAM STUDIO, alt yarıda Monitör (üstte) ve Multi Cam kartları, "Son kullanılan" (studio.son); tablette ortada 520 dp sütun | ✓ | ✓ | Android StudioGiris |
 | **Multi Cam telefon düzeni "Ninja":** üstte 46 dp şerit, hücreler KAYIT · CANLI · GEÇİŞ (sarı) · DÜZEN · PROGRAM · SSD/TELEFON · SES (iki çubuk), dokununca o ayar; altta kaynaklar (dokun sıradaki, yeniden dokun AUTO, basılı tut menü) + "+", sağda CUT · AUTO · KATMAN · MENÜ, REC; dikeyde hücreler 2 satır, kaynaklar 2×2. Tablet ATEM düzeni aynı | ✓ | ✓ | Android MasaActivity.ninjaDuzen |
+| **Kaynak ekle ekranı** (iOS KaynakEkleSayfasi ile aynı bölümler/metinler): BU CİHAZ (arka/ön), AKSİYON VE 360 (Luna · Ace Pro 2/GO Ultra · Osmo Pocket 4/4P/Action · GoPro; marka → adım adım rehber), DİĞER (Wi-Fi telefon, adresle ekle, USB Ara). Android'de Ace/Osmo/GoPro'ya ek RTMP yolu: rehberde canlı yayın adresi + Kopyala | ✓ | ✓ | Android KaynakEkle.kt; iOS'ta RTMP yok |
 
 ## Uygulama
 

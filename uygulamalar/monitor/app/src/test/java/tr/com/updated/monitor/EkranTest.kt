@@ -91,6 +91,18 @@ class EkranTest {
         }
     }
 
+    /** Multi Cam → Kaynak ekle: liste ve bir marka rehberi (telefon dikey) */
+    @Test fun kaynakEkle() {
+        RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
+        Robolectric.buildActivity(MasaActivity::class.java).setup().use { c ->
+            val a = c.get(); MasaActivity::class.java.getDeclaredMethod("kaynakMenu").apply { isAccessible = true }.invoke(a)
+            kaydet(a, "studio-kaynak-ekle")
+            val sayfa = MasaActivity::class.java.getDeclaredField("kaynakSayfasi").apply { isAccessible = true }.get(a) as KaynakEkle
+            KaynakEkle::class.java.getDeclaredMethod("rehber", KaynakEkle.Harici::class.java).apply { isAccessible = true }.invoke(sayfa, KaynakEkle.HEPSI[2])
+            kaydet(a, "studio-kaynak-rehber")
+        }
+    }
+
     /** UpCam Studio açılışı (telefon dikey, tablet) */
     @Test fun studioGiris() {
         RuntimeEnvironment.setQualifiers(nitelik(boyutlar[1].second, false))
