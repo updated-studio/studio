@@ -176,32 +176,42 @@ object StilGom {
 
     /**
      * Videoya LUT işler (kayıttan sonra yeniden kodlar, Media3 Transformer): `uri`deki dosya geçici dosyaya işlenir, sonra üstüne yazılır.
-     * Ana iş parçacığından çağrılır; `bitti(başarılı)` ana iş parçacığında.
+     * `looper` iş parçacığında çalışır (VideoIsleme hizmeti); `ilerleme` (0–100) ve `bitti(başarılı)` o iş parçacığında. Başlamazsa null.
      */
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-    fun video(ctx: Context, uri: Uri, lut: Lut, hevc: Boolean, bitti: (Boolean) -> Unit) {
+    fun video(ctx: Context, uri: Uri, lut: Lut, hevc: Boolean, looper: android.os.Looper, ilerleme: (Int) -> Unit = {}, bitti: (Boolean) -> Unit): androidx.media3.transformer.Transformer? {
         val n = lut.boyut
         val kup = Array(n) { r -> Array(n) { g -> IntArray(n) { b ->
             val i = ((b * n + g) * n + r) * 3
             Color.rgb((lut.veri[i] * 255 + 0.5f).toInt(), (lut.veri[i + 1] * 255 + 0.5f).toInt(), (lut.veri[i + 2] * 255 + 0.5f).toInt())
         } } }
         val gecici = File(ctx.cacheDir, "stil-${System.currentTimeMillis()}.mp4")
-        try {
+        val h = android.os.Handler(looper)
+        return try {
             val etki = androidx.media3.effect.SingleColorLut.createFromCube(kup)
             val oge = androidx.media3.transformer.EditedMediaItem.Builder(androidx.media3.common.MediaItem.fromUri(uri))
                 .setEffects(androidx.media3.transformer.Effects(emptyList(), listOf(etki))).build()
-            val t = androidx.media3.transformer.Transformer.Builder(ctx)
+            var bitmedi = true
+            val t = androidx.media3.transformer.Transformer.Builder(ctx).setLooper(looper)
                 .setVideoMimeType(if (hevc) androidx.media3.common.MimeTypes.VIDEO_H265 else androidx.media3.common.MimeTypes.VIDEO_H264)
                 .addListener(object : androidx.media3.transformer.Transformer.Listener {
                     override fun onCompleted(c: androidx.media3.transformer.Composition, s: androidx.media3.transformer.ExportResult) {
-                        val ok = runCatching { ctx.contentResolver.openOutputStream(uri, "wt")!!.use { o -> gecici.inputStream().use { it.copyTo(o) } } }.isSuccess
+                        bitmedi = false
+                        val ok = runCatching { ctx.contentResolver.openOutputStream(uri, "wt")!!.use { o -> gecici.inputStream().use { it.copyTo(o, 1 shl 20) } } }.isSuccess
                         gecici.delete(); bitti(ok)
                     }
                     override fun onError(c: androidx.media3.transformer.Composition, s: androidx.media3.transformer.ExportResult, e: androidx.media3.transformer.ExportException) {
-                        HataKaydi.not("stil", e.stackTraceToString()); gecici.delete(); bitti(false)
+                        bitmedi = false; HataKaydi.not("stil", e.stackTraceToString()); gecici.delete(); bitti(false)
                     }
                 }).build()
-            t.start(oge, gecici.absolutePath)
-        } catch (e: Exception) { HataKaydi.not("stil", e.stackTraceToString()); gecici.delete(); bitti(false) }
+            h.post { t.start(oge, gecici.absolutePath) }
+            val tutucu = androidx.media3.transformer.ProgressHolder()
+            h.post(object : Runnable { override fun run() {
+                if (!bitmedi) return
+                if (t.getProgress(tutucu) == androidx.media3.transformer.Transformer.PROGRESS_STATE_AVAILABLE) ilerleme(tutucu.progress)
+                h.postDelayed(this, 500)
+            } })
+            t
+        } catch (e: Exception) { HataKaydi.not("stil", e.stackTraceToString()); gecici.delete(); null }
     }
 }

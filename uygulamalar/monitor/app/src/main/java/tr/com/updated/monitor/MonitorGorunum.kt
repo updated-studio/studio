@@ -49,6 +49,8 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
 
     /** Kayıt: her yeni kare araçsız (LUT, odak, zebra, kılavuz yok) bu yüzeye de çizilir; null = kayıt yok */
     @Volatile var kayitYuzeyi: Surface? = null
+    /** Kayda ekrandaki stil/LUT da işlensin (Kamera'da LUT'lu video çekimi; araçlar yine kayda girmez) */
+    @Volatile var kayitLutlu = false
     /** Timelapse: kayda yalnız her `kayitAraligiNs`'de bir kare girer, zaman damgası kare sırasından (Timelapse.kt); 0 = her kare, gerçek saat */
     @Volatile var kayitAraligiNs = 0L
     /** Bu kayıtta kodlayıcıya giden kare sayısı (yeni kayıt yüzeyinde sıfırlanır) */
@@ -307,7 +309,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             val h = IntArray(1).also { android.opengl.EGL14.eglQuerySurface(dpy, es, android.opengl.EGL14.EGL_HEIGHT, it, 0) }[0]
             val (kw, kh) = kayitBoyutu()
             GLES30.glViewport(0, 0, w, h); GLES30.glClearColor(0f, 0f, 0f, 1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-            ciz(0, 0, w, h, kw.toFloat(), kh.toFloat(), ham = true, olcum = true, sigdir = true)
+            ciz(0, 0, w, h, kw.toFloat(), kh.toFloat(), ham = true, olcum = true, sigdir = true, lutla = kayitLutlu)
             android.opengl.EGLExt.eglPresentationTimeANDROID(dpy, es, if (aralik > 0) kayitIlkNs + Timelapse.kareZamaniNs(kayitKareSayisi) else simdi)
             android.opengl.EGL14.eglSwapBuffers(dpy, es)
             kayitKareSayisi++
@@ -316,7 +318,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
         }
 
         /** Görüntüyü (kw:kh oranıyla) verilen alana sığdırarak çizer; ham = araçsız, olcum = kılavuz/vurgu yok */
-        private fun ciz(x: Int, y: Int, w: Int, h: Int, kw: Float, kh: Float, ham: Boolean, olcum: Boolean = false, tam: Boolean = false, sigdir: Boolean = false) {
+        private fun ciz(x: Int, y: Int, w: Int, h: Int, kw: Float, kh: Float, ham: Boolean, olcum: Boolean = false, tam: Boolean = false, sigdir: Boolean = false, lutla: Boolean = false) {
             var vx = x; var vy = y; var vw = w; var vh = h
             if (!tam) {
                 val oran = kw / kh
@@ -330,7 +332,7 @@ class MonitorGorunum(context: Context) : GLSurfaceView(context) {
             GLES30.glActiveTexture(GLES30.GL_TEXTURE1); GLES30.glBindTexture(GLES30.GL_TEXTURE_3D, lutTex); GLES30.glUniform1i(u("uLut"), 1)
             GLES30.glUniformMatrix4fv(u("uTexMat"), 1, false, texMat, 0)
             GLES30.glUniform1f(u("uLutBoyut"), lutBoyut.toFloat())
-            GLES30.glUniform1i(u("uLutAcik"), if (!ham && a.lutAcik) 1 else 0)
+            GLES30.glUniform1i(u("uLutAcik"), if ((!ham || lutla) && a.lutAcik) 1 else 0)
             GLES30.glUniform1i(u("uPeaking"), if (!ham && !sade && a.peaking) 1 else 0)
             GLES30.glUniform1f(u("uPeakEsik"), a.peakEsik)
             GLES30.glUniform3fv(u("uPeakRenk"), 1, PEAK_RENKLERI[a.peakRenk], 0)

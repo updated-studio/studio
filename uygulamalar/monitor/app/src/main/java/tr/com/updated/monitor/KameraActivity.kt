@@ -163,7 +163,9 @@ class KameraActivity : Activity() {
     // Timelapse (Timelapse.kt): kare aralığı, çekim süresi sınırı (dk, 0 = sınırsız), pozlama kilidi
     private var tlAralik = 2000L; private var tlSure = 0; private var tlPozSabit = true
     private var tlKaydedici: Kaydedici? = null; private var tlUri: Uri? = null
-    private fun kayitSuruyor() = kaynak?.kayitta == true || tlKaydedici != null
+    private fun kayitSuruyor() = kaynak?.kayitta == true || tlKaydedici != null || lutKaydedici != null
+    /** LUT'lu video çekimi: kamera → GPU (stil/LUT) → kodlayıcı; kayıttan sonra işleme beklemesi yok */
+    private var lutKaydedici: Kaydedici? = null
     /** Wi-Fi kamera (MasaActivity'ye görüntü gönderir; AgYayin.kt). Açıkken ekrandaki görüntü kodlayıcıya da çizilir */
     private var verici: YayinVerici? = null
     private var wifiKamera = false
@@ -1865,7 +1867,7 @@ class KameraActivity : Activity() {
                 Grup.KAYIT -> {
                     if (k != null) bicimAc()
                     if (k != null && mod == KMod.VIDEO) {
-                        val kayitta = k.kayitta
+                        val kayitta = kayitSuruyor()
                         fun f(is_: () -> Unit): (() -> Unit)? = if (kayitta) null else ({ is_(); grupAc(Grup.KAYIT) })
                         cipSatiri(ic, "KODEK", listOf(Triple("HEVC", ayar.hevc || ayar.renk == 1, f { ayar.hevc = true; ayarKaydet() }),
                             Triple("H.264", !ayar.hevc && ayar.renk != 1, if (ayar.renk == 1) null else f { ayar.hevc = false; ayarKaydet() }), Triple("ProRes", false, null)))
@@ -2239,14 +2241,15 @@ class KameraActivity : Activity() {
     }
 
     private fun videoDugmesi(k: KameraKaynak) {
+        lutKaydedici?.let { y -> lutKayitBitir(y); return }
         if (k.kayitta) {
             k.kayitDurdur { ok -> runOnUiThread {
                 val l = kayitLut
                 kayitUri?.let { u ->
                     fun bitir() { contentResolver.update(u, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null); if (ok) { sonUri = u; sonMime = "video/mp4"; kucukResim(u) } else contentResolver.delete(u, null, null) }
-                    // Stil kayıttan sonra videoya işlenir (HDR'de değil; LUT SDR için)
-                    if (ok && l != null && ayar.renk != 1) { tost("Stil videoya işleniyor…")
-                        StilGom.video(this, u, l, ayar.hevc) { iyi -> runOnUiThread { bitir(); tost(if (iyi) "Stil videoya işlendi." else "Stil işlenemedi; video özgün renkte kaydedildi.") } }
+                    // Stil kayıttan sonra videoya işlenir (HDR'de değil; LUT SDR için); ön plan hizmetinde, ekrandan çıkılsa da biter
+                    if (ok && l != null && ayar.renk != 1) { tost("Stil videoya işleniyor; ekrandan çıkabilirsin, bildirimde ilerler.")
+                        VideoIsleme.ekle(applicationContext, VideoIsleme.Is(u, l, ayar.hevc))
                     } else bitir()
                 }
                 kayitUri = null; deklansorDugme.kayitta = false; kayitCip.visibility = View.GONE; bilgiCiz()
@@ -2263,6 +2266,41 @@ class KameraActivity : Activity() {
         kayitUri = uri
         val b = k.secilenBoyut(); val fps = ayar.fps?.upper ?: 30
         val mbps = when { b.height >= 2160 -> 50; b.height >= 1080 -> if (fps > 30) 30 else 20; else -> 12 }
+        // Stil/LUT varsa (HDR değil, Wi-Fi kamera değil) çekerken uygulanır: kayıttan sonra işleme beklemesi olmaz
+        if (kayitLut != null && ayar.renk != 1 && verici == null) {
+            val (w, h) = monitor.kayitBoyutu()
+            val y = runCatching { Kaydedici(this, fd, w, h, fps, mbps, ayar.hevc, sesIste = true, yon = fizikselYon).also { it.baslat() } }
+                .getOrElse { e -> HataKaydi.not("kayit", e.stackTraceToString()); null }
+            if (y != null) {
+                lutKaydedici = y; monitor.kayitLutlu = true; monitor.kayitYuzeyi = y.yuzey; monitor.yenile()
+                if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.START_VIDEO_RECORDING) }
+                kayitBas = System.currentTimeMillis(); deklansorDugme.kayitta = true; kayitCip.text = zamanKodu(0); kayitCip.visibility = View.VISIBLE; bilgiSira.visibility = View.INVISIBLE; favSira.visibility = View.INVISIBLE; oneriCip.visibility = View.GONE
+                return
+            }
+            // GPU kaydı açılamadı: kamera kaydı + kayıttan sonra işleme
+            runCatching { fd.close() }
+            val fd2 = contentResolver.openFileDescriptor(uri, "w") ?: return tost("Kayıt dosyası açılamadı.")
+            return normalKayit(k, uri, fd2, mbps)
+        }
+        normalKayit(k, uri, fd, mbps)
+    }
+
+    private fun lutKayitBitir(y: Kaydedici) {
+        lutKaydedici = null; monitor.kayitLutlu = false; monitor.kayitYuzeyi = verici?.yuzey; monitor.yenile()
+        val u = kayitUri; kayitUri = null; deklansorDugme.kayitta = false; kayitCip.visibility = View.GONE; bilgiCiz()
+        if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.STOP_VIDEO_RECORDING) }
+        Thread {
+            Thread.sleep(150)
+            val ok = runCatching { y.bitir() }.getOrDefault(false)
+            runOnUiThread {
+                if (u == null) return@runOnUiThread
+                if (ok) { contentResolver.update(u, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null); sonUri = u; sonMime = "video/mp4"; kucukResim(u) }
+                else { contentResolver.delete(u, null, null); tost("Kayıt kaydedilemedi (çok kısa olabilir).") }
+            }
+        }.start()
+    }
+
+    private fun normalKayit(k: KameraKaynak, uri: Uri, fd: android.os.ParcelFileDescriptor, mbps: Int) {
         k.kayitBasla(fd, ayar.hevc, mbps, true) { hata -> runOnUiThread {
             if (hata != null) { tost("Kayıt başlamadı: $hata"); contentResolver.delete(uri, null, null); kayitUri = null; return@runOnUiThread }
             kayitBas = System.currentTimeMillis(); deklansorDugme.kayitta = true; kayitCip.text = zamanKodu(0); kayitCip.visibility = View.VISIBLE; bilgiSira.visibility = View.INVISIBLE; favSira.visibility = View.INVISIBLE; oneriCip.visibility = View.GONE
@@ -2364,7 +2402,7 @@ class KameraActivity : Activity() {
     private var sonSaniye = -1L
     private fun tik() {
         val k = kaynak
-        if (k?.kayitta == true) { val ms = System.currentTimeMillis() - kayitBas; kayitCip.text = zamanKodu(ms) }
+        if (k?.kayitta == true || lutKaydedici != null) { val ms = System.currentTimeMillis() - kayitBas; kayitCip.text = zamanKodu(ms) }
         tlKaydedici?.let { y ->
             // Timelapse: geçen süre · çıkacak video süresi; süre sınırı dolunca biter
             val ms = System.currentTimeMillis() - kayitBas
@@ -2508,12 +2546,15 @@ class KameraActivity : Activity() {
         if (yonDinle.canDetectOrientation()) yonDinle.enable()
         if (acilir == null) modlariCiz()
         kameraAc(); yayinAyarla()
+        // İşlenen video bitince son çekim küçük resmi güncellenir; önceki oturumdan yarım kalan varsa özgün renkte kurtarılır
+        VideoIsleme.bitti = { u, iyi -> sonUri = u; sonMime = "video/mp4"; kucukResim(u); tost(if (iyi) "Stil videoya işlendi." else "Stil işlenemedi; video özgün renkte kaydedildi.") }
+        VideoIsleme.artiklariKurtar(applicationContext)
     }
     override fun onPause() {
-        super.onPause(); onde = false; yonDinle.disable(); sensorler.unregisterListener(yercekimDinle)
+        super.onPause(); onde = false; yonDinle.disable(); sensorler.unregisterListener(yercekimDinle); VideoIsleme.bitti = null
         geriSayiliyor = false; seriSuruyor = false; ortaYazi.visibility = View.GONE
         if (monitor.birlestiriyor) monitor.birlestirmeIptal()
-        kaynak?.let { k -> if (k.kayitta) videoDugmesi(k) }
+        kaynak?.let { k -> if (k.kayitta || lutKaydedici != null) videoDugmesi(k) }
         tlKaydedici?.let { timelapseBitir(it) } // alta alınınca kamera kapanır: o ana kadarki kareler kaydedilir
         yayinAyarla() // onde = false: Wi-Fi kamera durur, geri gelince yeniden açılır
         dongu.postDelayed({ if (!onde) { kaynak?.durdur(); kaynak = null } }, if (kaynak?.kayitta == true) 600 else 0)

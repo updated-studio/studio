@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.external" android:required="false" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
@@ -57,5 +59,10 @@
             android:name=".EkranYayini"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+        <!-- Kayıttan sonra videoya stil (LUT) işleme: ekrandan çıkılsa da sürer -->
+        <service
+            android:name=".VideoIsleme"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|mediaProcessing" />
     </application>
 </manifest>
