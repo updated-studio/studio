@@ -19,9 +19,12 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BaseGlShaderProgram
 import androidx.media3.effect.GlEffect
 import androidx.media3.effect.GlShaderProgram
+import androidx.media3.effect.OverlaySettings
+import androidx.media3.effect.VideoCompositorSettings
 import androidx.media3.effect.SingleColorLut
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
@@ -62,9 +65,9 @@ object DuzenMotoru {
     }
 
     /** Düzenlenmiş dosyanın adı: "<özgün ad> düzenlendi.mp4" (özgün ad yoksa tarih) */
-    fun yeniAd(ozgun: String?): String {
+    fun yeniAd(ozgun: String?, ek: String = "düzenlendi"): String {
         val kok = ozgun?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: "UPDATED ${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}"
-        return "$kok düzenlendi.mp4"
+        return "$kok $ek.mp4"
     }
 
     @OptIn(UnstableApi::class)
@@ -108,12 +111,57 @@ object DuzenMotoru {
         } catch (e: Exception) { HataKaydi.not("duzen", e.stackTraceToString()); gecici.delete(); null }
     }
 
+    /** Vlog birleşik videosu: girdi 0 ön kamera (üstte çizilir), girdi 1 arka kamera (zemin; çıkış boyutu ve ses ondan) */
+    const val VLOG_PENCERE = 0.28f; const val VLOG_KENAR = 0.04f
+    @OptIn(UnstableApi::class)
+    class VlogDuzeni : VideoCompositorSettings {
+        @Volatile private var tuval = Size(1920, 1080); @Volatile private var pencere = Size(1280, 720)
+        override fun getOutputSize(boyutlar: List<Size>): Size { pencere = boyutlar[0]; tuval = boyutlar.getOrElse(1) { boyutlar[0] }; return tuval }
+        override fun getOverlaySettings(girdi: Int, us: Long): OverlaySettings {
+            if (girdi != 0) return OverlaySettings.Builder().build()
+            // Ön pencere: zemin genişliğinin %28'i, sağ alt köşede, kenarlardan genişliğin %4'ü kadar içeride
+            val o = VLOG_PENCERE * tuval.width / pencere.width
+            return OverlaySettings.Builder().setScale(o, o).setOverlayFrameAnchor(1f, -1f)
+                .setBackgroundFrameAnchor(1f - 2 * VLOG_KENAR, -1f + 2 * VLOG_KENAR * tuval.width / tuval.height).build()
+        }
+    }
+
+    /** Vlog: arka ve ön kamera dosyalarından birleşik video ("<ad> vlog.mp4"); iki özgün dosya kalır. `disaAktar` gibi çalışır */
+    @OptIn(UnstableApi::class)
+    fun vlogBirlestir(ctx: Context, arka: Uri, on: Uri, hevc: Boolean, looper: Looper, ilerleme: (Int) -> Unit = {}, bitti: (Uri?) -> Unit): Transformer? {
+        val gecici = File(ctx.cacheDir, "vlog-${System.currentTimeMillis()}.mp4")
+        val h = Handler(looper)
+        return try {
+            val c = Composition.Builder(
+                EditedMediaItemSequence(EditedMediaItem.Builder(MediaItem.fromUri(on)).setRemoveAudio(true).build()),
+                EditedMediaItemSequence(EditedMediaItem.Builder(MediaItem.fromUri(arka)).build()))
+                .setVideoCompositorSettings(VlogDuzeni()).build()
+            var surer = true
+            val t = Transformer.Builder(ctx).setLooper(looper)
+                .setVideoMimeType(if (hevc) MimeTypes.VIDEO_H265 else MimeTypes.VIDEO_H264)
+                .addListener(object : Transformer.Listener {
+                    override fun onCompleted(c: Composition, s: ExportResult) { surer = false; bitti(yayinla(ctx, arka, gecici, "vlog")); gecici.delete() }
+                    override fun onError(c: Composition, s: ExportResult, e: ExportException) {
+                        surer = false; HataKaydi.not("vlog", e.stackTraceToString()); gecici.delete(); bitti(null)
+                    }
+                }).build()
+            h.post { t.start(c, gecici.absolutePath) }
+            val tutucu = ProgressHolder()
+            h.post(object : Runnable { override fun run() {
+                if (!surer) return
+                if (t.getProgress(tutucu) == Transformer.PROGRESS_STATE_AVAILABLE) ilerleme(tutucu.progress)
+                h.postDelayed(this, 500)
+            } })
+            t
+        } catch (e: Exception) { HataKaydi.not("vlog", e.stackTraceToString()); gecici.delete(); null }
+    }
+
     /** Geçici dosyayı galeriye yeni video olarak koyar (özgünün yanına); olmazsa null */
-    private fun yayinla(ctx: Context, ozgun: Uri, dosya: File): Uri? = runCatching {
+    private fun yayinla(ctx: Context, ozgun: Uri, dosya: File, ek: String = "düzenlendi"): Uri? = runCatching {
         val r = ctx.contentResolver
         val ad = runCatching { r.query(ozgun, arrayOf(MediaStore.Video.Media.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null } }.getOrNull()
         val v = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, yeniAd(ad)); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            put(MediaStore.Video.Media.DISPLAY_NAME, yeniAd(ad, ek)); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
             put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/UPDATED Kamera"); put(MediaStore.Video.Media.IS_PENDING, 1)
         }
         val u = r.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, v)!!

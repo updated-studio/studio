@@ -48,6 +48,7 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 | **Ton kaydırıcısı (beyaz denge):** Beyaz denge panelinde yeşil ↔ macenta renkli kaydırıcı, iki yanda − / + (±5), ortada sıfır çentiği, çift dokunuş sıfırlar, sağda "Y12 / M12 / 0" | ✓ | ✓ | Fatih 29 Ekim 16:53 |
 | **Kayıt başında oturuma dokunmama:** kodek, sabitleme, ses biçimi VİDEO moduna geçince ve ayar değişince uygulanır; kayıt başında yalnız değişen ayar yazılır | ✓ | — (Android: MediaRecorder kayıt yüzeyi için oturum kayıt başında yeniden kurulmak zorunda; stil kayıttan sonra tüm dosyaya işlendiği için video başında düz renk yok. Kalıcı giriş yüzeyine geçiş cihazda denenince) | video başı düz renk / donma şikâyeti |
 | Açılış ekranı (Kamera / Monitör / Masa) ve "Açılışta sor" | ✓ | ✓ | `GirisEkran`, UserDefaults "giris" (Android ile aynı anahtar) |
+| **Vlog (çift kamera):** VİDEO → KAYIT → VLOG "Ön + arka"; ön kamera sağ altta küçük aynalı pencere; kayıtta iki dosya (ön "<ad>_on.mp4", sessiz) + kayıttan sonra birleşik "<ad> vlog.mp4" (ön pencere genişliğin %28'i, kenardan %4; ses arka kayıttan); HDR'de birleşik yapılmaz; açıkken ana kamera en çok 1080p | ✓ | | Android 11+ ve eşzamanlı kamera desteği (concurrentCameraIds); Media3 çoklu dizi birleştirme |
 
 ## Monitör ekranı (Android: MainActivity + MonitorGorunum)
 
@@ -90,6 +91,9 @@ Gerçek cihazda henüz denenmedi (iOS): dönüş yönleri, USB kamera ile iki ka
 | **Masa adı "Multi Cam"** (ekran, bildirim, Wi-Fi durum yazıları); kayıt klasörü "UPDATED Masa/…" aynı kalır | ✓ | | 30 Ekim, Android Kamera 0.17.3 / Studio 0.2.0 |
 | **Kaynak: bu cihazın kendi kamerası** (USB ve Wi-Fi ile birlikte, aynı anda ISO kayıt; bir seferde tek telefon kamerası) | ✓ | | Android KameraKaynak, ekran dönüşüne göre döner |
 | **RTMP girişi (DJI Osmo/Pocket, Insta360 Ace/GO/Luna, GoPro "canlı yayın"):** adres `rtmp://<telefon-ip>:1935/canli/<kaynak-adı>`; H.264, H.265 (FLV kod 12 ve Enhanced RTMP hvc1); her yayın bir kaynak, yayın bitince kaynak düşer; ISO kaydı kameranın kendi sıkıştırılmış akışından (yeniden kodlamasız) | ✓ | | Android Rtmp.kt (+RtmpTest); "Kamera bağla" penceresi adresi gösterir/kopyalar |
+| **ATEM benzeri geçişler:** KES / MIX / DIP (siyaha) / WIPE (soldan sağa), süre 0,3–2 sn; tablette KES = kesme, AUTO = seçili geçiş; telefonda kaynağa dokunuş seçili geçişle; yalnız tek düzende (çoklu düzende kesme); program ekranında ve kayıtta aynı | ✓ | | Android MasaGorunum.gecis; klavye: boşluk KES, Enter AUTO, F FTB |
+| **Katmanlar:** FTB (programı siyaha indirir), LOGO (galeriden; sağ üst, yükseklik %10), ALT YAZI (ad + unvan; siyah %72 plaka, solda beyaz çizgi; sol alt, yükseklik %15); yumuşak açılıp kapanır, kayda girer | ✓ | | ayarlar: masa.gecis, masa.gecisSure, masa.logo, masa.altYazi1/2 |
+| **Düzen 5 = PiP:** canlı tam, önizlemedeki (yoksa ilk diğer) kaynak sağ altta, genişlik %28, kenar %4 (Vlog ile aynı ölçü) | ✓ | | masa.duzen değeri 5 |
 
 ## Uygulama
 

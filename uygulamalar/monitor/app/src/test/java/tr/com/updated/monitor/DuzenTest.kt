@@ -39,5 +39,6 @@ class DuzenTest {
     @Test fun yeniAd() {
         assertEquals("UPDATED 20261030-101500 düzenlendi.mp4", DuzenMotoru.yeniAd("UPDATED 20261030-101500.mp4"))
         assertTrue(DuzenMotoru.yeniAd(null).endsWith(" düzenlendi.mp4"))
+        assertEquals("UPDATED_20261030_101500 vlog.mp4", DuzenMotoru.yeniAd("UPDATED_20261030_101500.mp4", "vlog"))
     }
 }

@@ -72,6 +72,7 @@ class MasaActivity : Activity() {
     private lateinit var denetim: LinearLayout
     private lateinit var hizliYazi: TextView
     private val sonDokunus = LongArray(MasaGorunum.EN_COK)
+    private lateinit var gecisYazi: TextView
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
@@ -97,7 +98,13 @@ class MasaActivity : Activity() {
         if (tablet) ust.addView(hizliYazi, LinearLayout.LayoutParams(-2, dp(40f)).apply { marginEnd = dp(10f) })
         sure = etiket("", 15f).apply { typeface = mono; setPadding(dp(10f), 0, dp(10f), 0); background = Tema.kapsul(KIRMIZI, dp(12f).toFloat()); visibility = View.GONE }
         ust.addView(sure, LinearLayout.LayoutParams(-2, dp(30f)).apply { marginEnd = dp(10f) })
-        masa.duzen = tercih.getInt("masa.duzen", 1).coerceIn(0, 4)
+        masa.duzen = tercih.getInt("masa.duzen", 1).coerceIn(0, 5)
+        masa.gecisTuru = tercih.getInt("masa.gecis", 1).coerceIn(0, 3); masa.gecisSure = tercih.getInt("masa.gecisSure", 600)
+        katmanlariYukle()
+        gecisYazi = etiket("", 13f).apply { background = Tema.kapsul(Color.argb(40, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
+            contentDescription = "Geçiş ve katmanlar"; setOnClickListener { gecisMenu() } }
+        ust.addView(gecisYazi, LinearLayout.LayoutParams(-2, dp(34f)).apply { marginEnd = dp(8f) })
+        gecisGoster()
         duzenYazi = etiket("", 13f).apply { background = Tema.kapsul(Color.argb(40, 255, 255, 255), dp(14f).toFloat()); setPadding(dp(12f), 0, dp(12f), 0)
             contentDescription = "Program düzeni"; setOnClickListener { duzenMenu() } }
         ust.addView(duzenYazi, LinearLayout.LayoutParams(-2, dp(34f)).apply { marginEnd = dp(8f) })
@@ -234,6 +241,12 @@ class MasaActivity : Activity() {
         denetim.addView(etiket("KES", 20f, SIYAH_YAZI).apply { typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.06f; setShadowLayer(0f, 0f, 0f, 0)
             background = Tema.kapsul(if (kesVar) Color.WHITE else Color.argb(76, 255, 255, 255), dp(12f).toFloat()); contentDescription = "Önizlemeyi canlıya al"
             setOnClickListener { kes() } }, LinearLayout.LayoutParams(dp(120f), -1).apply { marginEnd = dp(12f) })
+        denetim.addView(etiket("AUTO", 18f, SIYAH_YAZI).apply { typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.06f; setShadowLayer(0f, 0f, 0f, 0)
+            background = Tema.kapsul(if (kesVar) Color.WHITE else Color.argb(76, 255, 255, 255), dp(12f).toFloat()); contentDescription = "Önizlemeyi geçişle canlıya al"
+            setOnClickListener { oto() } }, LinearLayout.LayoutParams(dp(100f), -1).apply { marginEnd = dp(12f) })
+        denetim.addView(etiket("FTB", 16f, if (masa.karart) Color.WHITE else GRI).apply { typeface = Typeface.DEFAULT_BOLD; setShadowLayer(0f, 0f, 0f, 0)
+            background = Tema.kapsul(if (masa.karart) KIRMIZI else Color.rgb(28, 28, 30), dp(12f).toFloat()); contentDescription = "Siyaha in"
+            setOnClickListener { masa.karart = !masa.karart; gecisGoster(); denetimCiz() } }, LinearLayout.LayoutParams(dp(76f), -1).apply { marginEnd = dp(12f) })
         denetim.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(14f), 0, dp(18f), 0)
             background = Tema.kapsul(Color.rgb(28, 28, 30), dp(12f).toFloat()); contentDescription = if (kaydedici != null) "Kaydı durdur" else "Kaydı başlat"; setOnClickListener { kayitDugmesi(); denetimCiz() }
             addView(KayitDugmesi(this@MasaActivity).apply { kayitta = kaydedici != null; isClickable = false }, LinearLayout.LayoutParams(dp(40f), dp(40f)))
@@ -251,14 +264,114 @@ class MasaActivity : Activity() {
     /** KES: önizlemedeki canlıya, canlıdaki önizlemeye (ATEM gibi) */
     private fun kes() {
         val s = masa.siradaki; if (s < 0 || !masa.dolu[s]) return
-        val eski = masa.canli; canliYap(s); masa.siradaki = if (masa.dolu[eski] && eski != s) eski else -1; duzen()
+        val eski = masa.canli; canliYap(s, 0); masa.siradaki = if (masa.dolu[eski] && eski != s) eski else -1; duzen()
+    }
+    /** AUTO: önizlemedekini seçili geçişle canlıya alır (seçili geçiş kesmeyse MIX) */
+    private fun oto() {
+        val s = masa.siradaki; if (s < 0 || !masa.dolu[s]) return
+        val eski = masa.canli; canliYap(s, masa.gecisTuru.takeIf { it != 0 } ?: 1); masa.siradaki = if (masa.dolu[eski] && eski != s) eski else -1; duzen()
     }
 
-    /** Tablet klavyesi: 1–4 kaynak, boşluk KES, R kayıt */
+    /* ================= geçiş ve katmanlar ================= */
+    private val GECISLER = listOf("KES", "MIX", "DIP", "WIPE")
+    private fun gecisGoster() {
+        val ek = buildList { if (masa.karart) add("FTB"); if (masa.logoAcik) add("LOGO"); if (masa.altYaziAcik) add("ALT YAZI") }
+        gecisYazi.text = GECISLER[masa.gecisTuru] + (if (masa.gecisTuru != 0) " %.1f".format(Locale("tr"), masa.gecisSure / 1000f) else "") + ek.joinToString("") { " · $it" }
+        gecisYazi.setTextColor(if (masa.karart) KIRMIZI else Color.WHITE)
+    }
+
+    /** Geçiş türü ve süresi; katmanlar: FTB (siyaha in), logo, alt yazı. Hepsi program ekranında ve kayıtta */
+    private fun gecisMenu() {
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20f), dp(8f), dp(20f), dp(4f)) }
+        fun baslik(m: String) = p.addView(etiket(m, 11f, GRI).apply { gravity = Gravity.START; letterSpacing = 0.12f; setShadowLayer(0f, 0f, 0f, 0); setPadding(0, dp(14f), 0, dp(6f)) })
+        fun sira(l: List<Pair<String, Boolean>>, sec: (Int) -> Unit) = p.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL
+            l.forEachIndexed { i, (ad, secili) -> addView(etiket(ad, 13f, if (secili) SIYAH_YAZI else Color.WHITE).apply { setShadowLayer(0f, 0f, 0f, 0)
+                background = Tema.kapsul(if (secili) Color.WHITE else Color.argb(40, 255, 255, 255), dp(10f).toFloat()); setOnClickListener { sec(i) } },
+                LinearLayout.LayoutParams(0, dp(38f), 1f).apply { if (i > 0) marginStart = dp(6f) }) } })
+        lateinit var ciz: () -> Unit
+        ciz = {
+            p.removeAllViews()
+            baslik("GEÇİŞ")
+            sira(GECISLER.mapIndexed { i, a -> a to (masa.gecisTuru == i) }) { masa.gecisTuru = it; tercih.edit().putInt("masa.gecis", it).apply(); gecisGoster(); ciz() }
+            if (masa.gecisTuru != 0 || masa.karart) {
+                baslik("SÜRE")
+                val sureler = listOf(300, 600, 1000, 2000)
+                sira(sureler.map { "%.1f sn".format(Locale("tr"), it / 1000f) to (masa.gecisSure == it) }) { masa.gecisSure = sureler[it]; tercih.edit().putInt("masa.gecisSure", sureler[it]).apply(); gecisGoster(); ciz() }
+            }
+            baslik("KATMANLAR")
+            sira(listOf("FTB" to masa.karart, "LOGO" to masa.logoAcik, "ALT YAZI" to masa.altYaziAcik)) { i ->
+                when (i) {
+                    0 -> masa.karart = !masa.karart
+                    1 -> if (masa.logo == null) logoSec() else masa.logoAcik = !masa.logoAcik
+                    else -> if (masa.altYazi == null) altYaziSor() else masa.altYaziAcik = !masa.altYaziAcik
+                }
+                gecisGoster(); ciz(); if (tablet) denetimCiz()
+            }
+            p.addView(LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8f), 0, 0)
+                addView(etiket("Logo seç", 13f, GRI).apply { setShadowLayer(0f, 0f, 0f, 0); setOnClickListener { logoSec() } }, LinearLayout.LayoutParams(0, dp(36f), 1f))
+                addView(etiket("Alt yazıyı düzenle", 13f, GRI).apply { setShadowLayer(0f, 0f, 0f, 0); setOnClickListener { altYaziSor() } }, LinearLayout.LayoutParams(0, dp(36f), 1f))
+            })
+            p.addView(etiket("Kaynağa dokununca seçili geçişle canlıya geçer. Tablette KES her zaman kesme, AUTO seçili geçiş. Geçiş tek düzende çalışır.", 11f, GRI).apply {
+                isSingleLine = false; gravity = Gravity.START; setShadowLayer(0f, 0f, 0f, 0); setPadding(0, dp(10f), 0, 0) })
+        }
+        ciz()
+        AlertDialog.Builder(this).setTitle("Geçiş ve katmanlar").setView(android.widget.ScrollView(this).apply { addView(p) }).setPositiveButton("Kapat", null).show()
+    }
+
+    private fun logoSec() = runCatching {
+        @Suppress("DEPRECATION") startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"), 9)
+    }.onFailure { tost("Resim seçici açılamadı.") }
+
+    private fun altYaziSor() {
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20f), dp(8f), dp(20f), 0) }
+        val ad = EditText(this).apply { hint = "Ad (örn. Ayşe Yılmaz)"; setText(tercih.getString("masa.altYazi1", "")); isSingleLine = true }
+        val unvan = EditText(this).apply { hint = "Unvan (isteğe bağlı)"; setText(tercih.getString("masa.altYazi2", "")); isSingleLine = true }
+        p.addView(ad); p.addView(unvan)
+        AlertDialog.Builder(this).setTitle("Alt yazı").setView(p)
+            .setPositiveButton("Göster") { _, _ ->
+                tercih.edit().putString("masa.altYazi1", ad.text.toString().trim()).putString("masa.altYazi2", unvan.text.toString().trim()).apply()
+                masa.altYazi = altYaziResmi(); masa.altYaziAcik = masa.altYazi != null; gecisGoster(); if (tablet) denetimCiz()
+            }.setNegativeButton("Vazgeç", null).show()
+    }
+
+    /** Alt yazı plakası: siyah %72 zemin, solda ince beyaz çizgi, ad (yarı kalın) ve unvan (%70 beyaz); boşsa null */
+    private fun altYaziResmi(): android.graphics.Bitmap? {
+        val a = tercih.getString("masa.altYazi1", "").orEmpty(); val u = tercih.getString("masa.altYazi2", "").orEmpty()
+        if (a.isEmpty() && u.isEmpty()) return null
+        val buyuk = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 88f; typeface = kosul }
+        val kucuk = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(178, 255, 255, 255); textSize = 54f; typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL) }
+        val pay = 56f; val cizgi = 8f
+        val w = (maxOf(buyuk.measureText(a), kucuk.measureText(u)) + 2 * pay + cizgi).toInt().coerceIn(400, 3000)
+        val h = if (a.isNotEmpty() && u.isNotEmpty()) 240 else 160
+        val b = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(b)
+        c.drawColor(Color.argb(184, 0, 0, 0))
+        c.drawRect(0f, 0f, cizgi, h.toFloat(), android.graphics.Paint().apply { color = Color.WHITE })
+        var y = if (a.isNotEmpty()) 108f else 102f
+        if (a.isNotEmpty()) { c.drawText(a, cizgi + pay, y, buyuk); y += 82f }
+        if (u.isNotEmpty()) c.drawText(u, cizgi + pay, y, kucuk)
+        return b
+    }
+
+    private fun logoResmi(u: Uri): android.graphics.Bitmap? = runCatching {
+        val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, o) }
+        var s = 1; while (o.outHeight / (s * 2) >= 360) s *= 2
+        contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = s }) }
+    }.getOrNull()
+
+    private fun katmanlariYukle() {
+        masa.altYazi = altYaziResmi()
+        tercih.getString("masa.logo", null)?.let { Uri.parse(it) }?.takeIf { u -> contentResolver.persistedUriPermissions.any { it.uri == u } }?.let { masa.logo = logoResmi(it) }
+    }
+
+    /** Tablet klavyesi: 1–4 kaynak, boşluk KES, Enter AUTO, F FTB, R kayıt */
     override fun onKeyDown(k: Int, e: android.view.KeyEvent?): Boolean {
         when (k) {
             in android.view.KeyEvent.KEYCODE_1..android.view.KeyEvent.KEYCODE_4 -> { sec(k - android.view.KeyEvent.KEYCODE_1); return true }
             android.view.KeyEvent.KEYCODE_SPACE -> { kes(); return true }
+            android.view.KeyEvent.KEYCODE_ENTER -> { oto(); return true }
+            android.view.KeyEvent.KEYCODE_F -> { masa.karart = !masa.karart; gecisGoster(); if (tablet) denetimCiz(); return true }
             android.view.KeyEvent.KEYCODE_R -> { kayitDugmesi(); duzen(); return true }
         }
         return super.onKeyDown(k, e)
@@ -270,8 +383,9 @@ class MasaActivity : Activity() {
         masa.dolu = booleanArrayOf(true, true, true, false); masa.canli = 0; if (tablet) masa.siradaki = 1; duzen()
     }
 
-    private fun canliYap(i: Int) {
-        masa.canli = i; if (masa.siradaki == i) masa.siradaki = -1; duzen()
+    /** Canlıya alır: `tur` geçiş türü (varsayılan seçili geçiş; KES her zaman kesme) */
+    private fun canliYap(i: Int, tur: Int = masa.gecisTuru) {
+        masa.gecis(i, tur); if (masa.siradaki == i) masa.siradaki = -1; duzen()
         kaynaklar.forEachIndexed { j, k -> (k as? WifiKameraKaynak)?.tally(j == i) }
     }
 
@@ -466,6 +580,11 @@ class MasaActivity : Activity() {
     override fun onActivityResult(istek: Int, sonuc: Int, veri: Intent?) {
         super.onActivityResult(istek, sonuc, veri)
         val u = veri?.data ?: return
+        if (istek == 9 && sonuc == RESULT_OK) {
+            runCatching { contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            val b = logoResmi(u) ?: return tost("Resim açılamadı.")
+            tercih.edit().putString("masa.logo", u.toString()).apply(); masa.logo = b; masa.logoAcik = true; gecisGoster(); if (tablet) denetimCiz(); return
+        }
         if (istek != 7 || sonuc != RESULT_OK) return
         runCatching { contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
             .onFailure { return tost("Bu klasöre yazma izni alınamadı.") }
@@ -480,11 +599,11 @@ class MasaActivity : Activity() {
         kayitBaslat(o)
     }
 
-    private fun duzenAdi(d: Int) = when (d) { 0 -> "Oto"; 2 -> "2'li"; 3 -> "3'lü"; 4 -> "4'lü"; else -> "Tek" }
+    private fun duzenAdi(d: Int) = when (d) { 0 -> "Oto"; 2 -> "2'li"; 3 -> "3'lü"; 4 -> "4'lü"; 5 -> "PiP"; else -> "Tek" }
 
     /** Program düzeni: Tek (canlı kaynak), 2'li, 3'lü, 4'lü; 4K tuvalde her 1080p kaynak kendi yerinde tam boyutta. Kayıt sırasında da değişir */
     private fun duzenMenu() {
-        val l = listOf(0 to "Oto: kaynak sayısına göre", 1 to "Tek: canlı kaynak tam ekran", 2 to "2'li: yan yana", 3 to "3'lü: üstte iki, altta bir", 4 to "4'lü: 2×2 ızgara")
+        val l = listOf(0 to "Oto: kaynak sayısına göre", 1 to "Tek: canlı kaynak tam ekran", 2 to "2'li: yan yana", 3 to "3'lü: üstte iki, altta bir", 4 to "4'lü: 2×2 ızgara", 5 to "PiP: canlı tam ekran, ikinci kaynak sağ altta")
         AlertDialog.Builder(this).setTitle("Program düzeni")
             .setSingleChoiceItems(l.map { it.second }.toTypedArray(), masa.duzen) { d, i ->
                 masa.duzen = l[i].first; tercih.edit().putInt("masa.duzen", masa.duzen).apply(); duzenYazi.text = (if (tablet) "Düzen: " else "") + duzenAdi(masa.duzen); duzen(); d.dismiss()

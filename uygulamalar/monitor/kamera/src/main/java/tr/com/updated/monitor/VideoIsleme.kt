@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
  */
 class VideoIsleme : Service() {
     /** Stil işleme (özgünün üstüne yazılır) ya da düzenleme (`duzen`: yeni dosya, özgün kalır) */
-    class Is(val uri: Uri, val lut: Lut?, val hevc: Boolean, val duzen: Duzen? = null) {
+    class Is(val uri: Uri, val lut: Lut?, val hevc: Boolean, val duzen: Duzen? = null, val vlogOn: Uri? = null) {
         companion object { fun duzenle(d: Duzen) = Is(d.kaynak, null, d.hevc, d) }
     }
     companion object {
@@ -32,6 +32,8 @@ class VideoIsleme : Service() {
         private val sira = ConcurrentLinkedQueue<Is>()
         /** Ekran açıksa sonucu gösterir (uri, işlendi mi); ana iş parçacığında */
         @Volatile var bitti: ((Uri, Boolean) -> Unit)? = null
+        /** Son biten işin türü (ekrandaki bildirim yazısı için): "stil", "düzen", "vlog" */
+        @Volatile var sonTur = "stil"; private set
         /** İşlenen videonun ilerlemesi (0–100; -1 iş yok) */
         @Volatile var yuzde = -1; private set
         fun ekle(ctx: Context, i: Is) {
@@ -81,13 +83,14 @@ class VideoIsleme : Service() {
     private fun siradaki() {
         val j = sira.poll() ?: run { yuzde = -1; ana.post { calisiyor = false; stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }; return }
         yuzde = 0
+        j.vlogOn?.let { o -> return vlog(j.uri, o, j.hevc) }
         j.duzen?.let { d -> return duzenle(d) }
         val lut = j.lut ?: run { islem.post { siradaki() }; return }
         val t = StilGom.video(this, j.uri, lut, j.hevc, islem.looper,
             ilerleme = { p -> if (p != yuzde) { yuzde = p; ana.post { bildirim("Stil videoya işleniyor", p) } } }) { ok ->
             runCatching { contentResolver.update(j.uri, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null) }
             ana.post {
-                val b = bitti
+                val b = bitti; sonTur = "stil"
                 if (b != null) b(j.uri, ok) else if (!ok) bilgi("Stil işlenemedi; video özgün renkte kaydedildi.")
             }
             islem.post { siradaki() }
@@ -101,8 +104,22 @@ class VideoIsleme : Service() {
         val t = DuzenMotoru.disaAktar(this, d, islem.looper,
             ilerleme = { p -> if (p != yuzde) { yuzde = p; ana.post { bildirim("Video düzenleniyor", p) } } }) { yeni ->
             ana.post {
-                val b = bitti
+                val b = bitti; sonTur = "düzen"
                 if (b != null) b(yeni ?: d.kaynak, yeni != null) else bilgi(if (yeni != null) "Düzenlenen video galeride." else "Video düzenlenemedi; özgünü duruyor.")
+            }
+            islem.post { siradaki() }
+        }
+        if (t == null) islem.post { siradaki() }
+    }
+
+    /** Vlog: arka + ön kamera dosyalarından birleşik video (yeni dosya; ikisi de kalır) */
+    private fun vlog(arka: Uri, on: Uri, hevc: Boolean) {
+        bildirim("Vlog videosu birleştiriliyor", 0)
+        val t = DuzenMotoru.vlogBirlestir(this, arka, on, hevc, islem.looper,
+            ilerleme = { p -> if (p != yuzde) { yuzde = p; ana.post { bildirim("Vlog videosu birleştiriliyor", p) } } }) { yeni ->
+            ana.post {
+                val b = bitti; sonTur = "vlog"
+                if (b != null) b(yeni ?: arka, yeni != null) else bilgi(if (yeni != null) "Vlog videosu galeride." else "Vlog videosu birleştirilemedi; iki kamera dosyası duruyor.")
             }
             islem.post { siradaki() }
         }

@@ -202,7 +202,9 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     }
 
     /** Varsayılan boyut: 1080p'yi geçmeyen en büyük 16:9 (yoksa en büyük) */
-    fun secilenBoyut(): Size = (if (fotoModu) fotoOnizleme() else ayar.boyut) ?: yetenek.boyutlar.filter { it.width <= 1920 && it.height <= 1080 && kotlin.math.abs(it.width * 9 - it.height * 16) < it.width / 10 }.maxByOrNull { it.width * it.height }
+    /** Vlog (iki kamera aynı anda): seçilen boyut bu yüksekliği geçiyorsa varsayılana (1080p) iner; telefonlar eşzamanlı kamerayı en çok 1440p'de garanti eder */
+    var boyutSiniri: Int? = null
+    fun secilenBoyut(): Size = (if (fotoModu) fotoOnizleme() else ayar.boyut?.takeIf { b -> boyutSiniri.let { it == null || b.height <= it } }) ?: yetenek.boyutlar.filter { it.width <= 1920 && it.height <= 1080 && kotlin.math.abs(it.width * 9 - it.height * 16) < it.width / 10 }.maxByOrNull { it.width * it.height }
         ?: yetenek.boyutlar.filter { it.width <= 1920 }.maxByOrNull { it.width * it.height } ?: Size(1920, 1080)
 
     /** Fotoğrafla aynı en/boy oranında, 1080p'yi geçmeyen en büyük önizleme */

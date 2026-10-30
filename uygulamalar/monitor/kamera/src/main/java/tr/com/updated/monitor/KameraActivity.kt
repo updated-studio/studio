@@ -166,6 +166,15 @@ class KameraActivity : Activity() {
     private fun kayitSuruyor() = kaynak?.kayitta == true || tlKaydedici != null || lutKaydedici != null
     /** LUT'lu video çekimi: kamera → GPU (stil/LUT) → kodlayıcı; kayıttan sonra işleme beklemesi yok */
     private var lutKaydedici: Kaydedici? = null
+    /**
+     * Vlog (çift kamera, iOS ile aynı kural): VİDEO'da arka + ön kamera aynı anda; ön kamera sağ altta küçük pencere (aynalı önizleme).
+     * Kayıtta iki ayrı dosya (ön: "<ad>_on.mp4", sessiz) ve kayıttan sonra birleşik dosya ("<ad> vlog.mp4", VideoIsleme). Android 11+ ve
+     * telefonun eşzamanlı kamera desteği gerekir; açıkken ana kamera en çok 1080p.
+     */
+    private var vlog = false; private var onKaynak: KameraKaynak? = null; private var onPencere: android.view.TextureView? = null
+    private var onUri: Uri? = null; private var kayitKok = ""
+    private var vlogBekleyen = 0; private var vlogArkaOk = false; private var vlogOnOk = false; private var vlogArka: Uri? = null; private var vlogOnDosya: Uri? = null
+    private val vlogAcik get() = vlog && mod == KMod.VIDEO && vlogOnId() != null
     /** Wi-Fi kamera (MasaActivity'ye görüntü gönderir; AgYayin.kt). Açıkken ekrandaki görüntü kodlayıcıya da çizilir */
     private var verici: YayinVerici? = null
     private var wifiKamera = false
@@ -463,7 +472,7 @@ class KameraActivity : Activity() {
         if (m == KMod.MONITOR) { monitoreGec(); return }
         mod = m; tercih.edit().putString("mod", m.name).apply()
         if (ayar.pozlamaNs != null || bulb) { ayar.pozlamaNs = null; ayar.uzunOnizleme = 0; bulb = false; ayarKaydet() }
-        modlariCiz(); modUygula()
+        modlariCiz(); modUygula(); vlogGuncelle()
         if (m == KMod.PRO) mercekUygula()
         if (m == KMod.PRO && kartlar) proKartlar()
     }
@@ -1342,8 +1351,89 @@ class KameraActivity : Activity() {
         val k = runCatching { KameraKaynak(this, id, ad, ayar) }.getOrElse { e -> tost("Kamera açılamadı: ${e.message}"); HataKaydi.not("kamera", e.stackTraceToString()); return }
         k.fotoModu = mod.foto; k.sahne = mod.sahne; k.sdrZorla = wifiKamera; k.pro = proIstek(); k.ekranYonu = (360 - fizikselYon) % 360
         @Suppress("DEPRECATION") monitor.otoDondur = windowManager.defaultDisplay.rotation * 90
-        kaynak = k
+        kaynak = k; if (vlogAcik) k.boyutSiniri = 1080
         k.baslat(y, { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); zoomCiz(); flasCiz(); aracCiz() } }, { hata -> runOnUiThread { if (hata == "POLITIKA") engelli() else tost(hata) } })
+        vlogGuncelle()
+    }
+
+    /** Arka kamerayla aynı anda açılabilen ön kamera (Android 11+, CameraManager.concurrentCameraIds); yoksa null */
+    private fun vlogOnId(): String? {
+        if (android.os.Build.VERSION.SDK_INT < 30) return null
+        val arka = kamListe.getOrNull(kamIndex)?.first ?: return null
+        val cm = getSystemService(android.hardware.camera2.CameraManager::class.java)
+        return runCatching {
+            cm.concurrentCameraIds.filter { arka in it }.flatten().firstOrNull { it != arka &&
+                cm.getCameraCharacteristics(it).get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) == android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT }
+        }.getOrNull()
+    }
+
+    private fun vlogSec(v: Boolean) {
+        vlog = v; tercih.edit().putBoolean("vlog", v).apply()
+        if (v && (ayar.boyut?.height ?: 0) > 1080) tost("Vlog'da ana kamera 1080p çeker.")
+        vlogGuncelle()
+    }
+
+    /** Vlog açıkken ön kamerayı sağ altta küçük pencerede açar, kapalıyken kapatır; ana kameranın boyut sınırını ayarlar */
+    private fun vlogGuncelle() {
+        val iste = onde && vlogAcik && kaynak != null
+        kaynak?.let { k -> val s = if (iste) 1080 else null; if (k.boyutSiniri != s && !kayitSuruyor()) { k.boyutSiniri = s; oturumuYenile() } }
+        if (!iste) { onKaynak?.durdur(); onKaynak = null; onPencere?.let { kok.removeView(it) }; onPencere = null; return }
+        if (onPencere != null) return
+        val id = vlogOnId() ?: return
+        val g = (resources.displayMetrics.widthPixels * DuzenMotoru.VLOG_PENCERE).toInt()
+        val p = android.view.TextureView(this).apply {
+            scaleX = -1f // ön kamera ayna gibi görünür (kayıt aynasız)
+            outlineProvider = object : android.view.ViewOutlineProvider() { override fun getOutline(v: View, o: android.graphics.Outline) { o.setRoundRect(0, 0, v.width, v.height, dp(14f).toFloat()) } }
+            clipToOutline = true; contentDescription = "Ön kamera (Vlog)"
+            surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+                override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
+                    val k = runCatching { KameraKaynak(this@KameraActivity, id, "Ön kamera") }.getOrElse { tost("Ön kamera açılamadı."); return }
+                    k.ekranYonu = (360 - fizikselYon) % 360; onKaynak = k
+                    k.baslat(android.view.Surface(st), { bw, bh -> st.setDefaultBufferSize(bw, bh) },
+                        { hata -> runOnUiThread { tost("Vlog kapandı: ön kamera açılamadı ($hata)"); vlogSec(false) } })
+                }
+                override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {}
+                override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean { onKaynak?.durdur(); onKaynak = null; return true }
+                override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
+            }
+        }
+        val alt = if (zoomSira.height > 0) kok.height - zoomSira.top else dp(230f)
+        kok.addView(p, kok.indexOfChild(tallyCerceve), FrameLayout.LayoutParams(g, g * 16 / 9, Gravity.BOTTOM or Gravity.END).apply { marginEnd = dp(16f); bottomMargin = alt + dp(8f) })
+        onPencere = p
+    }
+
+    /** Vlog kaydının ön kamera dosyası (ana kayıt başlayınca); sessiz, arka kaydın sesi birleşik dosyaya gider */
+    private fun onKayitBasla(mbps: Int) {
+        val o = onKaynak ?: return
+        val d = ContentValues().apply { put(MediaStore.Video.Media.DISPLAY_NAME, "${kayitKok}_on.mp4"); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4"); put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/UPDATED Kamera"); put(MediaStore.Video.Media.IS_PENDING, 1) }
+        val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, d) ?: return tost("Ön kamera dosyası açılamadı.")
+        val fd = contentResolver.openFileDescriptor(uri, "w") ?: run { contentResolver.delete(uri, null, null); return tost("Ön kamera dosyası açılamadı.") }
+        o.ekranYonu = (360 - fizikselYon) % 360
+        o.kayitBasla(fd, ayar.hevc, (mbps / 2).coerceAtLeast(10), false) { hata -> runOnUiThread {
+            if (hata != null) { contentResolver.delete(uri, null, null); tost("Ön kamera kaydı başlamadı: $hata") } else onUri = uri
+        } }
+    }
+
+    /** Vlog kaydını bitirir (ana kayıt dururken): ön dosya görünür olur; iki dosya da tamamsa `vlogParca` birleşik videoyu sıraya koyar */
+    private fun vlogDurdur(arka: Uri?) {
+        val o = onKaynak; val u = onUri; onUri = null
+        if (o == null || u == null || arka == null || !o.kayitta) { vlogBekleyen = 0; return }
+        vlogBekleyen = 2; vlogArka = arka; vlogOnDosya = u; vlogArkaOk = false; vlogOnOk = false
+        o.kayitDurdur { ok -> runOnUiThread {
+            if (ok) contentResolver.update(u, ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }, null, null) else contentResolver.delete(u, null, null)
+            vlogOnOk = ok; vlogParca()
+        } }
+    }
+
+    private fun vlogParca(arkaOk: Boolean? = null) {
+        if (vlogBekleyen == 0) return
+        arkaOk?.let { vlogArkaOk = it }
+        if (--vlogBekleyen > 0) return
+        val a = vlogArka ?: return; val o = vlogOnDosya ?: return
+        if (!vlogArkaOk || !vlogOnOk) return
+        if (ayar.renk == 1) return tost("Vlog: iki kamera ayrı dosya kaydedildi (HDR'de birleşik video yapılmaz).")
+        tost("Vlog: birleşik video hazırlanıyor; ekrandan çıkabilirsin, bildirimde ilerler.")
+        VideoIsleme.ekle(applicationContext, VideoIsleme.Is(a, null, ayar.hevc, vlogOn = o))
     }
 
     private fun kameraCevir() {
@@ -1880,6 +1970,9 @@ class KameraActivity : Activity() {
                         cipSatiri(ic, "SABİTLEME", listOf(0 to "Kapalı", 1 to "Standart", 2 to "Sinematik").map { (i, ad) ->
                             Triple(ad, ayar.sabit == i, if (i in k.sabitlemeler) f { ayar.sabit = i; ayarKaydet(); k.ayarDegisti() } else null) },
                             mapOf("Standart" to "Bu kamerada sabitleme yok.", "Sinematik" to "Bu kamerada sinematik sabitleme yok."))
+                        val onVar = vlogOnId() != null
+                        cipSatiri(ic, "VLOG", listOf(Triple("Kapalı", !vlog || !onVar, f { vlogSec(false) }), Triple("Ön + arka", vlog && onVar, if (onVar) f { vlogSec(true) } else null)),
+                            mapOf("Ön + arka" to "Bu telefon ön ve arka kamerayı aynı anda açamıyor (Android 11 ve telefon desteği gerekir)."))
                     }
                     val l = ArrayList<Oge>()
                     if (mod != KMod.PRO) l.add(Oge(if (ayar.flas == 0) R.drawable.ic_flas_yok else R.drawable.ic_flas, null, "Flaş", listOf("Kapalı", "Oto", "Açık", "Fener")[ayar.flas.coerceIn(0, 3)], ayar.flas > 0) { flasDegistir(); grupAc(Grup.KAYIT) })
@@ -2248,6 +2341,7 @@ class KameraActivity : Activity() {
     private fun videoDugmesi(k: KameraKaynak) {
         lutKaydedici?.let { y -> lutKayitBitir(y); return }
         if (k.kayitta) {
+            vlogDurdur(kayitUri)
             k.kayitDurdur { ok -> runOnUiThread {
                 val l = kayitLut
                 kayitUri?.let { u ->
@@ -2259,12 +2353,13 @@ class KameraActivity : Activity() {
                 }
                 kayitUri = null; deklansorDugme.kayitta = false; kayitCip.visibility = View.GONE; bilgiCiz()
                 if (!ok) tost("Kayıt kaydedilemedi (çok kısa olabilir).")
+                vlogParca(ok)
             } }
             return
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 2); return }
         k.ekranYonu = (360 - fizikselYon) % 360
-        val ad = "UPDATED_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.mp4"
+        val ad = "UPDATED_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.mp4"; kayitKok = ad.removeSuffix(".mp4")
         val d = ContentValues().apply { put(MediaStore.Video.Media.DISPLAY_NAME, ad); put(MediaStore.Video.Media.MIME_TYPE, "video/mp4"); put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/UPDATED Kamera"); put(MediaStore.Video.Media.IS_PENDING, 1) }
         val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, d) ?: return tost("Kayıt dosyası açılamadı.")
         val fd = contentResolver.openFileDescriptor(uri, "w") ?: return tost("Kayıt dosyası açılamadı.")
@@ -2272,7 +2367,7 @@ class KameraActivity : Activity() {
         val b = k.secilenBoyut(); val fps = ayar.fps?.upper ?: 30
         val mbps = when { b.height >= 2160 -> 50; b.height >= 1080 -> if (fps > 30) 30 else 20; else -> 12 }
         // Stil/LUT varsa (HDR değil, Wi-Fi kamera değil) çekerken uygulanır: kayıttan sonra işleme beklemesi olmaz
-        if (kayitLut != null && ayar.renk != 1 && verici == null) {
+        if (kayitLut != null && ayar.renk != 1 && verici == null && !vlogAcik) {
             val (w, h) = monitor.kayitBoyutu()
             val y = runCatching { Kaydedici(this, fd, w, h, fps, mbps, ayar.hevc, sesIste = true, yon = fizikselYon).also { it.baslat() } }
                 .getOrElse { e -> HataKaydi.not("kayit", e.stackTraceToString()); null }
@@ -2309,6 +2404,7 @@ class KameraActivity : Activity() {
         k.kayitBasla(fd, ayar.hevc, mbps, true) { hata -> runOnUiThread {
             if (hata != null) { tost("Kayıt başlamadı: $hata"); contentResolver.delete(uri, null, null); kayitUri = null; return@runOnUiThread }
             kayitBas = System.currentTimeMillis(); deklansorDugme.kayitta = true; kayitCip.text = zamanKodu(0); kayitCip.visibility = View.VISIBLE; bilgiSira.visibility = View.INVISIBLE; favSira.visibility = View.INVISIBLE; oneriCip.visibility = View.GONE
+            if (vlogAcik) onKayitBasla(mbps)
         } }
     }
 
@@ -2526,6 +2622,7 @@ class KameraActivity : Activity() {
         proMod = runCatching { ProMod.valueOf(tercih.getString("proMod", "SAMANYOLU")!!) }.getOrDefault(ProMod.SAMANYOLU)
         uzunYol = tercih.getString("uzunYol", "ort") ?: "ort"
         zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true)
+        vlog = tercih.getBoolean("vlog", false)
         tlAralik = tercih.getLong("tlAralik", 2000L); tlSure = tercih.getInt("tlSure", 0); tlPozSabit = tercih.getBoolean("tlPozSabit", true)
         enstAci = tercih.getBoolean("enstAci", false)
                 sonGrup = runCatching { Grup.valueOf(tercih.getString("sonGrup", "POZLAMA")!!) }.getOrDefault(Grup.POZLAMA)
@@ -2554,7 +2651,9 @@ class KameraActivity : Activity() {
         if (acilir == null) modlariCiz()
         kameraAc(); yayinAyarla()
         // İşlenen video bitince son çekim küçük resmi güncellenir; önceki oturumdan yarım kalan varsa özgün renkte kurtarılır
-        VideoIsleme.bitti = { u, iyi -> sonUri = u; sonMime = "video/mp4"; kucukResim(u); tost(if (iyi) "Stil videoya işlendi." else "Stil işlenemedi; video özgün renkte kaydedildi.") }
+        VideoIsleme.bitti = { u, iyi -> sonUri = u; sonMime = "video/mp4"; kucukResim(u); tost(when (VideoIsleme.sonTur) {
+            "vlog" -> if (iyi) "Vlog videosu galeride." else "Vlog videosu birleştirilemedi; iki kamera dosyası duruyor."
+            else -> if (iyi) "Stil videoya işlendi." else "Stil işlenemedi; video özgün renkte kaydedildi." }) }
         VideoIsleme.artiklariKurtar(applicationContext)
     }
     override fun onPause() {
@@ -2565,6 +2664,7 @@ class KameraActivity : Activity() {
         tlKaydedici?.let { timelapseBitir(it) } // alta alınınca kamera kapanır: o ana kadarki kareler kaydedilir
         yayinAyarla() // onde = false: Wi-Fi kamera durur, geri gelince yeniden açılır
         dongu.postDelayed({ if (!onde) { kaynak?.durdur(); kaynak = null } }, if (kaynak?.kayitta == true) 600 else 0)
+        dongu.postDelayed({ if (!onde) vlogGuncelle() }, 700)
         monitor.onPause()
     }
     /** Göstergeler → LUT → + Ekle: seçilen .cube kitaplığa kopyalanır ve uygulanır */
