@@ -152,7 +152,13 @@ struct AnaEkran: View {
                 if let b = kamera.bildirim { bildirimKutusu(b) }
                 if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 14) }
                 if panel == nil {
-                    if let f = acikSatir { FavoriSatir(f: f, kamera: kamera).padding(.bottom, 14) } else { mercekler(dikey: false).padding(.bottom, 20) }
+                    if let f = acikSatir { FavoriSatir(f: f, kamera: kamera).padding(.bottom, 14) } else {
+                        VStack(spacing: 10) {
+                            if kamera.mod != .pro { PozlamaCetveli(kamera: kamera).yardimBalonu(yardim, "Kaydır: pozlama · çift dokun: sıfırla") }
+                            mercekler(dikey: false)
+                        }
+                        .padding(.bottom, 20)
+                    }
                 }
                 // Apple Kamera gibi: mod şeridi tam genişlikte (VLOG dahil hepsi okunur), altında son çekim · deklanşör · ön/arka
                 if panel == nil {
@@ -1146,3 +1152,62 @@ private struct CekimKararmasi: View {
             }
     }
 }
+
+/// Sentez (Leica): deklanşörün üstünde ince pozlama cetveli; 1/3 EV çentikleri, tam değerler uzun; sarı nokta şimdiki EV.
+/// Sağa/sola kaydır: pozlama; çift dokun: sıfır. Değer sağda sabit genişlikte (cetvel kaymaz)
+struct PozlamaCetveli: View {
+    @ObservedObject var kamera: Kamera
+    @State private var bas: Float?
+    private let gen: CGFloat = 240
+
+    var body: some View {
+        let alt = max(-2, kamera.evAralik.lowerBound), ust = min(2, kamera.evAralik.upperBound)
+        let adim = Int(((ust - alt) * 3).rounded())
+        HStack(spacing: 10) {
+            ZStack(alignment: .topLeading) {
+                Canvas { c, b in
+                    guard adim > 0 else { return }
+                    for i in 0...adim {
+                        let v = alt + Float(i) / 3
+                        let x = b.width * CGFloat(i) / CGFloat(adim)
+                        let tam = abs(v - v.rounded()) < 0.01
+                        let h: CGFloat = abs(v) < 0.01 ? 12 : (tam ? 8 : 5)
+                        var yol = Path(); yol.move(to: CGPoint(x: x, y: 14 - h)); yol.addLine(to: CGPoint(x: x, y: 14))
+                        c.stroke(yol, with: .color(.white.opacity(abs(v) < 0.01 ? 0.95 : (tam ? 0.6 : 0.35))), lineWidth: 1)
+                    }
+                }
+                .frame(width: gen, height: 14)
+                Circle().fill(Tema.sari).frame(width: 4, height: 4)
+                    .offset(x: konum(kamera.ev, alt, ust) - 2, y: 17)
+                    .animation(AnaEkran.yay, value: kamera.ev)
+            }
+            .frame(width: gen, height: 22, alignment: .top)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 4).onChanged { d in
+                if bas == nil { bas = kamera.ev }
+                let v = (bas ?? 0) + Float(d.translation.width / gen) * (ust - alt)
+                let y = min(ust, max(alt, (v * 3).rounded() / 3))
+                if abs(y - kamera.ev) > 0.01 { UISelectionFeedbackGenerator().selectionChanged(); kamera.evSec(y) }
+            }.onEnded { _ in bas = nil })
+            .onTapGesture(count: 2) { kamera.evSec(0) }
+            Text(Cetvel.evYazi(kamera.ev)).font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .foregroundStyle(abs(kamera.ev) >= 0.05 ? Tema.sari : .white.opacity(0.6))
+                .frame(width: 30, alignment: .leading)
+        }
+        .padding(.leading, 40)  // değer yazısını dengeler: cetvel ortada kalır
+        .shadow(color: .black.opacity(0.5), radius: 2)
+        .disabled(kamera.kayitta && kamera.secilenEnst != nil)
+        .accessibilityElement()
+        .accessibilityLabel("Pozlama \(Cetvel.evYazi(kamera.ev))")
+        .accessibilityAdjustableAction { y in
+            let d: Float = y == .increment ? 1 / 3 : -1 / 3
+            kamera.evSec(min(ust, max(alt, ((kamera.ev + d) * 3).rounded() / 3)))
+        }
+    }
+
+    private func konum(_ v: Float, _ alt: Float, _ ust: Float) -> CGFloat {
+        guard ust > alt else { return gen / 2 }
+        return gen * CGFloat((min(ust, max(alt, v)) - alt) / (ust - alt))
+    }
+}
+

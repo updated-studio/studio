@@ -288,12 +288,16 @@ struct MonitorEkran: View {
         Button {
             withAnimation(Self.yay) { acikParam = acikParam == p ? nil : p }
         } label: {
+            // Sentez (Kamera ile aynı dil): küçük etiket, eş genişlikli rakam; sarı = elle ayarlanmış, açık olanın altında sarı nokta
+            let elle = !["OTO", "—", "0", "±0"].contains(deger)
             VStack(spacing: 2) {
-                Text(etiket).font(.system(size: 10, weight: .semibold)).tracking(0.8).foregroundStyle(.white.opacity(0.84)).lineLimit(1)
-                Text(deger).font(.system(size: 17, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                Text(etiket).font(.system(size: 9, weight: .medium)).tracking(1.2).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+                Text(deger).font(.system(size: 16, weight: .semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.7)
+                    .foregroundStyle(elle ? Self.sari : .white)
+                    .contentTransition(.numericText())
             }
             .shadow(color: .black.opacity(0.8), radius: 3, y: 1)
-            .foregroundStyle(acikParam == p ? Self.sari : .white)
+            .overlay(alignment: .bottom) { if acikParam == p { Circle().fill(Self.sari).frame(width: 4, height: 4).offset(y: 2) } }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(acikParam == p ? Color.white.opacity(0.1) : .clear).padding(3))
             .contentShape(Rectangle())
@@ -304,11 +308,15 @@ struct MonitorEkran: View {
     /// Kayıtta geçen süre (saat:dk:sn:kare), değilse saat
     private func zamanKodu(buyuk: Bool) -> some View {
         TimelineView(.periodic(from: .now, by: m.kayitta ? 1.0 / 30 : 1)) { an in
-            Text(tcYazi(an.date))
-                .font(.system(size: buyuk ? 34 : 26, weight: .bold, design: .monospaced))
-                .foregroundStyle(m.kayitta ? .red : .white)
-                .shadow(color: .black.opacity(0.8), radius: 3, y: 1)
-                .lineLimit(1).minimumScaleFactor(0.6)
+            HStack(spacing: buyuk ? 10 : 8) {
+                Circle().fill(m.kayitta ? Tema.kirmizi : Color.white.opacity(0.35)).frame(width: buyuk ? 9 : 7, height: buyuk ? 9 : 7)
+                    .shadow(color: m.kayitta ? Tema.kirmizi.opacity(0.9) : .clear, radius: 4)
+                Text(tcYazi(an.date))
+                    .font(.system(size: buyuk ? 30 : 22, weight: .medium).monospacedDigit()).tracking(0.6)
+                    .foregroundStyle(m.kayitta ? .white : .white.opacity(0.8))
+            }
+            .shadow(color: .black.opacity(0.8), radius: 3, y: 1)
+            .lineLimit(1).minimumScaleFactor(0.6)
         }
     }
 
@@ -853,7 +861,7 @@ struct KayitDugmesi: View {
             let s = min(g.size.width, g.size.height)
             ZStack {
                 Circle().stroke(.white, lineWidth: s * 0.06)
-                RoundedRectangle(cornerRadius: kayitta ? s * 0.08 : s * 0.4)
+                RoundedRectangle(cornerRadius: kayitta ? s * 0.08 : s * 0.27, style: .continuous)
                     .fill(Color(red: 0.9, green: 0.16, blue: 0.16))
                     .frame(width: kayitta ? s * 0.38 : s * 0.78, height: kayitta ? s * 0.38 : s * 0.78)
                     .opacity(kayitta && nabiz ? 0.55 : 1)
