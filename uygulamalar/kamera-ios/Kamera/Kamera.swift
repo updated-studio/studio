@@ -158,6 +158,11 @@ final class Kamera: NSObject, ObservableObject {
     private var girdi: AVCaptureDeviceInput?
     let fotoCikti = AVCapturePhotoOutput()
     let videoCikti = AVCaptureMovieFileOutput()
+    /// Stil/LUT'lu SDR video kaydı için ses (CanliKayit.swift); stil yokken AVCaptureMovieFileOutput kendi sesini alır
+    let sesCikti = AVCaptureAudioDataOutput()
+    let sesKuyruk = DispatchQueue(label: "tr.com.updated.kamera.ses")
+    /// Süren stil işlemeli kayıt (CanliKaydedici); nil = kayıt yok ya da dosya çıkışıyla kayıt
+    var canliKayit: CanliKaydedici?
     /// Kare kare görüntü (Pro birleştirme, timelapse, akıllı yardımcı; Wi-Fi kamera da `kareDinleyiciler` ile bağlanabilir). Yalnız gerektiğinde oturumda.
     let kareCikti = AVCaptureVideoDataOutput()
     let kareKuyruk = DispatchQueue(label: "tr.com.updated.kamera.kare")
@@ -234,6 +239,7 @@ final class Kamera: NSObject, ObservableObject {
             oturum.addInput(g)
         }
         if oturum.canAddOutput(fotoCikti) { oturum.addOutput(fotoCikti); fotoCikti.maxPhotoQualityPrioritization = .quality }
+        if oturum.canAddOutput(sesCikti) { oturum.addOutput(sesCikti); sesCikti.setSampleBufferDelegate(self, queue: sesKuyruk) }
         if oturum.canAddOutput(yuzCikti) { oturum.addOutput(yuzCikti); yuzCikti.setMetadataObjectsDelegate(self, queue: kuyruk) }
         kareCikti.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         kareCikti.alwaysDiscardsLateVideoFrames = true
@@ -360,6 +366,8 @@ final class Kamera: NSObject, ObservableObject {
         if let b = kareCikti.connection(with: .video) {
             if b.isVideoOrientationSupported { b.videoOrientation = Onizleme.yon(arayuzYonu) }
             if b.isVideoMirroringSupported { b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = cihaz?.position == .front }
+            // Stil işlemeli kayıt bu kareleri yazar: sabitleme burada da uygulanır (yalnız videoda; diğer modlarda gecikme olmasın)
+            if b.isVideoStabilizationSupported { b.preferredVideoStabilizationMode = mod == .video ? sabitleme.mod : .off }
         }
     }
 
@@ -685,7 +693,15 @@ final class Kamera: NSObject, ObservableObject {
         case .pro:
             proCek(yon: yon)
         case .video:
-            if kayitta { kuyruk.async { self.videoCikti.stopRecording() }; return }
+            if kayitta {
+                if let c = canliKayit { canliBitir(c) } else { kuyruk.async { self.videoCikti.stopRecording() } }
+                return
+            }
+            // Stil/LUT açıkken (SDR): renk çekerken işlenir, kayıttan sonra bekleme yok
+            if canliGom, oturum.outputs.contains(kareCikti), let r = renkLutu(),
+               let f = r.uret().suzgec(renkAlani: CGColorSpace(name: CGColorSpace.itur_709)!) {
+                canliBasla(f); return
+            }
             kayitta = true
             kayitBasi = Date()
             kuyruk.async {
@@ -986,6 +1002,50 @@ extension Kamera: AVCapturePhotoCaptureDelegate {
     }
 }
 
+extension Kamera {
+    /// Stil/LUT çekerken işlenir mi: video, SDR ve renk değişiyor (HDR'de kayıttan sonra; Apple Log özgün)
+    var canliGom: Bool { mod == .video && renkModu == .sdr && gom }
+
+    private func canliBasla(_ suzgec: CIFilter) {
+        kayitta = true
+        kayitBasi = Date()
+        let var_ = videoCikti.availableVideoCodecTypes
+        var k = kodek.tur
+        if !var_.isEmpty, !var_.contains(k) { k = var_.contains(.hevc) ? .hevc : .h264 }
+        let fps = cihaz.map { Int((1 / $0.activeVideoMinFrameDuration.seconds).rounded()) } ?? 30
+        let c = CanliKaydedici(suzgec: suzgec, kodek: k, fps: fps, sesAyari: canliSesAyari())
+        kuyruk.async { self.canliKayit = c }
+    }
+
+    private func canliBitir(_ c: CanliKaydedici) {
+        kayitta = false
+        kayitBasi = nil
+        kuyruk.async { self.canliKayit = nil }
+        c.bitir { url in
+            guard let url else { DispatchQueue.main.async { self.bildirim = "Kayıt başarısız: \(c.hata ?? "")" }; return }
+            let kucuk = Kamera.kucukResim(video: url)
+            self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil) }, mesaj: "Video kaydedildi", kucuk: kucuk)
+        }
+    }
+
+    /// Ses çıkış ayarı: Genel Ayarlar'daki ses biçimi (Oto: harici mikrofonda 24 bit PCM, telefonda AAC)
+    private func canliSesAyari() -> [String: Any]? {
+        let bit: Int?
+        switch sesBicimi {
+        case .oto: bit = harici ? 24 : nil
+        case .pcm24: bit = 24
+        case .pcm16: bit = 16
+        case .aac: bit = nil
+        }
+        if let bit {
+            return [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: harici ? 2 : 1,
+                    AVLinearPCMBitDepthKey: bit, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false]
+        }
+        return sesCikti.recommendedAudioSettingsForAssetWriter(writingTo: .mov)
+            ?? [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1, AVEncoderBitRateKey: 192_000]
+    }
+}
+
 extension Kamera: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo url: URL, from connections: [AVCaptureConnection], error: Error?) {
         DispatchQueue.main.async { self.kayitta = false; self.kayitBasi = nil }
@@ -996,10 +1056,12 @@ extension Kamera: AVCaptureFileOutputRecordingDelegate {
     }
 }
 
-extension Kamera: AVCaptureVideoDataOutputSampleBufferDelegate {
+extension Kamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if output === sesCikti { canliKayit?.ses(sampleBuffer); return }
         for d in kareDinleyiciler { d(sampleBuffer) }
         guard let kare = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        canliKayit?.kare(kare, pts: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
         if araclarAcik { cizici.kare(kare) }
         tlYazici?.kare(kare)
         asistan.kare(kare)

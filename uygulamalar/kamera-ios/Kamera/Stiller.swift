@@ -317,7 +317,7 @@ struct StilPedi: View {
                     kaydirici("Doygunluk", String(format: "%+d", Int(kamera.stil.doygunluk * 100)), deger: Binding(get: { kamera.stil.doygunluk }, set: { kamera.stil.doygunluk = $0 }), -1...1)
                 }
             }
-            Text(kamera.mod == .video && kamera.renkModu == .log ? "Apple Log kaydı özgün kalır; stil yalnız ekranda." : "Fotoğraf ve video bu renkle kaydedilir.")
+            Text(kamera.mod == .video && kamera.renkModu == .log ? "Apple Log kaydı özgün kalır; stil yalnız ekranda." : kamera.mod == .video && kamera.renkModu == .hdr ? "HDR videoda stil kayıttan sonra işlenir." : "Fotoğraf ve video bu renkle kaydedilir; video çekerken işlenir.")
                 .font(.caption).foregroundStyle(Tema.metin2)
         }
         .pano()
