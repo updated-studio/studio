@@ -74,6 +74,7 @@ class MasaActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         HataKaydi.kur(this)
+        if (b == null && Ekranlar.masaUygulamasi(this)) dongu.postDelayed({ Guncelleme.denetle(this, sessiz = true) }, 3000)
         kok = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         masa = MasaGorunum(this)
         masa.yuzeylerHazir = { l -> yuzeyler = l; for (i in kaynaklar.indices) kaynaklar[i]?.let { baslat(i, it) } }
@@ -82,7 +83,9 @@ class MasaActivity : Activity() {
         kok.addView(katman, FrameLayout.LayoutParams(-1, -1))
         // Üst: geri · MASA · süre · kaynak ekle; sağ altta kayıt
         val ust = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(12f), 0, dp(12f), 0) }
-        ust.addView(etiket("‹  Kamera", 15f).apply { setOnClickListener { finish() }; contentDescription = "Kameraya dön" }, LinearLayout.LayoutParams(-2, dp(44f)))
+        // Kamera uygulamasında Kamera'ya döner; ayrı Masa uygulamasında Monitör'ü açar (Monitör'den geri Masa'ya gelinir)
+        if (Ekranlar.masaUygulamasi(this)) ust.addView(etiket("Monitör  ›", 15f).apply { setOnClickListener { startActivity(Intent(this@MasaActivity, MainActivity::class.java).putExtra("mod", "monitor")) }; contentDescription = "Monitörü aç" }, LinearLayout.LayoutParams(-2, dp(44f)))
+        else ust.addView(etiket("‹  Kamera", 15f).apply { setOnClickListener { finish() }; contentDescription = "Kameraya dön" }, LinearLayout.LayoutParams(-2, dp(44f)))
         ust.addView(etiket("MASA", 16f, TURUNCU).apply { setPadding(dp(16f), 0, 0, 0) }, LinearLayout.LayoutParams(-2, dp(44f)))
         ust.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         hizli = tercih.getBoolean("masa.hizli", false)

@@ -23,11 +23,14 @@ import kotlin.concurrent.thread
 object Guncelleme {
     private const val EYLEM = "tr.com.updated.monitor.KURULUM"
 
+    /** Her uygulamanın kendi yayın klasörü: UPDATED Kamera kökte, UpCam Studio "masa/" altında (derle.sh --masa) */
+    private fun kanal(a: Activity) = if (Ekranlar.masaUygulamasi(a)) "masa/" else ""
+
     private fun mevcutKod(a: Activity): Long = a.packageManager.getPackageInfo(a.packageName, 0).longVersionCode
 
     /** sessiz: açılıştaki denetim, yeni sürüm yoksa ya da ağ yoksa hiçbir şey göstermez */
     fun denetle(a: Activity, sessiz: Boolean) {
-        val kok = BuildConfig.GUNCELLEME_ADRESI
+        val kok = BuildConfig.GUNCELLEME_ADRESI.takeIf { it.isNotEmpty() }?.plus(kanal(a)).orEmpty()
         if (kok.isEmpty()) { if (!sessiz) Toast.makeText(a, "Bu derlemede güncelleme adresi yok.", Toast.LENGTH_LONG).show(); return }
         thread(isDaemon = true) {
             val j = runCatching { JSONObject(oku(kok + "surum.json?t=" + System.currentTimeMillis()).toString(Charsets.UTF_8)) }.getOrNull()
@@ -36,7 +39,7 @@ object Guncelleme {
                 if (j == null) { if (!sessiz) Toast.makeText(a, "Güncelleme denetlenemedi (internet?).", Toast.LENGTH_LONG).show(); return@runOnUiThread }
                 if (j.optLong("kod") <= mevcutKod(a)) { if (!sessiz) Toast.makeText(a, "Uygulama güncel (${j.optString("ad")}).", Toast.LENGTH_LONG).show(); return@runOnUiThread }
                 val not = j.optString("not").takeIf { it.isNotBlank() }?.let { "\n\n$it" } ?: ""
-                AlertDialog.Builder(a).setTitle("Yeni sürüm: ${j.optString("ad")}").setMessage("UPDATED Kamera'nın yeni sürümü hazır.$not")
+                AlertDialog.Builder(a).setTitle("Yeni sürüm: ${j.optString("ad")}").setMessage("${a.applicationInfo.loadLabel(a.packageManager)} için yeni sürüm hazır.$not")
                     .setPositiveButton("Güncelle") { _, _ -> indirKur(a, kok + j.optString("apk", "updated-monitor.apk")) }
                     .setNegativeButton("Sonra", null).show()
             }

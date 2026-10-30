@@ -5,7 +5,7 @@ Yeni özellik eklenince iki sütun da doldurulur. ✓ var · ✱ yapılıyor · 
 
 İş bölümü (iki Claude aynı dalda): **Kamera ekranı** = proje sohbetindeki Claude, **Monitör ekranı** = sunucudaki (Remote Control) Claude. Ortak dosyalarda (AnaEkran.swift, Kamera.swift, project.yml) küçük ve sık gönderim, önce rebase.
 
-İki uygulamaya hazırlık (Android, 0.17.1): Gradle modülleri `:ortak` (paylaşılan kod ve bütün kaynaklar; PRO + Monitör ekranı MainActivity burada, çünkü PRO Kamera'nın, Monitör Masa'nın), `:kamera` (KameraActivity, ayarlar, stiller, kayıt sonrası işleme, EkranYayini: yalnız Kamera kullanıyor), `:masa` (Masa ekranı). `:app` bugünkü tek uygulama (ikisi birden, paket kimliği aynı); `:masa-uygulama` Masa + Monitör iskeleti (ad/simge/paket kimliği gelince doldurulur, yayına girmez). Modüller arası ekran açma adla (`Ekranlar.kt`).
+İki uygulamaya hazırlık (Android, 0.17.1): Gradle modülleri `:ortak` (paylaşılan kod ve bütün kaynaklar; PRO + Monitör ekranı MainActivity burada, çünkü PRO Kamera'nın, Monitör Masa'nın), `:kamera` (KameraActivity, ayarlar, stiller, kayıt sonrası işleme, EkranYayini: yalnız Kamera kullanıyor), `:masa` (Masa ekranı). `:app` bugünkü tek uygulama (ikisi birden, paket kimliği aynı); `:masa-uygulama` = **UpCam Studio** (tr.com.upcam.studio; Masa + Monitör, kendi güncelleme kanalı `derle.sh --masa`; simge seçimi bekliyor). Modüller arası ekran açma adla (`Ekranlar.kt`).
 
 ## Kamera ekranı (Android: KameraActivity)
 
