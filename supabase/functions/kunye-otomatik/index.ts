@@ -95,7 +95,8 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
       });
       const g = await r.text();
       if (!r.ok) {
-        son = `${a.etiket} · ${model} ${r.status} ${g.slice(0, 120)}`;
+        // Hangi kota doldu (genel istek mi, Google arama mı): yanıttaki quotaMetric/quotaId adları kaydedilir (31 Ekim 2026)
+        son = `${a.etiket} · ${model} ${r.status} ${[...new Set(g.match(/"quota(?:Metric|Id)":\s*"[^"]+"/g) ?? [])].join(" ") || g.slice(0, 160)}`;
         const ah = anahtarHatasi(r.status, g);
         if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
         if (ah !== "kota_dolu") hepsiKota = false;
