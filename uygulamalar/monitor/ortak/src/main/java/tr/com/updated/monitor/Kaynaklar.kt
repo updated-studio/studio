@@ -124,6 +124,20 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     @Volatile var odakNoktasi: android.graphics.PointF? = null; private set
     /** Flaşlı çekimden önce pozlama ölçümü bitince çağrılır */
     private var olcumBekleyen: ((Int?) -> Unit)? = null
+    /**
+     * Fiziksel merceklerin 1×'e göre yakınlaştırma oranları (çoklu kamera; 35 mm eşdeğer odak uzaklığından): ör. iPhone'daki gibi 0,5 · 1 · 3 · 5.
+     * Ana (1×) mercek mantıksal kameranın kendi odak uzaklığı ve sensörüdür. Bulunamazsa boş.
+     */
+    val optikOranlar: List<Float> by lazy {
+        if (android.os.Build.VERSION.SDK_INT < 28) return@lazy emptyList()
+        val cm = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        fun esdeger(o: CameraCharacteristics): Float? { val f = o.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull() ?: return null
+            val b = o.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return null; val k = Math.hypot(b.width.toDouble(), b.height.toDouble()).toFloat()
+            return if (k > 0f) f * 43.27f / k else null }
+        val ana = esdeger(oz) ?: return@lazy emptyList()
+        runCatching { oz.physicalCameraIds.mapNotNull { pid -> esdeger(cm.getCameraCharacteristics(pid))?.let { Math.round(it / ana * 10f) / 10f } } }.getOrDefault(emptyList())
+            .filter { it > 0.3f }.distinct().sorted()
+    }
     val zoomAralik: Range<Float>? by lazy { if (android.os.Build.VERSION.SDK_INT >= 30) oz.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE) else null }
     val flasVar: Boolean by lazy { oz.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true }
     /** Otomatik beyaz dengenin son kazançları ve renk dönüşümü: elle Kelvin'de dönüşüm bundan alınır, başlangıç Kelvin'i bundan tahmin edilir */
@@ -307,7 +321,9 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
 
     private fun okuyuculariKur() {
         val foto = fotoModu && kaydedici == null
-        val fb = if (foto) secilenFotoBoyut() else null
+        val rawIste = foto && ayar.raw && rawVar && !rawDustu
+        // RAW ile tam sensör kipi birlikte kurulamaz (DNG normal kipte gelir): RAW açıkken fotoğraf normal kipin en büyüğü
+        val fb = if (!foto) null else secilenFotoBoyut()?.let { b -> if (rawIste && buyukMu(b)) harita?.getOutputSizes(ImageFormat.JPEG)?.maxByOrNull { it.width * it.height } ?: b else b }
         // HEIF: kameranın HEIC boyutlarından seçilene en yakın (büyük kip HEIC vermez)
         val heif = fb != null && ayar.heif && heifVar
         val boy = if (!heif) fb else harita?.getOutputSizes(ImageFormat.HEIC)?.sortedByDescending { it.width * it.height }?.let { l -> l.firstOrNull { it.width * it.height <= fb!!.width * fb.height } ?: l.last() }
@@ -315,7 +331,6 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         if (boy == null || jpegOkuyucu?.let { it.width != boy.width || it.height != boy.height || it.imageFormat != bicim } == true) { runCatching { jpegOkuyucu?.close() }; jpegOkuyucu = null }
         if (boy != null && jpegOkuyucu == null) jpegOkuyucu = ImageReader.newInstance(boy.width, boy.height, bicim, 2)
         fotoHeif = heif; fotoBuyuk = boy != null && !heif && buyukMu(boy)
-        val rawIste = foto && ayar.raw && rawVar && !rawDustu
         if (!rawIste) { runCatching { rawOkuyucu?.close() }; rawOkuyucu = null }
         else if (rawOkuyucu == null) harita?.getOutputSizes(ImageFormat.RAW_SENSOR)?.maxByOrNull { it.width * it.height }?.let { rawOkuyucu = ImageReader.newInstance(it.width, it.height, ImageFormat.RAW_SENSOR, 2) }
     }
@@ -365,10 +380,17 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         return arrayOf(android.hardware.camera2.params.MeteringRectangle(x - yari, y - yari, yari * 2, yari * 2, 900))
     }
 
+    /**
+     * Fotoğraf modunda önizleme kare hızı: telefonun varsayılanı çoğu zaman 15–30 (loşta 15'e düşer, mod değişince "takılma" gibi görünür).
+     * Üstü 30, altı 20 ve üstü olan en geniş aralık; yoksa sabit 30.
+     */
+    private val onizlemeFps: Range<Int>? by lazy {
+        yetenek.fpsler.filter { it.upper == 30 && it.lower >= 20 }.minByOrNull { it.lower } ?: yetenek.fpsler.firstOrNull { it.lower == 30 && it.upper == 30 } }
+
     /** Ayarları (pozlama, ISO, beyaz dengesi, odak, sabitleme) bir isteğe uygular */
     private fun ayarUygula(r: CaptureRequest.Builder, foto: Boolean) {
         pro?.let { (m, a) -> return proUygula(r, foto, m, a) }
-        ayar.fps?.let { if (!foto) r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+        if (!foto) (if (fotoModu) onizlemeFps else ayar.fps)?.let { r.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
         val elle = ayar.iso != null || ayar.pozlamaNs != null
         if (elle && yetenek.elleKontrol) {
             r.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
