@@ -84,9 +84,11 @@ const TARAYICI = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (
 const ATLA = /youtube\.|amazon\.|reddit\.|facebook\.|instagram\.|tiktok\.|x\.com|twitter\.|pinterest\.|ebay\.|aliexpress\./i;
 /** Ürünün özellik sayfaları: DuckDuckGo'nun HTML sonuçlarından (anahtarsız) adaylar; önce üreticinin alan adı, sonra B&H, GSMArena, DPReview,
  *  sonra diğerleri. En çok 2 okunabilir sayfa (robot engeli "Access Denied" olanlar atlanır), her biri 14 bin karaktere kısaltılır. */
+let SAYFA_TESHIS = "";
 async function sayfaBul(urun: Urun): Promise<Sayfa[]> {
   const q = `${urun.brand} ${urun.name} ${urun.type === "lens" ? "lens" : ""} specifications`.replace(/\s+/g, " ");
-  const h = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), { headers: { "User-Agent": TARAYICI, "Accept-Language": "en" }, signal: AbortSignal.timeout(15_000) }).then((r) => r.text());
+  const hr = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), { headers: { "User-Agent": TARAYICI, "Accept-Language": "en" }, signal: AbortSignal.timeout(15_000) });
+  const h = await hr.text();
   const adaylar = [...h.matchAll(/class="result__a" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => {
     let u = m[1].replace(/&amp;/g, "&"); const k = u.match(/uddg=([^&]+)/); if (k) u = decodeURIComponent(k[1]);
     return { url: u.startsWith("//") ? "https:" + u : u, baslik: duz(m[2]) };
@@ -94,12 +96,13 @@ async function sayfaBul(urun: Urun): Promise<Sayfa[]> {
   const m = sade(urun.brand).slice(0, 5), puan = (u: string) => (sade(hostAl(u)).includes(m) ? 0 : /bhphotovideo|gsmarena|dpreview/.test(u) ? 1 : 2);
   const sirali = adaylar.map((x, i) => ({ ...x, i })).sort((a, b) => puan(a.url) - puan(b.url) || a.i - b.i);
   const cikan: Sayfa[] = [];
+  SAYFA_TESHIS = `arama ${hr.status}, ${h.length} bayt, ${adaylar.length} aday`;
   for (const x of sirali) {
     if (cikan.length >= 2) break;
     const r = await fetch(x.url, { headers: { "User-Agent": TARAYICI, "Accept-Language": "en,tr" }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
-    if (!r?.ok || !/html/i.test(r.headers.get("content-type") ?? "")) { await r?.body?.cancel().catch(() => {}); continue; }
+    if (!r?.ok || !/html/i.test(r.headers.get("content-type") ?? "")) { SAYFA_TESHIS += ` · ${hostAl(x.url)} ${r?.status ?? "yok"}`; await r?.body?.cancel().catch(() => {}); continue; }
     const t = duz((await r.text()).replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " "));
-    if (t.length < 1500 || /access denied|captcha|are you a robot/i.test(t.slice(0, 400))) continue;
+    if (t.length < 1500 || /access denied|captcha|are you a robot/i.test(t.slice(0, 400))) { SAYFA_TESHIS += ` · ${hostAl(x.url)} engel/kısa`; continue; }
     cikan.push({ url: x.url, baslik: x.baslik, metin: t.slice(0, 14_000), resmi: puan(x.url) === 0 });
   }
   return cikan;
@@ -116,7 +119,7 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
   let son = "";
   // 1) Asıl yol (31 Ekim 2026): sayfayı sunucu kendisi bulur ve okur, ücretsiz Gemini (araçsız istek, kota içinde) yalnız okunan metinden
   //    değer çıkarır. Ücretsiz katmanda Gemini'nin Google arama aracı her istekte 429 veriyordu; aramasız istekler geçiyor.
-  const sayfalar = await sayfaBul(urun).catch(() => [] as Sayfa[]);
+  const sayfalar = await sayfaBul(urun).catch((e) => { SAYFA_TESHIS = "arama hatası: " + String(e).slice(0, 120); return [] as Sayfa[]; });
   if (sayfalar.length) {
     const metin = sayfalar.map((x, i) => `[${i + 1}] KAYNAK: ${x.url}\n${x.metin}`).join("\n\n---\n\n");
     for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
@@ -141,11 +144,12 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
         const izinli = new Set(sayfalar.map((x) => x.url));
         if (Array.isArray(v.ozellikler)) v.ozellikler = v.ozellikler.filter((o: { kaynak?: string }) => izinli.has(String(o?.kaynak ?? "")));
         if (v.urunSayfasi && !izinli.has(v.urunSayfasi)) v.urunSayfasi = sayfalar.find((x) => x.resmi)?.url ?? null;
+        SAYFA_TESHIS += ` → ${model}`;
         return { v, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })) };
       } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
     }
     if (hepsiKota) await isaretle(a, "kota_dolu", son); }
-  } else son = "Ürün sayfası bulunamadı ya da okunamadı";
+  } else son = `Ürün sayfası bulunamadı ya da okunamadı (${SAYFA_TESHIS})`;
   // 2) Yedek: sayfa okunamadıysa ya da Gemini olmadıysa Groq kendi web aramasıyla dener.
   // Groq'ta gpt-oss modelleri yerleşik web aramasıyla (browser_search) aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
   // ("groq/compound" bu hesapta yok: 404, 31 Ekim 2026)
@@ -165,6 +169,7 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
       const arananlar = (m?.executed_tools ?? []).flatMap((t: any) => t?.search_results?.results ?? []).map((x: { title?: string; url?: string }) => ({ baslik: x.title ?? "", url: x.url ?? "" }));
       const ozKaynak = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).map((o: { kaynak?: string }) => ({ baslik: "", url: String(o?.kaynak ?? "") }));
       const kaynaklar = [...arananlar, ...ozKaynak].filter((x) => /^https?:\/\//.test(x.url)).filter((x, i, l) => l.findIndex((y) => y.url === x.url) === i).slice(0, 12);
+      SAYFA_TESHIS += ` → Groq ${model}`;
       return { v, kaynaklar };
     } catch (e) { son += ` | Groq ${model}: ${String(e).slice(0, 120)}`; }
   }
@@ -254,7 +259,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" }).select("id").single();
       if (error) await sb.from("kunye_oneriler").insert(kayit);
       else if (gorsel && cf && yeni) await gorselIsle(sb, cf, { id: yeni.id as number, urun_id: u.id, gorsel_aday: gorsel });
-      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length }); await kaydet(false);
+      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length, hata: SAYFA_TESHIS }); await kaydet(false);
     } catch (e) {
       // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda
       if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu", hata: String((e as Error).message).slice(0, 600) }); break; }
