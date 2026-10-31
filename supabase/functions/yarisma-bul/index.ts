@@ -38,7 +38,7 @@ async function ara(sb: ReturnType<typeof createClient>, bilinen: string[]) {
   const istem = `BUGÜN: ${bugun}\nZATEN BİLİNENLER:\n${bilinen.slice(0, 120).map((x) => "- " + x).join("\n") || "(yok)"}`;
   let son = "";
   // Anahtar havuzu (göç 0052): anahtarlar sırayla, her birinde modeller sırayla; bütün modelleri 429 veren anahtar "kota dolu" işaretlenir
-  for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+  for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST", signal: AbortSignal.timeout(120_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },

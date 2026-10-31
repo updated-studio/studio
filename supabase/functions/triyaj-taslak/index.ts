@@ -17,7 +17,7 @@ import { adayListesi, commons, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, 
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const MODELLER = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]; // sırayla denenir (eski GEMINI_MODELLER)
+const MODELLER = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]; // 31 Ekim 2026: 3.8-flash ücretsiz katmanda her istekte 429 (sayaç, göç 0055); çıkarıldı // sırayla denenir (eski GEMINI_MODELLER)
 
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

@@ -30,7 +30,7 @@ function jsonOku(s: string) { try { return JSON.parse(s); } catch { const m = s.
 async function yz(sistem: string, kullanici: string) {
   let son = "";
   // Anahtar havuzu (göç 0052): anahtarlar sırayla, her birinde modeller sırayla
-  for (const a of await anahtarlar()) { let hepsiKota = true; for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+  for (const a of await anahtarlar()) { let hepsiKota = true; for (const model of ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST", signal: AbortSignal.timeout(60_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },

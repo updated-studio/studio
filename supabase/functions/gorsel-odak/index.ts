@@ -7,7 +7,7 @@ import { anahtarlar, isaretle } from "./anahtar.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
-const MODELLER = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
+const MODELLER = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash"];
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (legacy) return legacy;

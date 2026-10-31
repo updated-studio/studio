@@ -79,6 +79,34 @@ async function gorselBul(marka: string, ad: string, gemini: string | null | unde
   return null;
 }
 
+type Sayfa = { url: string; baslik: string; metin: string; resmi: boolean };
+const TARAYICI = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+const ATLA = /youtube\.|amazon\.|reddit\.|facebook\.|instagram\.|tiktok\.|x\.com|twitter\.|pinterest\.|ebay\.|aliexpress\./i;
+/** Ürünün özellik sayfaları: DuckDuckGo'nun HTML sonuçlarından (anahtarsız) adaylar; önce üreticinin alan adı, sonra B&H, GSMArena, DPReview,
+ *  sonra diğerleri. En çok 2 okunabilir sayfa (robot engeli "Access Denied" olanlar atlanır), her biri 14 bin karaktere kısaltılır. */
+async function sayfaBul(urun: Urun): Promise<Sayfa[]> {
+  const q = `${urun.brand} ${urun.name} ${urun.type === "lens" ? "lens" : ""} specifications`.replace(/\s+/g, " ");
+  const h = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), { headers: { "User-Agent": TARAYICI, "Accept-Language": "en" }, signal: AbortSignal.timeout(15_000) }).then((r) => r.text());
+  const adaylar = [...h.matchAll(/class="result__a" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => {
+    let u = m[1].replace(/&amp;/g, "&"); const k = u.match(/uddg=([^&]+)/); if (k) u = decodeURIComponent(k[1]);
+    return { url: u.startsWith("//") ? "https:" + u : u, baslik: duz(m[2]) };
+  }).filter((x) => /^https?:\/\//.test(x.url) && !ATLA.test(x.url)).slice(0, 8);
+  const m = sade(urun.brand).slice(0, 5), puan = (u: string) => (sade(hostAl(u)).includes(m) ? 0 : /bhphotovideo|gsmarena|dpreview/.test(u) ? 1 : 2);
+  const sirali = adaylar.map((x, i) => ({ ...x, i })).sort((a, b) => puan(a.url) - puan(b.url) || a.i - b.i);
+  const cikan: Sayfa[] = [];
+  for (const x of sirali) {
+    if (cikan.length >= 2) break;
+    const r = await fetch(x.url, { headers: { "User-Agent": TARAYICI, "Accept-Language": "en,tr" }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+    if (!r?.ok || !/html/i.test(r.headers.get("content-type") ?? "")) { await r?.body?.cancel().catch(() => {}); continue; }
+    const t = duz((await r.text()).replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " "));
+    if (t.length < 1500 || /access denied|captcha|are you a robot/i.test(t.slice(0, 400))) continue;
+    cikan.push({ url: x.url, baslik: x.baslik, metin: t.slice(0, 14_000), resmi: puan(x.url) === 0 });
+  }
+  return cikan;
+}
+const OKU_SISTEM = SISTEM.replace("Görevin bir ürünün teknik özelliklerini İNTERNETTE ARAYARAK bulmak.", "Görevin bir ürünün teknik özelliklerini SANA VERİLEN SAYFA METİNLERİNDEN çıkarmak. İnternette arama yapma; yalnız bu metinlerde açıkça yazanı kullan.")
+  .replace(/"kaynak": [^\n]*/, '"kaynak": değeri aldığın sayfanın KAYNAK satırındaki adres, aynen. "kanit": o sayfadan kısa alıntı (en fazla 120 karakter).');
+
 async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
   const anahtarlar = await geminiAnahtarlari();
   if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
@@ -86,33 +114,39 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
   const ozellikler = liste.map((s) => `- ${s.key}${s.unit ? " · " + s.unit : ""}`).join("\n");
   const istem = `ÜRÜN: ${urun.brand} ${urun.name}\nDOLDURULACAK ÖZELLİKLER (ad · birim):\n${ozellikler}`;
   let son = "";
-  // Anahtarlar sırayla (havuz, göç 0052); her anahtarda modeller sırayla. Bir anahtarın bütün modelleri 429 verirse kotası dolu işaretlenir.
-  for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: SISTEM }] }, contents: [{ role: "user", parts: [{ text: istem }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1 } }),
-      });
-      const g = await r.text();
-      if (!r.ok) {
-        // Hangi kota doldu (genel istek mi, Google arama mı): yanıttaki quotaMetric/quotaId adları kaydedilir (31 Ekim 2026)
-        son = `${a.etiket} · ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 300)}`;
-        const ah = anahtarHatasi(r.status, g);
-        if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
-        if (ah !== "kota_dolu") hepsiKota = false;
-        continue;
-      }
-      hepsiKota = false; await isaretle(a, "calisiyor");
-      const j = JSON.parse(g), c = j?.candidates?.[0];
-      const metin = (c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("");
-      const v = jsonOku(metin);
-      if (!v) { son = `${model} geçersiz yanıt`; continue; }
-      const kaynaklar = (c?.groundingMetadata?.groundingChunks ?? []).map((x: { web?: { uri?: string; title?: string } }) => ({ baslik: x.web?.title ?? "", url: x.web?.uri ?? "" })).filter((x: { url: string }) => x.url).slice(0, 12);
-      return { v, kaynaklar };
-    } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
-  }
-  if (hepsiKota) await isaretle(a, "kota_dolu", son); }
-  // Yedek (31 Ekim 2026): ücretsiz Gemini anahtarlarında Google arama istekleri hep 429 alıyor (aramasız istekler geçiyor).
+  // 1) Asıl yol (31 Ekim 2026): sayfayı sunucu kendisi bulur ve okur, ücretsiz Gemini (araçsız istek, kota içinde) yalnız okunan metinden
+  //    değer çıkarır. Ücretsiz katmanda Gemini'nin Google arama aracı her istekte 429 veriyordu; aramasız istekler geçiyor.
+  const sayfalar = await sayfaBul(urun).catch(() => [] as Sayfa[]);
+  if (sayfalar.length) {
+    const metin = sayfalar.map((x, i) => `[${i + 1}] KAYNAK: ${x.url}\n${x.metin}`).join("\n\n---\n\n");
+    for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },
+          body: JSON.stringify({ systemInstruction: { parts: [{ text: OKU_SISTEM }] }, contents: [{ role: "user", parts: [{ text: `${istem}\n\nSAYFALAR:\n${metin}` }] }], generationConfig: { temperature: 0.1, responseMimeType: "application/json" } }),
+        });
+        const g = await r.text();
+        if (!r.ok) {
+          son = `${a.etiket} · ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 300)}`;
+          const ah = anahtarHatasi(r.status, g);
+          if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
+          if (ah !== "kota_dolu") hepsiKota = false;
+          continue;
+        }
+        hepsiKota = false; await isaretle(a, "calisiyor");
+        const c = JSON.parse(g)?.candidates?.[0];
+        const v = jsonOku((c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join(""));
+        if (!v) { son = `${model} geçersiz yanıt`; continue; }
+        // Kaynak yalnız okunan sayfalardan biri olabilir (model adres uyduramaz)
+        const izinli = new Set(sayfalar.map((x) => x.url));
+        if (Array.isArray(v.ozellikler)) v.ozellikler = v.ozellikler.filter((o: { kaynak?: string }) => izinli.has(String(o?.kaynak ?? "")));
+        if (v.urunSayfasi && !izinli.has(v.urunSayfasi)) v.urunSayfasi = sayfalar.find((x) => x.resmi)?.url ?? null;
+        return { v, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })) };
+      } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
+    }
+    if (hepsiKota) await isaretle(a, "kota_dolu", son); }
+  } else son = "Ürün sayfası bulunamadı ya da okunamadı";
+  // 2) Yedek: sayfa okunamadıysa ya da Gemini olmadıysa Groq kendi web aramasıyla dener.
   // Groq'ta gpt-oss modelleri yerleşik web aramasıyla (browser_search) aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
   // ("groq/compound" bu hesapta yok: 404, 31 Ekim 2026)
   const groq = Deno.env.get("GROQ_API_KEY");
