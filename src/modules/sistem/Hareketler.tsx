@@ -98,11 +98,11 @@ export default function Hareketler() {
       <div className="segment" role="group" aria-label="Dönem">
         {DONEM.map(([k, ad]) => <button key={k} className="chip" aria-pressed={donem === k} onClick={() => setDonem(k)}>{ad}</button>)}
       </div>
-      <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+      <div className="suzgec-izgara">
         <select aria-label="Kişi" value={kisi} onChange={(e) => setKisi(e.target.value)}><option value="">Herkes</option>{kisiler.map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}</select>
         <select aria-label="İşlem" value={islem} onChange={(e) => setIslem(e.target.value)}><option value="">Bütün işlemler</option>{Object.entries(ISLEM).map(([k, [ad]]) => <option key={k} value={k}>{ad}</option>)}</select>
         <select aria-label="Tür" value={tur} onChange={(e) => setTur(e.target.value)}><option value="">Bütün türler</option>{turler.map((t) => <option key={t} value={t}>{TUR[t] ?? t}</option>)}</select>
-        <input aria-label="Ara" placeholder="Başlıkta ara" value={ara} onChange={(e) => setAra(e.target.value)} style={{ flex: "1 1 160px" }} />
+        <input aria-label="Ara" type="search" placeholder="Başlıkta ara" value={ara} onChange={(e) => setAra(e.target.value)} />
       </div>
       {hata && <div className="msg err">{hata}</div>}
       {!hata && !gorunen.length && <div className="empty">{yukleniyor ? "Yükleniyor…" : "Bu süzgeçte kayıt yok."}</div>}

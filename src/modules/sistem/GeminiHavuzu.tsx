@@ -120,8 +120,8 @@ export default function GeminiHavuzu() {
             <span className="muted" style={{ fontSize: 13 }}>Toplam {toplam} istek. "Kota" sütunu reddedilen (429) istekler; kota model başına sayılır.</span>
             {fonklar.map((x) => (
               <div key={x.f} className="stack" style={{ gap: 2 }}>
-                <div className="row" style={{ justifyContent: "space-between" }}><b>{AD[x.f] ?? x.f}</b><span className="mono">{x.top}</span></div>
-                {x.l.map((y) => <div key={y.model} className="row muted" style={{ justifyContent: "space-between", fontSize: 13 }}><span className="mono">{y.model}</span><span className="mono">{y.basarili} başarılı · {y.kota} kota · {y.hata} hata</span></div>)}
+                <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}><b style={{ flex: 1, minWidth: 0 }}>{AD[x.f] ?? x.f}</b><span className="mono">{x.top}</span></div>
+                {x.l.map((y) => <div key={y.model} className="row muted" style={{ justifyContent: "space-between", fontSize: 13, columnGap: 12 }}><span className="mono">{y.model}</span><span className="mono">{y.basarili} başarılı · {y.kota} kota · {y.hata} hata</span></div>)}
               </div>
             ))}
           </div>

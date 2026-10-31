@@ -32,7 +32,7 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: butt; stroke-linejoin: miter; flex: none; } /* kit §8 İkon (1.4): 2 px, düz uç */
 
-.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 48px; display: flex; flex-direction: column; gap: 16px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 14px calc(118px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 16px; }
 .brand { font-family: var(--body); font-weight: 600; font-size: 24px; }
 .brand { display: flex; align-items: center; gap: 10px; }
 /* Sol üst logo: marka kiti 1.2 yatay logo (dar ekranda UP). Açılış ekranındaki işaret ayrı, index.html'de. */
@@ -49,7 +49,7 @@ h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: v
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 .btn.sm { padding: 6px 10px; font-size: 13px; }
 .btn:disabled { opacity: .5; }
-input[type=text], input[type=email], input[type=password], input[type=date], select { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; min-width: 0; width: 100%; }
+input:not([type]), input[type=search], input[type=number], input[type=url], input[type=text], input[type=email], input[type=password], input[type=date], select { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; min-width: 0; width: 100%; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .msg { border-radius: 10px; padding: 9px 12px; font-size: 13px; }
 .msg.err { background: var(--orange-soft); color: var(--err); }

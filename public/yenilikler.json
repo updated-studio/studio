@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-10-31-b",
+    "tarih": "31 Ekim 2026",
+    "baslik": "Telefonda daha derli toplu Stüdyo",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Haber Masası süzgeçleri telefonda daha az yer kaplıyor; yayın kuyruğu tek satır.",
+          "Üst çubuk kaydırınca arkasını göstermiyor; sayfa sonu alttaki menünün arkasında kalmıyor.",
+          "Hareket geçmişi süzgeçleri yan yana; arama kutuları her yerde aynı görünüyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-31-a",
     "tarih": "31 Ekim 2026",
     "baslik": "Künye otomasyonu ve sitede yeni araçlar",
