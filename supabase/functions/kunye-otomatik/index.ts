@@ -84,12 +84,20 @@ let SAYFA_TESHIS = "";
 /** Ürünün özellik sayfaları: yalnız künyede kayıtlı bağlantılar (üretici sayfası, önceki önerilerin kaynakları) okunur; arama motoru
  *  kazınmaz (31 Ekim 2026: robot doğrulaması olan aramalar kullanılmaz). Sayfa kendi adımızla (UA) istenir; engelleyen site atlanır.
  *  Yeni ürünün sayfasını bulmak Groq'un web aramasına kalır (aşağıda); bir arama API'si eklenirse burası onu kullanır. */
+const BRAVE_AY_SINIR = 700; // ücretsiz 1.000 aramanın güvenli altı
 const ATLA = /youtube\.|amazon\.|reddit\.|facebook\.|instagram\.|tiktok\.|x\.com|twitter\.|pinterest\.|ebay\.|aliexpress\./i;
 /** Brave Search API (göç 0057, Stüdyo → Bağlantı anahtarları "brave_arama"): ürünün özellik sayfası adayları. Anahtar yoksa boş döner. */
 async function braveAra(sb: ReturnType<typeof createClient>, urun: Urun): Promise<string[]> {
   const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "brave_arama").maybeSingle();
   const anahtar = (data as { deger?: string } | null)?.deger;
   if (!anahtar) return [];
+  // Aylık güvenlik sınırı (31 Ekim 2026, kullanıcı: "sınırı aşıp kartımdan çekmesin"): Brave ücretsiz hakkı ayda 5 $ ≈ 1.000 arama;
+  // sistem ayda en çok BRAVE_AY_SINIR arama yapar, sayaç tr_settings.brave_sayac'ta (ay başında sıfırlanır).
+  const ay = new Date().toISOString().slice(0, 7);
+  const { data: sy } = await sb.from("tr_settings").select("value").eq("key", "brave_sayac").maybeSingle();
+  const sayac = (sy?.value as { ay?: string; adet?: number } | null)?.ay === ay ? Number((sy!.value as { adet?: number }).adet ?? 0) : 0;
+  if (sayac >= BRAVE_AY_SINIR) { SAYFA_TESHIS = `Brave aylık sınır doldu (${sayac}/${BRAVE_AY_SINIR})`; return []; }
+  await sb.from("tr_settings").upsert({ key: "brave_sayac", value: { ay, adet: sayac + 1 } });
   const q = `${urun.brand} ${urun.name} ${urun.type === "lens" ? "lens " : ""}specifications`;
   const r = await fetch("https://api.search.brave.com/res/v1/web/search?count=8&q=" + encodeURIComponent(q), { headers: { Accept: "application/json", "X-Subscription-Token": anahtar }, signal: AbortSignal.timeout(15_000) });
   if (!r.ok) { SAYFA_TESHIS = `Brave ${r.status}`; await r.body?.cancel().catch(() => {}); return []; }
