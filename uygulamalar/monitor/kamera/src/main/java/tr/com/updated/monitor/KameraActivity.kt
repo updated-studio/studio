@@ -342,8 +342,11 @@ class KameraActivity : Activity() {
         // Üstte tek okuma şeridi (biçim + elle değişmiş değerler); sabitlenenler şeridin altında küçük kapsüller
         bilgiSira = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setOnLongClickListener { duzenleAc(); true }
             setPadding(dp(4f), 0, dp(4f), 0); clipChildren = false; clipToPadding = false }
-        aciklamalar.add(bilgiSira to "Değerler: dokun değiştir, basılı tut düzenle")
-        kutu.addView(bilgiSira, FrameLayout.LayoutParams(-2, dp(42f), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(6f) })
+        aciklamalar.add(bilgiSira to "Sabitlenenler: dokun aç/kapa, basılı tut ayrıntı")
+        kutu.addView(bilgiSira, FrameLayout.LayoutParams(-2, dp(44f), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(22f) })
+        okumaSatir = TextView(this).apply { textSize = 12f; typeface = inter400; letterSpacing = 0.06f; setTextColor(VURGU); gravity = Gravity.CENTER; isSingleLine = true; fontFeatureSettings = "tnum"
+            setShadowLayer(dp(3f).toFloat(), 0f, 0f, Color.argb(150, 0, 0, 0)); visibility = View.INVISIBLE }
+        kutu.addView(okumaSatir, FrameLayout.LayoutParams(-2, dp(18f), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(2f) })
         favSira = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setOnLongClickListener { duzenleAc(); true }; clipChildren = false; clipToPadding = false }
         aciklamalar.add(favSira to "Sabitlenenler (basılı tut: düzenle)")
         kutu.addView(favSira, FrameLayout.LayoutParams(-2, dp(24f), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(54f) })
@@ -479,6 +482,7 @@ class KameraActivity : Activity() {
      */
     private lateinit var hizliSira: LinearLayout
     private lateinit var kapsulYeri: View
+    private lateinit var okumaSatir: TextView
     /** `simge` yazının solunda (yazı boşsa tek başına); `en` parçanın sabit genişliği (dp): değer değişince kapsül ve komşular kaymaz */
     private class Hizli(val ad: String, val yazi: String, val simge: Int?, val secenekler: List<String>, val secili: Int, val en: Float, val sec: (Int) -> Unit)
 
@@ -1069,7 +1073,8 @@ class KameraActivity : Activity() {
         grupIci?.let { g -> v.background = null; (v.parent as? android.view.ViewGroup)?.removeView(v); g.addView(v, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6f) }); return }
         // Açık pano yenileniyorsa (seçim yapıldı) anında değişir; yeni açılışta alttan kayarak gelir
         val yenileniyor = acilir != null
-        acilirKapat(hemen = true); secimKapat()
+        val fav = panelFav
+        acilirKapat(hemen = true); secimKapat(); panelFav = fav
         val perde = FrameLayout(this).apply { setOnClickListener { perdeKapat?.invoke() ?: acilirKapat() } }
         val kap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = pano(0f); setPadding(dp(14f), dp(10f), dp(14f), dp(16f)); isClickable = true }
         val bas = FrameLayout(this)
@@ -1079,6 +1084,9 @@ class KameraActivity : Activity() {
             setOnClickListener { sol.second() } }, FrameLayout.LayoutParams(-2, dp(32f), Gravity.START or Gravity.CENTER_VERTICAL))
         else if (!carpiYok) bas.addView(ImageView(this).apply { setImageResource(R.drawable.ic_kapat); setColorFilter(METIN2); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(7f), dp(7f), dp(7f), dp(7f)); contentDescription = "Kapat"
             background = daire(false, Color.argb(31, 255, 255, 255)); setOnClickListener { perdeKapat?.invoke() ?: acilirKapat() } }, FrameLayout.LayoutParams(dp(28f), dp(28f), Gravity.START or Gravity.CENTER_VERTICAL).apply { marginStart = dp(6f) })
+        if (fav != null && fav in favoriler) bas.addView(ImageView(this).apply { setImageResource(R.drawable.ic_raptiye_yok); setColorFilter(METIN2); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(6f), dp(6f), dp(6f), dp(6f))
+            contentDescription = "Sabitlemeyi kaldır"; background = daire(false, Color.argb(31, 255, 255, 255))
+            setOnClickListener { favSabitle(fav); acilirKapat(); bilgiCiz() } }, FrameLayout.LayoutParams(dp(28f), dp(28f), Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = dp(6f) })
         kap.addView(bas, LinearLayout.LayoutParams(-1, dp(44f)))
         v.background = null
         val kaydir = v as? ScrollView ?: ScrollView(this).apply { isVerticalScrollBarEnabled = false; addView(v) }
@@ -1104,7 +1112,7 @@ class KameraActivity : Activity() {
                 if (k == null) kok.removeView(p)
                 else { k.isEnabled = false; k.animate().alpha(0f).translationY(dp(24f).toFloat()).setDuration(150).setInterpolator(android.view.animation.AccelerateInterpolator(1.5f)).withEndAction { kok.removeView(p) }.start() } }
         }
-        acilir = null; aktifGrup = null; aktifDenetim = false
+        acilir = null; aktifGrup = null; aktifDenetim = false; panelFav = null
         if (this::aracSerit.isInitialized) {
             aracCiz(); altGizle(false)
             deklansorSira.animate().translationY(0f).setDuration(160).start()
@@ -1908,10 +1916,50 @@ class KameraActivity : Activity() {
     } }
     private fun favKaydet() { tercih.edit().putString("k.favoriler", org.json.JSONArray(favoriler).toString()).apply(); bilgiCiz() }
     private fun favSabitle(a: String) {
-        if (a in favoriler) { favoriler.remove(a); tost("Sabitleme kaldırıldı: ${favAd(a)}") }
+        kok.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        if (a in favoriler) { favoriler.remove(a); tost("${favAd(a)} ana ekrandan kaldırıldı") }
         else if (favoriler.size >= FAV_EN_COK) return tost("En çok $FAV_EN_COK denetim sabitlenir.")
-        else { favoriler.add(a); tost("Sabitlendi: ${favAd(a)}") }
+        else { favoriler.add(a); tost("${favAd(a)} ana ekrana sabitlendi") }
         favKaydet()
+    }
+
+    /** Sabitlenen simgeye basılı tutunca: ayarın tam panosu (beyaz denge: Kelvin + yeşil-macenta), başlığın sağında "kaldır"; panosu olmayanlarda simgenin altında küçük menü */
+    private var panelFav: String? = null
+    private fun favPanel(a: String, v: View) {
+        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        when (a) {
+            "bd", "ev", "odak" -> { panelFav = a; cetvelAc(when (a) { "bd" -> Cetvel.BD; "ev" -> Cetvel.POZ; else -> Cetvel.ODAK }) }
+            "stil", "ses" -> { panelFav = a; favDokun(a) }
+            else -> favMenu(a, v)
+        }
+    }
+    private fun favMenu(a: String, v: View) {
+        acilirKapat(); hizliMenu?.dismiss()
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(10f), 0, dp(6f))
+            background = GradientDrawable().apply { setColor(Color.argb(236, 28, 28, 30)); cornerRadius = dp(16f).toFloat(); setStroke(ince, CAM_KENAR) }
+            elevation = dp(10f).toFloat(); rotation = -fizikselYon.toFloat() }
+        p.addView(TextView(this).apply { text = favAd(a).uppercase(Locale("tr")); textSize = 10f; typeface = kosulKalin; letterSpacing = 0.14f; setTextColor(METIN2); setPadding(dp(16f), 0, dp(16f), dp(6f)) })
+        val menu = android.widget.PopupWindow(p, dp(210f), -2, true).apply { isOutsideTouchable = true; animationStyle = android.R.style.Animation_Dialog; setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)) }
+        fun satir(ad: String, secili: Boolean, renk: Int, simge: Int? = null, is_: () -> Unit) = p.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16f), 0, dp(14f), 0); contentDescription = ad
+            if (simge != null) addView(ImageView(this@KameraActivity).apply { setImageResource(simge); setColorFilter(renk) }, LinearLayout.LayoutParams(dp(16f), dp(16f)).apply { marginEnd = dp(10f) })
+            addView(TextView(this@KameraActivity).apply { text = ad; textSize = 15f; typeface = if (secili) kosulKalin else kosul; setTextColor(renk) }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (secili) addView(View(this@KameraActivity).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(VURGU) } }, LinearLayout.LayoutParams(dp(7f), dp(7f)))
+            setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); menu.dismiss(); is_() }
+        }, LinearLayout.LayoutParams(-1, dp(44f)))
+        val acik = favGorunum(a).degisik
+        when (a) {
+            "zamanlayici" -> listOf(0, 3, 10).forEach { z -> satir(if (z == 0) "Kapalı" else "$z sn", zamanlayici == z, if (zamanlayici == z) VURGU else Color.WHITE) {
+                zamanlayici = z; tercih.edit().putInt("zamanlayici", z).apply(); bilgiCiz() } }
+            "flas" -> satir("Değiştir", false, Color.WHITE) { favDokun(a) }
+            in FAV_ACKAPA -> { satir("Açık", acik, if (acik) VURGU else Color.WHITE) { if (!acik) favDokun(a) }; satir("Kapalı", !acik, if (!acik) VURGU else Color.WHITE) { if (acik) favDokun(a) } }
+            else -> satir("Seçenekler…", false, Color.WHITE) { favDokun(a) }
+        }
+        p.addView(View(this).apply { setBackgroundColor(HAT) }, LinearLayout.LayoutParams(-1, ince).apply { topMargin = dp(4f); bottomMargin = dp(4f) })
+        satir("Sabitlemeyi kaldır", false, METIN2, R.drawable.ic_raptiye_yok) { favSabitle(a); bilgiCiz() }
+        menu.setOnDismissListener { if (hizliMenu === menu) hizliMenu = null }
+        hizliMenu = menu
+        menu.showAsDropDown(v, (v.width - dp(210f)) / 2, dp(8f))
     }
 
     private fun favAd(a: String) = when (a) {
@@ -1977,45 +2025,33 @@ class KameraActivity : Activity() {
     }
 
     /**
-     * Değer hücreleri (Sentez): üstte küçük ince etiket, altında değer; zeminsiz, gölgeli. Her hücre sabit genişlikte (değer değişince komşular kaymaz).
-     * Sarı yalnız elle değişen değerde. Sıra: PRO'da modun ISO/S'si; diğerlerinde ISO · ENST. · BEYAZ · EV · ODAK (sabitlenmişse ya da elle değiştiyse),
-     * ardından sabitlenen aç/kapa denetimleri (simge + etiket). Düzenlemede hepsi ⊖ rozetli.
+     * Üst satır (Kombin; iPhone 0.18.0 ile aynı): sabitlenenler yalnız 36 dp cam daire simge (ad ve değer yok); değişmişse sarı simge ve ince sarı halka.
+     * Dokun: aç/kapa ya da hızlı seçim; basılı tut: ayarın tam panosu. Elle değişmiş değerler (sabitli olsun olmasın) üstte tek ince sarı satırda.
      */
     private fun ustSatirCiz(k: KameraKaynak?, metin: String) {
         bilgiSira.removeAllViews(); favSira.removeAllViews()
-        fun hucre(etiket: String, deger: String?, ikon: Int?, degisik: Boolean, ad: String, sil: (() -> Unit)?, tik: () -> Unit) {
-            val renk = if (degisik) VURGU else Color.WHITE
-            val ic = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
-                addView(TextView(this@KameraActivity).apply { text = etiket; textSize = 9f; typeface = inter400; letterSpacing = 0.12f; setTextColor(Color.argb(170, 255, 255, 255)); gravity = Gravity.CENTER
-                    isSingleLine = true; includeFontPadding = false; setShadowLayer(dp(3f).toFloat(), 0f, 0f, Color.argb(150, 0, 0, 0))
-                    setAutoSizeTextTypeUniformWithConfiguration(7, 9, 1, android.util.TypedValue.COMPLEX_UNIT_SP) }, LinearLayout.LayoutParams(-1, dp(12f)))
-                if (deger != null) addView(TextView(this@KameraActivity).apply { text = deger; textSize = 15f; typeface = kosulKalin; setTextColor(renk); gravity = Gravity.CENTER; fontFeatureSettings = "tnum"
-                    isSingleLine = true; includeFontPadding = false; setShadowLayer(dp(3f).toFloat(), 0f, 0f, Color.argb(150, 0, 0, 0))
-                    setAutoSizeTextTypeUniformWithConfiguration(11, 15, 1, android.util.TypedValue.COMPLEX_UNIT_SP) }, LinearLayout.LayoutParams(-1, dp(19f)).apply { topMargin = dp(3f) })
-                else addView(ImageView(this@KameraActivity).apply { setImageResource(ikon ?: R.drawable.ic_ayar); setColorFilter(renk); alpha = if (degisik) 1f else 0.72f; scaleType = ImageView.ScaleType.FIT_CENTER },
-                    LinearLayout.LayoutParams(dp(18f), dp(18f)).apply { topMargin = dp(3f) })
-            }
-            val f = FrameLayout(this).apply { clipChildren = false; contentDescription = ad; rotation = -fizikselYon.toFloat()
-                setOnClickListener { tik() }; setOnLongClickListener { duzenleAc(); true } }
-            f.addView(ic, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
-            if (sil != null) f.addView(etiket("−", 12f).apply { typeface = kosulKalin; background = daire(false, Color.rgb(99, 99, 102)); setOnClickListener { sil() } },
-                FrameLayout.LayoutParams(dp(15f), dp(15f), Gravity.TOP or Gravity.START).apply { topMargin = -dp(9f); marginStart = -dp(2f) })
-            bilgiSira.addView(f, LinearLayout.LayoutParams(dp(58f), -1))
+        // Okuma satırı: elle değişen değerler (PRO'da modun ISO/S'si)
+        val ok = ArrayList<String>()
+        if (mod == KMod.PRO) { val a = proMod.oku(tercih); if (a.iso != null) ok.add("ISO ${ProMod.isoYazi(a.iso)}"); a.enstNs?.let { ok.add(ProMod.enstYazi(it)) } }
+        else listOf("iso", "enst", "bd", "ev", "odak").forEach { a -> val g = favGorunum(a)
+            if (g.degisik && g.ust != null) ok.add(when (a) { "iso" -> "ISO ${g.ust}"; "bd" -> (if (g.ust.all { it.isDigit() }) "${g.ust}K" else g.ust) + (if (ayar.ton != 0) " ${tonYazi(ayar.ton)}" else "")
+                "ev" -> "${g.ust} EV"; "odak" -> g.ust; else -> g.ust }) }
+        okumaSatir.text = ok.joinToString("  ·  ")
+        okumaSatir.visibility = if (ok.isEmpty()) View.INVISIBLE else View.VISIBLE
+        okumaSatir.rotation = -fizikselYon.toFloat()
+        // Sabitlenenler: yalnız simge
+        favoriler.filter { it != "cozunurluk" && favUygun(it) && (mod != KMod.PRO || it in FAV_ACKAPA || duzenleniyor) }.forEach { a ->
+            val g = favGorunum(a); val renk = if (g.degisik) VURGU else Color.WHITE
+            val f = FrameLayout(this).apply { clipChildren = false; contentDescription = favAd(a); rotation = -fizikselYon.toFloat()
+                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(CAM_UST, CAM_ALT)).apply { shape = GradientDrawable.OVAL
+                    if (g.degisik) setStroke(dp(1f), Color.argb(225, 255, 214, 10)) else setStroke(ince, CAM_KENAR) }
+                setOnClickListener { favDokun(a) }; setOnLongClickListener { if (duzenleniyor) false else { favPanel(a, this); true } } }
+            if (g.ikon != null) f.addView(ImageView(this).apply { setImageResource(g.ikon); setColorFilter(renk); scaleType = ImageView.ScaleType.FIT_CENTER }, FrameLayout.LayoutParams(dp(18f), dp(18f), Gravity.CENTER))
+            else f.addView(TextView(this).apply { text = g.ust ?: favKisa(a); textSize = 9.5f; typeface = kosulKalin; setTextColor(renk); gravity = Gravity.CENTER; isSingleLine = true }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+            if (duzenleniyor) f.addView(etiket("−", 12f).apply { typeface = kosulKalin; background = daire(false, Color.rgb(99, 99, 102)); setOnClickListener { favoriler.remove(a); favKaydet(); duzenleAc(yeniden = true) } },
+                FrameLayout.LayoutParams(dp(15f), dp(15f), Gravity.TOP or Gravity.START).apply { topMargin = -dp(4f); marginStart = -dp(4f) })
+            bilgiSira.addView(f, LinearLayout.LayoutParams(dp(36f), dp(36f)).apply { marginStart = dp(6f); marginEnd = dp(6f) })
         }
-        fun silici(a: String): (() -> Unit)? = if (!duzenleniyor) null else ({ favoriler.remove(a); favKaydet(); duzenleAc(yeniden = true) })
-        val degerli = listOf("iso", "enst", "bd", "ev", "odak")
-        fun degerEtiket(a: String, g: FavGorunum) = when (a) { "enst" -> if (g.alt == "AÇI") "AÇI" else "ENST."; "bd" -> "BEYAZ"; else -> favEtiket(a) }
-        fun degerYazi(a: String, g: FavGorunum) = if (a == "bd" && g.ust?.all { it.isDigit() } == true) "${g.ust}K" else g.ust
-        val sabit = favoriler.filter { it != "cozunurluk" && favUygun(it) }
-        if (mod == KMod.PRO && !duzenleniyor) {
-            val a = proMod.oku(tercih)
-            hucre("ISO", ProMod.isoYazi(a.iso), null, a.iso != null, "ISO", null) { proOzellestir() }
-            hucre("ENST.", a.enstNs?.let { ProMod.enstYazi(it) } ?: "OTO", null, a.enstNs != null, "Enstantane", null) { proOzellestir() }
-        } else degerli.forEach { a -> val g = favGorunum(a)
-            if (g.ust != null && (a in sabit || g.degisik)) hucre(degerEtiket(a, g), degerYazi(a, g), null, g.degisik, favAd(a), silici(a).takeIf { a in sabit }) { favDokun(a) } }
-        sabit.filter { it !in degerli && (mod != KMod.PRO || it in FAV_ACKAPA || duzenleniyor) }.forEach { a -> val g = favGorunum(a)
-            if (g.ikon == null && g.ust != null) hucre(favKisa(a).uppercase(Locale("tr")), g.ust, null, g.degisik, favAd(a), silici(a)) { favDokun(a) }
-            else hucre(favKisa(a).uppercase(Locale("tr")), null, g.ikon, g.degisik, favAd(a), silici(a)) { favDokun(a) } }
         bilgiSira.background = if (duzenleniyor) Tema.kapsul(Color.argb(60, 0, 0, 0), 999f, Color.argb(150, 255, 255, 255)) else null
     }
     /** Sabitlenen kapsülündeki kısa ad */
@@ -2166,11 +2202,15 @@ class KameraActivity : Activity() {
             sira.forEach { a ->
                 val g = favGorunum(a)
                 val h = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; contentDescription = favAd(a); setPadding(0, dp(6f), 0, dp(10f))
-                    setOnClickListener { favDokun(a) }; setOnLongClickListener { favSabitle(a); true } }
+                    setOnClickListener { favDokun(a) }; setOnLongClickListener { favSabitle(a); bilgiCiz(); denetimlerAc(); true } }
                 val d = FrameLayout(this).apply { background = daire(g.degisik, DOLGU); rotation = -fizikselYon.toFloat() }
                 val ic = favIcerik(g, g.ust != null && a in setOf("iso", "enst", "bd", "ev", "cozunurluk", "kodek", "renk", "odak"), 13f, false)
                 if (ic is ImageView) d.addView(ic, FrameLayout.LayoutParams(dp(26f), dp(26f), Gravity.CENTER)) else d.addView(ic, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
-                h.addView(d, LinearLayout.LayoutParams(dp(60f), dp(60f)))
+                val c = FrameLayout(this).apply { clipChildren = false }
+                c.addView(d, FrameLayout.LayoutParams(dp(60f), dp(60f)))
+                if (a in favoriler) c.addView(ImageView(this).apply { setImageResource(R.drawable.ic_raptiye); setColorFilter(Color.BLACK); setPadding(dp(3f), dp(3f), dp(3f), dp(3f))
+                    background = daire(false, VURGU); contentDescription = "Sabitli" }, FrameLayout.LayoutParams(dp(18f), dp(18f), Gravity.TOP or Gravity.END))
+                h.addView(c, LinearLayout.LayoutParams(dp(60f), dp(60f)))
                 h.addView(TextView(this).apply { text = favEtiket(a); textSize = 9.5f; letterSpacing = 0.08f; typeface = kosulKalin; setTextColor(METIN2); gravity = Gravity.CENTER; isSingleLine = true; setPadding(0, dp(7f), 0, 0) })
                 s.addView(h, LinearLayout.LayoutParams(0, -2, 1f))
             }
