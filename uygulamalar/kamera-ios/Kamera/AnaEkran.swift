@@ -26,6 +26,8 @@ struct AnaEkran: View {
     @State private var acikSatir: Favori?
     /// Kısayolları düzenleme (Apple Kamera "Düzenle"); vazgeçince eski liste geri gelir
     @State private var duzenleme = false
+    /// "Dok" tasarımı (Fatih 31 Ekim 19:54 "bir de böyle deneyelim"): sabitlenenler deklanşörün üstünde tek cam şeritte
+    @AppStorage("k.dok") private var dok = true
     @State private var yedekFavoriler: [Favori] = []
     @State private var uyariMod: ProMod?
     @State private var arayuz: UIInterfaceOrientation = .portrait
@@ -158,7 +160,7 @@ struct AnaEkran: View {
             VStack(spacing: 0) {
                 ustBant.frame(height: ust)
                 bilgi.padding(.top, 6)
-                sabitler.padding(.top, 8)
+                if !dok { sabitler.padding(.top, 8) }
                 cipler(yatay: false).padding(.top, 8)
                 Spacer(minLength: 0)
                 if let b = kamera.bildirim { bildirimKutusu(b) }
@@ -174,6 +176,7 @@ struct AnaEkran: View {
                         .padding(.bottom, 20)
                     }
                 }
+                if dok && panel == nil && !duzenleme { dokSeridi.padding(.bottom, 14) }
                 // Apple Kamera gibi: mod şeridi tam genişlikte (VLOG dahil hepsi okunur), altında son çekim · deklanşör · ön/arka
                 if panel == nil {
                     modSecici(dikey: false, genislik: g.size.width).padding(.bottom, 8)
@@ -181,12 +184,10 @@ struct AnaEkran: View {
                 HStack(spacing: 0) {
                     sonCekim
                     Spacer()
-                    solDugme
-                    Spacer()
+                    if !dok || kamera.mod == .pro { solDugme; Spacer() }
                     deklansor
                     Spacer()
-                    kontrolDugme
-                    Spacer()
+                    if !dok { kontrolDugme; Spacer() }
                     cevirDugme
                 }
                 .padding(.horizontal, 20)
@@ -555,6 +556,53 @@ struct AnaEkran: View {
             }
             .disabled(kamera.kayitta)
         }
+    }
+
+    /// Dok: flaş · sabitlenenler · Denetimler tek cam şeritte (başparmak alanı). Sabitlenene dokun = şeffaf hızlı menü;
+    /// Denetimler'e dokun = ızgara, basılı tut = düzenleme (Apple'daki gibi ekle/çıkar, Vazgeç / Bitti)
+    private var dokSeridi: some View {
+        HStack(spacing: 0) {
+            if kamera.mod != .pro {
+                Button { UIImpactFeedbackGenerator(style: .light).impactOccurred(); kamera.flasDegistir() } label: {
+                    Image(systemName: kamera.flas == .kapali ? "bolt.slash" : (kamera.flas == .oto ? "bolt.badge.automatic" : "bolt.fill"))
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(kamera.flas == .kapali ? .white : Tema.sari)
+                        .frame(width: 40, height: 40)
+                }
+                .accessibilityLabel("Flaş")
+                Rectangle().fill(Color.white.opacity(0.16)).frame(width: 0.5, height: 22).padding(.horizontal, 4)
+            }
+            ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) && $0 != .flas }) { f in
+                Menu {
+                    HizliMenu(f: f, kamera: kamera, ayrinti: { ayrintiAc(f) })
+                } label: {
+                    SabitKapsul(f: f, kamera: kamera)
+                }
+                .menuOrder(.fixed)
+                .simultaneousGesture(TapGesture().onEnded { UIImpactFeedbackGenerator(style: .light).impactOccurred() })
+                .overlay(alignment: .bottom) {
+                    if kamera.favoriDeger(f).etkin || acikSatir == f || panel == .favori(f) { Circle().fill(Tema.sari).frame(width: 3, height: 3).offset(y: -1) }
+                }
+            }
+            Rectangle().fill(Color.white.opacity(0.16)).frame(width: 0.5, height: 22).padding(.horizontal, 4)
+            Image(systemName: "chevron.up").font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(degisik ? Tema.sari : .white)
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+                .onTapGesture { UIImpactFeedbackGenerator(style: .light).impactOccurred(); acikSatir = nil; panelAc(.kontroller) }
+                .onLongPressGesture(minimumDuration: 0.4) { UIImpactFeedbackGenerator(style: .medium).impactOccurred(); duzenlemeBasla() }
+                .accessibilityLabel("Denetimler")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction(named: "Sabitlenenleri düzenle") { duzenlemeBasla() }
+        }
+        .padding(.horizontal, 6)
+        .frame(height: 50)
+        .background(Capsule().fill(.ultraThinMaterial).opacity(0.85))
+        .background(Capsule().fill(Color.black.opacity(0.25)))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
+        .environment(\.colorScheme, .dark)
+        .disabled(kamera.kayitta)
+        .transition(.opacity)
     }
 
     private func okuma(_ o: (String, String, Bool)) -> some View {

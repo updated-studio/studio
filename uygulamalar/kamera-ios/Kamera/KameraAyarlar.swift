@@ -5,6 +5,7 @@ import SwiftUI
 /// zamanlayıcı; VİDEO: çözünürlük · kare hızı · Kayıt (kodek, SDR / HDR / Log, sabitleme) · Ses. Altında ortaklar, Masa, Uygulama
 struct KameraAyarlar: View {
     @ObservedObject var kamera: Kamera
+    @AppStorage("k.dok") var dok = true
     var wifiKamera: () -> Void
     var vlog: () -> Void = {}
     var yardimAc: () -> Void = {}
@@ -23,6 +24,7 @@ struct KameraAyarlar: View {
                     NavigationLink { renk } label: { satir("circle.lefthalf.filled", .pink, "Renk ve beyaz denge", kamera.bd.map { "\(Int($0))K" } ?? "Oto") }
                     NavigationLink { gostergeler } label: { satir("chart.bar", .green, "Göstergeler", kamera.gostergeEtkin ? "Açık" : (kamera.kompTur == .kapali ? "" : kamera.kompTur.ad)) }
                     NavigationLink { FavoriDuzenle(kamera: kamera) } label: { satir("pin", .yellow, "Sabitlenenler", "\(kamera.favoriler.count)") }
+                    Toggle(isOn: $dok) { Label("Sabitlenenler deklanşörün üstünde", systemImage: "dock.rectangle") }
                 }
                 if kamera.mod == .video {
                     Section {
