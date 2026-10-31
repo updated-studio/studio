@@ -197,6 +197,10 @@ class KameraActivity : Activity() {
     private var vlogCikti = 0
     /** Vlog: ön pencere köşesi (0 sağ alt, 1 sağ üst, 2 sol üst, 3 sol alt), pencere açık mı, kayıt öncesi sayaç (0/3/10 sn) */
     private var vlogKose = 0; private var vlogPencere = true; private var vlogSayac = 0
+    /** "Dok" (Fatih 31 Ekim 19:54): dikeyde sabitlenenler deklanşörün üstünde tek cam şeritte; Genel Ayarlar'dan eski düzene dönülür */
+    private var dokTercih = true
+    private val dokModu get() = dokTercih && fizikselYon != 90 && fizikselYon != 270
+    private lateinit var dok: LinearLayout; private lateinit var dokFlas: ImageView; private lateinit var dokFav: LinearLayout
     private var vlogSinir: Int? = null
     /** Bu telefonda ön + arka aynı anda açılabiliyor mu (VLOG modu yalnız o zaman görünür) */
     private val vlogDestek get() = vlogOnId() != null
@@ -332,7 +336,7 @@ class KameraActivity : Activity() {
         komp = KompozisyonGorunum(this) { monitor.goruntuAlani() }.also { it.tur = kompTur; it.yon = kompYon; it.asistan = asistanAcik
             // Kadraj çentikleri: üstteki sabitlenenlerin altından merceklerin üstüne
             it.kenar = { val u = if (ustBosluk == 0) dp(32f) else ustBosluk; val a = if (altBosluk == 0) dp(16f) else altBosluk
-                RectF(dp(16f).toFloat(), (u + dp(132f)).toFloat(), (it.width - dp(16f)).toFloat(), (it.height - a - dp(226f)).toFloat()) } }
+                RectF(dp(16f).toFloat(), (u + dp(if (dokModu) 60f else 132f)).toFloat(), (it.width - dp(16f)).toFloat(), (it.height - a - dp(if (dokModu) 284f else 226f)).toFloat()) } }
         tam.addView(komp, FrameLayout.LayoutParams(-1, -1))
         cerceve = tercih.getInt("k.cerceve", 0) and ((1 shl CERCEVELER.size) - 1)
         tam.addView(cerceveGorunum, FrameLayout.LayoutParams(-1, -1))
@@ -443,6 +447,28 @@ class KameraActivity : Activity() {
         deklansorSira.addView(kontrolDugme, FrameLayout.LayoutParams(dp(42f), dp(42f), Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = dp(84f) })
         kok.addView(deklansorSira)
 
+        // Dok: mod şeridi ve deklanşörün üstünde tek cam kapsül; solda flaş, ortada sabitlenenler (yalnız simge), sağda Denetimler oku
+        dok = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6f), 0, dp(6f), 0)
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(CAM_UST, CAM_ALT)).apply { cornerRadius = dp(25f).toFloat(); setStroke(dp(1f), Color.argb(70, 255, 255, 255)) }
+            visibility = View.GONE }
+        fun ayrac() = View(this).apply { setBackgroundColor(Color.argb(56, 255, 255, 255)) }
+        dokFlas = ImageView(this).apply { setImageResource(R.drawable.ic_flas_yok); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(12f), dp(13f), dp(12f), dp(13f))
+            contentDescription = "Flaş"; setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); flasDegistir() }; donenler.add(this) }
+        aciklamalar.add(dokFlas to "Flaş")
+        dok.addView(dokFlas, LinearLayout.LayoutParams(dp(46f), -1))
+        dok.addView(ayrac(), LinearLayout.LayoutParams(dp(1f), dp(22f)))
+        dokFav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; clipChildren = false; clipToPadding = false }
+        aciklamalar.add(dokFav to "Sabitlenenler: dokun hızlı menü, basılı tut ayrıntı")
+        dok.addView(dokFav, LinearLayout.LayoutParams(0, -1, 1f))
+        dok.addView(ayrac(), LinearLayout.LayoutParams(dp(1f), dp(22f)))
+        val dokOk = ImageView(this).apply { setImageResource(R.drawable.ic_yukari); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(12f), dp(13f), dp(12f), dp(13f))
+            contentDescription = "Denetimler"; donenler.add(this)
+            setOnClickListener { if (acilir != null) acilirKapat() else denetimlerAc() }
+            setOnLongClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS); duzenleAc(); true } }
+        aciklamalar.add(dokOk to "Dokun: Denetimler · basılı tut: düzenle")
+        dok.addView(dokOk, LinearLayout.LayoutParams(dp(46f), -1))
+        kok.addView(dok)
+
         // Dikey düzen (Fatih 30 Ekim 13:38; iPhone 0.16.2 ile aynı): mod şeridi kendi satırında tam genişlikte; altında tek sıra
         // son çekim · flaş/PRO · deklanşör · denetimler · ön/arka
         altSira = FrameLayout(this)
@@ -495,15 +521,19 @@ class KameraActivity : Activity() {
             cetvel.rotation = -fizikselYon.toFloat()
             cetvel.layoutParams = FrameLayout.LayoutParams(dp(300f), dp(36f), Gravity.TOP or kenar).apply { topMargin = ust + dp(150f - 18f); marginStart = dp(76f - 150f); marginEnd = dp(76f - 150f) }
         } else {
+            // Dok açıkken mercekler ve tekerlek dokun üstüne çıkar
+            val d = if (dokModu) dp(58f) else 0
             zoomSira.orientation = LinearLayout.HORIZONTAL; cetvel.rotation = 0f
-            zoomSira.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.BOTTOM).apply { bottomMargin = a + dp(146f) }
-            cetvel.layoutParams = FrameLayout.LayoutParams(dp(300f), dp(36f), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = a + dp(188f) }
+            zoomSira.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.BOTTOM).apply { bottomMargin = a + dp(146f) + d }
+            cetvel.layoutParams = FrameLayout.LayoutParams(dp(300f), dp(36f), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = a + dp(188f) + d }
         }
-        secimSira.layoutParams = FrameLayout.LayoutParams(-1, dp(44f), Gravity.BOTTOM).apply { bottomMargin = a + dp(144f); marginStart = dp(12f); marginEnd = dp(12f) }
+        dok.layoutParams = FrameLayout.LayoutParams(-1, dp(50f), Gravity.BOTTOM).apply { bottomMargin = a + dp(142f); marginStart = dp(16f); marginEnd = dp(16f) }
+        flasCiz(); bilgiCiz()
+        secimSira.layoutParams = FrameLayout.LayoutParams(-1, dp(44f), Gravity.BOTTOM).apply { bottomMargin = a + dp(if (dokModu) 202f else 144f); marginStart = dp(12f); marginEnd = dp(12f) }
         duzenSerit.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.TOP).apply { topMargin = u + dp(2f); marginStart = dp(16f); marginEnd = dp(16f) }
         hizliSira.layoutParams = FrameLayout.LayoutParams(-2, dp(34f), Gravity.TOP or Gravity.END).apply { topMargin = u + dp(5f); marginEnd = dp(16f) }
         if (vlogSerit.parent != null) vlogSerit.layoutParams = FrameLayout.LayoutParams(-2, dp(30f), Gravity.TOP or Gravity.END).apply { topMargin = u + dp(43f); marginEnd = dp(16f) }
-        sureSira.layoutParams = FrameLayout.LayoutParams(-1, dp(32f), Gravity.BOTTOM).apply { bottomMargin = a + dp(192f) }
+        sureSira.layoutParams = FrameLayout.LayoutParams(-1, dp(32f), Gravity.BOTTOM).apply { bottomMargin = a + dp(if (dokModu) 250f else 192f) }
         kok.requestLayout()
     }
 
@@ -1058,6 +1088,14 @@ class KameraActivity : Activity() {
         proIkon.visibility = if (pro) View.VISIBLE else View.GONE
         if (pro) proIkon.setImageResource(proMod.simge)
         solDugme.background = daire(pro || ayar.flas > 0)
+        // Dok: flaş şeritte; alt sırada yalnız son çekim · deklanşör · ön/arka (UZMAN'da kartlar düğmesi kalır)
+        if (this::dok.isInitialized) {
+            dokFlas.setImageResource(if (ayar.flas == 0) R.drawable.ic_flas_yok else R.drawable.ic_flas)
+            dokFlas.setColorFilter(if (ayar.flas > 0) VURGU else Color.WHITE)
+            dokFlas.alpha = if (kaynak?.flasVar == false) 0.35f else 1f
+            solDugme.visibility = if (!dokModu || pro) View.VISIBLE else View.GONE
+            kontrolDugme.visibility = if (dokModu) View.GONE else View.VISIBLE
+        }
         solDugme.contentDescription = if (pro) "Uzman modlar" else "Flaş"
     }
 
@@ -1200,7 +1238,10 @@ class KameraActivity : Activity() {
         }
     }
     /** Pano açıkken alt bant görünmesin (pano onun üstüne biner) */
-    private fun altGizle(gizle: Boolean) = listOf(altSira).forEach { it.visibility = if (gizle) View.INVISIBLE else View.VISIBLE }
+    private fun altGizle(gizle: Boolean) {
+        altSira.visibility = if (gizle) View.INVISIBLE else View.VISIBLE
+        if (this::dok.isInitialized && dokModu) dok.visibility = if (gizle || kayitGorunur || duzenleniyor) View.INVISIBLE else View.VISIBLE
+    }
 
     /* ================= cetvel: pozlama, beyaz denge, odak (Final Cut Camera gibi alttan) ================= */
     enum class Cetvel { POZ, BD, ODAK }
@@ -1533,6 +1574,7 @@ class KameraActivity : Activity() {
                         grup("Zamanlayıcı") { listOf(0 to "Kapalı", 3 to "3 sn", 10 to "10 sn").forEach { (z, ad) -> secenek(ad, zamanlayici == z) { zamanlayici = z; tercih.edit().putInt("zamanlayici", z).apply() } } }
                     } }
                     anahtar("Deklanşör sesi", deklansorSesi) { deklansorSesi = it; tercih.edit().putBoolean("deklansor", it).apply() }
+                    anahtar("Sabitlenenler deklanşörün üstünde", dokTercih, "Kapalıyken üstte, eski düzen") { dokTercih = it; tercih.edit().putBoolean("k.dok", it).apply(); yerlestir() }
                     anahtar("Kirli mercek uyarısı", tercih.getBoolean("k.kirliUyari", true)) { tercih.edit().putBoolean("k.kirliUyari", it).apply() }
                     if (k.diyaframlar.size > 1) git(R.drawable.ic_artieksi, Color.rgb(255, 204, 0), "Diyafram", "") { e.git("Diyafram") { pozlamaSayfasi(k) } }
                 }
@@ -1935,6 +1977,7 @@ class KameraActivity : Activity() {
         if (!kayitGorunur) kodGoster(false)
         if (this::cetvel.isInitialized) cetvel.invalidate()
         bilgiSira.visibility = if (kayitGorunur || bilgiSira.childCount == 0) View.INVISIBLE else View.VISIBLE
+        if (this::dok.isInitialized) dok.visibility = if (!dokModu) View.GONE else if (kayitGorunur || duzenleniyor || acilir != null) View.INVISIBLE else View.VISIBLE
         favSira.visibility = View.GONE
     }
 
@@ -2198,8 +2241,22 @@ class KameraActivity : Activity() {
         okumaSatir.text = ok.joinToString("  ·  ")
         okumaSatir.visibility = if (ok.isEmpty()) View.INVISIBLE else View.VISIBLE
         okumaSatir.rotation = -fizikselYon.toFloat()
-        // Sabitlenenler: yalnız simge
-        favoriler.filter { it != "cozunurluk" && favUygun(it) && (mod != KMod.PRO || it in FAV_ACKAPA || duzenleniyor) }.forEach { a ->
+        // Sabitlenenler: yalnız simge. Dok'ta zeminsiz simge + değişmişse altında sarı nokta; düzenlemede üstte (alttaki pano dok'u örter)
+        val dokta = dokModu && !duzenleniyor
+        if (this::dok.isInitialized) dokFav.removeAllViews()
+        if (dokta) favoriler.filter { it != "cozunurluk" && favUygun(it) && (mod != KMod.PRO || it in FAV_ACKAPA) }.forEach { a ->
+            val g = favGorunum(a); val renk = if (g.degisik) VURGU else Color.WHITE
+            val f = FrameLayout(this).apply { contentDescription = favAd(a); rotation = -fizikselYon.toFloat()
+                setOnClickListener { v -> v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    if (a in FAV_SATIR || a == "gostergeler") { hizliHedef = v; try { favDokun(a) } finally { hizliHedef = null } } else favDokun(a) }
+                setOnLongClickListener { favPanel(a, this); true } }
+            if (g.ikon != null) f.addView(ImageView(this).apply { setImageResource(g.ikon); setColorFilter(renk); scaleType = ImageView.ScaleType.FIT_CENTER }, FrameLayout.LayoutParams(dp(20f), dp(20f), Gravity.CENTER))
+            else f.addView(TextView(this).apply { text = g.ust ?: favKisa(a); textSize = 10f; typeface = kosulKalin; setTextColor(renk); gravity = Gravity.CENTER; isSingleLine = true }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+            if (g.degisik) f.addView(View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(VURGU) } },
+                FrameLayout.LayoutParams(dp(3f), dp(3f), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(6f) })
+            dokFav.addView(f, LinearLayout.LayoutParams(0, -1, 1f).apply { width = 0 })
+        }
+        if (!dokta) favoriler.filter { it != "cozunurluk" && favUygun(it) && (mod != KMod.PRO || it in FAV_ACKAPA || duzenleniyor) }.forEach { a ->
             val g = favGorunum(a); val renk = if (g.degisik) VURGU else Color.WHITE
             val f = FrameLayout(this).apply { clipChildren = false; contentDescription = favAd(a); rotation = -fizikselYon.toFloat()
                 background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(CAM_UST, CAM_ALT)).apply { shape = GradientDrawable.OVAL
@@ -3338,6 +3395,7 @@ class KameraActivity : Activity() {
         uzunYol = tercih.getString("uzunYol", "ort") ?: "ort"
         zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true)
         vlogCikti = tercih.getInt("vlogCikti", 0)
+        dokTercih = tercih.getBoolean("k.dok", true)
         vlogKose = tercih.getInt("vlogKose", 0); vlogPencere = tercih.getBoolean("vlogPencere", true); vlogSayac = tercih.getInt("vlogSayac", 0)
         // Eski "Vlog açık" seçimi VLOG moduna taşınır
         if (tercih.getBoolean("vlog", false) && mod == KMod.VIDEO) { mod = KMod.VLOG; tercih.edit().putBoolean("vlog", false).putString("mod", "VLOG").apply() }
