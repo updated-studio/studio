@@ -117,8 +117,8 @@ final class Masa: NSObject, ObservableObject {
     /// Vlog (Kamera uygulaması, Fatih 30 Ekim "çift kamera ile Vlog kayıt"): aynı motor; arka kamera canlı, ön kamera PiP, dikey program,
     /// Wi-Fi / USB aranmaz, kayıt "UPDATED Vlog/" klasörüne (arka, ön ve birleşik dosya)
     let vlog: Bool
-    /// Program dikey (9:16): vlogda varsayılan
-    let dikey: Bool
+    /// Program dikey (9:16): vlogda telefon dik tutulunca; yan tutulunca 16:9 (kayıt dışında telefonun yönünü izler)
+    private(set) var dikey: Bool
     init(vlog: Bool = false, dikey: Bool = false) {
         self.vlog = vlog
         self.dikey = dikey
@@ -183,6 +183,9 @@ final class Masa: NSObject, ObservableObject {
     var duzenAdet: Int { vlog ? 0 : duzen.adet(yuvalar.count) }
     private var duzenZamanlayici: DispatchSourceTimer?
     private var onizlemeHavuz: CVPixelBufferPool?
+    private var havuzDikey = false
+    /// Telefonun son tutuluşu (ana iş parçacığında yazılır; kamera kuyruğunda okunur)
+    private var sonYon: UIDeviceOrientation = .portrait
     /// Dizili düzendeki kaynaklar (kilit altında; kayıt kuyruğu okur)
     private var _duzenKaynaklar: [Yuva] = []
     /// Birleştirici çalışırken (kilit altında): geçiş, katmanlar, karartma
@@ -275,6 +278,10 @@ final class Masa: NSObject, ObservableObject {
 
     func ac() {
         UIApplication.shared.isIdleTimerDisabled = true
+        if vlog {
+            let o = UIDevice.current.orientation
+            if o.isLandscape { sonYon = o; dikey = false } else if o.isPortrait { sonYon = o }
+        }
         duzenDegisti()
         if vlog {
             Task {
@@ -519,11 +526,16 @@ final class Masa: NSObject, ObservableObject {
         s.addOutputWithNoConnections(c)
         let b = AVCaptureConnection(inputPorts: [port], output: c)
         guard s.canAddConnection(b) else { s.removeOutput(c); s.removeInput(g); return false }
-        // Vlog: yerleşik kamera dikey çekilir (kareler 9:16 gelir), ön kamera ayna
-        let dik = dikey && y.yerlesik && b.isVideoRotationAngleSupported(90)
-        if dik { b.videoRotationAngle = 90 }
         if y.ayna, b.isVideoMirroringSupported { b.automaticallyAdjustsVideoMirroring = false; b.isVideoMirrored = true }
         s.addConnection(b)
+        // Vlog: yerleşik kamera telefonun tutuluşuna göre döndürülür (dikte 9:16). Bağlantı oturuma eklendikten sonra ayarlanır;
+        // önce ayarlanınca bazı iPhone'larda yok sayılıp görüntü yan geliyordu (Fatih 31 Ekim)
+        var dik = false
+        if vlog && y.yerlesik {
+            let a = Masa.ufukAcisi(d, yon: sonYon, varsayilan: dikey ? 90 : 0)
+            if b.isVideoRotationAngleSupported(a) { b.videoRotationAngle = a }
+            dik = Int(b.videoRotationAngle) % 180 == 90
+        }
         if !coklu { bicimSec(d, coklu: false) }
         // Vlog: iki kamera seçilen kalitede birlikte açılamıyorsa ikisi de 1080p'ye iner
         if vlog, let m = s as? AVCaptureMultiCamSession, m.hardwareCost > 1 {
@@ -549,6 +561,40 @@ final class Masa: NSObject, ObservableObject {
         if vlog, y.yerlesik, !y.ayna { DispatchQueue.main.async { self.vlogBoyut = b0 } }
         kilit.lock(); usbBaglar[ObjectIdentifier(c)] = UsbBag(yuva: y, girdi: g, cikti: c); kilit.unlock()
         return true
+    }
+
+    /// Telefonun şu anki tutuluşunda ufku düz tutan döndürme açısı (ön ve arka kamera için ayrı hesaplanır)
+    static func ufukAcisi(_ d: AVCaptureDevice, yon o: UIDeviceOrientation, varsayilan: CGFloat) -> CGFloat {
+        guard o.isPortrait || o.isLandscape else { return varsayilan }
+        return AVCaptureDevice.RotationCoordinator(device: d, previewLayer: nil).videoRotationAngleForHorizonLevelCapture
+    }
+
+    /// Vlog: telefon döndürülünce (kayıt dışında) kameraların açısı ve program oranı (9:16 / 16:9) yeni tutuluşa geçer
+    func vlogYonuGuncelle() {
+        guard vlog, !kayitta else { return }
+        let o = UIDevice.current.orientation
+        guard o.isPortrait || o.isLandscape else { return }
+        sonYon = o
+        usbKuyruk.async {
+            self.kilit.lock(); let baglar = Array(self.usbBaglar.values); self.kilit.unlock()
+            var yeniDik = self.dikey
+            for bag in baglar where bag.yuva.yerlesik {
+                guard let b = bag.cikti.connection(with: .video) else { continue }
+                let a = Masa.ufukAcisi(bag.girdi.device, yon: o, varsayilan: b.videoRotationAngle)
+                if b.isVideoRotationAngleSupported(a), b.videoRotationAngle != a { b.videoRotationAngle = a }
+                let dik = Int(b.videoRotationAngle) % 180 == 90
+                yeniDik = dik
+                let b0 = CMVideoFormatDescriptionGetDimensions(bag.girdi.device.activeFormat.formatDescription)
+                let boyut = dik ? CMVideoDimensions(width: min(b0.width, b0.height), height: max(b0.width, b0.height))
+                                : CMVideoDimensions(width: max(b0.width, b0.height), height: min(b0.width, b0.height))
+                DispatchQueue.main.async { bag.yuva.boyut = boyut }
+            }
+            DispatchQueue.main.async {
+                guard self.dikey != yeniDik else { return }
+                self.dikey = yeniDik
+                self.duzenDegisti()
+            }
+        }
     }
 
     /// En büyük biçim (tek USB kamerada 4K'ya, çok kamerada 1080p'ye kadar), en az 25 kare/sn; aynı boyutta 60 kare/sn veren öne
@@ -752,7 +798,8 @@ final class Masa: NSObject, ObservableObject {
             return r.cropped(to: CGRect(x: 0, y: 0, width: W, height: H))
         }
         // Ekrandaki program monitörü
-        if onizlemeHavuz == nil {
+        if onizlemeHavuz == nil || havuzDikey != dikey {
+            havuzDikey = dikey
             CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey: dikey ? 720 : 1280,
                                                                  kCVPixelBufferHeightKey: dikey ? 1280 : 720, kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &onizlemeHavuz)
         }

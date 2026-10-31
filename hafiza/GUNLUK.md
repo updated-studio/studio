@@ -67,6 +67,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ### 29 Ekim 2026
 
+- 20:00 (31 Ekim) Fatih: "vlog modülünde dikey kamera yan görünüyor, yan çevirince çalışmaya da bak". iOS 0.20.4: döndürme açısı bağlantı eklendikten sonra RotationCoordinator ile; yan tutuşta 16:9 Vlog. Yeni tasarım alternatifi "Dok" 2 görseli hazır (/mnt/project-files/kamera-onizleme/tasarim-dok.png), Fatih onayı bekleniyor.
 - 19:50 (31 Ekim) iOS 0.20.2: Vlog'a kayıt öncesi sayaç ve ön kamera penceresi köşe seçimi (19). 27 maddeden iPhone'da hepsi kodlandı, cihazda denenmedi. Sırada yeni tasarım alternatifi (önce 1-2 görsel).
 - 19:25 (31 Ekim) 0.20.0 derlemesi zoom tekerleğindeki CGFloat/Double belirsizliğinde düştü; düzeltildi, 0.20.1 TestFlight'a gönderildi (0.20.0 yüklenmedi).
 - 19:35 (31 Ekim) iOS Kamera 0.20.1 (27 madde, 3. parti): fotoğrafta LUT yok (Stiller'de), Göstergeler tek simge + alt menü, AI Kadraj ibresiz köşe çentikleri, kirli mercek uyarısı (fotoğraf küçük kopyasından pus ölçümü), yatay düzende sol alt zoom + mercekler, UZMAN dönüşü, Vlog/Kamera oturum sırası. Kalan: Vlog'a yeni özellikler (19), yeni tasarım alternatifi.

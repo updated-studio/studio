@@ -89,10 +89,14 @@ struct VlogEkran: View {
         .foregroundStyle(.white)
         .preferredColorScheme(.dark)
         .onAppear {
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
             m.ac()
             if disk.takili { diskGoster() }
         }
         .onDisappear { sayim?.cancel(); m.kapat() }
+        // Yan tutuş (Fatih 31 Ekim): kayıt dışında telefon döndürülünce Vlog 16:9'a, dik tutulunca 9:16'ya geçer;
+        // kayıt sürerken başladığı yönde kalır
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in m.vlogYonuGuncelle() }
         .onChange(of: disk.ad) { eski, yeni in
             if eski == nil, yeni != nil { diskGoster() }
             if yeni == nil { withAnimation(.smooth(duration: 0.25)) { diskSor = false } }
