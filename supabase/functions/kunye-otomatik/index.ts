@@ -112,6 +112,27 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
     } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
   }
   if (hepsiKota) await isaretle(a, "kota_dolu", son); }
+  // Yedek (31 Ekim 2026): ücretsiz Gemini anahtarlarında Google arama istekleri hep 429 alıyor (aramasız istekler geçiyor).
+  // Groq'un web aramalı "compound" modelleri aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
+  const groq = Deno.env.get("GROQ_API_KEY");
+  if (groq) for (const model of ["groq/compound", "groq/compound-mini"]) {
+    try {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", signal: AbortSignal.timeout(120_000), headers: { "Content-Type": "application/json", Authorization: "Bearer " + groq },
+        body: JSON.stringify({ model, temperature: 0.1, messages: [{ role: "system", content: SISTEM }, { role: "user", content: istem }] }),
+      });
+      const g = await r.text();
+      if (!r.ok) { son += ` | Groq ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 200)}`; continue; }
+      const m = JSON.parse(g)?.choices?.[0]?.message;
+      const v = jsonOku(String(m?.content ?? ""));
+      if (!v) { son += ` | Groq ${model} geçersiz yanıt`; continue; }
+      // deno-lint-ignore no-explicit-any
+      const arananlar = (m?.executed_tools ?? []).flatMap((t: any) => t?.search_results?.results ?? []).map((x: { title?: string; url?: string }) => ({ baslik: x.title ?? "", url: x.url ?? "" }));
+      const ozKaynak = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).map((o: { kaynak?: string }) => ({ baslik: "", url: String(o?.kaynak ?? "") }));
+      const kaynaklar = [...arananlar, ...ozKaynak].filter((x) => /^https?:\/\//.test(x.url)).filter((x, i, l) => l.findIndex((y) => y.url === x.url) === i).slice(0, 12);
+      return { v, kaynaklar };
+    } catch (e) { son += ` | Groq ${model}: ${String(e).slice(0, 120)}`; }
+  }
   throw new Error("Yapay zekâ yanıt vermedi (" + son + ")");
 }
 
