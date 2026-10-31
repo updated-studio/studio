@@ -11,6 +11,12 @@ struct VlogEkran: View {
     @StateObject private var disk = HariciDisk()
     @State private var diskSor = false
     @State private var klasorAcik = false
+    /// Kayıt öncesi geri sayım (sn); 0 = hemen. Telefonu yerleştirip kadraja geçmek için (Fatih 31 Ekim (19))
+    @AppStorage("vlog.sayac") private var sayac = 0
+    @State private var geriSayim: Int?
+    @State private var sayim: Task<Void, Never>?
+    static let koseAdi = ["Sağ üst", "Sol üst", "Sol alt", "Sağ alt"]
+    static let koseSimge = ["rectangle.inset.topright.filled", "rectangle.inset.topleft.filled", "rectangle.inset.bottomleft.filled", "rectangle.inset.bottomright.filled"]
 
     var body: some View {
         ZStack {
@@ -23,21 +29,46 @@ struct VlogEkran: View {
             }
             .ignoresSafeArea()
             .allowsHitTesting(false)
+            if let s = geriSayim {
+                Text("\(s)").font(.system(size: 96, weight: .thin, design: .rounded)).monospacedDigit()
+                    .shadow(color: .black.opacity(0.5), radius: 6)
+                    .transition(.opacity).id(s)
+                    .allowsHitTesting(false)
+            }
             VStack(spacing: 0) {
                 ustSerit.frame(height: 44).padding(.horizontal, 16)
                 McBildirim(m: m).padding(.top, 8)
                 Spacer(minLength: 0)
                 if diskSor, let ad = disk.ad { diskKarti(ad).padding(.horizontal, 20).padding(.bottom, 16).transition(.move(edge: .bottom).combined(with: .opacity)) }
                 HStack {
-                    Button { m.pip.toggle() } label: {
-                        Image(systemName: m.pip ? "rectangle.inset.topright.filled" : "rectangle")
+                    // Dokun: pencere aç/kapa; basılı tut: köşe seç
+                    Menu {
+                        Section("Ön kamera penceresi") {
+                            ForEach(0..<4, id: \.self) { i in
+                                Button { m.pipKose = i; m.pip = true } label: {
+                                    if m.pip && m.pipKose == i { Label(VlogEkran.koseAdi[i], systemImage: "checkmark") } else { Text(VlogEkran.koseAdi[i]) }
+                                }
+                            }
+                            Button { m.pip = false } label: { if !m.pip { Label("Kapalı", systemImage: "checkmark") } else { Text("Kapalı") } }
+                        }
+                    } label: {
+                        Image(systemName: m.pip ? VlogEkran.koseSimge[min(max(m.pipKose, 0), 3)] : "rectangle")
                             .font(.system(size: 16, weight: .medium)).foregroundStyle(m.pip ? Tema.sari : .white)
                             .frame(width: 44, height: 44).yuvarlakYuzey()
-                    }
+                    } primaryAction: { m.pip.toggle() }
+                    .menuOrder(.fixed)
                     .disabled(m.yuvalar.count < 2)
                     .accessibilityLabel("Ön kamera penceresi")
                     Spacer()
-                    McKayitDugmesi(m: m, boyut: 74)
+                    ZStack {
+                        McKayitDugmesi(m: m, boyut: 74).allowsHitTesting(false)
+                        Color.clear.frame(width: 80, height: 80).contentShape(Circle())
+                            .onTapGesture { kayitBas() }
+                    }
+                    .accessibilityElement()
+                    .accessibilityLabel(m.kayitta ? "Kaydı durdur" : "Kaydı başlat")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { kayitBas() }
                     Spacer()
                     Button { degistir() } label: {
                         Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 15, weight: .medium))
@@ -61,7 +92,7 @@ struct VlogEkran: View {
             m.ac()
             if disk.takili { diskGoster() }
         }
-        .onDisappear { m.kapat() }
+        .onDisappear { sayim?.cancel(); m.kapat() }
         .onChange(of: disk.ad) { eski, yeni in
             if eski == nil, yeni != nil { diskGoster() }
             if yeni == nil { withAnimation(.smooth(duration: 0.25)) { diskSor = false } }
@@ -79,6 +110,20 @@ struct VlogEkran: View {
                 Text(kalite).font(.system(size: 12, weight: .semibold).monospacedDigit()).tracking(0.6)
                     .foregroundStyle(Tema.ikincil)
                 Spacer()
+                Button {
+                    sayac = sayac == 0 ? 3 : (sayac == 3 ? 10 : 0)
+                    UISelectionFeedbackGenerator().selectionChanged()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "timer").font(.system(size: 11, weight: .light))
+                        Text(sayac == 0 ? "Kapalı" : "\(sayac) sn").font(.system(size: 13, weight: .light).monospacedDigit())
+                    }
+                    .foregroundStyle(sayac == 0 ? .white : Tema.sari)
+                    .frame(width: 76, height: 28)
+                    .contentShape(Rectangle())
+                }
+                .disabled(m.kayitta).opacity(m.kayitta ? 0.4 : 1)
+                .accessibilityLabel("Kayıt öncesi sayaç: \(sayac == 0 ? "kapalı" : "\(sayac) saniye")")
                 Button {
                     withAnimation(.smooth(duration: 0.2)) { m.yalnizFinal.toggle() }
                     UISelectionFeedbackGenerator().selectionChanged()
@@ -163,6 +208,24 @@ struct VlogEkran: View {
         .padding(14)
         .yuzey(22)
         .disabled(m.kayitta)
+    }
+
+    /// Kayıt düğmesi: kayıttaysa durdurur; sayaç açıksa önce geri sayar (sayım sırasında dokunmak iptal eder)
+    private func kayitBas() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if m.kayitta || sayac == 0 { m.kayitDegistir(); return }
+        if sayim != nil { sayim?.cancel(); sayim = nil; withAnimation { geriSayim = nil }; return }
+        sayim = Task { @MainActor in
+            for i in stride(from: sayac, to: 0, by: -1) {
+                withAnimation(.easeOut(duration: 0.2)) { geriSayim = i }
+                UISelectionFeedbackGenerator().selectionChanged()
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+            }
+            withAnimation { geriSayim = nil }
+            sayim = nil
+            m.kayitDegistir()
+        }
     }
 
     /// Ana görüntü arka ↔ ön (kayıt sürerken de)

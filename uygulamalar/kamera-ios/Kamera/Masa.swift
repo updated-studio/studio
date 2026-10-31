@@ -215,6 +215,11 @@ final class Masa: NSObject, ObservableObject {
     @Published var gecisIlerleme: Double?
     /// Resim içinde resim: sıradaki (yoksa canlı olmayan ilk) kaynak sağ altta
     @Published var pip = false { didSet { efektYaz() } }
+    /// Ön kamera penceresinin köşesi (Vlog; Fatih 31 Ekim (19)): 0 sağ üst, 1 sol üst, 2 sol alt, 3 sağ alt
+    @Published var pipKose = UserDefaults.standard.integer(forKey: "vlog.pipKose") {
+        didSet { UserDefaults.standard.set(pipKose, forKey: "vlog.pipKose"); kilit.lock(); _pipKose = pipKose; kilit.unlock() }
+    }
+    private var _pipKose = UserDefaults.standard.integer(forKey: "vlog.pipKose")
     @Published var logoAcik = false { didSet { efektYaz() } }
     @Published var logo: UIImage? = Masa.logoOku() { didSet { Masa.logoYaz(logo); efektYaz() } }
     @Published var altYaziAcik = false { didSet { efektYaz() } }
@@ -694,7 +699,7 @@ final class Masa: NSObject, ObservableObject {
     /// Birleştirici (kayitKuyruk, 30 kare/sn): kaynakların son kareleri tuvale; ekrana 1280×720, kayda program boyutunda
     private func duzenKaresi() {
         kilit.lock()
-        let kaynaklar = _duzenKaynaklar, c = canliYuva, g = _gecisD, py = _pipYuva, lg = _logoCI, ay = _altYazi, ftb = _ftb
+        let kaynaklar = _duzenKaynaklar, c = canliYuva, g = _gecisD, py = _pipYuva, lg = _logoCI, ay = _altYazi, ftb = _ftb, kose = _pipKose
         kilit.unlock()
         let t = CACurrentMediaTime()
         let ftbDeger: CGFloat = {
@@ -718,11 +723,15 @@ final class Masa: NSObject, ObservableObject {
                 let dik = py.donus % 180 != 0
                 let kw = CGFloat(dik ? CVPixelBufferGetHeight(pb) : CVPixelBufferGetWidth(pb)), kh = CGFloat(dik ? CVPixelBufferGetWidth(pb) : CVPixelBufferGetHeight(pb))
                 let w = W * (H > W ? 0.34 : 0.3), h = w * kh / max(kw, 1), k = W * 0.04
-                let yer = H > W ? H - h - k * 2.2 : k
+                // Vlog'da köşe seçilebilir (CI koordinatında y aşağıdan yukarı)
+                let ust = H > W ? H - h - k * 2.2 : H - h - k, altY = H > W ? k * 2.2 : k
+                let (x, yer): (CGFloat, CGFloat) = H > W
+                    ? [(W - w - k, ust), (k, ust), (k, altY), (W - w - k, altY)][min(max(kose, 0), 3)]
+                    : (W - w - k, k)
                 let kucuk = Masa.sigdir(pb, donus: py.donus, W: w, H: h)
-                    .transformed(by: CGAffineTransform(translationX: W - w - k, y: yer))
+                    .transformed(by: CGAffineTransform(translationX: x, y: yer))
                 let cerceve = CIImage(color: CIColor(red: 1, green: 1, blue: 1, alpha: 0.9))
-                    .cropped(to: CGRect(x: W - w - k - 3, y: yer - 3, width: w + 6, height: h + 6))
+                    .cropped(to: CGRect(x: x - 3, y: yer - 3, width: w + 6, height: h + 6))
                 r = kucuk.composited(over: cerceve.composited(over: r))
             }
             if let lg {
