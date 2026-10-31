@@ -276,6 +276,7 @@ final class Masa: NSObject, ObservableObject {
                 _ = await AVCaptureDevice.requestAccess(for: .video)
                 _ = await AVCaptureDevice.requestAccess(for: .audio)
                 usbKuyruk.async {
+                    _ = Kamera.kameraKapaniyor.wait(timeout: .now() + 2)
                     self.oturumKur(coklu: AVCaptureMultiCamSession.isMultiCamSupported)
                     DispatchQueue.main.async {
                         self.telefonKamerasiEkle(on: false)
@@ -321,8 +322,10 @@ final class Masa: NSObject, ObservableObject {
         yuvalar = []
         canli = nil
         kilit.lock(); canliYuva = nil; kilit.unlock()
+        Kamera.masaKapaniyor.enter()
         usbKuyruk.async {
             self.oturum?.stopRunning()
+            defer { Kamera.masaKapaniyor.leave() }
             self.oturum = nil
             self.kilit.lock(); self.usbBaglar = [:]; self.kilit.unlock()
         }

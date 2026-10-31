@@ -697,7 +697,7 @@ struct MonitorEkran: View {
         case .kompozisyon:
             baslik("AKILLI KADRAJ", ilk: true)
             anahtar("AKILLI YARDIMCI", $m.asistanAcik)
-            aciklama("Yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca ibre yeşile döner. Cihazın içinde çalışır. Büyütme açıkken durur.")
+            aciklama("Yüzü ya da en belirgin konuyu bulur, en yakın güçlü noktaya ok gösterir; konu yerine oturunca köşeler yeşile döner. Cihazın içinde çalışır. Büyütme açıkken durur.")
             anahtar("KOMPOZİSYON ÖNERİSİ", $m.oneriAcik)
             aciklama("Konuya en az hareketle uyan kılavuzu üstte önerir; dokununca uygulanır.")
             baslik("KOMPOZİSYON")

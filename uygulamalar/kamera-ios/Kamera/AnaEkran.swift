@@ -96,7 +96,7 @@ struct AnaEkran: View {
         .onChange(of: ekran) { _, yeni in
             if yeni == nil { kamera.baslat() } else { kamera.durdur() }
         }
-        .onChange(of: kamera.mod) { _, m in panel = m == .pro ? .proKartlar : nil }
+        .onChange(of: kamera.mod) { _, m in withAnimation(AnaEkran.yay) { panel = m == .pro ? .proKartlar : nil } }
         // Kamera Denetimi / ses düğmesi: basınca ortaya odaklanır (kilit yoksa), bırakınca çeker (Fatih 31 Ekim (23))
         .modifier(KameraDugmesi(basla: {
             guard ekran == nil, kamera.mod.foto, !kamera.aeafKilit, !kamera.asistanAcik else { return }
@@ -222,6 +222,18 @@ struct AnaEkran: View {
                         if let b = kamera.bildirim { bildirimKutusu(b) }
                         if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 10) }
                         if panel == nil, let f = acikSatir { FavoriSatir(f: f, kamera: kamera).frame(maxWidth: 480).padding(.bottom, 10) }
+                        // Yan tutuşta sol alt (Fatih 31 Ekim (24)): zoom tekerleği ve mercekler başparmağın altında; sağda yalnız mod şeridi
+                        if panel == nil && acikSatir == nil {
+                            HStack(alignment: .bottom) {
+                                VStack(spacing: 8) {
+                                    if !kamera.onde { ZoomTekerlegi(kamera: kamera) }
+                                    mercekler(dikey: false)
+                                }
+                                .padding(.leading, 16)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.bottom, 12)
+                        }
                         if let p = panel {
                             HStack {
                                 panelKabi(p, enYuksek: g.size.height * 0.82).frame(maxWidth: 480)
@@ -232,7 +244,6 @@ struct AnaEkran: View {
                     if panel == nil {
                         HStack(spacing: 14) {
                             Spacer()
-                            mercekler(dikey: true)
                             modSecici(dikey: true, genislik: 0)
                         }
                         .padding(.trailing, 10)
@@ -1107,7 +1118,7 @@ struct AnaEkran: View {
         VStack(spacing: 14) {
             if duzenleme {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 14) {
-                    ForEach(Favori.allCases) { f in
+                    ForEach(Favori.gorunenler) { f in
                         let secili = kamera.favoriler.contains(f)
                         Button { UISelectionFeedbackGenerator().selectionChanged(); withAnimation(AnaEkran.yay) { kamera.favoriAcKapa(f) } } label: {
                             DenetimDaire(f: f, kamera: kamera, kucuk: true, soluk: secili)
@@ -1123,7 +1134,7 @@ struct AnaEkran: View {
                 .buttonStyle(.plain)
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 16) {
-                    ForEach(Favori.allCases.filter { $0.uygun(kamera.mod) }) { f in
+                    ForEach(Favori.gorunenler.filter { $0.uygun(kamera.mod) }) { f in
                         // Dokun: ayar; basılı tut: ana ekrana sabitle / kaldır (Fatih 31 Ekim: "sabitlemek ve kaldırmak daha kolay olsun")
                         DenetimDaire(f: f, kamera: kamera, sabit: kamera.favoriler.contains(f))
                             .contentShape(Rectangle())

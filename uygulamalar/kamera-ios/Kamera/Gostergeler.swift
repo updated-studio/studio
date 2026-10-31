@@ -33,7 +33,7 @@ extension Kamera {
 
     var gostergeEtkin: Bool {
         let g = gosterge
-        let renk = !hdrOnizleme && (g.lutAcik || stil.etkin)
+        let renk = !hdrOnizleme && ((g.lutAcik && !mod.foto) || stil.etkin)
         return g.falseColor || g.zebra || g.peaking || g.monokrom || histogram || logDuzelt || renk
     }
 
@@ -83,29 +83,12 @@ struct GostergeMenu: View {
                 arac("Odak vurgusu", "scope", kamera.gosterge.peaking) { kamera.gosterge.peaking.toggle() }
                 arac("Histogram", "chart.bar.xaxis", kamera.histogram) { kamera.histogram.toggle() }
                 arac("Siyah-beyaz", "circle.lefthalf.filled", kamera.gosterge.monokrom) { kamera.gosterge.monokrom.toggle() }
-                arac("LUT", "camera.filters", kamera.gosterge.lutAcik) {
-                    if kamera.gosterge.lutAcik { kamera.gosterge.lutAcik = false } else if let ilk = lutlar.first { kamera.gosterge.lutAdi = kamera.gosterge.lutAdi.isEmpty ? ilk : kamera.gosterge.lutAdi; kamera.gosterge.lutAcik = true } else { lutAl = true }
-                }
             }
             if kamera.gosterge.zebra {
                 HStack(spacing: 6) {
                     Text("ZEBRA").bolumBasligi().frame(width: 52, alignment: .leading)
                     Secenek(yazi: "%95", alt: "patlama", secili: kamera.gosterge.zebraEsik >= 0.9) { kamera.gosterge.zebraEsik = 0.95 }
                     Secenek(yazi: "%70", alt: "ten", secili: kamera.gosterge.zebraEsik < 0.9) { kamera.gosterge.zebraEsik = 0.70 }
-                }
-            }
-            HStack(spacing: 6) {
-                Text("LUT").bolumBasligi().frame(width: 52, alignment: .leading)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        Secenek(yazi: "Kapalı", secili: !kamera.gosterge.lutAcik) { kamera.gosterge.lutAcik = false }
-                        ForEach(lutlar, id: \.self) { ad in
-                            Secenek(yazi: ad.replacingOccurrences(of: ".cube", with: ""), secili: kamera.gosterge.lutAcik && kamera.gosterge.lutAdi == ad) {
-                                kamera.gosterge.lutAdi = ad; kamera.gosterge.lutAcik = true
-                            }
-                        }
-                        Secenek(yazi: "+ Ekle", secili: false) { lutAl = true }
-                    }
                 }
             }
             if kamera.mod == .video && kamera.renkModu == .log {

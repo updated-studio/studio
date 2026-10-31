@@ -76,8 +76,9 @@ struct KameraAyarlar: View {
                 }
             }
             if kamera.sesKapatilabilir { Toggle("Deklanşör sesi", isOn: $kamera.deklansorSesi) }
+            Toggle("Kirli mercek uyarısı", isOn: $kamera.mercekUyari)
         } header: { Text("Fotoğraf") } footer: {
-            Text(kamera.fotoBicim.aciklama + (kamera.fotoBicim == .raw ? " (yanında \(kamera.heif ? "HEIF" : "JPEG") de kaydedilir)." : "."))
+            Text(kamera.fotoBicim.aciklama + ". Görüntü arka arkaya puslu çıkarsa merceği silmeniz için seyrek uyarı verilir.")
         }
     }
 

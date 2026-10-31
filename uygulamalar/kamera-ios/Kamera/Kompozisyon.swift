@@ -108,7 +108,7 @@ enum Kompozisyon {
 }
 
 /// Görüntünün üstündeki kompozisyon katmanı: kılavuz çizgileri, güçlü noktalar; akıllı yardımcı açıksa konu kutusu, konudan en yakın
-/// güçlü noktaya ok, altta ibre (konu yerine oturunca yeşil), yön tarifi ve terazi (ufuk düzse yeşil). Dokunma almaz.
+/// güçlü noktaya ince ok (konu yerine oturunca köşeler yeşil), yön tarifi ve terazi (ufuk düzse yeşil). Dokunma almaz.
 struct KompozisyonKatman: View {
     var tur: KompTur
     var yon: Int
@@ -221,21 +221,17 @@ struct KompozisyonKatman: View {
             if let u = an.ufuk { cizgi(P(u.a.x, u.a.y), P(u.b.x, u.b.y), renk: Color(red: 106 / 255, green: 152 / 255, blue: 248 / 255).opacity(0.8), en: 1.5, kesik: [9, 6]) }
             if tur == .oncu { for l in an.oncu { cizgi(P(l.a.x, l.a.y), P(l.b.x, l.b.y), renk: Tema.vurgu.opacity(0.67), en: 1.5) } }
         }
-        // Akıllı yardımcı: konudan en yakın güçlü noktaya ok + ibre
+        // Akıllı yardımcı: konudan en yakın güçlü noktaya ince ok, köşe çentikleri
         if asistan, let k = konu, let h = Kompozisyon.hedef(tur, yon: yon, oran: oran, konu: k, analiz: analiz) {
             let renk = h.tamam ? Self.yesil : (h.hizalama > 0.6 ? Self.sari : .white)
             let kutu = CGRect(origin: P(k.minX, k.minY), size: CGSize(width: k.width * r.width, height: k.height * r.height))
-            if konuSecili {
-                // Seçili konu: köşe çentikleri (stüdyo kamerası izleme kutusu gibi)
-                let u = min(kutu.width, kutu.height) * 0.22
-                var c = Path()
-                for (x, y, sx, sy) in [(kutu.minX, kutu.minY, 1.0, 1.0), (kutu.maxX, kutu.minY, -1.0, 1.0), (kutu.minX, kutu.maxY, 1.0, -1.0), (kutu.maxX, kutu.maxY, -1.0, -1.0)] {
-                    c.move(to: CGPoint(x: x, y: y + sy * u)); c.addLine(to: CGPoint(x: x, y: y)); c.addLine(to: CGPoint(x: x + sx * u, y: y))
-                }
-                g.stroke(c, with: .color(Tema.sari), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-            } else {
-                g.stroke(Path(kutu), with: .color(renk), lineWidth: 1.5)
+            // Konu: vizör gibi yalnız 4 köşe çentiği (Fatih 31 Ekim (22)); seçili = sarı, kadraj iyi = yeşil
+            let u = min(kutu.width, kutu.height) * 0.22
+            var ks = Path()
+            for (x, y, sx, sy) in [(kutu.minX, kutu.minY, 1.0, 1.0), (kutu.maxX, kutu.minY, -1.0, 1.0), (kutu.minX, kutu.maxY, 1.0, -1.0), (kutu.maxX, kutu.maxY, -1.0, -1.0)] {
+                ks.move(to: CGPoint(x: x, y: y + sy * u)); ks.addLine(to: CGPoint(x: x, y: y)); ks.addLine(to: CGPoint(x: x + sx * u, y: y))
             }
+            g.stroke(ks, with: .color(konuSecili && !h.tamam ? Tema.sari : renk), style: StrokeStyle(lineWidth: konuSecili ? 2.2 : 1.6, lineCap: .round, lineJoin: .round))
             let hp = P(h.nokta.x, h.nokta.y)
             if !h.tamam {
                 let sp = P(k.midX, k.midY)
@@ -243,10 +239,9 @@ struct KompozisyonKatman: View {
                 let aci = atan2(hp.y - sp.y, hp.x - sp.x), u: CGFloat = 13
                 ok.move(to: hp); ok.addLine(to: CGPoint(x: hp.x - u * cos(aci - 0.5), y: hp.y - u * sin(aci - 0.5)))
                 ok.move(to: hp); ok.addLine(to: CGPoint(x: hp.x - u * cos(aci + 0.5), y: hp.y - u * sin(aci + 0.5)))
-                g.stroke(ok, with: .color(renk), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                g.stroke(ok, with: .color(renk.opacity(0.85)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
             }
-            g.stroke(Path(ellipseIn: CGRect(x: hp.x - 8, y: hp.y - 8, width: 16, height: 16)), with: .color(renk), lineWidth: 2)
-            ibre(&g, r, h.hizalama, h.tamam)
+            g.stroke(Path(ellipseIn: CGRect(x: hp.x - 7, y: hp.y - 7, width: 14, height: 14)), with: .color(renk), lineWidth: 1.5)
             if !konuAdi.isEmpty {
                 g.draw(Text(konuSecili ? "\(konuAdi) · AF" : konuAdi).font(.caption.weight(.bold)).foregroundColor(konuSecili ? Tema.sari : .white),
                        at: CGPoint(x: kutu.minX, y: kutu.minY - 4), anchor: .bottomLeading)
@@ -264,21 +259,5 @@ struct KompozisyonKatman: View {
             g.draw(Text(String(format: "%.1f°", e).replacingOccurrences(of: ".", with: ",")).font(.caption.weight(.bold)).foregroundColor(renk),
                    at: CGPoint(x: m.x + uz + 20, y: m.y), anchor: .leading)
         }
-    }
-
-    /// Alt ortada yarım daire ibre: 0 = uzak, 1 = tam yerinde (yeşil)
-    private func ibre(_ g: inout GraphicsContext, _ r: CGRect, _ v: CGFloat, _ tamam: Bool) {
-        let rr = min(r.width, r.height) * 0.11, m = CGPoint(x: r.midX, y: r.maxY - 11)
-        func yay(_ bas: Double, _ son: Double, _ renk: Color) {
-            var p = Path(); p.addArc(center: m, radius: rr, startAngle: .degrees(bas), endAngle: .degrees(son), clockwise: false)
-            g.stroke(p, with: .color(renk), style: StrokeStyle(lineWidth: 5, lineCap: .round))
-        }
-        yay(180, 360, .black.opacity(0.47))
-        yay(180, 240, Color(red: 230 / 255, green: 60 / 255, blue: 50 / 255)); yay(240, 300, Self.sari); yay(300, 360, Self.yesil)
-        let a = (180 + 180 * v) * .pi / 180, renk = tamam ? Self.yesil : Color.white
-        var p = Path(); p.move(to: m); p.addLine(to: CGPoint(x: m.x + rr * 0.95 * cos(a), y: m.y + rr * 0.95 * sin(a)))
-        g.stroke(p, with: .color(renk), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-        g.fill(Path(ellipseIn: CGRect(x: m.x - 4, y: m.y - 4, width: 8, height: 8)), with: .color(renk))
-        if tamam { g.draw(Text("YERİNDE").font(.caption.weight(.heavy)).foregroundColor(Self.yesil), at: CGPoint(x: m.x, y: m.y - rr - 8), anchor: .bottom) }
     }
 }

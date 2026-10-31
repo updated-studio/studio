@@ -202,7 +202,8 @@ extension Kamera {
     /// Ekrandaki ve kayda gömülen tek LUT: taban + stil. nil = renk değişmiyor
     func renkLutu() -> (anahtar: String, uret: () -> Lut)? {
         let g = gosterge, s = stil
-        let tabanAdi = g.lutAcik ? g.lutAdi : (logDuzelt ? Lut.logAdi : "")
+        // Fotoğrafta LUT yok, yalnız stil (Fatih 31 Ekim (11)); LUT video ve timelapse içindir
+        let tabanAdi = g.lutAcik && !mod.foto ? g.lutAdi : (logDuzelt ? Lut.logAdi : "")
         guard s.etkin || !tabanAdi.isEmpty else { return nil }
         return ("\(tabanAdi)#\(s.etkin ? s.anahtar : "")", {
             let taban = tabanAdi.isEmpty ? nil : Lut.yukle(tabanAdi)
@@ -305,7 +306,7 @@ struct StilPedi: View {
         VStack(alignment: .leading, spacing: 12) {
             sira("TEMEL", HazirStil.temel)
             sira("FİLM REÇETELERİ", HazirStil.receteler)
-            lutSirasi
+            if !kamera.mod.foto { lutSirasi }
             HStack(alignment: .top, spacing: 14) {
                 VStack(spacing: 4) {
                     pad.frame(width: 140, height: 140)

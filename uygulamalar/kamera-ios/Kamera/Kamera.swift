@@ -94,6 +94,10 @@ final class Kamera: NSObject, ObservableObject {
     }
     var fotoBicimleri: [FotoBicim] { rawVar ? FotoBicim.allCases : [.heif, .jpeg] }
     @Published var zamanlayici = Kamera.ud.integer(forKey: "k.zamanlayici") { didSet { Kamera.ud.set(zamanlayici, forKey: "k.zamanlayici") } }
+    /// Kirli mercek / ışık dağılması uyarısı (MercekUyari.swift)
+    @Published var mercekUyari = Kamera.ud.object(forKey: "k.mercekUyari") as? Bool ?? true { didSet { Kamera.ud.set(mercekUyari, forKey: "k.mercekUyari") } }
+    var pusSayac = 0
+    var sonMercekUyari = Date.distantPast
     @Published var deklansorSesi = Kamera.ud.object(forKey: "k.deklansor") as? Bool ?? true { didSet { Kamera.ud.set(deklansorSesi, forKey: "k.deklansor") } }
     @Published var sesKapatilabilir = false
     // Video
@@ -138,7 +142,7 @@ final class Kamera: NSObject, ObservableObject {
         didSet { if let d = try? JSONEncoder().encode(stil) { Kamera.ud.set(d, forKey: "k.stil") }; if stil.anahtar != oldValue.anahtar { gostergeUygula() } }
     }
     /// Sabitlenen kısayollar (Favoriler.swift), sırasıyla; en çok 6
-    @Published var favoriler: [Favori] = (try? JSONDecoder().decode([Favori].self, from: Kamera.ud.data(forKey: "k.favoriler") ?? Data())) ?? Favori.varsayilan {
+    @Published var favoriler: [Favori] = (try? JSONDecoder().decode([Favori].self, from: Kamera.ud.data(forKey: "k.favoriler") ?? Data())).map(Favori.tasi) ?? Favori.varsayilan {
         didSet { if let d = try? JSONEncoder().encode(favoriler) { Kamera.ud.set(d, forKey: "k.favoriler") } }
     }
     /// AI Kadraj düşünürken aday öneri ve sahne (aynı aday ~6 sn sürünce gösterilir; Fatih 29 Ekim: "saniyede 1 fikirle gelmesin")
@@ -270,6 +274,8 @@ final class Kamera: NSObject, ObservableObject {
             await MainActor.run { self.izinVar = kamera }
             guard kamera else { return }
             kuyruk.async {
+                // Vlog'dan dönüşte onun çoklu kamera oturumu kapanmadan kameralar açılmasın (Fatih 31 Ekim (14))
+                _ = Kamera.masaKapaniyor.wait(timeout: .now() + 2)
                 if self.kuruldu { if !self.oturum.isRunning { self.oturum.startRunning() } } else { self.kur() }
             }
             await MainActor.run {
@@ -280,9 +286,13 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
+    /// Kamera ile Vlog/Masa oturumları sırayla: biri tamamen kapanmadan öteki kameraları açmaz
+    static let kameraKapaniyor = DispatchGroup(), masaKapaniyor = DispatchGroup()
+
     func durdur() {
         if tlYazici != nil { tlBitir() }
-        kuyruk.async { if self.oturum.isRunning { self.oturum.stopRunning() } }
+        Kamera.kameraKapaniyor.enter()
+        kuyruk.async { if self.oturum.isRunning { self.oturum.stopRunning() }; Kamera.kameraKapaniyor.leave() }
         hareket.stopDeviceMotionUpdates()
         saat?.invalidate(); saat = nil
     }
@@ -652,13 +662,15 @@ final class Kamera: NSObject, ObservableObject {
         // Fatih 31 Ekim: "geçiş hızlı ama sonra anlık fps düşmesi": yeniden kurulum biter bitmez değil, akış oturunca (≈0,25 sn) açılır
         gecis = true
         kuyruk.async {
-            if !self.cihazUyumla() {
+            // UZMAN'dan dönüşte fiziksel mercekten sanal kameraya geçilir; akış daha geç oturur (Fatih 31 Ekim (25))
+            let degisti = self.cihazUyumla()
+            if !degisti {
                 self.oturum.beginConfiguration()
                 self.presetUygula()
                 self.oturum.commitConfiguration()
                 self.isoGuncelle()
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.gecis = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + (degisti ? 0.45 : 0.25)) { self.gecis = false }
         }
     }
 
@@ -1269,6 +1281,7 @@ extension Kamera: AVCapturePhotoCaptureDelegate {
         }
         let gomulu = p.islenmis.map { fotoyaGom(mod == .portre ? portreBulanik($0) : $0) } ?? ana
         let kucuk = p.islenmis.flatMap { Kamera.kucukResim($0) }
+        DispatchQueue.main.async { self.mercekDenetle(kucuk) }
         let mesaj = mod == .pro && proMod.seri ? (seriSayi > 1 ? "\(seriSayi) kare çekildi" : "Fotoğraf kaydedildi") : (p.ham != nil ? "Fotoğraf kaydedildi (RAW + \(heif ? "HEIF" : "JPEG"))" : "Fotoğraf kaydedildi")
         // RAW (Fatih 31 Ekim: "RAW galeriye kaydedilemiyor"): HEIF + DNG'yi tek varlıkta eşlemek (.alternatePhoto) bazı
         // ProRAW çekimlerinde reddediliyordu; Apple Kamera gibi DNG asıl fotoğraf olarak yazılır (Fotoğraflar RAW rozetiyle gösterir).

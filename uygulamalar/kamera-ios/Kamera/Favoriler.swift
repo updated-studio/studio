@@ -9,13 +9,15 @@ import SwiftUI
 enum Favori: String, CaseIterable, Identifiable, Codable {
     case iso, enst, bd, ev, odak, cozunurluk, kodek, renk, sabitleme, stil, lut
     case zebra, falseColor, peaking, histogram, monokrom, flas, zamanlayici, kilavuz, cerceve, terazi, yardimci, ses
+    /// Pro görüntü araçları tek simgede (Fatih 31 Ekim (12)): basınca alt menü
+    case gostergeler
     var id: String { rawValue }
 
     /// Hangi modlarda anlamlı (Fatih 30 Ekim 10:41: "fotoğrafa özel, videoya özel, ortak"): menüler yalnız ilgili olanı gösterir
     enum Kapsam { case foto, video, ortak }
     var kapsam: Kapsam {
         switch self {
-        case .kodek, .renk, .sabitleme, .cerceve, .ses: return .video
+        case .kodek, .renk, .sabitleme, .cerceve, .ses, .lut: return .video
         case .zamanlayici: return .foto
         default: return .ortak
         }
@@ -23,13 +25,25 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
     func uygun(_ m: Kamera.Mod) -> Bool {
         switch kapsam {
         case .ortak: return true
-        case .video: return m == .video || (m == .timelapse && self == .cerceve)
+        case .video: return m == .video || (m == .timelapse && (self == .cerceve || self == .lut))
         case .foto: return m.foto
         }
     }
 
     static let enCok = 6
-    static let varsayilan: [Favori] = [.iso, .enst, .bd, .zebra]
+    static let varsayilan: [Favori] = [.iso, .enst, .bd, .gostergeler]
+    /// Göstergeler simgesinin altındaki araçlar; Denetimler'de ayrı daire olarak görünmez
+    static let gostergeAraclari: [Favori] = [.zebra, .falseColor, .peaking, .histogram, .monokrom]
+    static var gorunenler: [Favori] { allCases.filter { !gostergeAraclari.contains($0) } }
+    /// Eski kayıtta tek tek sabitlenmiş araçlar tek Göstergeler simgesine dönüşür
+    static func tasi(_ l: [Favori]) -> [Favori] {
+        var s: [Favori] = []
+        for f in l {
+            let y = gostergeAraclari.contains(f) ? Favori.gostergeler : f
+            if !s.contains(y) { s.append(y) }
+        }
+        return s
+    }
 
     var ad: String {
         switch self {
@@ -56,6 +70,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .terazi: return "Terazi"
         case .yardimci: return "AI Kadraj"
         case .ses: return "Ses girişi"
+        case .gostergeler: return "Göstergeler"
         }
     }
 
@@ -84,6 +99,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .terazi: return "level"
         case .yardimci: return "sparkles"
         case .ses: return "mic"
+        case .gostergeler: return "waveform"
         }
     }
 
@@ -95,7 +111,7 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         case .ev, .odak: return .blue
         case .cozunurluk, .kodek, .renk, .sabitleme: return .indigo
         case .lut: return .purple
-        case .zebra, .falseColor, .peaking, .histogram, .monokrom: return .green
+        case .zebra, .falseColor, .peaking, .histogram, .monokrom, .gostergeler: return .green
         case .flas, .zamanlayici: return .brown
         case .kilavuz, .cerceve, .terazi, .yardimci: return .teal
         case .ses: return .gray
@@ -143,6 +159,7 @@ extension Kamera {
         case .cerceve: return (cerceveler.isEmpty ? "Kapalı" : (cerceveler.count == 1 ? cerceveler[0].ad : "\(cerceveler.count) oran"), !cerceveler.isEmpty)
         case .terazi: return ("", teraziAcik)
         case .yardimci: return ("", asistanAcik)
+        case .gostergeler: return ("", gosterge.zebra || gosterge.falseColor || gosterge.peaking || gosterge.monokrom || histogram)
         case .ses: return (etkinSesGirdi ?? "Mikrofon", harici)
         }
     }
@@ -417,8 +434,8 @@ struct FavoriPanel: View {
         case .bd, .ev, .odak: Cetvel(tur: f == .bd ? .bd : (f == .ev ? .poz : .odak), kamera: kamera)
         case .cozunurluk: BicimPanel(kamera: kamera)
         case .kodek, .renk, .sabitleme: KayitHizli(kamera: kamera)
-        case .stil: StilPedi(kamera: kamera)
-        case .lut, .zebra, .falseColor, .peaking, .histogram, .monokrom: GostergeMenu(kamera: kamera)
+        case .stil, .lut: StilPedi(kamera: kamera)
+        case .zebra, .falseColor, .peaking, .histogram, .monokrom, .gostergeler: GostergeMenu(kamera: kamera)
         case .kilavuz: KilavuzMenu(kamera: kamera)
         case .cerceve: CerceveMenu(kamera: kamera)
         case .ses: SesHizli(kamera: kamera)
@@ -440,7 +457,7 @@ struct FavoriDuzenle: View {
                 if kamera.favoriler.isEmpty { Text("Henüz sabitlenen yok").foregroundStyle(.secondary) }
             } header: { Text("Kamera ekranında · sürükleyerek sırala") } footer: { Text("En çok \(Favori.enCok) ayar. Yan tutuşta sol kenarda dikey sıralanır.") }
             Section {
-                ForEach(Favori.allCases.filter { !kamera.favoriler.contains($0) }) { f in satir(f, sabit: false) }
+                ForEach(Favori.gorunenler.filter { !kamera.favoriler.contains($0) }) { f in satir(f, sabit: false) }
             } header: { Text("Diğer özellikler") } footer: { Text("Menülerde bir ayara basılı tutup \"Sabitle\" de diyebilirsin.") }
         }
         .environment(\.editMode, .constant(.active))
@@ -518,6 +535,10 @@ struct HizliMenu: View {
             case .zebra, .falseColor, .peaking, .histogram, .monokrom, .terazi, .yardimci:
                 let acik = kamera.favoriDeger(f).etkin
                 Button { kamera.favoriDegistir(f) } label: { Label(acik ? "Kapat" : "Aç", systemImage: acik ? "xmark.circle" : "checkmark.circle") }
+            case .gostergeler:
+                ForEach(Favori.gostergeAraclari) { a in
+                    secenek(a.ad, secili: kamera.favoriDeger(a).etkin) { kamera.favoriDegistir(a) }
+                }
             case .cozunurluk, .ses:
                 EmptyView()
             }
