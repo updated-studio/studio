@@ -1808,10 +1808,14 @@ class KameraActivity : Activity() {
     private fun vlogPencereYeri(p: View) {
         val g = (resources.displayMetrics.widthPixels * DuzenMotoru.VLOG_PENCERE).toInt()
         val alt = if (zoomSira.height > 0 && zoomSira.orientation == LinearLayout.HORIZONTAL) kok.height - zoomSira.top else dp(230f)
-        val ust = vlogKose == 1 || vlogKose == 2; val sol = vlogKose == 2 || vlogKose == 3
+        // Köşe kullanıcının baktığı yönde: telefon yan tutulunca ekran (dik kilitli) köşesine çevrilir
+        val kUst = vlogKose == 1 || vlogKose == 2; val kSol = vlogKose == 2 || vlogKose == 3
+        val (ust, sol) = when (fizikselYon) { 270 -> kSol to !kUst; 90 -> !kSol to kUst; 180 -> !kUst to !kSol; else -> kUst to kSol }
         val u = if (ustBosluk == 0) dp(32f) else ustBosluk
+        // Yan tutuşta mercek sırası ve zoom tekerleği o kenarda: pencere yanlarına kayar
+        val zoomYani = ust && ((fizikselYon == 270 && sol) || (fizikselYon == 90 && !sol))
         p.layoutParams = FrameLayout.LayoutParams(g, g * 16 / 9, (if (ust) Gravity.TOP else Gravity.BOTTOM) or (if (sol) Gravity.START else Gravity.END)).apply {
-            marginEnd = dp(16f); marginStart = dp(16f); if (ust) topMargin = u + dp(120f) else bottomMargin = alt + dp(8f) }
+            val yan = dp(if (zoomYani) 104f else 16f); marginEnd = yan; marginStart = yan; if (ust) topMargin = u + dp(120f) else bottomMargin = alt + dp(8f) }
     }
 
     /** Vlog açıkken ön kamerayı sağ altta küçük pencerede açar, kapalıyken kapatır; ana kameranın boyut sınırını ayarlar */
@@ -3277,6 +3281,8 @@ class KameraActivity : Activity() {
         kaynak?.ekranYonu = (360 - fizikselYon) % 360
         verici?.yon = fizikselYon
         bilgiCiz(); modlariCiz(); zoomCiz(); yerlestir()
+        // Kayıt sürerken pencere başladığı yerde kalır (kayıt yönü de başlangıçta sabitlenir)
+        if (!kayitSuruyor()) onPencere?.let { vlogPencereYeri(it) }
     }
 
     /* ================= PRO ve Monitör ================= */
