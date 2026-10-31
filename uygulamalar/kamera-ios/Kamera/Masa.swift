@@ -217,9 +217,9 @@ final class Masa: NSObject, ObservableObject {
     @Published var pip = false { didSet { efektYaz() } }
     /// Ön kamera penceresinin köşesi (Vlog; Fatih 31 Ekim (19)): 0 sağ üst, 1 sol üst, 2 sol alt, 3 sağ alt
     @Published var pipKose = UserDefaults.standard.integer(forKey: "vlog.pipKose") {
-        didSet { UserDefaults.standard.set(pipKose, forKey: "vlog.pipKose"); kilit.lock(); _pipKose = pipKose; kilit.unlock() }
+        didSet { UserDefaults.standard.set(pipKose, forKey: "vlog.pipKose"); kilit.lock(); pipKoseKilitli = pipKose; kilit.unlock() }
     }
-    private var _pipKose = UserDefaults.standard.integer(forKey: "vlog.pipKose")
+    private var pipKoseKilitli = UserDefaults.standard.integer(forKey: "vlog.pipKose")
     @Published var logoAcik = false { didSet { efektYaz() } }
     @Published var logo: UIImage? = Masa.logoOku() { didSet { Masa.logoYaz(logo); efektYaz() } }
     @Published var altYaziAcik = false { didSet { efektYaz() } }
@@ -699,7 +699,7 @@ final class Masa: NSObject, ObservableObject {
     /// Birleştirici (kayitKuyruk, 30 kare/sn): kaynakların son kareleri tuvale; ekrana 1280×720, kayda program boyutunda
     private func duzenKaresi() {
         kilit.lock()
-        let kaynaklar = _duzenKaynaklar, c = canliYuva, g = _gecisD, py = _pipYuva, lg = _logoCI, ay = _altYazi, ftb = _ftb, kose = _pipKose
+        let kaynaklar = _duzenKaynaklar, c = canliYuva, g = _gecisD, py = _pipYuva, lg = _logoCI, ay = _altYazi, ftb = _ftb, kose = pipKoseKilitli
         kilit.unlock()
         let t = CACurrentMediaTime()
         let ftbDeger: CGFloat = {
