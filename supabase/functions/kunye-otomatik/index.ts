@@ -200,7 +200,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length }); await kaydet(false);
     } catch (e) {
       // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda
-      if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu", hata: String((e as Error).message).slice(0, 200) }); break; }
+      if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu", hata: String((e as Error).message).slice(0, 500) }); break; }
       await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, durum: "hata", hata: String((e as Error).message).slice(0, 300) });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "hata", hata: String((e as Error).message).slice(0, 200) }); await kaydet(false);
     }
