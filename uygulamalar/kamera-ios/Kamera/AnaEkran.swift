@@ -1396,21 +1396,22 @@ struct ZoomTekerlegi: View {
                 .foregroundStyle(Tema.sari).frame(width: 44)
             Canvas { c, b in
                 let orta = b.width / 2
-                let z0 = log2(max(kamera.zoom, 0.01))
+                let z0: CGFloat = log2(max(kamera.zoom, 0.01))
                 var z = alt
                 while z <= ust * 1.001 {
-                    let x = orta + (log2(z) - z0) * adim
+                    let x: CGFloat = orta + (log2(z) - z0) * adim
                     if x >= -2, x <= b.width + 2 {
                         let durak = kamera.zoomDuraklari.contains { abs($0 - z) < 0.01 }
                         let h: CGFloat = durak ? 10 : 5
                         var yol = Path(); yol.move(to: CGPoint(x: x, y: 18 - h)); yol.addLine(to: CGPoint(x: x, y: 18))
-                        let uzak = min(1, abs(x - orta) / orta)
-                        c.stroke(yol, with: .color(.white.opacity((durak ? 0.9 : 0.45) * (1 - uzak * 0.7))), lineWidth: durak ? 1.2 : 0.8)
+                        let uzak = Double(min(1, abs(x - orta) / orta))
+                        let parlak: Double = (durak ? 0.9 : 0.45) * (1 - uzak * 0.7)
+                        c.stroke(yol, with: .color(.white.opacity(parlak)), lineWidth: durak ? 1.2 : 0.8)
                     }
                     z = ((z + (z < 2 ? 0.1 : (z < 5 ? 0.25 : 0.5))) * 100).rounded() / 100
                 }
                 for d in kamera.zoomDuraklari {
-                    let x = orta + (log2(d) - z0) * adim
+                    let x: CGFloat = orta + (log2(d) - z0) * adim
                     guard x > 8, x < b.width - 8 else { continue }
                     c.draw(Text(AnaEkran.fmt(d)).font(.system(size: 9, weight: .medium)).foregroundColor(.white.opacity(0.75)), at: CGPoint(x: x, y: 27))
                 }
