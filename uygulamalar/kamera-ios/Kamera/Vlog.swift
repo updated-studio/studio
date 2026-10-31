@@ -174,7 +174,7 @@ struct VlogEkran: View {
 
 /// Kamera'nın alt mod şeridi (Vlog ekranında aynı görünüm): seçili mod ortada, kenarlar silikleşir
 struct ModSeridi: View {
-    static let adlar = ["TIMELAPSE", "VİDEO", "VLOG", "FOTO", "PRO MODLAR", "PORTRE"]
+    static let adlar = ["TIMELAPSE", "VİDEO", "VLOG", "FOTO", "PORTRE", "PRO MODLAR"]
     let secili: String
     var kilitli = false
     var sec: (String) -> Void
@@ -191,7 +191,7 @@ struct ModSeridi: View {
                                 UISelectionFeedbackGenerator().selectionChanged()
                                 sec(ad)
                             } label: {
-                                Text(ad == "PRO MODLAR" ? "PRO" : ad).font(.system(size: 12, weight: .semibold)).tracking(1.4).lineLimit(1)
+                                Text(ad == "PRO MODLAR" ? "UZMAN" : ad).font(.system(size: 12, weight: .semibold)).tracking(1.4).lineLimit(1)
                                     .foregroundStyle(ad == secili ? Color.white : Tema.ikincil)
                                     .padding(.horizontal, 11).frame(height: 30)
                                     .background(Capsule().fill(ad == secili ? Color.white.opacity(0.12) : .clear))

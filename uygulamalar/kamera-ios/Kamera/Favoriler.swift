@@ -173,11 +173,12 @@ struct SabitKapsul: View {
 
     var body: some View {
         let d = kamera.favoriDeger(f)
-        Image(systemName: f.simge).font(.system(size: 14, weight: .regular))
+        // Apple Kamera'daki gibi çıplak simge (daire yok), görüntü üstünde okunsun diye hafif gölge
+        Image(systemName: f.simge).font(.system(size: 19, weight: .regular))
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(d.etkin ? Tema.sari : .white)
-            .frame(width: 36, height: 36)
-            .yuvarlakYuzey(d.etkin ? Tema.sari : nil)
+            .frame(width: 40, height: 36)
+            .shadow(color: .black.opacity(0.55), radius: 3)
             .accessibilityLabel(FavoriSatir.baslik(f).capitalized(with: Locale(identifier: "tr")) + (d.yazi.isEmpty ? "" : " \(d.yazi)"))
     }
 }
@@ -224,6 +225,8 @@ struct DenetimDaire: View {
     @ObservedObject var kamera: Kamera
     var kucuk = false
     var soluk = false
+    /// Ana ekrana sabitli: iğne yerine Apple gibi hafif sarı parıltı (Fatih 31 Ekim)
+    var sabit = false
 
     var body: some View {
         let d = kamera.favoriDeger(f)
@@ -242,7 +245,9 @@ struct DenetimDaire: View {
                 }
             }
             .frame(width: cap, height: cap)
-            .foregroundStyle(d.etkin ? Tema.sari : .white)
+            .overlay { if sabit { Circle().strokeBorder(Tema.sari.opacity(0.55), lineWidth: 1) } }
+            .shadow(color: sabit ? Tema.sari.opacity(0.45) : .clear, radius: 8)
+            .foregroundStyle(d.etkin || sabit ? Tema.sari : .white)
             Text(FavoriSatir.baslik(f)).font(.system(size: kucuk ? 10 : 11, weight: .medium)).tracking(0.8)
                 .lineLimit(1).minimumScaleFactor(0.7)
         }

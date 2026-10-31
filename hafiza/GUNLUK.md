@@ -67,6 +67,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ### 29 Ekim 2026
 
+- 18:40 (31 Ekim) Fatih 18:01 27 maddelik liste (hafızada kamera-31ekim-27-madde). PRO adı UZMAN (Fatih seçti). iOS 0.19.0 1. parti: RAW kaydı, geçiş bulanıklığı, Göstergeler List hatası, yalnız sabitlenenler + şeffaf menü, sarı parıltı, basılı tut düzenleme, UZMAN en sağda, kırmızı kayıt düğmesi, odak karesi + AE/AF kilidi. Sırada: zoom tekerleği + kesin optik geçiş, Kamera Denetimi düğmesi, diyafram, portre diyaframı, timelapse şablonları, LUT/Stil birleşimi, göstergeler alt menü, kirli mercek, AI Kadraj, Vlog, yatay düzen, yeni tasarım.
 - 03:10 (31 Ekim) Fatih 02:55: tasarımı 1-2-3 bir kez daha birleştir (RC tuvale Cam + Sinema + Leica panosu ekliyor); sabitlenenler yalnız simge, basılı tut = seçenekler (WB: Kelvin + yeşil-macenta), sabitle/kaldır kolay. iOS 0.18.0: simgeli sabitlenenler, Denetimler'de basılı tut = sabitle/kaldır, panelde kaldır düğmesi.
 - 14:55 (30 Ekim) iOS 0.17.0 TestFlight'ta (Android Kamera 0.21.0 / Studio 0.4.3 aynı adım). 0.17.1: pozlama cetveli (Kamera), Monitör hücreleri/zaman kodu/kayıt düğmesi Sentez dilinde.
 - 14:30 (30 Ekim) iOS 0.16.1 ve 0.16.2 TestFlight'ta; Android Kamera 0.20.0 / Studio 0.4.2 yayında. Sentez tasarımı (5 dilin en iyileri, Fatih onayı 13:34) iOS 0.17.0 1. adım: üst bant Ayarlar · zaman kodu · biçim, değer hücreleri, mod noktası, yuvarlak kare kayıt düğmesi, cam mercek kapsülü. Sırada: pozlama cetveli, ses çubukları, Monitör.

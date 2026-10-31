@@ -35,9 +35,9 @@ final class GezintiTesti: XCTestCase {
         ekran("ana-ekran")
         XCTAssertTrue(dugme("FOTO").waitForExistence(timeout: 5), "Kamera ekranı açılmadı (mod düğmeleri yok)")
         // Modlar
-        for mod in ["FOTO", "VİDEO", "PORTRE", "PRO", "TIMELAPSE", "FOTO"] {
+        for mod in ["FOTO", "VİDEO", "PORTRE", "UZMAN", "TIMELAPSE", "FOTO"] {
             dokun(dugme(mod), "mod-\(mod)")
-            if mod == "PRO" { panelleriGez(on: "pro") }
+            if mod == "UZMAN" { panelleriGez(on: "pro") }
         }
         panelleriGez(on: "foto")
         dokun(dugme("VİDEO"), "video")
@@ -96,7 +96,7 @@ final class GezintiTesti: XCTestCase {
         for ad in ["Bitti", "Kapat", "Done"] where dugme(ad).exists { dugme(ad).tap(); break }
     }
 
-    static let modlar: Set<String> = ["FOTO", "VİDEO", "PORTRE", "PRO", "TİMELAPSE", "TIMELAPSE", "MONİTÖR", "VLOG"]
+    static let modlar: Set<String> = ["FOTO", "VİDEO", "PORTRE", "PRO", "UZMAN", "TİMELAPSE", "TIMELAPSE", "MONİTÖR", "VLOG"]
 
     /// Aynı adlı düğmelerden ekranda görüneni (Vlog'un kendi mod şeridi ana ekranınkinin üstünde; tek eşleşme beklemek hata veriyordu)
     private func dugme(_ ad: String) -> XCUIElement {

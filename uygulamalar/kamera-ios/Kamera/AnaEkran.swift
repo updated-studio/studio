@@ -29,6 +29,9 @@ struct AnaEkran: View {
     @State private var uyariMod: ProMod?
     @State private var arayuz: UIInterfaceOrientation = .portrait
     @State private var yardim = false
+    /// Son dokunulan odak noktası (görünümde 0–1) ve kaçıncı dokunuş (kare her dokunuşta yeniden belirir)
+    @State private var odakIsaret: CGPoint?
+    @State private var odakSayac = 0
     @State private var ayarlar = false
     /// Masa ve Monitör UpCam Studio'da (Fatih 30 Ekim 08:24 "Kaldır"); Kamera doğrudan açılır, açılış sorusu yok
     @State private var giris = false
@@ -41,7 +44,7 @@ struct AnaEkran: View {
     static let cam = Color(white: 0.16).opacity(0.78)
     /// Menü geçişleri (Fatih 30 Ekim 10:41 "daha smooth"): sönümlü yay; açılış ve kapanış aynı akışta, sekmeden
     /// Üstte zaten görünenler (biçim kapsülü ve değer hücreleri): sabitlenenlerde tekrarlanmaz
-    static let ustteGorunen: [Favori] = [.cozunurluk, .iso, .enst, .bd, .ev]
+    static let ustteGorunen: [Favori] = [.cozunurluk]
 
     static let yay = Animation.spring(response: 0.34, dampingFraction: 0.9, blendDuration: 0.1)
     /// Dairesel düğmeler (Apple Kamera'daki koyu gri)
@@ -264,13 +267,33 @@ struct AnaEkran: View {
         GeometryReader { tam in
             let alan = AnaEkran.doldurAlan(oran: kamera.goruntuOrani, boyut: tam.size)
             ZStack {
-                Onizleme(oturum: kamera.oturum, yonu: arayuz) { nokta, ekran in
+                Onizleme(oturum: kamera.oturum, yonu: arayuz, dokun: { nokta, ekran in
                     panel = nil
-                    // AI Kadraj açıkken dokunulan yerdeki konu seçilir; AF-AE onu izler. Konu yoksa düz odak
+                    // Dokun: odak + otomatik pozlama o noktaya (kilit varsa çözülür). AI Kadraj açıkken dokunulan konu seçilir
                     let kare = CGPoint(x: (ekran.x * tam.size.width - alan.minX) / max(alan.width, 1), y: (ekran.y * tam.size.height - alan.minY) / max(alan.height, 1))
                     if kamera.asistanAcik { kamera.konuSec(kare, cihaz: nokta) } else { kamera.odakla(nokta) }
+                    odakGoster(ekran)
+                }, kilit: { nokta, ekran in
+                    // Basılı tut: AE/AF kilidi (Apple Kamera gibi)
+                    panel = nil
+                    kamera.kilitle(nokta)
+                    odakGoster(ekran)
+                })
+                .blur(radius: kamera.gecis ? 14 : 0)
+                .animation(.easeOut(duration: 0.2), value: kamera.gecis)
+                if let o = odakIsaret {
+                    OdakKaresi(kilitli: kamera.aeafKilit)
+                        .position(x: o.x * tam.size.width, y: o.y * tam.size.height)
+                        .id(odakSayac)
+                        .allowsHitTesting(false)
                 }
-                .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in kamera.odakSerbest() })
+                if kamera.aeafKilit {
+                    Text("AE/AF KİLİT").font(.system(size: 12, weight: .semibold)).tracking(0.6).foregroundStyle(.black)
+                        .padding(.horizontal, 8).frame(height: 22).background(RoundedRectangle(cornerRadius: 5).fill(Tema.sari))
+                        .position(x: tam.size.width / 2, y: tam.size.height * 0.17)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
                 if kamera.gostergeGorunur {
                     // Görüntü araçları: aynı kare GPU'da araçlarla çizilir (yalnız ekranda)
                     MonitorGorunum(cizici: kamera.cizici).allowsHitTesting(false)
@@ -422,7 +445,8 @@ struct AnaEkran: View {
                 .padding(.horizontal, 16).frame(minWidth: 220, minHeight: 44)
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
             } else if kamera.mod != .pro {
-                degerHucreleri
+                // Fatih 31 Ekim: üstte yalnız sabitlenenler (ISO / ENST. / BEYAZ / EV hücreleri kalktı; değişen ayar sabitlenen simgede sarı)
+                EmptyView()
             } else if !bilgiOgeleri.isEmpty {
                 Button { panelAc(.bicim) } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
@@ -496,13 +520,15 @@ struct AnaEkran: View {
             HStack(spacing: 10) {
                 // Biçim zaten sağ üstte (simgeli); burada tekrarlanmaz
                 ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) }) { f in
-                    SabitKapsul(f: f, kamera: kamera)
-                        .contentShape(Circle())
-                        .onTapGesture { kisayolDokun(f) }
-                        .onLongPressGesture(minimumDuration: 0.35) { UIImpactFeedbackGenerator(style: .medium).impactOccurred(); ayrintiAc(f) }
-                        .overlay(alignment: .bottom) { if acikSatir == f || panel == .favori(f) { Circle().fill(Tema.sari).frame(width: 4, height: 4).offset(y: 7) } }
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAction(named: "Ayrıntılı") { ayrintiAc(f) }
+                    // Fatih 31 Ekim (26): dokununca titreşimle şeffaf (sistem camı) açılır menü; seçenekler, Ayrıntılı…, sabitlemeyi kaldır
+                    Menu {
+                        HizliMenu(f: f, kamera: kamera, ayrinti: { ayrintiAc(f) })
+                    } label: {
+                        SabitKapsul(f: f, kamera: kamera)
+                    }
+                    .menuOrder(.fixed)
+                    .simultaneousGesture(TapGesture().onEnded { UIImpactFeedbackGenerator(style: .light).impactOccurred() })
+                    .overlay(alignment: .bottom) { if acikSatir == f || panel == .favori(f) { Circle().fill(Tema.sari).frame(width: 4, height: 4).offset(y: 7) } }
                 }
             }
             .disabled(kamera.kayitta)
@@ -515,6 +541,17 @@ struct AnaEkran: View {
             if !o.1.isEmpty { Text(o.1.lowercased(with: Locale(identifier: "tr"))).font(Tema.etiket).tracking(0.8).textCase(.uppercase).foregroundStyle(o.2 ? Tema.sari.opacity(0.8) : Tema.ikincil) }
         }
         .foregroundStyle(o.2 ? Tema.sari : .white)
+    }
+
+    /// Odak karesi: dokunulan yerde belirir, 1,5 sn sonra kaybolur (kilitliyken kalır)
+    private func odakGoster(_ ekran: CGPoint) {
+        odakSayac += 1
+        let n = odakSayac
+        withAnimation(.easeOut(duration: 0.15)) { odakIsaret = ekran }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            guard n == odakSayac, !kamera.aeafKilit else { return }
+            withAnimation(.easeOut(duration: 0.3)) { odakIsaret = nil }
+        }
     }
 
     /// Ana ekrana sabitle / kaldır (titreşim + kısa bildirim)
@@ -731,7 +768,7 @@ struct AnaEkran: View {
                 } else if kamera.mod.foto {
                     Circle().fill(.white).frame(width: 60, height: 60)
                 } else {
-                    RoundedRectangle(cornerRadius: 21, style: .continuous).fill(Tema.kirmizi).frame(width: 60, height: 60)
+                    Circle().fill(Tema.kirmizi).frame(width: 64, height: 64)
                 }
             }
             .animation(AnaEkran.yay, value: kamera.kayitta)
@@ -868,7 +905,7 @@ struct AnaEkran: View {
             if case let .grup(g) = p { grupCubugu(g) }
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 16)
-        .yuzey(30, dolgu: Color(red: 18 / 255, green: 18 / 255, blue: 20 / 255).opacity(0.72))
+        .yuzey(30, dolgu: Color(red: 18 / 255, green: 18 / 255, blue: 20 / 255).opacity(0.34))
         .environment(\.colorScheme, .dark)
         .padding(.horizontal, 10)
         .padding(.bottom, 4)
@@ -878,7 +915,7 @@ struct AnaEkran: View {
 
     private func panelBaslik(_ p: Panel) -> String {
         switch p {
-        case .proKartlar: return "PRO MODLAR"
+        case .proKartlar: return "UZMAN"
         case .proAyar: return kamera.proMod.ad.uppercased(with: Locale(identifier: "tr"))
         case .poz: return "POZLAMA"
         case .bd: return "BEYAZ DENGE"
@@ -1006,7 +1043,7 @@ struct AnaEkran: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 14) {
                     ForEach(Favori.allCases) { f in
                         let secili = kamera.favoriler.contains(f)
-                        Button { if !secili { kamera.favoriAcKapa(f) } } label: {
+                        Button { UISelectionFeedbackGenerator().selectionChanged(); withAnimation(AnaEkran.yay) { kamera.favoriAcKapa(f) } } label: {
                             DenetimDaire(f: f, kamera: kamera, kucuk: true, soluk: secili)
                         }
                         .buttonStyle(.plain)
@@ -1022,19 +1059,12 @@ struct AnaEkran: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 16) {
                     ForEach(Favori.allCases.filter { $0.uygun(kamera.mod) }) { f in
                         // Dokun: ayar; basılı tut: ana ekrana sabitle / kaldır (Fatih 31 Ekim: "sabitlemek ve kaldırmak daha kolay olsun")
-                        DenetimDaire(f: f, kamera: kamera)
-                            .overlay(alignment: .topTrailing) {
-                                if kamera.favoriler.contains(f) {
-                                    Image(systemName: "pin.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(.black)
-                                        .frame(width: 18, height: 18).background(Circle().fill(Tema.sari)).offset(x: -10, y: -2)
-                                        .transition(.scale.combined(with: .opacity))
-                                }
-                            }
+                        DenetimDaire(f: f, kamera: kamera, sabit: kamera.favoriler.contains(f))
                             .contentShape(Rectangle())
                             .onTapGesture { kisayolDokun(f) }
-                            .onLongPressGesture(minimumDuration: 0.4) { sabitDegistir(f) }
+                            .onLongPressGesture(minimumDuration: 0.4) { UIImpactFeedbackGenerator(style: .medium).impactOccurred(); duzenlemeBasla() }
                             .accessibilityAddTraits(.isButton)
-                            .accessibilityAction(named: kamera.favoriler.contains(f) ? "Sabitlemeyi kaldır" : "Sabitle") { sabitDegistir(f) }
+                            .accessibilityAction(named: "Sabitlenenleri düzenle") { duzenlemeBasla() }
                     }
                 }
                 HStack(spacing: 10) {
@@ -1237,6 +1267,34 @@ struct PozlamaCetveli: View {
     private func konum(_ v: Float, _ alt: Float, _ ust: Float) -> CGFloat {
         guard ust > alt else { return gen / 2 }
         return gen * CGFloat((min(ust, max(alt, v)) - alt) / (ust - alt))
+    }
+}
+
+/// Apple Kamera gibi sarı odak karesi: büyükten küçülerek oturur, kenar ortalarında kısa çentikler
+struct OdakKaresi: View {
+    var kilitli: Bool
+    @State private var oturdu = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .strokeBorder(Tema.sari, lineWidth: 1)
+            .overlay {
+                GeometryReader { g in
+                    let w = g.size.width, h = g.size.height
+                    Path { p in
+                        p.move(to: CGPoint(x: w / 2, y: 0)); p.addLine(to: CGPoint(x: w / 2, y: 6))
+                        p.move(to: CGPoint(x: w / 2, y: h)); p.addLine(to: CGPoint(x: w / 2, y: h - 6))
+                        p.move(to: CGPoint(x: 0, y: h / 2)); p.addLine(to: CGPoint(x: 6, y: h / 2))
+                        p.move(to: CGPoint(x: w, y: h / 2)); p.addLine(to: CGPoint(x: w - 6, y: h / 2))
+                    }
+                    .stroke(Tema.sari, lineWidth: 1)
+                }
+            }
+            .frame(width: 72, height: 72)
+            .scaleEffect(oturdu ? 1 : 1.35)
+            .opacity(kilitli || oturdu ? 1 : 0.6)
+            .shadow(color: .black.opacity(0.4), radius: 2)
+            .onAppear { withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) { oturdu = true } }
     }
 }
 

@@ -162,7 +162,7 @@ struct KameraAyarlar: View {
     private var renk: some View {
         List {
             Section {
-                Cetvel(tur: .bd, kamera: kamera).listRowBackground(Color.clear)
+                Cetvel(tur: .bd, kamera: kamera).buttonStyle(.plain).listRowBackground(Color.clear)
             } footer: { Text("Kamera ekranındaki beyaz denge düğmesi de aynı ayarları açar.") }
         }
         .navigationTitle("Renk")
@@ -189,7 +189,8 @@ struct KameraAyarlar: View {
     private var gostergeler: some View {
         List {
             Section {
-                GostergeMenu(kamera: kamera).listRowBackground(Color.clear)
+                // .plain: List satırında birden çok düğme varken dokunuş hepsine gidiyordu (Fatih 31 Ekim: "hepsi birlikte açılıp kapanıyor")
+                GostergeMenu(kamera: kamera).buttonStyle(.plain).listRowBackground(Color.clear)
             } header: { Text("Görüntü araçları") }
             Section("Kompozisyon") {
                 Picker("Kılavuz", selection: $kamera.kompTur) {

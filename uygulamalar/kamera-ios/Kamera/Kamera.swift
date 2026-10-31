@@ -10,10 +10,11 @@ import UIKit
 /// Baz ISO: etkin biçimin en düşük ISO'su (Android'de SENSOR_INFO_SENSITIVITY_RANGE alt sınırı ile aynı mantık).
 final class Kamera: NSObject, ObservableObject {
     enum Mod: String, CaseIterable {
-        case timelapse = "TIMELAPSE", video = "VİDEO", foto = "FOTO", pro = "PRO MODLAR", portre = "PORTRE"
+        // UZMAN (eski PRO MODLAR; Fatih 31 Ekim: "kamera zaten Pro") şeridin en sağında; ham değer kayıtlı ayarlar için aynı kalır
+        case timelapse = "TIMELAPSE", video = "VİDEO", foto = "FOTO", portre = "PORTRE", pro = "PRO MODLAR"
         var foto: Bool { self == .foto || self == .pro || self == .portre }
         /// Mod şeridinde görünen ad; yan tutuşta daha kısa (Fatih: "yatayda isimler uzun kalıyor")
-        var ad: String { self == .pro ? "PRO" : rawValue }
+        var ad: String { self == .pro ? "UZMAN" : rawValue }
         var kisa: String { self == .timelapse ? "TL" : ad }
     }
     enum Lens { case ultra, genis, tele }
@@ -622,12 +623,17 @@ final class Kamera: NSObject, ObservableObject {
         if secilenEnst != nil { secilenEnst = nil }
         if yeni.foto, flas == .fener { flas = .kapali }
         if !yeni.foto, flas == .oto || flas == .acik { flas = .kapali }
+        aeafKilit = false
+        // Fatih 31 Ekim: "geçiş hızlı ama sonra anlık fps düşmesi": yeniden kurulum biter bitmez değil, akış oturunca (≈0,25 sn) açılır
+        gecis = true
         kuyruk.async {
-            if self.cihazUyumla() { return }
-            self.oturum.beginConfiguration()
-            self.presetUygula()
-            self.oturum.commitConfiguration()
-            self.isoGuncelle()
+            if !self.cihazUyumla() {
+                self.oturum.beginConfiguration()
+                self.presetUygula()
+                self.oturum.commitConfiguration()
+                self.isoGuncelle()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.gecis = false }
         }
     }
 
@@ -752,7 +758,27 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
+    /// AE/AF kilidi açık mı (basılı tutunca; dokununca çözülür)
+    @Published var aeafKilit = false
+    /// Mod geçişinde önizleme bir an bulanıklaşır (Apple Kamera gibi): oturum yeniden kurulurken kare atlaması görünmez
+    @Published var gecis = false
+
+    /// Basılı tut: o noktaya odaklanıp pozlar, sonra ikisini kilitler (Fatih 31 Ekim)
+    func kilitle(_ nokta: CGPoint) {
+        aeafKilit = false
+        odakla(nokta)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        kuyruk.asyncAfter(deadline: .now() + 0.7) {
+            guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
+            if d.isFocusModeSupported(.locked) { d.focusMode = .locked }
+            if self.mod != .pro, self.secilenIso == nil, self.secilenEnst == nil, d.isExposureModeSupported(.locked) { d.exposureMode = .locked }
+            d.unlockForConfiguration()
+            DispatchQueue.main.async { self.aeafKilit = true }
+        }
+    }
+
     func odakla(_ nokta: CGPoint) {
+        if aeafKilit { DispatchQueue.main.async { self.aeafKilit = false } }
         kuyruk.async {
             guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
             let pro = self.mod == .pro
@@ -1164,14 +1190,36 @@ extension Kamera: AVCapturePhotoCaptureDelegate {
         let gomulu = p.islenmis.map { fotoyaGom($0) } ?? ana
         let kucuk = p.islenmis.flatMap { Kamera.kucukResim($0) }
         let mesaj = mod == .pro && proMod.seri ? (seriSayi > 1 ? "\(seriSayi) kare çekildi" : "Fotoğraf kaydedildi") : (p.ham != nil ? "Fotoğraf kaydedildi (RAW + \(heif ? "HEIF" : "JPEG"))" : "Fotoğraf kaydedildi")
-        kaydet({
-            let istek = PHAssetCreationRequest.forAsset()
-            istek.addResource(with: .photo, data: gomulu, options: nil)
-            if p.islenmis != nil, let ham = p.ham {
-                let s = PHAssetResourceCreationOptions()
-                s.originalFilename = "UPDATED-\(Int(Date().timeIntervalSince1970)).dng"
-                istek.addResource(with: .alternatePhoto, data: ham, options: s)
+        // RAW (Fatih 31 Ekim: "RAW galeriye kaydedilemiyor"): HEIF + DNG'yi tek varlıkta eşlemek (.alternatePhoto) bazı
+        // ProRAW çekimlerinde reddediliyordu; Apple Kamera gibi DNG asıl fotoğraf olarak yazılır (Fotoğraflar RAW rozetiyle gösterir).
+        // Yazılamazsa işlenmiş kopya ayrı fotoğraf olarak denenir
+        if let ham = p.ham {
+            let ad = "UPDATED-\(Int(Date().timeIntervalSince1970))"
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { durum in
+                guard durum == .authorized || durum == .limited else {
+                    DispatchQueue.main.async { self.bildirim = "Fotoğraflar izni yok, Ayarlar'dan açılabilir." }
+                    return
+                }
+                PHPhotoLibrary.shared().performChanges({
+                    let s = PHAssetResourceCreationOptions()
+                    s.originalFilename = ad + ".dng"
+                    s.uniformTypeIdentifier = "com.adobe.raw-image"
+                    PHAssetCreationRequest.forAsset().addResource(with: .photo, data: ham, options: s)
+                }) { tamam, _ in
+                    if tamam {
+                        DispatchQueue.main.async { self.bildirim = "RAW kaydedildi"; if let kucuk { self.sonResim = kucuk } }
+                    } else if p.islenmis != nil {
+                        self.kaydet({ PHAssetCreationRequest.forAsset().addResource(with: .photo, data: gomulu, options: nil) },
+                                    mesaj: "RAW kaydedilemedi; \(self.heif ? "HEIF" : "JPEG") kaydedildi", kucuk: kucuk)
+                    } else {
+                        DispatchQueue.main.async { self.bildirim = "RAW kaydedilemedi." }
+                    }
+                }
             }
+            return
+        }
+        kaydet({
+            PHAssetCreationRequest.forAsset().addResource(with: .photo, data: gomulu, options: nil)
         }, mesaj: mesaj, kucuk: kucuk)
     }
 }

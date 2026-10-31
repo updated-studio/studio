@@ -861,9 +861,9 @@ struct KayitDugmesi: View {
             let s = min(g.size.width, g.size.height)
             ZStack {
                 Circle().stroke(.white, lineWidth: s * 0.06)
-                RoundedRectangle(cornerRadius: kayitta ? s * 0.08 : s * 0.27, style: .continuous)
+                RoundedRectangle(cornerRadius: kayitta ? s * 0.08 : s * 0.42, style: .continuous)
                     .fill(Color(red: 0.9, green: 0.16, blue: 0.16))
-                    .frame(width: kayitta ? s * 0.38 : s * 0.78, height: kayitta ? s * 0.38 : s * 0.78)
+                    .frame(width: kayitta ? s * 0.38 : s * 0.84, height: kayitta ? s * 0.38 : s * 0.84)
                     .opacity(kayitta && nabiz ? 0.55 : 1)
             }
             .frame(width: s, height: s)
