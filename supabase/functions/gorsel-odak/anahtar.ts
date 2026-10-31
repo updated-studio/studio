@@ -18,6 +18,22 @@ function istemci() {
   sb = createClient(Deno.env.get("SUPABASE_URL")!, key);
   return sb;
 }
+// Kullanım sayacı (31 Ekim 2026, göç 0055): bu dosyayı yükleyen fonksiyonun bütün Gemini istekleri (generativelanguage.googleapis.com)
+// fonksiyon adı + model + sonuçla public.gemini_kullanim'a sayılır. fetch sarılır; istek ve yanıt değişmez, sayım beklenmez.
+const FONK = (() => { try { return new URL(import.meta.url).pathname.split("/").slice(-2, -1)[0] || "?"; } catch { return "?"; } })();
+const asilFetch = globalThis.fetch;
+if (!(asilFetch as unknown as { sayacli?: boolean }).sayacli) {
+  const sarili = async (girdi: Request | URL | string, ayar?: RequestInit) => {
+    const url = typeof girdi === "string" ? girdi : girdi instanceof URL ? girdi.href : girdi.url;
+    if (!url.includes("generativelanguage.googleapis.com")) return asilFetch(girdi, ayar);
+    const model = url.match(/models\/([^:/?]+)/)?.[1] ?? "?";
+    const say = (sonuc: string) => { istemci().rpc("gemini_say", { p_fonk: FONK, p_model: model, p_sonuc: sonuc }).then(() => {}, () => {}); };
+    try { const r = await asilFetch(girdi, ayar); say(r.ok ? "basarili" : r.status === 429 ? "kota" : "hata"); return r; }
+    catch (e) { say("hata"); throw e; }
+  };
+  (sarili as unknown as { sayacli: boolean }).sayacli = true;
+  globalThis.fetch = sarili as typeof fetch;
+}
 // Google'ın günlük kotası Pasifik saatiyle gece yarısı yenilenir (yaklaşık UTC-8)
 const pasifikGun = (t: number) => new Date(t - 8 * 3600e3).toISOString().slice(0, 10);
 

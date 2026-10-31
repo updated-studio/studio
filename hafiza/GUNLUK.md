@@ -209,3 +209,5 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - **31 Ekim 2026 · Künye nedeni doğrulandı.** Elle tur (kunye_kick): iki anahtar da 429 kota dolu. Göç 0053_kunye_saatleri turları kota yenilemesinin arkasına alır (onay bekliyor). Not: `radar-otomatik` dalındaki göç de 0053 numaralı; ana dala alınırken 0054 yapılmalı.
 
 - **31 Ekim 2026 · notify-email döngüsü.** invites_davet deyim tetikleyicisi notify-email'in kendi UPDATE'iyle yeniden tetikleniyordu: 30 Ekim'de ~160 bin çağrı/gün (00.32 UTC'de kendiliğinden kesildi, bir sonraki bildirimde yeniden başlar). Göç 0054 satır tetikleyicisi + WHEN koşulu; onay bekliyor.
+
+- **31 Ekim 2026 · Gemini kullanım sayacı.** Göç 0055 `gemini_kullanim` + `gemini_say`; ortak anahtar.ts fetch'i sarıp her Gemini isteğini fonksiyon/model/sonuç olarak sayar (göç uygulanmadan rpc hata verir, sessizce yutulur). Stüdyo → Bağlantı anahtarları → "Kotayı ne harcıyor". Onay bekleyen göçler: 0053 (künye saatleri), 0054 (davet döngüsü), 0055 (sayaç).

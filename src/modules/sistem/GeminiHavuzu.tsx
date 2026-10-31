@@ -19,6 +19,9 @@ const ADIMLAR: { metin: string; link?: string }[] = [
   { metin: "\"Hangi Google hesabı\" kutusuna kimin hangi hesabı olduğunu yaz (ör. Fatih – kişisel Gmail) → Ekle. Fatura (billing) ekleme" },
 ];
 
+/** Fonksiyonların ekrandaki adları (kullanım tablosu) */
+const AD: Record<string, string> = { "triyaj-topla": "Haber Masası · haber toplama ve kümeleme", "triyaj-taslak": "Haber Masası · taslak yazımı, görsel, kontrol", "kunye-otomatik": "Künye otomasyonu", "kunye-doldur": "Künye doldur (elle)", "yarisma-bul": "Yarışma tarama", "gorsel-odak": "Görsel odak noktası", "gemini-dene": "Anahtar denemesi" };
+
 export default function GeminiHavuzu() {
   const toast = useToast();
   const [liste, setListe] = useState<Satir[] | null>(null);
@@ -27,11 +30,15 @@ export default function GeminiHavuzu() {
   const [etiket, setEtiket] = useState("");
   const [mesgul, setMesgul] = useState("");
   const [adimAcik, setAdimAcik] = useState(false);
+  // Kullanım (göç 0055): son iki Pasifik günü, fonksiyon ve model başına istek sayısı
+  const [kullanim, setKullanim] = useState<{ gun: string; fonk: string; model: string; basarili: number; kota: number; hata: number }[] | null>(null);
 
   const yukle = useCallback(async () => {
     const { data, error } = await sb.rpc("gemini_liste");
     if (error) { setHata(/gemini_liste/.test(error.message) ? "Anahtar listesi henüz kurulmadı (göç 0052 bekleniyor)." : error.message); return; }
     setHata(""); setListe((data ?? []) as Satir[]);
+    const { data: k } = await sb.from("gemini_kullanim").select("gun,fonk,model,basarili,kota,hata").order("gun", { ascending: false }).limit(200);
+    setKullanim((k ?? []) as NonNullable<typeof kullanim>);
   }, []);
   useEffect(() => { yukle(); }, [yukle]);
 
@@ -101,6 +108,25 @@ export default function GeminiHavuzu() {
           })}
         </div>
       )}
+      {kullanim && kullanim.length > 0 && (() => {
+        // Kotayı ne harcıyor: en son gün, fonksiyon başına toplam (en çok harcayan üstte), altında modeller
+        const gun = kullanim[0].gun, bugun = kullanim.filter((x) => x.gun === gun);
+        const fonklar = [...new Set(bugun.map((x) => x.fonk))].map((f) => ({ f, l: bugun.filter((x) => x.fonk === f) }))
+          .map((x) => ({ ...x, top: x.l.reduce((s, y) => s + y.basarili + y.kota + y.hata, 0) })).sort((a, b) => b.top - a.top);
+        const toplam = fonklar.reduce((s, x) => s + x.top, 0);
+        return (
+          <div className="stack" style={{ gap: 6, borderTop: "1px solid var(--line)", paddingTop: 10 }}>
+            <strong>Kotayı ne harcıyor · {new Date(gun + "T12:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long" })} (Google günü)</strong>
+            <span className="muted" style={{ fontSize: 13 }}>Toplam {toplam} istek. "Kota" sütunu reddedilen (429) istekler; kota model başına sayılır.</span>
+            {fonklar.map((x) => (
+              <div key={x.f} className="stack" style={{ gap: 2 }}>
+                <div className="row" style={{ justifyContent: "space-between" }}><b>{AD[x.f] ?? x.f}</b><span className="mono">{x.top}</span></div>
+                {x.l.map((y) => <div key={y.model} className="row muted" style={{ justifyContent: "space-between", fontSize: 13 }}><span className="mono">{y.model}</span><span className="mono">{y.basarili} başarılı · {y.kota} kota · {y.hata} hata</span></div>)}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       <div className="stack" style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 10 }}>
         <strong>Anahtar ekle</strong>
         <button type="button" className="btn ghost sm" style={{ justifySelf: "start" }} onClick={() => setAdimAcik((x) => !x)}>{adimAcik ? "Adımları gizle" : "Anahtar nasıl alınır?"}</button>
