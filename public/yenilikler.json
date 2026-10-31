@@ -24,6 +24,13 @@
           "Araçlar 16'ya çıktı: dolunay, timelapse, alan derinliği, astrofotoğraf, flaş, makro, ağır çekim, dron GSD, batarya, lens görünümü, stüdyo ışığı.",
           "Ana sayfada çıkış radarı sağ sütunda; künyeye \"Tahmini çıkış tarihi\" girilince sıralanır."
         ]
+      },
+      {
+        "ad": "Yönetim",
+        "maddeler": [
+          "Bağlantı anahtarlarına \"Brave arama anahtarı\" eklendi: künye otomasyonu ürün sayfasını bununla bulur.",
+          "\"Kotayı ne harcıyor\" bölümü Gemini isteklerini iş iş gösterir."
+        ]
       }
     ]
   },

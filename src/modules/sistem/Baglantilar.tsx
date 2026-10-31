@@ -39,6 +39,16 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ],
   },
   {
+    ad: "brave_arama", baslik: "Brave arama anahtarı (künye otomasyonu)", ikon: "ara",
+    aciklama: "Künye otomasyonu ürünün resmî özellik sayfasını bununla bulur; sayfayı sistem okur, değerleri ücretsiz Gemini çıkarır. Google'ın ücretsiz Gemini'si internette arama yapamadığı için gerekli. Ürün başına bir arama yapılır.",
+    adimlar: [
+      { metin: "Brave Search API sayfasını aç, Google hesabınla ya da e-postayla kaydol", link: "https://api-dashboard.search.brave.com" },
+      { metin: "\"Subscriptions\" (Abonelikler) bölümünde ücretsiz planı seç. Planlar zaman zaman değişiyor: seçmeden önce ayda kaç aramanın ücretsiz olduğunu ve kart istenip istenmediğini sayfada kontrol et" },
+      { metin: "\"API Keys\" → \"Add API key\" → ad: updated-kunye → oluştur" },
+      { metin: "Çıkan anahtarı kopyala (BSA ile başlar), aşağıya yapıştır → Kaydet" },
+    ],
+  },
+  {
     ad: "cloudflare_anahtar", baslik: "Cloudflare görsel programı: anahtar", ikon: "yonetim",
     aciklama: "Programa yalnız bizim sistemimizin erişebilmesi için ortak şifre. Cloudflare'de ANAHTAR adıyla girdiğin şifrenin aynısı.",
     adimlar: [{ metin: "Yukarıdaki 5. adımda oluşturduğun şifreyi buraya yapıştır → Kaydet" }],

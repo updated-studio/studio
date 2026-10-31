@@ -84,16 +84,30 @@ let SAYFA_TESHIS = "";
 /** Ürünün özellik sayfaları: yalnız künyede kayıtlı bağlantılar (üretici sayfası, önceki önerilerin kaynakları) okunur; arama motoru
  *  kazınmaz (31 Ekim 2026: robot doğrulaması olan aramalar kullanılmaz). Sayfa kendi adımızla (UA) istenir; engelleyen site atlanır.
  *  Yeni ürünün sayfasını bulmak Groq'un web aramasına kalır (aşağıda); bir arama API'si eklenirse burası onu kullanır. */
+const ATLA = /youtube\.|amazon\.|reddit\.|facebook\.|instagram\.|tiktok\.|x\.com|twitter\.|pinterest\.|ebay\.|aliexpress\./i;
+/** Brave Search API (göç 0057, Stüdyo → Bağlantı anahtarları "brave_arama"): ürünün özellik sayfası adayları. Anahtar yoksa boş döner. */
+async function braveAra(sb: ReturnType<typeof createClient>, urun: Urun): Promise<string[]> {
+  const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "brave_arama").maybeSingle();
+  const anahtar = (data as { deger?: string } | null)?.deger;
+  if (!anahtar) return [];
+  const q = `${urun.brand} ${urun.name} ${urun.type === "lens" ? "lens " : ""}specifications`;
+  const r = await fetch("https://api.search.brave.com/res/v1/web/search?count=8&q=" + encodeURIComponent(q), { headers: { Accept: "application/json", "X-Subscription-Token": anahtar }, signal: AbortSignal.timeout(15_000) });
+  if (!r.ok) { SAYFA_TESHIS = `Brave ${r.status}`; await r.body?.cancel().catch(() => {}); return []; }
+  const j = await r.json();
+  const m = sade(urun.brand).slice(0, 5), puan = (u: string) => (sade(hostAl(u)).includes(m) ? 0 : /bhphotovideo|gsmarena|dpreview/.test(u) ? 1 : 2);
+  return ((j?.web?.results ?? []) as { url: string }[]).map((x, i) => ({ u: x.url, i })).filter((x) => /^https?:\/\//.test(x.u) && !ATLA.test(x.u))
+    .sort((a, b) => puan(a.u) - puan(b.u) || a.i - b.i).map((x) => x.u);
+}
 async function sayfaBul(adresler: string[]): Promise<Sayfa[]> {
   const cikan: Sayfa[] = [];
-  SAYFA_TESHIS = `${adresler.length} kayıtlı adres`;
-  for (const url of [...new Set(adresler)].filter((u) => /^https?:\/\//.test(u)).slice(0, 4)) {
+  SAYFA_TESHIS += `${SAYFA_TESHIS ? " · " : ""}${adresler.length} aday`;
+  for (const url of [...new Set(adresler)].filter((u) => /^https?:\/\//.test(u)).slice(0, 5)) {
     if (cikan.length >= 2) break;
     const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "en,tr" }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
     if (!r?.ok || !/html/i.test(r.headers.get("content-type") ?? "")) { SAYFA_TESHIS += ` · ${hostAl(url)} ${r?.status ?? "yok"}`; await r?.body?.cancel().catch(() => {}); continue; }
     const t = duz((await r.text()).replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " "));
     if (t.length < 1500) { SAYFA_TESHIS += ` · ${hostAl(url)} kısa`; continue; }
-    cikan.push({ url, baslik: hostAl(url), metin: t.slice(0, 14_000), resmi: true });
+    cikan.push({ url, baslik: hostAl(url), metin: t.slice(0, 14_000), resmi: cikan.length === 0 });
   }
   return cikan;
 }
@@ -111,7 +125,10 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
   //    değer çıkarır. Ücretsiz katmanda Gemini'nin Google arama aracı her istekte 429 veriyordu; aramasız istekler geçiyor.
   // Kayıtlı adresler: ürünün sourceUrl'leri (onaylanmış değerlerin kaynakları); varsa önce onlar okunur
   const kayitli = (urun.specs ?? []).map((x) => (x as Spec & { sourceUrl?: string | null }).sourceUrl ?? "").filter(Boolean) as string[];
-  const sayfalar = kayitli.length ? await sayfaBul(kayitli).catch(() => [] as Sayfa[]) : [];
+  SAYFA_TESHIS = "";
+  const bulunan = await braveAra(sb, urun).catch((e) => { SAYFA_TESHIS = "Brave hata: " + String(e).slice(0, 80); return [] as string[]; });
+  const adaylar = [...kayitli, ...bulunan];
+  const sayfalar = adaylar.length ? await sayfaBul(adaylar).catch(() => [] as Sayfa[]) : [];
   if (sayfalar.length) {
     const metin = sayfalar.map((x, i) => `[${i + 1}] KAYNAK: ${x.url}\n${x.metin}`).join("\n\n---\n\n");
     for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
@@ -141,7 +158,7 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
       } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
     }
     if (hepsiKota) await isaretle(a, "kota_dolu", son); }
-  } else son = kayitli.length ? `Kayıtlı sayfalar okunamadı (${SAYFA_TESHIS})` : "Kayıtlı sayfa yok";
+  } else son = adaylar.length ? `Sayfalar okunamadı (${SAYFA_TESHIS})` : `Sayfa adayı yok (${SAYFA_TESHIS || "Brave anahtarı girilmemiş"})`;
   // 2) Yedek: sayfa okunamadıysa ya da Gemini olmadıysa Groq kendi web aramasıyla dener.
   // Groq'ta gpt-oss modelleri yerleşik web aramasıyla (browser_search) aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
   // ("groq/compound" bu hesapta yok: 404, 31 Ekim 2026)
