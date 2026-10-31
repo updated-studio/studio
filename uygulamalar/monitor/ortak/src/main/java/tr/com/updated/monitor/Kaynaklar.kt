@@ -302,7 +302,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         try {
             c.createCaptureSession(android.hardware.camera2.params.SessionConfiguration(android.hardware.camera2.params.SessionConfiguration.SESSION_REGULAR, ciktilar,
                 java.util.concurrent.Executor { h.post(it) }, object : CameraCaptureSession.StateCallback() {
-                override fun onConfigured(s: CameraCaptureSession) { oturum = s; istekGonder(); if (kaydedici != null) runCatching { kaydedici?.start() }.onFailure { hataGeri("Kayıt başlatılamadı: ${it.message}"); HataKaydi.not("kayit", it.stackTraceToString()); kayitBirak() } }
+                override fun onConfigured(s: CameraCaptureSession) { oturum = s; istekGonder(); hazir?.invoke(); if (kaydedici != null) runCatching { kaydedici?.start() }.onFailure { hataGeri("Kayıt başlatılamadı: ${it.message}"); HataKaydi.not("kayit", it.stackTraceToString()); kayitBirak() } }
                 override fun onConfigureFailed(s: CameraCaptureSession) {
                     if (fotoBuyuk) { buyuktenDus(); return }
                     if (rawOkuyucu != null) { rawDustu = true; runCatching { rawOkuyucu?.close() }; rawOkuyucu = null; hataGeri("Bu kamera RAW'ı önizlemeyle birlikte veremiyor; yalnız JPEG çekilecek."); oturumKur(); return }
@@ -620,6 +620,9 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     fun ayarDegisti() = h.post { istekGonder() }
 
     /** Çözünürlük/kare hızı değişince oturum yeniden kurulur (kayıt sırasında değiştirilmez) */
+    /** Oturum her kurulduğunda (kamera iş parçacığında) çağrılır; ikinci kamera bunu bekler */
+    @Volatile var hazir: (() -> Unit)? = null
+
     fun oturumYenile(boyut: (Int, Int) -> Unit) { if (kayitta) return; val b = secilenBoyut(); boyut(b.width, b.height); h.post { oturumKur() } }
 
     /** Kayıt: dosya tanımlayıcısı (MediaStore) verilir; H.264/H.265, bit hızı Mbps, ses isteğe bağlı */

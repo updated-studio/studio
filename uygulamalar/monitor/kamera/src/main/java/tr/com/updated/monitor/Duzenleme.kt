@@ -114,15 +114,17 @@ object DuzenMotoru {
     /** Vlog birleşik videosu: girdi 0 ön kamera (üstte çizilir), girdi 1 arka kamera (zemin; çıkış boyutu ve ses ondan) */
     const val VLOG_PENCERE = 0.28f; const val VLOG_KENAR = 0.04f
     @OptIn(UnstableApi::class)
-    class VlogDuzeni : VideoCompositorSettings {
+    /** kose: 0 sağ alt, 1 sağ üst, 2 sol üst, 3 sol alt (kayıtta ekrandaki pencereyle aynı köşe) */
+    class VlogDuzeni(private val kose: Int = 0) : VideoCompositorSettings {
         @Volatile private var tuval = Size(1920, 1080); @Volatile private var pencere = Size(1280, 720)
         override fun getOutputSize(boyutlar: List<Size>): Size { pencere = boyutlar[0]; tuval = boyutlar.getOrElse(1) { boyutlar[0] }; return tuval }
         override fun getOverlaySettings(girdi: Int, us: Long): OverlaySettings {
             if (girdi != 0) return OverlaySettings.Builder().build()
-            // Ön pencere: zemin genişliğinin %28'i, sağ alt köşede, kenarlardan genişliğin %4'ü kadar içeride
+            // Ön pencere: zemin genişliğinin %28'i, seçilen köşede, kenarlardan genişliğin %4'ü kadar içeride
             val o = VLOG_PENCERE * tuval.width / pencere.width
-            return OverlaySettings.Builder().setScale(o, o).setOverlayFrameAnchor(1f, -1f)
-                .setBackgroundFrameAnchor(1f - 2 * VLOG_KENAR, -1f + 2 * VLOG_KENAR * tuval.width / tuval.height).build()
+            val sx = if (kose == 2 || kose == 3) -1f else 1f; val sy = if (kose == 1 || kose == 2) 1f else -1f
+            return OverlaySettings.Builder().setScale(o, o).setOverlayFrameAnchor(sx, sy)
+                .setBackgroundFrameAnchor(sx * (1f - 2 * VLOG_KENAR), sy * (1f - 2 * VLOG_KENAR * tuval.width / tuval.height)).build()
         }
     }
 
@@ -146,14 +148,14 @@ object DuzenMotoru {
 
     /** Vlog: arka ve ön kamera dosyalarından birleşik video ("<ad> vlog.mp4"); iki özgün dosya kalır. `disaAktar` gibi çalışır */
     @OptIn(UnstableApi::class)
-    fun vlogBirlestir(ctx: Context, arka: Uri, on: Uri, hevc: Boolean, looper: Looper, ilerleme: (Int) -> Unit = {}, dizin: Uri? = null, bitti: (Uri?) -> Unit): Transformer? {
+    fun vlogBirlestir(ctx: Context, arka: Uri, on: Uri, hevc: Boolean, looper: Looper, ilerleme: (Int) -> Unit = {}, dizin: Uri? = null, kose: Int = 0, bitti: (Uri?) -> Unit): Transformer? {
         val gecici = File(ctx.cacheDir, "vlog-${System.currentTimeMillis()}.mp4")
         val h = Handler(looper)
         return try {
             val c = Composition.Builder(
                 EditedMediaItemSequence(EditedMediaItem.Builder(MediaItem.fromUri(on)).setRemoveAudio(true).build()),
                 EditedMediaItemSequence(EditedMediaItem.Builder(MediaItem.fromUri(arka)).build()))
-                .setVideoCompositorSettings(VlogDuzeni()).build()
+                .setVideoCompositorSettings(VlogDuzeni(kose)).build()
             var surer = true
             val t = Transformer.Builder(ctx).setLooper(looper)
                 .setVideoMimeType(if (hevc) MimeTypes.VIDEO_H265 else MimeTypes.VIDEO_H264)

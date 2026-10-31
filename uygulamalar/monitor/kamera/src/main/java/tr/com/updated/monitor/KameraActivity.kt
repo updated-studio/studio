@@ -165,6 +165,25 @@ class KameraActivity : Activity() {
     private var seriSuruyor = false; private var seriSayi = 0
     // Timelapse (Timelapse.kt): kare aralığı, çekim süresi sınırı (dk, 0 = sınırsız), pozlama kilidi
     private var tlAralik = 2000L; private var tlSure = 0; private var tlPozSabit = true
+    /** Timelapse enstantanesi (null = oto), başlangıç sayacı (sn), seçili şablon; çekim öncesi enstantane yedeği */
+    private var tlEnst: Long? = null; private var tlSayac = 3; private var tlSablon: String? = null
+    private var tlOnceki: Pair<Long?, Int>? = null
+    /**
+     * Hazır senaryolar (DJI Osmo Pocket'taki gibi; iPhone ile aynı): aralık, süre (dk), enstantane, pozlama kilidi, sabitleme.
+     * Aralık ya da enstantane elle değişince şablon seçimi düşer.
+     */
+    private class TlSablon(val ad: String, val aralik: Long, val sure: Int, val enst: Long?, val kilit: Boolean, val sabit: Boolean = false)
+    private val TL_SABLONLAR = listOf(
+        TlSablon("Gün batımı", 5000, 60, null, false), TlSablon("Bulutlar", 3000, 30, null, true), TlSablon("Şehir trafiği", 2000, 0, SN_ / 15, true),
+        TlSablon("Gece", 10_000, 120, null, true), TlSablon("Kalabalık", 1000, 10, SN_ / 30, true), TlSablon("Hyperlapse", 500, 0, null, false, sabit = true))
+    private val TL_ENSTLER: List<Long?> = listOf(null, SN_ / 250, SN_ / 60, SN_ / 30, SN_ / 15, SN_ / 4, SN_ / 2, SN_)
+    private fun tlSablonUygula(t: TlSablon) {
+        tlSablon = t.ad; tlAralik = t.aralik; tlSure = t.sure; tlEnst = t.enst; tlPozSabit = t.kilit
+        if (t.sabit && kaynak?.sabitlemeler?.contains(1) == true) { ayar.sabit = 1; ayarKaydet(); kaynak?.ayarDegisti() }
+        tlKaydet(); if (mod == KMod.TIMELAPSE) sureCiz(); bilgiCiz()
+    }
+    private fun tlKaydet() = tercih.edit().putLong("tlAralik", tlAralik).putInt("tlSure", tlSure).putBoolean("tlPozSabit", tlPozSabit).putLong("tlEnst", tlEnst ?: 0L)
+        .putInt("tlSayac", tlSayac).putString("tlSablon", tlSablon).apply()
     private var tlKaydedici: Kaydedici? = null; private var tlUri: Uri? = null
     private fun kayitSuruyor() = kaynak?.kayitta == true || tlKaydedici != null || lutKaydedici != null
     /** LUT'lu video çekimi: kamera → GPU (stil/LUT) → kodlayıcı; kayıttan sonra işleme beklemesi yok */
@@ -176,6 +195,8 @@ class KameraActivity : Activity() {
      * çeker; telefon iki kamerayı o çözünürlükte açamazsa bir kez 1080p'ye iner (vlogSinir).
      */
     private var vlogCikti = 0
+    /** Vlog: ön pencere köşesi (0 sağ alt, 1 sağ üst, 2 sol üst, 3 sol alt), pencere açık mı, kayıt öncesi sayaç (0/3/10 sn) */
+    private var vlogKose = 0; private var vlogPencere = true; private var vlogSayac = 0
     private var vlogSinir: Int? = null
     /** Bu telefonda ön + arka aynı anda açılabiliyor mu (VLOG modu yalnız o zaman görünür) */
     private val vlogDestek get() = vlogOnId() != null
@@ -300,7 +321,7 @@ class KameraActivity : Activity() {
         histoAcik = tercih.getBoolean("g_histo", false)
         favOku()
         EkranYayini.degisti = { runOnUiThread { ayarEkrani?.yenile() } }
-        stil = Stil.oku(tercih.getString("stil", null))
+        stil = Stil.oku(tercih.getString("stil", null)); portreF = tercih.getFloat("portreF", 2.8f).takeIf { it in Portre.DEGERLER } ?: 2.8f
         tercih.getString("g_lut", null)?.let { lutUygula(it) } ?: renkGuncelle()
         monitor.yuzeyHazir = { y -> yuzey = y; kameraAc() }
         // Tam ekran önizleme (Fatih 29 Ekim 12:39): görüntü tüm ekranı doldurur (kenarlar ekranda kırpılır, kayıt tam kare), menüler ve düğmeler üstünde.
@@ -464,12 +485,24 @@ class KameraActivity : Activity() {
         altKarartma.layoutParams = FrameLayout.LayoutParams(-1, a + dp(300f), Gravity.BOTTOM)
         altSira.layoutParams = FrameLayout.LayoutParams(-1, dp(44f), Gravity.BOTTOM).apply { bottomMargin = a + dp(10f) }
         deklansorSira.layoutParams = FrameLayout.LayoutParams(-1, dp(76f), Gravity.BOTTOM).apply { bottomMargin = a + dp(60f) }
-        zoomSira.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.BOTTOM).apply { bottomMargin = a + dp(146f) }
-        cetvel.layoutParams = FrameLayout.LayoutParams(dp(300f), dp(36f), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = a + dp(188f) }
+        if (fizikselYon == 90 || fizikselYon == 270) {
+            // Yan tutuş: mercekler ve zoom tekerleği kullanıcının alt kenarında, mod şeridinin karşı ucunda (270'te sol alt);
+            // tekerlek döndürülür (dokunma da dönen koordinatta gelir), mercek sırası dikey olur
+            val kenar = if (fizikselYon == 270) Gravity.START else Gravity.END
+            val ust = u + dp(124f)
+            zoomSira.orientation = LinearLayout.VERTICAL
+            zoomSira.layoutParams = FrameLayout.LayoutParams(dp(44f), -2, Gravity.TOP or kenar).apply { topMargin = ust; marginStart = dp(10f); marginEnd = dp(10f) }
+            cetvel.rotation = -fizikselYon.toFloat()
+            cetvel.layoutParams = FrameLayout.LayoutParams(dp(300f), dp(36f), Gravity.TOP or kenar).apply { topMargin = ust + dp(150f - 18f); marginStart = dp(76f - 150f); marginEnd = dp(76f - 150f) }
+        } else {
+            zoomSira.orientation = LinearLayout.HORIZONTAL; cetvel.rotation = 0f
+            zoomSira.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.BOTTOM).apply { bottomMargin = a + dp(146f) }
+            cetvel.layoutParams = FrameLayout.LayoutParams(dp(300f), dp(36f), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = a + dp(188f) }
+        }
         secimSira.layoutParams = FrameLayout.LayoutParams(-1, dp(44f), Gravity.BOTTOM).apply { bottomMargin = a + dp(144f); marginStart = dp(12f); marginEnd = dp(12f) }
         duzenSerit.layoutParams = FrameLayout.LayoutParams(-1, dp(40f), Gravity.TOP).apply { topMargin = u + dp(2f); marginStart = dp(16f); marginEnd = dp(16f) }
         hizliSira.layoutParams = FrameLayout.LayoutParams(-2, dp(34f), Gravity.TOP or Gravity.END).apply { topMargin = u + dp(5f); marginEnd = dp(16f) }
-        if (vlogCip.parent != null) vlogCip.layoutParams = FrameLayout.LayoutParams(-2, dp(30f), Gravity.TOP or Gravity.END).apply { topMargin = u + dp(43f); marginEnd = dp(16f) }
+        if (vlogSerit.parent != null) vlogSerit.layoutParams = FrameLayout.LayoutParams(-2, dp(30f), Gravity.TOP or Gravity.END).apply { topMargin = u + dp(43f); marginEnd = dp(16f) }
         sureSira.layoutParams = FrameLayout.LayoutParams(-1, dp(32f), Gravity.BOTTOM).apply { bottomMargin = a + dp(192f) }
         kok.requestLayout()
     }
@@ -501,6 +534,9 @@ class KameraActivity : Activity() {
             val bl = fotoBicimleri(k)
             if (bl.size > 1) { val su = fotoBicimi(k); val i = bl.indexOfFirst { it.first == su }.coerceAtLeast(0)
                 l.add(Hizli("BİÇİM", su, if (su == "RAW") R.drawable.ic_raw else R.drawable.ic_foto, bl.map { it.first }, i, 72f) { bl[it].second(); ayarKaydet(); oturumuYenile() }) }
+            if (mod == KMod.PORTRE) { val i = Portre.DEGERLER.indexOf(portreF).coerceAtLeast(0)
+                l.add(Hizli("SANAL DİYAFRAM", Portre.yazi(portreF), null, Portre.DEGERLER.map { Portre.yazi(it) }, i, 52f) {
+                    portreF = Portre.DEGERLER[it]; tercih.edit().putFloat("portreF", portreF).apply(); jpegIsleKur() }) }
             if (mod != KMod.PRO) { val z = listOf(0, 3, 10); val i = z.indexOf(zamanlayici).coerceAtLeast(0)
                 l.add(Hizli("ZAMANLAYICI", if (zamanlayici == 0) "" else "$zamanlayici sn", R.drawable.ic_zaman, listOf("Kapalı", "3 sn", "10 sn"), i, if (zamanlayici == 0) 36f else 62f) {
                     zamanlayici = z[it]; tercih.edit().putInt("zamanlayici", zamanlayici).apply() }) }
@@ -512,7 +548,14 @@ class KameraActivity : Activity() {
             l.add(Hizli("ÇÖZÜNÜRLÜK", cozKisa(sb.height), null, vb.map { cozKisa(it.height) }, i, 44f) { ayar.boyut = vb[it]
                 if (!kodlayiciVar(vb[it], fps)) ayar.fps = Range(30, 30)
                 ayarKaydet(); oturumuYenile() }) }
-        if (mod == KMod.TIMELAPSE) return l
+        if (mod == KMod.TIMELAPSE) {
+            val si = TL_SABLONLAR.indexOfFirst { it.ad == tlSablon }
+            l.add(Hizli("ŞABLON", "", R.drawable.ic_timelapse, listOf("Elle") + TL_SABLONLAR.map { it.ad }, si + 1, 36f) {
+                if (it == 0) { tlSablon = null; tlKaydet() } else tlSablonUygula(TL_SABLONLAR[it - 1]) })
+            val z = listOf(0, 3, 5); val i = z.indexOf(tlSayac).coerceAtLeast(0)
+            l.add(Hizli("SAYAÇ", if (tlSayac == 0) "" else "$tlSayac sn", R.drawable.ic_zaman, listOf("Kapalı", "3 sn", "5 sn"), i, if (tlSayac == 0) 36f else 62f) { tlSayac = z[it]; tlKaydet() })
+            return l
+        }
         val fl = listOf(24, 25, 30, 60).filter { Range(it, it) in k.yetenek.fpsler && kodlayiciVar(sb, it) }
         if (fl.isNotEmpty()) l.add(Hizli("KARE HIZI", "$fps", null, fl.map { "$it" }, fl.indexOf(fps).coerceAtLeast(0), 36f) { ayar.fps = Range(fl[it], fl[it]); ayarKaydet(); oturumuYenile() })
         val sl = k.sabitlemeler
@@ -675,7 +718,7 @@ class KameraActivity : Activity() {
             k.sahne = mod.sahne; k.pro = proIstek()
             if (k.fotoModu != mod.foto) k.modDegistir(mod.foto) { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); komp.invalidate() } } else k.ayarDegisti()
         }
-        bilgiCiz(); flasCiz(); cerceveGorunum.invalidate()
+        bilgiCiz(); flasCiz(); cerceveGorunum.invalidate(); jpegIsleKur()
     }
 
     /* ================= PRO MODLAR: hazır çekim modları ================= */
@@ -851,7 +894,7 @@ class KameraActivity : Activity() {
         Timelapse.HIZLI.forEach { ms -> sureSira.addView(TextView(this).apply {
             text = Timelapse.aralikYazi(ms); textSize = 12f; typeface = kosulKalin; gravity = Gravity.CENTER; setTextColor(if (tlAralik == ms) VURGU else Color.argb(217, 255, 255, 255))
             background = if (tlAralik == ms) secenek(true) else cam(999f); setPadding(dp(12f), 0, dp(12f), 0); contentDescription = "Kare aralığı ${text}"
-            setOnClickListener { if (tlKaydedici != null) return@setOnClickListener; tlAralik = ms; tercih.edit().putLong("tlAralik", ms).apply(); sureCiz(); bilgiCiz() } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
+            setOnClickListener { if (tlKaydedici != null) return@setOnClickListener; tlAralik = ms; tlSablon = null; tlKaydet(); sureCiz(); bilgiCiz() } }, LinearLayout.LayoutParams(-2, dp(32f)).apply { marginEnd = dp(6f) }) }
     }
 
     /* ================= dokunma: odak, kaydırma (mod); yakınlaştırma yok, yalnız gerçek mercekler ================= */
@@ -980,7 +1023,8 @@ class KameraActivity : Activity() {
     private fun zoomCiz() {
         (0 until zoomSira.childCount).forEach { donenler.remove(zoomSira.getChildAt(it)) }
         zoomSira.removeAllViews()
-        val duraklar = mercekDuraklari()
+        // 90°'de kullanıcının solu ekranın altı: dikey sıra ters dizilir, küçük mercek solda kalır
+        val duraklar = mercekDuraklari().let { if (fizikselYon == 90) it.reversed() else it }
         val yakin = duraklar.minByOrNull { abs(it - ayar.zoomOrani) }
         duraklar.forEach { d ->
             val secili = d == yakin
@@ -990,7 +1034,7 @@ class KameraActivity : Activity() {
                 text = yazi; textSize = if (secili) 13f else 12f; typeface = kosulKalin; gravity = Gravity.CENTER; setTextColor(if (secili) VURGU else METIN2)
                 background = daire(false)
                 contentDescription = "Mercek ${fmt(d)}×"; setOnClickListener { zoomKay(d) }; donenler.add(this); rotation = -fizikselYon.toFloat()
-            }, LinearLayout.LayoutParams(dp(if (secili) 40f else 34f), dp(if (secili) 40f else 34f)).apply { marginStart = dp(4f); marginEnd = dp(4f) })
+            }, LinearLayout.LayoutParams(dp(if (secili) 40f else 34f), dp(if (secili) 40f else 34f)).apply { marginStart = dp(4f); marginEnd = dp(4f); topMargin = dp(3f); bottomMargin = dp(3f) })
         }
     }
     private fun fmt(v: Float) = if (v < 1f) "0,${(v * 10).toInt()}" else if (v % 1f == 0f) "${v.toInt()}" else "%.1f".format(v).replace('.', ',')
@@ -1489,6 +1533,7 @@ class KameraActivity : Activity() {
                         grup("Zamanlayıcı") { listOf(0 to "Kapalı", 3 to "3 sn", 10 to "10 sn").forEach { (z, ad) -> secenek(ad, zamanlayici == z) { zamanlayici = z; tercih.edit().putInt("zamanlayici", z).apply() } } }
                     } }
                     anahtar("Deklanşör sesi", deklansorSesi) { deklansorSesi = it; tercih.edit().putBoolean("deklansor", it).apply() }
+                    anahtar("Kirli mercek uyarısı", tercih.getBoolean("k.kirliUyari", true)) { tercih.edit().putBoolean("k.kirliUyari", it).apply() }
                     if (k.diyaframlar.size > 1) git(R.drawable.ic_artieksi, Color.rgb(255, 204, 0), "Diyafram", "") { e.git("Diyafram") { pozlamaSayfasi(k) } }
                 }
                 mod == KMod.TIMELAPSE -> grup("Timelapse") {
@@ -1627,7 +1672,13 @@ class KameraActivity : Activity() {
     }
 
     private fun AyarEkrani.Sayfa.timelapseSayfasi() {
-        grup("Kare aralığı") { Timelapse.ARALIKLAR.forEach { a -> secenek(Timelapse.aralikYazi(a), tlAralik == a) { tlAralik = a; tercih.edit().putLong("tlAralik", a).apply(); if (mod == KMod.TIMELAPSE) sureCiz() } } }
+        grup("Hazır şablonlar", "Seçince aralık, süre, enstantane ve pozlama kilidi ona göre ayarlanır.") {
+            TL_SABLONLAR.forEach { t -> secenek("${t.ad} · ${Timelapse.aralikYazi(t.aralik)}" + (if (t.sure > 0) " · ${Timelapse.sureYazi(t.sure)}" else ""), tlSablon == t.ad) { tlSablonUygula(t); ayarEkrani?.yenile() } } }
+        grup("Kare aralığı") { Timelapse.ARALIKLAR.forEach { a -> secenek(Timelapse.aralikYazi(a), tlAralik == a) { tlAralik = a; tlSablon = null; tlKaydet(); if (mod == KMod.TIMELAPSE) sureCiz(); ayarEkrani?.yenile() } } }
+        grup("Enstantane", "Uzun enstantane hareketi yumuşatır (trafik izleri, kalabalık). Oto'da telefon seçer.") {
+            TL_ENSTLER.forEach { e -> secenek(e?.let { enstGoster(it) } ?: "Oto", tlEnst == e) { tlEnst = e; tlSablon = null; tlKaydet(); ayarEkrani?.yenile() } } }
+        grup("Başlangıç sayacı", "Deklanşöre dokunmanın sarsıntısı geçsin diye çekim birkaç saniye sonra başlar.") {
+            listOf(0, 3, 5).forEach { n -> secenek(if (n == 0) "Kapalı" else "$n sn", tlSayac == n) { tlSayac = n; tlKaydet(); ayarEkrani?.yenile() } } }
         grup("Çekim süresi") { Timelapse.SURELER.forEach { s -> secenek(Timelapse.sureYazi(s), tlSure == s) { tlSure = s; tercih.edit().putInt("tlSure", s).apply() } } }
         grup(not = "Açıkken parlaklık kareden kareye oynamaz (titreme olmaz). Gün batımı gibi ışığın değiştiği çekimlerde kapat. Tripod kullan; ekran açık kalır.") {
             anahtar("Pozlamayı başta sabitle", tlPozSabit) { tlPozSabit = it; tercih.edit().putBoolean("tlPozSabit", it).apply() }
@@ -1662,6 +1713,8 @@ class KameraActivity : Activity() {
     private fun kameraAc() {
         val y = yuzey ?: return
         if (!onde || !secimYapildi || checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return
+        // Vlog: önce ön kamera, sonra ana kamera tamamen kapanır; ön kamera ana oturum kurulunca açılır
+        onKaynak?.let { o -> onKaynak = null; onPencere?.let { kok.removeView(it) }; onPencere = null; o.durdurVe { runOnUiThread { kameraAc() } }; return }
         val onceki = kaynak; kaynak = null
         if (onceki != null) { onceki.durdurVe { runOnUiThread { kameraAc() } }; return }
         val (id, ad) = kamListe.getOrNull(kamIndex) ?: return tost("Telefonda kamera bulunamadı.")
@@ -1671,9 +1724,11 @@ class KameraActivity : Activity() {
         k.fotoModu = mod.foto; k.sahne = mod.sahne; k.sdrZorla = wifiKamera; k.pro = proIstek(); k.ekranYonu = (360 - fizikselYon) % 360
         @Suppress("DEPRECATION") monitor.otoDondur = windowManager.defaultDisplay.rotation * 90
         kaynak = k; if (vlogAcik) k.boyutSiniri = vlogSinir
+        k.hazir = { runOnUiThread { if (kaynak === k && vlogAcik) vlogGuncelle() } }
+        jpegIsleKur()
         k.baslat(y, { w, h -> monitor.tampon(w, h); runOnUiThread { bilgiCiz(); zoomCiz(); flasCiz(); aracCiz() } }, { hata -> runOnUiThread {
             if (hata == "POLITIKA") engelli() else if (vlogAcik && vlogSinir == null && kaynak === k) vlogIndir() else tost(hata) } })
-        vlogGuncelle()
+        vlogCipCiz()
     }
 
     /** Arka kamerayla aynı anda açılabilen ön kamera (Android 11+, CameraManager.concurrentCameraIds); yoksa null */
@@ -1705,19 +1760,73 @@ class KameraActivity : Activity() {
         textSize = 12f; typeface = inter400; letterSpacing = 0.02f; setTextColor(Color.WHITE); gravity = Gravity.CENTER_VERTICAL or Gravity.END; isSingleLine = true
         setShadowLayer(dp(3f).toFloat(), 0f, 0f, Color.argb(150, 0, 0, 0)); setPadding(dp(10f), 0, dp(6f), 0); contentDescription = "Vlog çıktısı"
         setOnClickListener { if (kayitSuruyor()) tost("Kayıt sürerken değişmez.") else { performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); vlogCiktiSec(1 - vlogCikti) } } } }
+    /** Üst şeritteki vlog satırı: kayıt öncesi sayaç (sabit genişlik), ön pencere düğmesi, çıktı seçimi */
+    private val vlogSayacCip by lazy { TextView(this).apply {
+        textSize = 12f; typeface = inter400; setTextColor(Color.WHITE); gravity = Gravity.CENTER; isSingleLine = true; setShadowLayer(dp(3f).toFloat(), 0f, 0f, Color.argb(150, 0, 0, 0))
+        contentDescription = "Kayıt öncesi sayaç"
+        setOnClickListener { if (kayitSuruyor()) return@setOnClickListener
+            performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            vlogSayac = when (vlogSayac) { 0 -> 3; 3 -> 10; else -> 0 }; tercih.edit().putInt("vlogSayac", vlogSayac).apply(); vlogCipCiz() } } }
+    private val vlogPencereCip by lazy { TextView(this).apply {
+        textSize = 12f; typeface = inter400; setTextColor(Color.WHITE); gravity = Gravity.CENTER; isSingleLine = true; setShadowLayer(dp(3f).toFloat(), 0f, 0f, Color.argb(150, 0, 0, 0))
+        setPadding(dp(8f), 0, dp(8f), 0); contentDescription = "Ön kamera penceresi"
+        setOnClickListener { if (kayitSuruyor()) return@setOnClickListener tost("Kayıt sürerken değişmez.")
+            performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); vlogPencereAyarla(!vlogPencere, vlogKose) }
+        setOnLongClickListener { if (!kayitSuruyor()) vlogKoseMenu(this); true } } }
+    private val vlogSerit by lazy { LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        addView(vlogSayacCip, LinearLayout.LayoutParams(dp(56f), -1)); addView(vlogPencereCip, LinearLayout.LayoutParams(-2, -1)); addView(vlogCip, LinearLayout.LayoutParams(-2, -1)) } }
+    private val VLOG_KOSELER = listOf("Sağ alt", "Sağ üst", "Sol üst", "Sol alt")
     private fun vlogCipCiz() {
         if (!this::kok.isInitialized) return
-        if (vlogCip.parent == null) { kok.addView(vlogCip); yerlestir() }
+        if (vlogSerit.parent == null) { kok.addView(vlogSerit); yerlestir() }
         vlogCip.text = if (vlogCikti == 1) "Yalnız final" else "3 dosya"
-        vlogCip.visibility = if (mod == KMod.VLOG && !kayitSuruyor()) View.VISIBLE else View.GONE
+        vlogSayacCip.text = if (vlogSayac == 0) "Sayaç" else "$vlogSayac sn"
+        vlogSayacCip.setTextColor(if (vlogSayac == 0) Color.argb(170, 255, 255, 255) else VURGU)
+        vlogPencereCip.text = if (vlogPencere) "Ön · ${VLOG_KOSELER[vlogKose]}" else "Ön · Kapalı"
+        vlogPencereCip.setTextColor(if (vlogPencere) Color.WHITE else Color.argb(170, 255, 255, 255))
+        vlogSerit.visibility = if (mod == KMod.VLOG && !kayitSuruyor()) View.VISIBLE else View.GONE
+    }
+    /** Pencere aç/kapa ya da köşe değiştir; köşe hatırlanır, birleşik kayıtta da aynı köşeye yazılır */
+    private fun vlogPencereAyarla(acik: Boolean, kose: Int) {
+        vlogPencere = acik; vlogKose = kose; tercih.edit().putBoolean("vlogPencere", acik).putInt("vlogKose", kose).apply()
+        onPencere?.let { vlogPencereYeri(it) }
+        vlogGuncelle()
+    }
+    private fun vlogKoseMenu(hedef: View) {
+        kok.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+        val p = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(6f), 0, dp(6f)); background = camMenu() }
+        val pw = android.widget.PopupWindow(p, dp(170f), -2, true).apply { elevation = dp(8f).toFloat() }
+        (listOf(1, 2, 3, 0).map { it to VLOG_KOSELER[it] } + (-1 to "Kapalı")).forEach { (k, ad) ->
+            val sec = if (k < 0) !vlogPencere else vlogPencere && vlogKose == k
+            p.addView(TextView(this).apply { text = ad; textSize = 14f; typeface = if (sec) kosulKalin else inter400; setTextColor(if (sec) VURGU else Color.WHITE)
+                setPadding(dp(16f), dp(10f), dp(16f), dp(10f))
+                setOnClickListener { pw.dismiss(); performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); if (k < 0) vlogPencereAyarla(false, vlogKose) else vlogPencereAyarla(true, k) } })
+        }
+        pw.showAsDropDown(hedef, 0, dp(4f))
+    }
+    /** Ekrandaki ön pencere seçilen köşede: üstte araç satırının altında, altta mercek sırasının üstünde */
+    private fun vlogPencereYeri(p: View) {
+        val g = (resources.displayMetrics.widthPixels * DuzenMotoru.VLOG_PENCERE).toInt()
+        val alt = if (zoomSira.height > 0 && zoomSira.orientation == LinearLayout.HORIZONTAL) kok.height - zoomSira.top else dp(230f)
+        val ust = vlogKose == 1 || vlogKose == 2; val sol = vlogKose == 2 || vlogKose == 3
+        val u = if (ustBosluk == 0) dp(32f) else ustBosluk
+        p.layoutParams = FrameLayout.LayoutParams(g, g * 16 / 9, (if (ust) Gravity.TOP else Gravity.BOTTOM) or (if (sol) Gravity.START else Gravity.END)).apply {
+            marginEnd = dp(16f); marginStart = dp(16f); if (ust) topMargin = u + dp(120f) else bottomMargin = alt + dp(8f) }
     }
 
     /** Vlog açıkken ön kamerayı sağ altta küçük pencerede açar, kapalıyken kapatır; ana kameranın boyut sınırını ayarlar */
     private fun vlogGuncelle() {
-        val iste = onde && vlogAcik && kaynak != null
+        val iste = onde && vlogAcik && kaynak != null && vlogPencere
         vlogCipCiz()
-        kaynak?.let { k -> val s = if (iste) vlogSinir else null; if (k.boyutSiniri != s && !kayitSuruyor()) { k.boyutSiniri = s; oturumuYenile() } }
-        if (!iste) { onKaynak?.durdur(); onKaynak = null; onPencere?.let { kok.removeView(it) }; onPencere = null; return }
+        if (!iste) {
+            // ön kamera tamamen kapanınca ana oturum sınırsız boyuta döner
+            val o = onKaynak; onKaynak = null; onPencere?.let { kok.removeView(it) }; onPencere = null
+            val sonra = { kaynak?.let { k -> if (k.boyutSiniri != null && !kayitSuruyor()) { k.boyutSiniri = null; oturumuYenile() } }; Unit }
+            if (o != null) o.durdurVe { runOnUiThread { sonra() } } else sonra()
+            return
+        }
+        // boyut sınırı değişirse önce ana oturum yeniden kurulur; ön kamera onun hazir'ında açılır
+        kaynak?.let { k -> if (k.boyutSiniri != vlogSinir && !kayitSuruyor()) { k.boyutSiniri = vlogSinir; oturumuYenile(); return } }
         if (onPencere != null) return
         val id = vlogOnId() ?: return
         val g = (resources.displayMetrics.widthPixels * DuzenMotoru.VLOG_PENCERE).toInt()
@@ -1737,8 +1846,7 @@ class KameraActivity : Activity() {
                 override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) {}
             }
         }
-        val alt = if (zoomSira.height > 0) kok.height - zoomSira.top else dp(230f)
-        kok.addView(p, kok.indexOfChild(tallyCerceve), FrameLayout.LayoutParams(g, g * 16 / 9, Gravity.BOTTOM or Gravity.END).apply { marginEnd = dp(16f); bottomMargin = alt + dp(8f) })
+        kok.addView(p, kok.indexOfChild(tallyCerceve)); vlogPencereYeri(p)
         onPencere = p
     }
 
@@ -1771,7 +1879,7 @@ class KameraActivity : Activity() {
         if (!vlogArkaOk || !vlogOnOk) return
         if (ayar.renk == 1) return tost("Vlog: iki kamera ayrı dosya kaydedildi (HDR'de birleşik video yapılmaz).")
         tost("Vlog: birleşik video hazırlanıyor; ekrandan çıkabilirsin, bildirimde ilerler.")
-        VideoIsleme.ekle(applicationContext, VideoIsleme.Is(a, null, ayar.hevc, vlogOn = o, vlogSil = vlogCikti == 1, dizin = if (Disk.mi(a)) vlogDizin else null))
+        VideoIsleme.ekle(applicationContext, VideoIsleme.Is(a, null, ayar.hevc, vlogOn = o, vlogSil = vlogCikti == 1, dizin = if (Disk.mi(a)) vlogDizin else null, vlogKose = vlogKose))
     }
 
     private fun kameraCevir() {
@@ -2586,7 +2694,13 @@ class KameraActivity : Activity() {
         val l = if (stil.etkin) stil.lut(kullaniciLut) else kullaniciLut
         renkLut = l
         if (l != null) monitor.lutYukle(l) else { monitor.ayarlar.lutAcik = false; monitor.requestRender() }
-        kaynak?.jpegIsle = if (kayitLut != null) { b -> kayitLut?.let { StilGom.foto(b, it) } ?: b } else null
+        jpegIsleKur()
+    }
+    /** Fotoğrafa işlenenler: Portre'de sanal diyafram (önce), sonra stil/LUT */
+    private var portreF = 2.8f
+    private fun jpegIsleKur() {
+        val lut = kayitLut; val f = portreF.takeIf { mod == KMod.PORTRE && it < 16f }
+        kaynak?.jpegIsle = if (lut == null && f == null) null else { b -> var x = b; if (f != null) x = Portre.isle(x, f); kayitLut?.let { x = StilGom.foto(x, it) }; x }
     }
     private fun stilKaydet() { tercih.edit().putString("stil", stil.json()).apply(); renkGuncelle() }
 
@@ -2821,7 +2935,36 @@ class KameraActivity : Activity() {
     private fun deklansorBasildi() {
         acilirKapat()
         val k = kaynak ?: return tost("Kamera hazır değil.")
-        if (mod == KMod.TIMELAPSE) return timelapseDugmesi(k)
+        if (mod == KMod.TIMELAPSE) {
+            if (geriSayiliyor) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; return }
+            if (tlKaydedici != null || tlSayac == 0) return timelapseDugmesi(k)
+            // Başlangıç sayacı: dokunuşun sarsıntısı geçsin, telefon sabitlensin
+            geriSayiliyor = true; var kalan = tlSayac
+            fun adim() {
+                if (!geriSayiliyor) return
+                if (kalan == 0) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; kaynak?.let { timelapseDugmesi(it) }; return }
+                ortaYazi.textSize = 88f; ortaYazi.text = "$kalan"; ortaYazi.visibility = View.VISIBLE; kalan--
+                kok.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                dongu.postDelayed({ adim() }, 1000)
+            }
+            return adim()
+        }
+        if (mod == KMod.VLOG && !kayitSuruyor()) {
+            // Kayıt öncesi sayaç: büyük ince rakam; sayım sürerken dokunmak iptal eder
+            if (geriSayiliyor) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; ortaYazi.typeface = kosulKalin; return }
+            if (vlogSayac > 0) {
+                geriSayiliyor = true; var kalan = vlogSayac
+                fun adim() {
+                    if (!geriSayiliyor) return
+                    if (mod != KMod.VLOG) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; ortaYazi.typeface = kosulKalin; return }
+                    if (kalan == 0) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; ortaYazi.typeface = kosulKalin; kaynak?.let { videoDugmesi(it) }; return }
+                    ortaYazi.typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL); ortaYazi.textSize = 120f; ortaYazi.text = "$kalan"; ortaYazi.visibility = View.VISIBLE; kalan--
+                    kok.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    dongu.postDelayed({ adim() }, 1000)
+                }
+                return adim()
+            }
+        }
         if (!mod.foto) return videoDugmesi(k)
         if (monitor.birlestiriyor) { birlestirmeIstegi?.takeIf { bulb && mod == KMod.FOTO }?.let { it.bitir = true } ?: monitor.birlestirmeIptal(); return }
         if (geriSayiliyor) { geriSayiliyor = false; ortaYazi.visibility = View.GONE; return }
@@ -2861,11 +3004,11 @@ class KameraActivity : Activity() {
             say() }
         if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.SHUTTER_CLICK) }
         monitor.animate().alpha(0.2f).setDuration(60).withEndAction { monitor.animate().alpha(1f).setDuration(160) }
-        var ilk: Uri? = null
-        k.fotoCek({ ad, mime, yaz -> galeriyeYaz(ad, mime, yaz)?.also { if (mime == "image/jpeg") ilk = it } != null }) { hata -> runOnUiThread {
+        var ilk: Uri? = null; var ilkMime = "image/jpeg"
+        k.fotoCek({ ad, mime, yaz -> galeriyeYaz(ad, mime, yaz)?.also { if (mime == "image/jpeg" || mime == "image/heic") { ilk = it; ilkMime = mime } } != null }) { hata -> runOnUiThread {
             deklansorDugme.basili = false; if (uzunNs > 0) ortaYazi.visibility = View.GONE
             if (hata != null) { seriSuruyor = false; tost(hata); return@runOnUiThread }
-            ilk?.let { u -> sonUri = u; sonMime = "image/jpeg"; kucukResim(u) }
+            ilk?.let { u -> sonUri = u; sonMime = ilkMime; kucukResim(u); if (!seriSuruyor) pusDenetle(u) }
             if (seriSuruyor) { seriSayi++; ortaYazi.textSize = 34f; ortaYazi.text = "$seriSayi"; ortaYazi.visibility = View.VISIBLE; cek(k) }
         } }
     }
@@ -2993,7 +3136,10 @@ class KameraActivity : Activity() {
         val y = runCatching { Kaydedici(this, fd, w, h, Timelapse.FPS, mbps, false, sesIste = false, yon = fizikselYon).also { it.baslat() } }
             .getOrElse { e -> runCatching { fd.close() }; Disk.sil(this, uri); HataKaydi.not("timelapse", e.stackTraceToString()); return tost("Timelapse başlamadı: ${e.message}") }
         tlKaydedici = y; tlUri = uri
-        k.pozKilit = tlPozSabit; k.ayarDegisti()
+        // Şablon/elle enstantane: çekim süresince; ISO otomatik ölçümden (bitince eski ayar döner)
+        tlOnceki = ayar.pozlamaNs to ayar.uzunOnizleme
+        tlEnst?.let { ayar.pozlamaNs = it; ayar.uzunOnizleme = 1 }
+        k.pozKilit = tlPozSabit && tlEnst == null; k.ayarDegisti()
         monitor.kayitAraligiNs = tlAralik * 1_000_000L; monitor.kayitYuzeyi = y.yuzey; monitor.yenile()
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (deklansorSesi) runCatching { deklansor.play(android.media.MediaActionSound.START_VIDEO_RECORDING) }
@@ -3002,6 +3148,7 @@ class KameraActivity : Activity() {
     }
 
     private fun timelapseBitir(y: Kaydedici) {
+        tlOnceki?.let { (p, u) -> ayar.pozlamaNs = p; ayar.uzunOnizleme = u; tlOnceki = null; kaynak?.ayarDegisti() }
         tlKaydedici = null; monitor.kayitYuzeyi = verici?.yuzey; monitor.kayitAraligiNs = 0L; monitor.yenile()
         kaynak?.let { it.pozKilit = false; it.ayarDegisti() }
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -3030,6 +3177,30 @@ class KameraActivity : Activity() {
             contentResolver.openOutputStream(uri)!!.use { yaz(it) }
             contentResolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null); uri
         } catch (e: Exception) { runCatching { contentResolver.delete(uri, null, null) }; HataKaydi.not("foto", e.stackTraceToString()); null }
+    }
+
+    /**
+     * Kirli mercek uyarısı (iPhone ile aynı ölçüt): çekilen fotoğrafın küçük kopyasında parlaklığın %2'si > 48, %98−%2 aralığı < 125 ve ortalama > 95 ise puslu.
+     * Arka arkaya 2 puslu fotoğrafta, en çok 15 dakikada bir uyarı + titreşim. Ayarlar → Fotoğraf → "Kirli mercek uyarısı".
+     */
+    private var pusluSayi = 0; private var sonPusUyari = 0L
+    private fun pusDenetle(u: Uri) {
+        if (!tercih.getBoolean("k.kirliUyari", true)) return
+        Thread {
+            val bm = runCatching { contentResolver.loadThumbnail(u, Size(160, 160), null) }.getOrNull() ?: return@Thread
+            val px = IntArray(bm.width * bm.height).also { bm.getPixels(it, 0, bm.width, 0, 0, bm.width, bm.height) }
+            val h = IntArray(256); var top = 0L
+            px.forEach { p -> val y = (((p shr 16) and 255) * 299 + ((p shr 8) and 255) * 587 + (p and 255) * 114) / 1000; h[y]++; top += y }
+            fun yuzde(o: Float): Int { var t = 0; val hedef = px.size * o; for (i in 0..255) { t += h[i]; if (t >= hedef) return i }; return 255 }
+            val p2 = yuzde(0.02f); val p98 = yuzde(0.98f); val ort = top / px.size
+            val puslu = p2 > 48 && p98 - p2 < 125 && ort > 95
+            runOnUiThread {
+                pusluSayi = if (puslu) pusluSayi + 1 else 0
+                val simdi = System.currentTimeMillis()
+                if (pusluSayi >= 2 && simdi - sonPusUyari > 15 * 60_000L) { sonPusUyari = simdi; pusluSayi = 0
+                    kok.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS); tost("Görüntü puslu: merceği silin ya da ışığı kesin") }
+            }
+        }.start()
     }
 
     private fun kucukResim(u: Uri) { runCatching { sonResim.setImageBitmap(contentResolver.loadThumbnail(u, Size(160, 160), null)) } }
@@ -3090,7 +3261,7 @@ class KameraActivity : Activity() {
 
     /* ================= yön: ikonlar döner, düzen sabit ================= */
     /** Yalnız ekran testi: telefon yan tutulmuş gibi ikonlar hemen döner */
-    fun testYon(d: Int) { fizikselYon = d; donenler.forEach { it.rotation = -d.toFloat() } }
+    fun testYon(d: Int) { fizikselYon = d; zoomCiz(); yerlestir(); donenler.forEach { it.rotation = -d.toFloat() } }
 
     /** Kayıt zaman kodu: ss:dd:ss:kare */
     private fun zamanKodu(ms: Long): String { val fps = ayar.fps?.upper ?: 30
@@ -3105,7 +3276,7 @@ class KameraActivity : Activity() {
         }
         kaynak?.ekranYonu = (360 - fizikselYon) % 360
         verici?.yon = fizikselYon
-        bilgiCiz(); modlariCiz()
+        bilgiCiz(); modlariCiz(); zoomCiz(); yerlestir()
     }
 
     /* ================= PRO ve Monitör ================= */
@@ -3161,9 +3332,11 @@ class KameraActivity : Activity() {
         uzunYol = tercih.getString("uzunYol", "ort") ?: "ort"
         zamanlayici = tercih.getInt("zamanlayici", 0); deklansorSesi = tercih.getBoolean("deklansor", true)
         vlogCikti = tercih.getInt("vlogCikti", 0)
+        vlogKose = tercih.getInt("vlogKose", 0); vlogPencere = tercih.getBoolean("vlogPencere", true); vlogSayac = tercih.getInt("vlogSayac", 0)
         // Eski "Vlog açık" seçimi VLOG moduna taşınır
         if (tercih.getBoolean("vlog", false) && mod == KMod.VIDEO) { mod = KMod.VLOG; tercih.edit().putBoolean("vlog", false).putString("mod", "VLOG").apply() }
         tlAralik = tercih.getLong("tlAralik", 2000L); tlSure = tercih.getInt("tlSure", 0); tlPozSabit = tercih.getBoolean("tlPozSabit", true)
+        tlEnst = tercih.getLong("tlEnst", 0L).takeIf { it > 0 }; tlSayac = tercih.getInt("tlSayac", 3); tlSablon = tercih.getString("tlSablon", null)
         enstAci = tercih.getBoolean("enstAci", false)
                 sonGrup = runCatching { Grup.valueOf(tercih.getString("sonGrup", "POZLAMA")!!) }.getOrDefault(Grup.POZLAMA)
     }
