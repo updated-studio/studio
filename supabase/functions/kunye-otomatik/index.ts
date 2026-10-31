@@ -96,7 +96,7 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
       const g = await r.text();
       if (!r.ok) {
         // Hangi kota doldu (genel istek mi, Google arama mı): yanıttaki quotaMetric/quotaId adları kaydedilir (31 Ekim 2026)
-        son = `${a.etiket} · ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 1400)}`;
+        son = `${a.etiket} · ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 300)}`;
         const ah = anahtarHatasi(r.status, g);
         if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
         if (ah !== "kota_dolu") hepsiKota = false;
@@ -223,7 +223,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length }); await kaydet(false);
     } catch (e) {
       // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda
-      if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu", hata: String((e as Error).message).slice(0, 1600) }); break; }
+      if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu", hata: String((e as Error).message).slice(0, 600) }); break; }
       await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, durum: "hata", hata: String((e as Error).message).slice(0, 300) });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "hata", hata: String((e as Error).message).slice(0, 200) }); await kaydet(false);
     }
