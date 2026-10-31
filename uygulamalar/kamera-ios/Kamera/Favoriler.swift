@@ -165,21 +165,20 @@ extension Kamera {
 }
 
 /// Okuma şeridinin altındaki sabitlenen ayar: küçük kapsül, değeri (ya da adı) yazar; elle değişmişse sarı
+/// Sabitlenen ayar (Fatih 31 Ekim 02:55): yalnız simge, ad ya da değer yazılmaz. Ayar değişmişse simge sarı ve ince sarı halka.
+/// Dokun: aç/kapa ya da hızlı satır; basılı tut: ayarın tam paneli (ör. beyaz denge: Kelvin + yeşil-macenta)
 struct SabitKapsul: View {
     let f: Favori
     @ObservedObject var kamera: Kamera
 
     var body: some View {
         let d = kamera.favoriDeger(f)
-        let yazi = d.yazi.isEmpty || d.yazi == "Kapalı" ? FavoriSatir.baslik(f).capitalized(with: Locale(identifier: "tr")) : d.yazi
-        HStack(spacing: 4) {
-            if d.yazi.isEmpty { Image(systemName: f.simge).font(.system(size: 10, weight: .semibold)) }
-            Text(yazi).font(.system(size: 11, weight: .semibold).monospacedDigit()).tracking(0.3).lineLimit(1)
-        }
-        .foregroundStyle(d.etkin ? Tema.sari : Tema.ikincil)
-        .padding(.horizontal, 9).frame(height: 24)
-        .yuzey(12)
-        .overlay(Capsule().strokeBorder(d.etkin ? Tema.sari.opacity(0.5) : .clear, lineWidth: 0.5))
+        Image(systemName: f.simge).font(.system(size: 14, weight: .regular))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(d.etkin ? Tema.sari : .white)
+            .frame(width: 36, height: 36)
+            .yuvarlakYuzey(d.etkin ? Tema.sari : nil)
+            .accessibilityLabel(FavoriSatir.baslik(f).capitalized(with: Locale(identifier: "tr")) + (d.yazi.isEmpty ? "" : " \(d.yazi)"))
     }
 }
 

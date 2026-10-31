@@ -493,13 +493,16 @@ struct AnaEkran: View {
     /// Şeridin altında sabitlenenler: küçük kapsüller; dokununca satır ya da panel açılır
     @ViewBuilder private var sabitler: some View {
         if !duzenleme, !kamera.favoriler.isEmpty {
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 // Biçim zaten sağ üstte (simgeli); burada tekrarlanmaz
                 ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) }) { f in
-                    Button { kisayolDokun(f) } label: { SabitKapsul(f: f, kamera: kamera) }
-                        .buttonStyle(.plain)
-                        .sabitlenebilir(f, kamera) { ayrintiAc(f) }
-                        .overlay(alignment: .bottom) { if acikSatir == f { Circle().fill(Tema.sari).frame(width: 3, height: 3).offset(y: 5) } }
+                    SabitKapsul(f: f, kamera: kamera)
+                        .contentShape(Circle())
+                        .onTapGesture { kisayolDokun(f) }
+                        .onLongPressGesture(minimumDuration: 0.35) { UIImpactFeedbackGenerator(style: .medium).impactOccurred(); ayrintiAc(f) }
+                        .overlay(alignment: .bottom) { if acikSatir == f || panel == .favori(f) { Circle().fill(Tema.sari).frame(width: 4, height: 4).offset(y: 7) } }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction(named: "Ayrıntılı") { ayrintiAc(f) }
                 }
             }
             .disabled(kamera.kayitta)
@@ -512,6 +515,14 @@ struct AnaEkran: View {
             if !o.1.isEmpty { Text(o.1.lowercased(with: Locale(identifier: "tr"))).font(Tema.etiket).tracking(0.8).textCase(.uppercase).foregroundStyle(o.2 ? Tema.sari.opacity(0.8) : Tema.ikincil) }
         }
         .foregroundStyle(o.2 ? Tema.sari : .white)
+    }
+
+    /// Ana ekrana sabitle / kaldır (titreşim + kısa bildirim)
+    private func sabitDegistir(_ f: Favori) {
+        let vardi = kamera.favoriler.contains(f)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(AnaEkran.yay) { kamera.favoriAcKapa(f) }
+        if vardi != kamera.favoriler.contains(f) { kamera.bildirim = vardi ? "Ana ekrandan kaldırıldı" : "Ana ekrana sabitlendi" }
     }
 
     /// Hızlı menüden "Ayrıntılı…": ayarın tam paneli
@@ -833,6 +844,13 @@ struct AnaEkran: View {
                         .accessibilityLabel("Kapat")
                     }
                     Spacer()
+                    if case let .favori(f) = p, kamera.favoriler.contains(f) {
+                        Button { sabitDegistir(f); withAnimation(AnaEkran.yay) { panel = nil } } label: {
+                            Image(systemName: "pin.slash").font(.system(size: 12, weight: .semibold))
+                                .frame(width: 28, height: 28).background(Circle().fill(Color.white.opacity(0.1)))
+                        }
+                        .accessibilityLabel("Ana ekrandan kaldır")
+                    }
                     if p == .kontroller && !duzenleme {
                         Button { withAnimation(AnaEkran.yay) { panel = nil } } label: {
                             Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
@@ -1003,9 +1021,20 @@ struct AnaEkran: View {
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 16) {
                     ForEach(Favori.allCases.filter { $0.uygun(kamera.mod) }) { f in
-                        Button { kisayolDokun(f) } label: { DenetimDaire(f: f, kamera: kamera) }
-                            .buttonStyle(.plain)
-                            .sabitlenebilir(f, kamera) { ayrintiAc(f) }
+                        // Dokun: ayar; basılı tut: ana ekrana sabitle / kaldır (Fatih 31 Ekim: "sabitlemek ve kaldırmak daha kolay olsun")
+                        DenetimDaire(f: f, kamera: kamera)
+                            .overlay(alignment: .topTrailing) {
+                                if kamera.favoriler.contains(f) {
+                                    Image(systemName: "pin.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(.black)
+                                        .frame(width: 18, height: 18).background(Circle().fill(Tema.sari)).offset(x: -10, y: -2)
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture { kisayolDokun(f) }
+                            .onLongPressGesture(minimumDuration: 0.4) { sabitDegistir(f) }
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityAction(named: kamera.favoriler.contains(f) ? "Sabitlemeyi kaldır" : "Sabitle") { sabitDegistir(f) }
                     }
                 }
                 HStack(spacing: 10) {
