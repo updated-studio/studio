@@ -113,13 +113,14 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
   }
   if (hepsiKota) await isaretle(a, "kota_dolu", son); }
   // Yedek (31 Ekim 2026): ücretsiz Gemini anahtarlarında Google arama istekleri hep 429 alıyor (aramasız istekler geçiyor).
-  // Groq'un web aramalı "compound" modelleri aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
+  // Groq'ta gpt-oss modelleri yerleşik web aramasıyla (browser_search) aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
+  // ("groq/compound" bu hesapta yok: 404, 31 Ekim 2026)
   const groq = Deno.env.get("GROQ_API_KEY");
-  if (groq) for (const model of ["groq/compound", "groq/compound-mini"]) {
+  if (groq) for (const model of ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]) {
     try {
       const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST", signal: AbortSignal.timeout(120_000), headers: { "Content-Type": "application/json", Authorization: "Bearer " + groq },
-        body: JSON.stringify({ model, temperature: 0.1, messages: [{ role: "system", content: SISTEM }, { role: "user", content: istem }] }),
+        body: JSON.stringify({ model, temperature: 0.1, tools: [{ type: "browser_search" }], tool_choice: "required", messages: [{ role: "system", content: SISTEM }, { role: "user", content: istem }] }),
       });
       const g = await r.text();
       if (!r.ok) { son += ` | Groq ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 200)}`; continue; }
