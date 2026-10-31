@@ -33,7 +33,7 @@ export type Modul = {
 
 export const MODULLER: Modul[] = [
   { id: "ekip", ad: "Ekip", ikon: "ekip", bilesen: Ekip, renk: "blue" },
-  { id: "haber-masasi", ad: "Haber Masası", ikon: "triyaj", bilesen: HaberMasasi, renk: "rose" },
+  { id: "haber-masasi", ad: "Haber Masası", ikon: "triyaj", bilesen: HaberMasasi, renk: "rose", yer: "gizli" }, // 31 Ekim 2026: Site'nin içinde; adres eski bağlantılar için açık
   { id: "icerik", ad: "İçerik", ikon: "icerik", bilesen: Icerik, renk: "ok" },
   { id: "site", ad: "Site", ikon: "site", bilesen: Site, renk: "blue" },
   { id: "takvim", ad: "Takvim", ikon: "takvim", bilesen: Takvim, renk: "orange" },

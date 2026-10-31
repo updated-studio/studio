@@ -171,3 +171,7 @@
 .ko-gorsel { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .ko-gorsel img { width: 200px; aspect-ratio: 16/9; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 / 16px 16px; }
 .ko-l > li { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+
+/* Site'nin üst seçimi: Haber Masası | Site içeriği (31 Ekim 2026) */
+.site-ust { align-self: flex-start; }
+.site-ust button { font-size: 15px; font-weight: 600; padding-inline: 16px; }

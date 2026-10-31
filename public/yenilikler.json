@@ -5,6 +5,13 @@
     "baslik": "Künye otomasyonu ve sitede yeni araçlar",
     "bolumler": [
       {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Haber Masası artık Site'nin içinde ilk sekme: Site → Haber Masası | Site içeriği.",
+          "Alttaki menüden kalktı; eski bağlantılar çalışmaya devam eder."
+        ]
+      },
+      {
         "ad": "Site",
         "maddeler": [
           "Künye onayı ekranında otomasyonun son turu ve sonucu görünür.",

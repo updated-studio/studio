@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "../../shared/toast";
 import * as api from "./api";
@@ -12,6 +12,9 @@ import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
 import ListeAraclari, { aracAlanlari, hucre, kosullariEkle, sorguAnahtari, useAraclar, type AracAlan } from "./ListeAraclari";
 import "./site.css";
 import KunyeOnay from "./KunyeOnay";
+// Haber Masası Site'nin ilk bölümü (31 Ekim 2026, kullanıcı: "haber masası bence site modülünün içerisinde olmalı"): masadan seçilen haber
+// taslak olur, Site'de yayınlanır; tek yerde durur. Site rolü olmayan ekip üyesi de masayı görür. Eski #/haber-masasi adresi çalışmaya devam eder.
+const HaberMasasi = lazy(() => import("../haber-masasi/HaberMasasi"));
 
 // Site: updated.com.tr'deki haberler, incelemeler ve karşılaştırmalar (yayın paneli Payload'a Stüdyo girişiyle bağlanır).
 // Panelin bütün bölümleri Stüdyo'da: haberler özel ekranda (Duzenle.tsx), diğer her bölüm panelin alan yapısından çizilen
@@ -159,17 +162,31 @@ function Liste({ kullanici, k, ks, ilkSekme }: { kullanici: PanelKullanici; k: K
 export default function Site() {
   const [kullanici, setKullanici] = useState<PanelKullanici | null | undefined>(undefined);
   const [hata, setHata] = useState("");
+  const [sp] = useSearchParams();
+  // Bildirimden bir site bölümü istendiyse (#/site?bolum=…) doğrudan içerik açılır; yoksa son seçilen (varsayılan Haber Masası)
+  const [ust, setUst] = useState<"masa" | "icerik">(() => { if (sp.get("bolum")) return "icerik"; try { return localStorage.getItem("site-ust") === "icerik" ? "icerik" : "masa"; } catch { return "masa"; } });
   useEffect(() => { api.ben().then(setKullanici).catch((e) => setHata((e as Error).message)); }, []);
+  useEffect(() => { if (sp.get("bolum")) setUst("icerik"); }, [sp]);
+  const sec = (x: "masa" | "icerik") => { setUst(x); try { localStorage.setItem("site-ust", x); } catch { /* depolama kapalı */ } };
 
-  if (hata) return <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
-  if (kullanici === undefined) return <div className="muted">Yükleniyor…</div>;
-  if (!kullanici) return (
+  let icerik: React.ReactNode;
+  if (hata) icerik = <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
+  else if (kullanici === undefined) icerik = <div className="muted">Yükleniyor…</div>;
+  else if (!kullanici) icerik = (
     <div className="empty">
       Sitede yetkin yok. Yöneticiden Stüdyo'da <b>Ekip → Yönetim</b> bölümünde sana bir site rolü vermesini iste;
-      verilince bu sayfa kendiliğinden açılır.
+      verilince bu sayfa kendiliğinden açılır. Haber Masası'nı yine de kullanabilirsin.
     </div>
   );
-  return <Gezinme kullanici={kullanici} />;
+  else icerik = <Gezinme kullanici={kullanici} />;
+
+  return <>
+    <div className="segment site-ust" role="tablist" aria-label="Site">
+      <button role="tab" aria-selected={ust === "masa"} aria-pressed={ust === "masa"} onClick={() => sec("masa")}>Haber Masası</button>
+      <button role="tab" aria-selected={ust === "icerik"} aria-pressed={ust === "icerik"} onClick={() => sec("icerik")}>Site içeriği</button>
+    </div>
+    {ust === "masa" ? <Suspense fallback={<div className="muted">Yükleniyor…</div>}><HaberMasasi /></Suspense> : icerik}
+  </>;
 }
 
 const GRUP_SIRASI = ["İçerik", "Topluluk", "Künye", "Kanallar", "Gelir", "Kulüp", "Ekip", "Ayarlar"];
