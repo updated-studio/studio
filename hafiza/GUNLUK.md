@@ -207,3 +207,5 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - **31 Ekim 2026 · Künye otomasyonu sessiz.** `kunye_oneriler` hiç satır almamış (zamanlayıcı günde 4 kez çağırıyor). En olası neden Gemini kotası (manuel "doldur" 30 Ekim 01.54'te 11 kez anında döndü = kota dolu yanıtı). kunye-otomatik artık her turun sonucunu `tr_settings.son_kunye`'ye yazar, Künye onayı ekranı gösterir; manuel döngü kota dolunca durur. Sonraki zamanlayıcı turundan (07.40 UTC) sonra son_kunye okunup gerçek neden doğrulanmalı.
 
 - **31 Ekim 2026 · Künye nedeni doğrulandı.** Elle tur (kunye_kick): iki anahtar da 429 kota dolu. Göç 0053_kunye_saatleri turları kota yenilemesinin arkasına alır (onay bekliyor). Not: `radar-otomatik` dalındaki göç de 0053 numaralı; ana dala alınırken 0054 yapılmalı.
+
+- **31 Ekim 2026 · notify-email döngüsü.** invites_davet deyim tetikleyicisi notify-email'in kendi UPDATE'iyle yeniden tetikleniyordu: 30 Ekim'de ~160 bin çağrı/gün (00.32 UTC'de kendiliğinden kesildi, bir sonraki bildirimde yeniden başlar). Göç 0054 satır tetikleyicisi + WHEN koşulu; onay bekliyor.
