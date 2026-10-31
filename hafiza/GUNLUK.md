@@ -203,3 +203,5 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - Stüdyo kuruldu: tek depo, tek giriş; Ekip, Takvim, İçerik (çerçeveyle), Marka Kiti, Haber Masası modülleri. GitHub organizasyonu `updated-studio`, Supabase projesi `updated-panel`.
 
 - **30 Ekim 2026 · Radar otomasyonu beklemede.** Haber masası + Google aramasıyla çıkış radarını kendiliğinden dolduran iş yazıldı (göç 0053, fonksiyon radar-otomatik) ama kullanıcı "önce ana sayfayı bitirelim" dedi; ana dala alınmadı, `radar-otomatik` dalında duruyor. Eksikler: panel tarafı (site deposu apps/cms/src/lib/radar.ts + Products.radarOto alanı), deneme, 0053 onayı.
+
+- **31 Ekim 2026 · Künye otomasyonu sessiz.** `kunye_oneriler` hiç satır almamış (zamanlayıcı günde 4 kez çağırıyor). En olası neden Gemini kotası (manuel "doldur" 30 Ekim 01.54'te 11 kez anında döndü = kota dolu yanıtı). kunye-otomatik artık her turun sonucunu `tr_settings.son_kunye`'ye yazar, Künye onayı ekranı gösterir; manuel döngü kota dolunca durur. Sonraki zamanlayıcı turundan (07.40 UTC) sonra son_kunye okunup gerçek neden doğrulanmalı.

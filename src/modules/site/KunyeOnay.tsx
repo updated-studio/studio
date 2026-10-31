@@ -27,10 +27,14 @@ export default function KunyeOnay() {
   const [acik, setAcik] = useState<number | null>(null);
   const [gorselsiz, setGorselsiz] = useState<Record<number, boolean>>({});
   const dur = useRef(false);
+  // Zamanlayıcının son turu (kunye-otomatik → tr_settings.son_kunye): öneri gelmiyorsa nedeni burada görünür
+  const [sonTur, setSonTur] = useState<{ zaman: string; bitti: boolean; aday: number; islenen: { urun: string; durum: string; sayi?: number; hata?: string }[] } | null>(null)
 
   const yukle = useCallback(async () => {
     const { data } = await sb.from("kunye_oneriler").select("*").eq("durum", "bekliyor").order("created_at", { ascending: true }).limit(100);
     setListe((data as Oneri[]) ?? []);
+    const { data: t } = await sb.from("tr_settings").select("value").eq("key", "son_kunye").maybeSingle();
+    setSonTur((t?.value as typeof sonTur) ?? null);
   }, []);
   useEffect(() => { yukle(); }, [yukle]);
 
@@ -43,7 +47,10 @@ export default function KunyeOnay() {
         const r = await fetch(`${SUPABASE_URL}/functions/v1/kunye-otomatik`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${o.session?.access_token ?? ""}` }, body: JSON.stringify({ adet: 2 }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || `Hata ${r.status}`);
-        toplam += j.islenen.length; await yukle();
+        // Kota dolunca fonksiyon ürünü işaretlemeden döner; döngü 60 tur boşa dönüp "işlendi" demesin (31 Ekim 2026)
+        const kota = (j.islenen as { durum: string }[]).some((x) => x.durum === "kota dolu");
+        toplam += (j.islenen as { durum: string }[]).filter((x) => x.durum !== "kota dolu").length; await yukle();
+        if (kota) { setDurum(`Gemini kotası dolu${toplam ? ` (${toplam} ürün işlendi)` : ""}. Kota her gün Türkiye saatiyle 10.00-11.00 arası yenilenir; Sistem → Gemini anahtarlarından yeni anahtar da eklenebilir.`); return; }
         if (!j.islenen.length || j.kalan === 0) break;
       }
       setDurum(toplam ? `${toplam} ürün işlendi; öneriler aşağıda.` : "Doldurulacak künye kalmadı (son 7 günde denenenler tekrar denenmez).");
@@ -89,6 +96,12 @@ export default function KunyeOnay() {
         {calisiyor ? <button className="btn ghost" onClick={() => { dur.current = true; }}>Durdur</button> : <button className="btn" onClick={otomatik}>Eksik künyeleri doldur</button>}
       </div>
       {durum && <div className="muted">{durum}</div>}
+      {sonTur && <div className="muted" style={{ fontSize: 13 }}>
+        Son tur {new Date(sonTur.zaman).toLocaleString("tr-TR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}: {sonTur.islenen.length
+          ? sonTur.islenen.map((x) => `${x.urun} · ${x.durum}${x.sayi ? ` (${x.sayi})` : ""}`).join(", ")
+          : sonTur.bitti ? "doldurulacak ürün yok" : "başladı, sonuç gelmeden yarıda kaldı"}
+        {sonTur.islenen.some((x) => x.durum === "kota dolu") && " · Gemini kotası dolu, kota Türkiye saatiyle 10.00-11.00 arası yenilenir."}
+      </div>}
       {liste === null ? <div className="muted">Yükleniyor…</div> : !liste.length ? <div className="muted">Onay bekleyen öneri yok.</div> : (
         <ul className="ko-l">
           {liste.map((o) => (

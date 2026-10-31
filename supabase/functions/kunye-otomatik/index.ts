@@ -179,7 +179,12 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
     urunler = tum.filter((u) => !atla.has(u.id) && (u.specs?.length ?? 0) > 0 && (u.specs ?? []).filter((s) => s.value).length < (u.specs ?? []).length / 2);
   }
   const kalan = Math.max(0, urunler.length - adet);
-  const sonuc: { urun: string; durum: string; sayi?: number }[] = [];
+  const sonuc: { urun: string; durum: string; sayi?: number; hata?: string }[] = [];
+  // Son tur Stüdyo'da görünsün (31 Ekim 2026: zamanlayıcı turları 4 gün hiç öneri yazmadı, neden görünmüyordu): her üründen sonra yazılır,
+  // işçi süre dolduğu için yarıda kesilse de o ana kadarki sonuç kalır
+  const baslangic = new Date().toISOString();
+  const kaydet = (bitti: boolean) => sb.from("tr_settings").upsert({ key: "son_kunye", value: { zaman: baslangic, bitti, aday: urunler.length, islenen: sonuc, kalan } }).then(() => {}, () => {});
+  await kaydet(false);
   for (const u of urunler.slice(0, adet)) {
     try {
       const { v, kaynaklar } = await ara(sb, u);
@@ -192,13 +197,14 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" }).select("id").single();
       if (error) await sb.from("kunye_oneriler").insert(kayit);
       else if (gorsel && cf && yeni) await gorselIsle(sb, cf, { id: yeni.id as number, urun_id: u.id, gorsel_aday: gorsel });
-      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length });
+      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length }); await kaydet(false);
     } catch (e) {
       // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda
-      if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu" }); break; }
+      if (kotaDolu(String((e as Error).message))) { sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "kota dolu", hata: String((e as Error).message).slice(0, 200) }); break; }
       await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, durum: "hata", hata: String((e as Error).message).slice(0, 300) });
-      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "hata" });
+      sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "hata", hata: String((e as Error).message).slice(0, 200) }); await kaydet(false);
     }
   }
+  await kaydet(true);
   return { islenen: sonuc, kalan };
 }

@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-31-a",
+    "tarih": "31 Ekim 2026",
+    "baslik": "Künye otomasyonu ve sitede yeni araçlar",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Künye onayı ekranında otomasyonun son turu ve sonucu görünür.",
+          "Gemini kotası dolunca \"Eksik künyeleri doldur\" boşa dönmez, kotanın ne zaman yenileneceğini söyler."
+        ]
+      },
+      {
+        "ad": "Sitede",
+        "maddeler": [
+          "Araçlar 16'ya çıktı: dolunay, timelapse, alan derinliği, astrofotoğraf, flaş, makro, ağır çekim, dron GSD, batarya, lens görünümü, stüdyo ışığı.",
+          "Ana sayfada çıkış radarı sağ sütunda; künyeye \"Tahmini çıkış tarihi\" girilince sıralanır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-30-a",
     "tarih": "30 Ekim 2026",
     "baslik": "Birden çok Google (Gemini) anahtarı",
