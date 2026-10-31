@@ -11,7 +11,7 @@ import { istekYap, medyaYukle } from "./api";
 
 type Oz = { key: string; value: string; num: number | null; kaynak: string | null; kanit: string };
 type GorselAday = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string };
-type Oneri = { id: number; urun_id: number; urun_adi: string; tur: string; ozellikler: Oz[]; kaynaklar: { baslik: string; url: string }[]; durum: string; hata: string | null; created_at: string;
+type Oneri = { id: number; urun_id: number; urun_adi: string; resmi_ad?: string | null; tur: string; ozellikler: Oz[]; kaynaklar: { baslik: string; url: string }[]; durum: string; hata: string | null; created_at: string;
   gorsel?: string | null; gorsel_durum?: string; gorsel_aday?: GorselAday | null; gorsel_hata?: string | null };
 /** Görsel künyesi: üretici görseli "Görsel: Sony"; serbest lisanslıysa yazar ve lisans */
 const gorselKunye = (g: GorselAday | null | undefined, marka: string) => !g || g.kaynak === "Üretici" ? `Görsel: ${marka}` : `Fotoğraf: ${g.yazar} / ${g.kaynak} (${g.lisans})`;
@@ -26,6 +26,7 @@ export default function KunyeOnay() {
   const [durum, setDurum] = useState("");
   const [acik, setAcik] = useState<number | null>(null);
   const [gorselsiz, setGorselsiz] = useState<Record<number, boolean>>({});
+  const [adsiz, setAdsiz] = useState<Record<number, boolean>>({});
   const dur = useRef(false);
   // Zamanlayıcının son turu (kunye-otomatik → tr_settings.son_kunye): öneri gelmiyorsa nedeni burada görünür
   const [sonTur, setSonTur] = useState<{ zaman: string; bitti: boolean; aday: number; islenen: { urun: string; durum: string; sayi?: number; hata?: string }[] } | null>(null)
@@ -74,6 +75,8 @@ export default function KunyeOnay() {
         specs.push({ key: x.key, value: x.value, num: x.num, group: "Gövde", unit: x.key === "Boyutlar" ? "mm" : undefined, source: resmi ? "uretici" : "diger", sourceUrl: x.kaynak, at: bugun, higherIsBetter: false, searchWeight: 2 });
       }
       const govde: Record<string, unknown> = { specs };
+      // Önerilen resmî ad (göç 0060) onayla birlikte künyenin adı olur
+      if (o.resmi_ad && !adsiz[o.id]) govde.name = o.resmi_ad;
       if (o.gorsel_durum === "hazir" && o.gorsel && !gorselsiz[o.id]) {
         const b = await fetch(o.gorsel).then((r) => { if (!r.ok) throw new Error("Görsel indirilemedi"); return r.blob(); });
         const m = await medyaYukle(new File([b], `${kucuk(o.urun_adi) || "urun"}.webp`, { type: "image/webp" }), `${o.urun_adi} ürün görseli`, gorselKunye(o.gorsel_aday, u.brand), false);
@@ -110,6 +113,7 @@ export default function KunyeOnay() {
                 <button className="linkbtn" onClick={() => setAcik(acik === o.id ? null : o.id)}><b>{o.urun_adi}</b> · {o.ozellikler.length} özellik önerisi</button>
                 <div className="row" style={{ gap: 6 }}><button className="btn sm" onClick={() => onayla(o)}>Onayla</button><button className="btn ghost sm" onClick={() => reddet(o)}>Reddet</button></div>
               </div>
+              {o.resmi_ad && <label className="muted" style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14 }}><input type="checkbox" checked={!adsiz[o.id]} onChange={(e) => setAdsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Adı da düzelt: <b>{o.resmi_ad}</b></label>}
               {o.gorsel_durum === "hazir" && o.gorsel ? (
                 <div className="ko-gorsel">
                   <img src={o.gorsel} alt={`${o.urun_adi} (arka planı silinmiş)`} loading="lazy" />

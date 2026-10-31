@@ -32,9 +32,10 @@ KURALLAR:
 - Fiyatı yalnız Türkiye fiyatı (TL) resmî kaynakta yazıyorsa doldur.
 - "Boyutlar": genişlik × yükseklik × derinlik, milimetre (ör. "131 × 96 × 80 mm"); lensse çap × uzunluk (ör. "Ø 81 × 128 mm"). num: null.
 - "urunSayfasi": üreticinin bu ürüne ait resmî ürün sayfasının TAM adresi (yoksa null).
+- "resmiAd": ürünün kaynakta yazan tam ve ayırt edici model adı, markasız (ör. "MacBook Pro 14 inç (M6, 2026)", "Nikkor Z 120-300mm f/2.8 TC VR S"). Verilen ad zaten tam ve doğruysa ya da emin değilsen null.
 - "gorselAdresi": üreticinin sitesindeki ya da basın kitindeki ürün fotoğrafının DOĞRUDAN adresi (.jpg/.png/.webp; tercihen düz zeminli, önden ya da 3/4 açı); bulamazsan null. Uydurma.
 Yanıtı YALNIZ şu JSON olarak ver, başka metin yazma:
-{"urunSayfasi":"https://...","gorselAdresi":null,"ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
+{"urunSayfasi":"https://...","resmiAd":null,"gorselAdresi":null,"ozellikler":[{"key":"...","value":"...","num":null,"kaynak":"https://...","kanit":"..."}]}`;
 
 /** Künye görseli (27 Ekim 2026): üreticinin resmî ürün sayfasındaki paylaşım görseli (og:image / JSON-LD image).
  *  Yalnız marka alan adındaki sayfalardan alınır; arka planı sunucudaki işçi siler (scripts/kunye-gorsel), editör onaylar. */
@@ -271,9 +272,13 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       const oz = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).filter((o: { key?: string; value?: string }) => o?.key && adlar.has(o.key) && o.value)
         .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string }) => ({ key: o.key, value: String(o.value).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160) }));
       const gorsel = await gorselBul(u.brand, u.name, v?.gorselAdresi, [v?.urunSayfasi, ...oz.map((o: { kaynak: string | null }) => o.kaynak)]).catch(() => null);
-      const kayit = { urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length ? "bekliyor" : "hata", hata: oz.length ? null : "Kaynaklarda değer bulunamadı" };
+      // Resmî ad (göç 0060): yalnız gerçekten farklı ve makul uzunluktaysa; markayla başlıyorsa marka çıkarılır
+      let resmiAd = typeof v?.resmiAd === "string" ? v.resmiAd.trim().slice(0, 90) : "";
+      if (resmiAd.toLocaleLowerCase("tr-TR").startsWith(u.brand.toLocaleLowerCase("tr-TR") + " ")) resmiAd = resmiAd.slice(u.brand.length + 1);
+      if (resmiAd.length < 2 || sade(resmiAd) === sade(u.name)) resmiAd = "";
+      const kayit = { urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar, durum: oz.length || resmiAd ? "bekliyor" : "hata", hata: oz.length || resmiAd ? null : "Kaynaklarda değer bulunamadı" };
       // Görsel sütunları göç 0043 ile geldi; uygulanmamışsa kayıt görselsiz yazılır
-      const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" }).select("id").single();
+      const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, ...(resmiAd ? { resmi_ad: resmiAd } : {}), gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" }).select("id").single();
       if (error) await sb.from("kunye_oneriler").insert(kayit);
       else if (gorsel && cf && yeni) await gorselIsle(sb, cf, { id: yeni.id as number, urun_id: u.id, gorsel_aday: gorsel });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length, hata: SAYFA_TESHIS }); await kaydet(false);

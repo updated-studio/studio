@@ -89,7 +89,7 @@ KURALLAR:
 - "tahmini_ay": beklenen ya da açıklanan çıkış ayı "YYYY-MM"; kaynaklarda hiç ipucu yoksa null. Uydurma.
 - "tarih_notu": kısa Türkçe not, en çok 40 karakter (ör. "Eylül etkinliği", "CES 2027", "Aralık başı"); yoksa "".
 - "ozet": ürünü tanıtan tek Türkçe cümle, en çok 140 karakter, iddia ise "iddiaya göre" de.
-- "ad": yaygın model adı (markasız). "marka": üretici.
+- "ad": metinlerdeki tam ve ayırt edici model adı, markasız; nesil, boyut ya da yıl varsa ekle (ör. "MacBook Pro 14 inç (M6)", "Galaxy S27 Ultra"). "marka": üretici.
 Yanıtı YALNIZ şu JSON olarak ver: {"gercek":true,"marka":"...","ad":"...","durum":"sizinti","tahmini_ay":"2027-02","tarih_notu":"","ozet":"...","kaynak_sayisi":2}`;
 
 
@@ -209,7 +209,7 @@ async function isle(sb: Sb) {
       const tarihNotu = String(v.tarih_notu ?? "").slice(0, 40);
       const degisti = !eski || eski.durum !== durum || (eski.tarih ?? null) !== ay || eski.tarih_notu !== tarihNotu;
       const satir = {
-        anahtar: k, marka: x.marka, ad: x.ad, tur: x.tur, durum, tarih: ay, tarih_notu: tarihNotu, ozet: String(v.ozet ?? "").slice(0, 160),
+        anahtar: k, marka: x.marka, ad: (eski?.ad && u ? eski.ad : markasiz(x.marka, String(v.ad || x.ad))).slice(0, 80), tur: x.tur, durum, tarih: ay, tarih_notu: tarihNotu, ozet: String(v.ozet ?? "").slice(0, 160),
         kaynaklar, haberler: [...new Set([...(eski?.haberler ?? []), ...x.haberler])].slice(-40), kontrol_zamani: simdi, updated_at: simdi,
         ...(degisti || eski?.islem === "hata" ? { islem: "bekliyor", islem_notu: "" } : {}),
       };
