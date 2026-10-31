@@ -23,6 +23,62 @@ enum Timelapse {
         return String(format: "%.1f sn", Double(ms) / 1000).replacingOccurrences(of: ".", with: ",")
     }
     static func sureYazi(_ dk: Int) -> String { dk == 0 ? "Sınırsız" : (dk % 60 == 0 ? "\(dk / 60) sa" : "\(dk) dk") }
+
+    /// Timelapse enstantaneleri (sn); nil = otomatik. Uzun enstantane hareketi yumuşatır (şehir ışıkları, su, bulut)
+    static let enstler: [Double?] = [nil, 1.0 / 250, 1.0 / 60, 1.0 / 30, 1.0 / 15, 1.0 / 4, 0.5, 1]
+    static func enstYazi(_ e: Double?) -> String {
+        guard let e else { return "Oto" }
+        return e >= 1 ? "\(Int(e)) sn" : "1/\(Int((1 / e).rounded()))"
+    }
+    /// Başlamadan önce geri sayım (telefon bırakılıp titreşim dinsin)
+    static let sayaclar = [0, 3, 5]
+
+    /// Hazır senaryolar (DJI Osmo Pocket'taki gibi; Fatih 31 Ekim (16)): aralık, süre, pozlama kilidi, enstantane
+    enum Sablon: String, CaseIterable, Identifiable {
+        case gunBatimi, bulut, sehir, gece, kalabalik, hyperlapse
+        var id: String { rawValue }
+        var ad: String {
+            switch self {
+            case .gunBatimi: return "Gün batımı"
+            case .bulut: return "Bulutlar"
+            case .sehir: return "Şehir trafiği"
+            case .gece: return "Gece / yıldız"
+            case .kalabalik: return "Kalabalık"
+            case .hyperlapse: return "Hyperlapse"
+            }
+        }
+        var simge: String {
+            switch self {
+            case .gunBatimi: return "sunset"
+            case .bulut: return "cloud"
+            case .sehir: return "car.rear"
+            case .gece: return "moon.stars"
+            case .kalabalik: return "person.3"
+            case .hyperlapse: return "figure.walk"
+            }
+        }
+        var aciklama: String {
+            switch self {
+            case .gunBatimi: return "5 sn aralık · 1 sa · pozlama ışığı izler"
+            case .bulut: return "3 sn aralık · 30 dk · pozlama kilitli"
+            case .sehir: return "2 sn aralık · 1/15 enstantane, ışık izleri"
+            case .gece: return "10 sn aralık · 2 sa · tripod"
+            case .kalabalik: return "1 sn aralık · 10 dk · 1/30"
+            case .hyperlapse: return "0,5 sn aralık · yürüyerek, sabitleme açık"
+            }
+        }
+        /// (aralık ms, süre dk, pozlama kilidi, enstantane)
+        var ayar: (Int, Int, Bool, Double?) {
+            switch self {
+            case .gunBatimi: return (5000, 60, false, nil)
+            case .bulut: return (3000, 30, true, nil)
+            case .sehir: return (2000, 30, true, 1.0 / 15)
+            case .gece: return (10_000, 120, true, nil)
+            case .kalabalik: return (1000, 10, true, 1.0 / 30)
+            case .hyperlapse: return (500, 0, false, nil)
+            }
+        }
+    }
 }
 
 /// Timelapse videosunu yazar: kare kuyruğundan gelen görüntülerden her aralıkta biri, sıra numarasıyla damgalanır. Ses yok.

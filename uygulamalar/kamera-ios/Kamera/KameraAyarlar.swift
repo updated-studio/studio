@@ -208,6 +208,28 @@ struct KameraAyarlar: View {
 
     private var timelapse: some View {
         List {
+            Section {
+                ForEach(Timelapse.Sablon.allCases) { t in
+                    Button { kamera.tlSablonSec(kamera.tlSablon == t ? nil : t) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: t.simge).frame(width: 24).foregroundStyle(Tema.sari)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(t.ad).foregroundStyle(.primary)
+                                Text(t.aciklama).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if kamera.tlSablon == t { Image(systemName: "checkmark").foregroundStyle(Tema.sari) }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            } header: { Text("Hazır senaryolar") }
+            Picker("Enstantane", selection: $kamera.tlEnst) {
+                ForEach(Timelapse.enstler, id: \.self) { e in Text(Timelapse.enstYazi(e)).tag(e) }
+            }
+            Picker("Başlamadan önce sayaç", selection: $kamera.tlSayac) {
+                ForEach(Timelapse.sayaclar, id: \.self) { z in Text(z == 0 ? "Kapalı" : "\(z) sn").tag(z) }
+            }
             Picker("Kare aralığı", selection: $kamera.tlAralik) {
                 ForEach(Timelapse.araliklar, id: \.self) { a in Text(Timelapse.aralikYazi(a)).tag(a) }
             }

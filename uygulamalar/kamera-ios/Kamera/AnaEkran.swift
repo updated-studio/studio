@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import SwiftUI
 
 enum ProPanelTuru { case mod, ayar }
@@ -96,6 +97,14 @@ struct AnaEkran: View {
             if yeni == nil { kamera.baslat() } else { kamera.durdur() }
         }
         .onChange(of: kamera.mod) { _, m in panel = m == .pro ? .proKartlar : nil }
+        // Kamera Denetimi / ses düğmesi: basınca ortaya odaklanır (kilit yoksa), bırakınca çeker (Fatih 31 Ekim (23))
+        .modifier(KameraDugmesi(basla: {
+            guard ekran == nil, kamera.mod.foto, !kamera.aeafKilit, !kamera.asistanAcik else { return }
+            kamera.odakla(CGPoint(x: 0.5, y: 0.5))
+        }, bitir: {
+            guard ekran == nil, panel == nil || panel == .proKartlar else { return }
+            kamera.deklansor(yon: ekranYonu)
+        }))
         .onChange(of: panel) { _, p in if p != .kontroller && duzenleme { duzenleme = false } }
         .fullScreenCover(item: Binding(get: { ekran == .vlog ? nil : ekran }, set: { ekran = $0 })) { e in
             switch e {
@@ -157,7 +166,9 @@ struct AnaEkran: View {
                 if panel == nil {
                     if let f = acikSatir { FavoriSatir(f: f, kamera: kamera).padding(.bottom, 14) } else {
                         VStack(spacing: 10) {
-                            if kamera.mod != .pro, kamera.mod != .timelapse, !kamera.kayitta, kamera.secilenIso == nil, kamera.secilenEnst == nil { PozlamaCetveli(kamera: kamera).yardimBalonu(yardim, "Kaydır: pozlama · çift dokun: sıfırla") }
+                            // Fatih 31 Ekim (9): pozlama cetveli yerine zoom tekerleği; merceklerde kesin optik geçiş
+                            if !kamera.onde { ZoomTekerlegi(kamera: kamera).yardimBalonu(yardim, "Kaydır: yakınlaştır") }
+                            if kamera.mod == .portre { sanalDiyaframSirasi }
                             mercekler(dikey: false)
                         }
                         .padding(.bottom, 20)
@@ -543,6 +554,28 @@ struct AnaEkran: View {
         .foregroundStyle(o.2 ? Tema.sari : .white)
     }
 
+    /// PORTRE: sanal diyafram (f/1.4 güçlü bulanık … f/16 net); çekimde derinlikle uygulanır
+    private var sanalDiyaframSirasi: some View {
+        HStack(spacing: 4) {
+            Text("ƒ").font(.system(size: 14, weight: .semibold, design: .serif)).italic().foregroundStyle(Tema.sari).frame(width: 18)
+            ForEach(Kamera.sanalDiyaframlar, id: \.self) { f in
+                let s = kamera.sanalDiyafram == f
+                Button { UISelectionFeedbackGenerator().selectionChanged(); kamera.sanalDiyafram = f } label: {
+                    Text(String(format: f < 10 && f != f.rounded() ? "%.1f" : "%.0f", f).replacingOccurrences(of: ".", with: ","))
+                        .font(.system(size: 11.5, weight: s ? .semibold : .regular).monospacedDigit())
+                        .foregroundStyle(s ? Tema.sari : .white.opacity(0.8))
+                        .frame(width: 30, height: 26)
+                        .background(Capsule().fill(s ? Color.white.opacity(0.14) : .clear))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(Color.black.opacity(0.28)))
+        .shadow(color: .black.opacity(0.4), radius: 2)
+        .accessibilityLabel("Sanal diyafram")
+    }
+
     /// Odak karesi: dokunulan yerde belirir, 1,5 sn sonra kaybolur (kilitliyken kalır)
     private func odakGoster(_ ekran: CGPoint) {
         odakSayac += 1
@@ -696,10 +729,44 @@ struct AnaEkran: View {
 
     /// TIMELAPSE: kare aralığı hızlı seçimi
     private func sureSira(dikey: Bool) -> some View {
+        VStack(spacing: 8) {
+            sablonSira
+            araliklarSira
+        }
+        .disabled(kamera.kayitta)
+    }
+
+    /// TIMELAPSE hazır senaryoları (gün batımı, hyperlapse…); seçili sarı
+    private var sablonSira: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(Timelapse.Sablon.allCases) { t in
+                    let s = kamera.tlSablon == t
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        kamera.tlSablonSec(s ? nil : t)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: t.simge).font(.system(size: 11, weight: .medium))
+                            Text(t.ad).font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(s ? Tema.sari : .white.opacity(0.9))
+                        .padding(.horizontal, 10).frame(height: 26)
+                        .yuzey(13)
+                        .overlay(Capsule().strokeBorder(s ? Tema.sari.opacity(0.5) : .clear, lineWidth: 0.5))
+                    }
+                    .accessibilityHint(t.aciklama)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var araliklarSira: some View {
         HStack(spacing: 6) {
             ForEach(Timelapse.hizli, id: \.self) { ms in
                 let s = kamera.tlAralik == ms
-                Button { kamera.tlAralik = ms } label: {
+                Button { kamera.tlAralik = ms; kamera.tlSablon = nil } label: {
                     Text(Timelapse.aralikYazi(ms)).font(.system(size: 11, weight: .semibold).monospacedDigit())
                         .foregroundStyle(s ? Tema.sari : Tema.ikincil)
                         .padding(.horizontal, 10).frame(height: 26)
@@ -708,7 +775,6 @@ struct AnaEkran: View {
                 }
             }
         }
-        .disabled(kamera.kayitta)
     }
 
     // MARK: deklanşör sırası
@@ -1145,6 +1211,8 @@ struct BicimPanel: View {
                 satir("ÇÖZ.", kamera.videoSecenekleri.map { h in (h >= 2160 ? "4K" : (h >= 1080 ? "HD" : "720p"), kamera.videoYukseklik == h, { kamera.videoYukseklik = h }) })
                 satir("ARALIK", Timelapse.hizli.map { a in (Timelapse.aralikYazi(a), kamera.tlAralik == a, { kamera.tlAralik = a }) })
                 satir("SÜRE", Timelapse.sureler.prefix(5).map { s in (Timelapse.sureYazi(s), kamera.tlSure == s, { kamera.tlSure = s }) })
+                satir("ENSTANTANE", Timelapse.enstler.map { e in (Timelapse.enstYazi(e), kamera.tlEnst == e, { kamera.tlEnst = e }) })
+                satir("SAYAÇ", Timelapse.sayaclar.map { z in (z == 0 ? "Kapalı" : "\(z) sn", kamera.tlSayac == z, { kamera.tlSayac = z }) })
             default:
                 satir("ÇÖZ.", kamera.fotoBoyutlari.map { b in
                     (HizliBicim.mpAd(b), kamera.fotoBoyut.map { $0.width == b.width && $0.height == b.height } ?? false, { kamera.fotoBoyutSec(b) })
@@ -1295,6 +1363,96 @@ struct OdakKaresi: View {
             .opacity(kilitli || oturdu ? 1 : 0.6)
             .shadow(color: .black.opacity(0.4), radius: 2)
             .onAppear { withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) { oturdu = true } }
+    }
+}
+
+/// Zoom tekerleği (Fatih 31 Ekim): mercek düğmelerinin üstünde ince, kaydırmalı; çentikler logaritmik (0,5× … en çok),
+/// gerçek mercek çarpanlarında uzun çentik ve sayı; o çarpana yaklaşınca yapışır ve titreşir (optik öncelikli: 4,9 → 5×).
+/// Değer ortada sarı; tekerlek parmakla birlikte kayar, çarpan ortadaki iğnenin altındadır
+struct ZoomTekerlegi: View {
+    @ObservedObject var kamera: Kamera
+    @State private var bas: CGFloat?
+    @State private var sonDurak: CGFloat?
+    private let gen: CGFloat = 300
+    /// Bir zoom katlanması (×2) kaç nokta
+    private let adim: CGFloat = 70
+
+    var body: some View {
+        let alt = kamera.zoomDuraklari.first ?? 1
+        let ust = kamera.zoomUst
+        VStack(spacing: 3) {
+            Text(AnaEkran.fmt(kamera.zoom) + "×").font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .foregroundStyle(Tema.sari).frame(width: 44)
+            Canvas { c, b in
+                let orta = b.width / 2
+                let z0 = log2(max(kamera.zoom, 0.01))
+                var z = alt
+                while z <= ust * 1.001 {
+                    let x = orta + (log2(z) - z0) * adim
+                    if x >= -2, x <= b.width + 2 {
+                        let durak = kamera.zoomDuraklari.contains { abs($0 - z) < 0.01 }
+                        let h: CGFloat = durak ? 10 : 5
+                        var yol = Path(); yol.move(to: CGPoint(x: x, y: 18 - h)); yol.addLine(to: CGPoint(x: x, y: 18))
+                        let uzak = min(1, abs(x - orta) / orta)
+                        c.stroke(yol, with: .color(.white.opacity((durak ? 0.9 : 0.45) * (1 - uzak * 0.7))), lineWidth: durak ? 1.2 : 0.8)
+                    }
+                    z = ((z + (z < 2 ? 0.1 : (z < 5 ? 0.25 : 0.5))) * 100).rounded() / 100
+                }
+                for d in kamera.zoomDuraklari {
+                    let x = orta + (log2(d) - z0) * adim
+                    guard x > 8, x < b.width - 8 else { continue }
+                    c.draw(Text(AnaEkran.fmt(d)).font(.system(size: 9, weight: .medium)).foregroundColor(.white.opacity(0.75)), at: CGPoint(x: x, y: 27))
+                }
+                var igne = Path(); igne.move(to: CGPoint(x: orta, y: 2)); igne.addLine(to: CGPoint(x: orta, y: 20))
+                c.stroke(igne, with: .color(Tema.sari), lineWidth: 1.5)
+            }
+            .frame(width: gen, height: 32)
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.18),
+                                         .init(color: .black, location: 0.82), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 2).onChanged { d in
+                if bas == nil { bas = kamera.zoom }
+                var z = (bas ?? 1) * pow(2, -d.translation.width / adim)
+                z = min(max(z, alt), ust)
+                // Mercek çarpanına yakınsa yapış (o merceğe kesin geçiş)
+                if let durak = kamera.zoomDuraklari.first(where: { abs(log2($0) - log2(z)) < 0.06 }) {
+                    z = durak
+                    if sonDurak != durak { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(); sonDurak = durak }
+                } else { sonDurak = nil }
+                kamera.yakinlastir(z, kaydir: true)
+            }.onEnded { _ in bas = nil })
+        }
+        .shadow(color: .black.opacity(0.5), radius: 2)
+        .disabled(kamera.proCalisiyor || (kamera.kayitta && !kamera.sanalda))
+        .accessibilityElement()
+        .accessibilityLabel("Yakınlaştırma \(AnaEkran.fmt(kamera.zoom))×")
+        .accessibilityAdjustableAction { y in
+            let l = kamera.zoomDuraklari
+            if let i = l.firstIndex(where: { abs($0 - kamera.zoom) < 0.05 }) {
+                let j = y == .increment ? min(i + 1, l.count - 1) : max(i - 1, 0)
+                kamera.yakinlastir(l[j])
+            }
+        }
+    }
+}
+
+/// Donanım deklanşörü (Kamera Denetimi, ses düğmeleri): iOS 18'de yakalama olayı; basış başı ve sonu
+struct KameraDugmesi: ViewModifier {
+    var basla: () -> Void
+    var bitir: () -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onCameraCaptureEvent { olay in
+                switch olay.phase {
+                case .began: basla()
+                case .ended: bitir()
+                default: break
+                }
+            }
+        } else {
+            content
+        }
     }
 }
 

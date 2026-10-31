@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 import Combine
 import CoreMotion
 import Photos
@@ -161,6 +162,18 @@ final class Kamera: NSObject, ObservableObject {
     @Published var tlAralik = Kamera.ud.object(forKey: "k.tlAralik") as? Int ?? 2000 { didSet { Kamera.ud.set(tlAralik, forKey: "k.tlAralik"); bicimYaz() } }
     @Published var tlSure = Kamera.ud.integer(forKey: "k.tlSure") { didSet { Kamera.ud.set(tlSure, forKey: "k.tlSure") } }
     @Published var tlPozSabit = Kamera.ud.object(forKey: "k.tlPozSabit") as? Bool ?? true { didSet { Kamera.ud.set(tlPozSabit, forKey: "k.tlPozSabit") } }
+    @Published var tlEnst = Kamera.ud.object(forKey: "k.tlEnst") as? Double { didSet { Kamera.ud.set(tlEnst, forKey: "k.tlEnst") } }
+    @Published var tlSayac = Kamera.ud.object(forKey: "k.tlSayac") as? Int ?? 3 { didSet { Kamera.ud.set(tlSayac, forKey: "k.tlSayac") } }
+    @Published var tlSablon = Timelapse.Sablon(rawValue: Kamera.ud.string(forKey: "k.tlSablon") ?? "") { didSet { Kamera.ud.set(tlSablon?.rawValue, forKey: "k.tlSablon") } }
+
+    /// Hazır senaryoyu uygular (aralık, süre, pozlama kilidi, enstantane); sonra elle değiştirilen ayar senaryoyu "özel" yapar
+    func tlSablonSec(_ s: Timelapse.Sablon?) {
+        tlSablon = s
+        guard let s else { return }
+        let a = s.ayar
+        tlAralik = a.0; tlSure = a.1; tlPozSabit = a.2; tlEnst = a.3
+        kuyruk.async { self.oturum.beginConfiguration(); self.kareCiktiAyarla(); self.oturum.commitConfiguration() }
+    }
     @Published var tlKare = 0
     // Kompozisyon, akıllı yardımcı, terazi, sahne önerisi
     /// Kesik çizgili kadraj çerçeveleri (yalnız video modlarında, Cerceve.swift)
@@ -331,7 +344,7 @@ final class Kamera: NSObject, ObservableObject {
     /// Tek mercek gereken durumlar
     var fizikselGerek: Bool {
         if mod.foto && Kamera.sanalFotoKucuk { return true }
-        if mod == .pro || odakKonum != nil || uzunSuruyor || uzunPozlama { return true }
+        if mod == .pro || odakKonum != nil || uzunSuruyor || uzunPozlama || secilenDiyafram != nil { return true }
         if secilenIso != nil || secilenEnst != nil { return !(Kamera.sanalArka?.isExposureModeSupported(.custom) ?? false) }
         return false
     }
@@ -385,10 +398,16 @@ final class Kamera: NSObject, ObservableObject {
         if let eski = girdi { oturum.removeInput(eski) }
         if oturum.canAddInput(g) { oturum.addInput(g); girdi = g; cihaz = d; lens = yeniOnde ? .genis : l }
         presetUygula()
+        if #available(iOS 18.0, *) { kameraDenetimiKur(d) }
         oturum.commitConfiguration()
         // Sanal cihazda görünen yakınlaştırma korunur (fizikselden dönünce aynı kadraj)
         if d.isVirtualDevice, (try? d.lockForConfiguration()) != nil {
             d.videoZoomFactor = min(max(zoom * Kamera.sanalTaban, d.minAvailableVideoZoomFactor), d.maxAvailableVideoZoomFactor)
+            // Fatih 31 Ekim (9): "4,9×'tan 5×'e geçince kamera 5×'e geçsin, optik öncelikli": Apple'ın ışık/odak uzaklığına göre
+            // ana mercekte kalıp dijital kırpması kapatılır; mercek yalnız yakınlaştırma eşiğinde değişir
+            if #available(iOS 15.0, *), d.primaryConstituentDeviceSwitchingBehavior != .unsupported {
+                d.setPrimaryConstituentDeviceSwitchingBehavior(.restricted, restrictedSwitchingBehaviorConditions: [.videoZoomChanged])
+            }
             d.unlockForConfiguration()
         } else if !yeniOnde, (try? d.lockForConfiguration()) != nil {
             // Fiziksel mercekte merceğin içindeki dijital yakınlaştırma (ör. 1,5× geniş açıda)
@@ -453,6 +472,8 @@ final class Kamera: NSObject, ObservableObject {
         if let s = secili { fotoCikti.maxPhotoDimensions = s }
         if fotoCikti.isAppleProRAWSupported { fotoCikti.isAppleProRAWEnabled = raw }
         // Art arda dokunuşlarda deklanşör beklemesin (iOS 17)
+        // PORTRE: derinlik verisi (sanal diyafram için)
+        fotoCikti.isDepthDataDeliveryEnabled = mod == .portre && fotoCikti.isDepthDataDeliverySupported
         if fotoCikti.isResponsiveCaptureSupported { fotoCikti.isResponsiveCaptureEnabled = true }
         if fotoCikti.isFastCapturePrioritizationSupported { fotoCikti.isFastCapturePrioritizationEnabled = true }
         let rawVarMi = !fotoCikti.availableRawPhotoPixelFormatTypes.isEmpty || fotoCikti.isAppleProRAWSupported
@@ -491,6 +512,10 @@ final class Kamera: NSObject, ObservableObject {
 
     /// Kare çıkışının sabitlemesi (kuyrukta okunur)
     private var kareSabitleme: AVCaptureVideoStabilizationMode {
+        // Hyperlapse (yürüyerek): kare çıkışında sinematik sabitleme
+        if mod == .timelapse, tlSablon == .hyperlapse {
+            return cihaz?.activeFormat.isVideoStabilizationModeSupported(.cinematicExtended) == true ? .cinematicExtended : .standard
+        }
         guard mod == .video else { return .off }
         if canliKayit != nil || sabitleme == .kapali { return sabitleme.mod }
         if #available(iOS 17.0, *), cihaz?.activeFormat.isVideoStabilizationModeSupported(.previewOptimized) == true { return .previewOptimized }
@@ -666,6 +691,9 @@ final class Kamera: NSObject, ObservableObject {
     }
 
     /// Görünen çarpana göre mercek seçilir (0,5× geniş açı, tele ve üstü tele mercek), aradaki kısım dijital
+    /// Yakınlaştırmanın üst sınırı (tekerlek ve iki parmak)
+    var zoomUst: CGFloat { max(10, (teleCarpani ?? 2) * 2) }
+
     func yakinlastir(_ istenen: CGFloat, moda: Bool = true, kaydir: Bool = false) {
         // Sanal cihazda mercek geçişi kayıt sürerken de olur (oturum yeniden kurulmaz)
         guard !proCalisiyor, !kayitta || sanalda else { return }
@@ -756,6 +784,34 @@ final class Kamera: NSObject, ObservableObject {
             let ac = flas == .fener && !mod.foto
             if d.isTorchModeSupported(ac ? .on : .off) { d.torchMode = ac ? .on : .off }
         }
+        diyaframUygula(d)
+    }
+
+    // MARK: ayarlanabilir diyafram (iPhone 18 Pro ve sonrası, iOS 27; Fatih 31 Ekim (17))
+
+    @Published var diyaframlar: [Float] = []
+    /// PORTRE'de sanal diyafram (f sayısı)
+    @Published var sanalDiyafram: Float = Kamera.ud.object(forKey: "k.sanalDiyafram") as? Float ?? 2.8 { didSet { Kamera.ud.set(sanalDiyafram, forKey: "k.sanalDiyafram") } }
+    @Published var secilenDiyafram: Float?
+
+    func diyaframSec(_ f: Float?) {
+        secilenDiyafram = f
+        kuyruk.async { self.cihazUyumla(); self.normalUygula() }
+    }
+
+    /// Kuyrukta, kilit içinde: seçili diyafram (enstantane ve ISO otomatik ya da elle seçilen); seçim yoksa otomatik pozlama sürer
+    private func diyaframUygula(_ d: AVCaptureDevice) {
+        #if compiler(>=6.3)
+        if #available(iOS 27.0, *) {
+            let b = d.activeFormat
+            let duraklar = b.minLensAperture < b.maxLensAperture ? b.recommendedLensApertureStops : []
+            DispatchQueue.main.async { if self.diyaframlar != duraklar { self.diyaframlar = duraklar } }
+            guard let f = secilenDiyafram, !duraklar.isEmpty, mod != .pro else { return }
+            let sure = secilenEnst.map { CMTime(seconds: $0, preferredTimescale: 1_000_000) } ?? AVCaptureDevice.autoExposureDuration
+            let iso = secilenIso ?? AVCaptureDevice.autoISO
+            d.setExposureModeCustom(lensAperture: min(max(f, b.minLensAperture), b.maxLensAperture), duration: sure, iso: iso, completionHandler: nil)
+        }
+        #endif
     }
 
     /// AE/AF kilidi açık mı (basılı tutunca; dokununca çözülür)
@@ -916,7 +972,21 @@ final class Kamera: NSObject, ObservableObject {
                 self.videoCikti.startRecording(to: url, recordingDelegate: self)
             }
         case .timelapse:
-            if tlYazici != nil { tlBitir() } else { tlBasla(yon: yon) }
+            if geriSayiyor { geriSayiyor = false; proIlerleme = nil; return }
+            if tlYazici != nil { tlBitir(); return }
+            // Başlamadan geri sayım: telefon bırakılır, titreşim diner, sonra pozlama sabitlenip çekim başlar
+            guard tlSayac > 0 else { tlBasla(yon: yon); return }
+            geriSayiyor = true
+            Task { @MainActor in
+                for i in stride(from: tlSayac, to: 0, by: -1) {
+                    proIlerleme = "\(i)"
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    if !geriSayiyor { proIlerleme = nil; return }
+                }
+                geriSayiyor = false
+                proIlerleme = nil
+                tlBasla(yon: yon)
+            }
         }
     }
 
@@ -942,6 +1012,10 @@ final class Kamera: NSObject, ObservableObject {
             ayar.photoQualityPrioritization = hizli ? .speed : .quality
         }
         ayar.maxPhotoDimensions = fotoCikti.maxPhotoDimensions
+        if mod == .portre, fotoCikti.isDepthDataDeliveryEnabled, ayar.rawPhotoPixelFormatType == 0 {
+            ayar.isDepthDataDeliveryEnabled = true
+            ayar.embedsDepthDataInPhoto = true
+        }
         let f: AVCaptureDevice.FlashMode = flas == .oto ? .auto : (flas == .acik ? .on : .off)
         if mod != .pro, fotoCikti.supportedFlashModes.contains(f) { ayar.flashMode = f }
         if #available(iOS 18.0, *), !deklansorSesi, fotoCikti.isShutterSoundSuppressionSupported { ayar.isShutterSoundSuppressionEnabled = true }
@@ -1018,12 +1092,18 @@ final class Kamera: NSObject, ObservableObject {
             if let b = self.kareCikti.connection(with: .video), b.isVideoOrientationSupported { b.videoOrientation = yon }
             self.tlYazici = y
         }
-        // Pozlama başta sabitlenir: parlaklık kareden kareye oynamaz (titreme olmaz)
-        if tlPozSabit {
+        // Enstantane seçiliyse o süre (parlaklık ISO ile korunur); pozlama başta sabitlenir: kareden kareye titreme olmaz
+        let enst = tlEnst, sabit = tlPozSabit
+        if sabit || enst != nil {
             kuyruk.asyncAfter(deadline: .now() + 0.3) {
                 guard let d = self.cihaz, (try? d.lockForConfiguration()) != nil else { return }
-                if d.isExposureModeSupported(.locked) { d.exposureMode = .locked }
-                if d.isWhiteBalanceModeSupported(.locked) { d.whiteBalanceMode = .locked }
+                if let e = enst, d.isExposureModeSupported(.custom) {
+                    let b = d.activeFormat
+                    let sure = min(max(e, b.minExposureDuration.seconds), min(b.maxExposureDuration.seconds, 1.0 / 30 >= e ? 1 : e))
+                    let iso = min(max(d.iso * Float(d.exposureDuration.seconds / sure), b.minISO), b.maxISO)
+                    d.setExposureModeCustom(duration: CMTime(seconds: sure, preferredTimescale: 1_000_000), iso: iso)
+                } else if sabit, d.isExposureModeSupported(.locked) { d.exposureMode = .locked }
+                if sabit, d.isWhiteBalanceModeSupported(.locked) { d.whiteBalanceMode = .locked }
                 d.unlockForConfiguration()
             }
         }
@@ -1187,7 +1267,7 @@ extension Kamera: AVCapturePhotoCaptureDelegate {
             if error != nil { DispatchQueue.main.async { self.bildirim = "Fotoğraf çekilemedi." } }
             return
         }
-        let gomulu = p.islenmis.map { fotoyaGom($0) } ?? ana
+        let gomulu = p.islenmis.map { fotoyaGom(mod == .portre ? portreBulanik($0) : $0) } ?? ana
         let kucuk = p.islenmis.flatMap { Kamera.kucukResim($0) }
         let mesaj = mod == .pro && proMod.seri ? (seriSayi > 1 ? "\(seriSayi) kare çekildi" : "Fotoğraf kaydedildi") : (p.ham != nil ? "Fotoğraf kaydedildi (RAW + \(heif ? "HEIF" : "JPEG"))" : "Fotoğraf kaydedildi")
         // RAW (Fatih 31 Ekim: "RAW galeriye kaydedilemiyor"): HEIF + DNG'yi tek varlıkta eşlemek (.alternatePhoto) bazı
@@ -1330,3 +1410,57 @@ extension Kamera: AVCaptureMetadataOutputObjectsDelegate {
         d.unlockForConfiguration()
     }
 }
+
+// MARK: Kamera Denetimi düğmesi (iPhone 16 ve sonrası; Fatih 31 Ekim (23))
+
+/// Hafif basışta açılan sistem kaydırıcıları: yakınlaştırma ve pozlama. Tam basış AnaEkran'daki yakalama olayında (odak → çek)
+@available(iOS 18.0, *)
+final class KameraDenetimiTemsilci: NSObject, AVCaptureSessionControlsDelegate {
+    func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {}
+    func sessionControlsWillEnterFullscreenAppearance(_ session: AVCaptureSession) {}
+    func sessionControlsWillExitFullscreenAppearance(_ session: AVCaptureSession) {}
+    func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {}
+}
+
+extension Kamera {
+    private static var denetimTemsilci: AnyObject?
+
+    /// Kuyrukta, yapılandırma içinde
+    @available(iOS 18.0, *)
+    func kameraDenetimiKur(_ d: AVCaptureDevice) {
+        guard oturum.supportsControls else { return }
+        if Kamera.denetimTemsilci == nil {
+            let t = KameraDenetimiTemsilci()
+            Kamera.denetimTemsilci = t
+            oturum.setControlsDelegate(t, queue: kuyruk)
+        }
+        for c in oturum.controls { oturum.removeControl(c) }
+        let taban = d.isVirtualDevice ? Kamera.sanalTaban : 1
+        let zoom = AVCaptureSystemZoomSlider(device: d) { [weak self] f in
+            DispatchQueue.main.async { self?.zoom = f / taban }
+        }
+        if oturum.canAddControl(zoom) { oturum.addControl(zoom) }
+        let poz = AVCaptureSystemExposureBiasSlider(device: d)
+        if oturum.canAddControl(poz) { oturum.addControl(poz) }
+    }
+}
+
+// MARK: PORTRE sanal diyafram (Fatih 31 Ekim (15))
+
+extension Kamera {
+    static let sanalDiyaframlar: [Float] = [1.4, 2, 2.8, 4, 5.6, 8, 16]
+
+    /// Derinlikli fotoğrafa arka plan bulanıklığı (Fotoğraflar'daki Derinlik denetimiyle aynı süzgeç); derinlik yoksa özgün veri
+    func portreBulanik(_ veri: Data) -> Data {
+        let baglam = CIContext()
+        guard let f = baglam.depthBlurEffectFilter(forImageData: veri, options: nil),
+              let kaynak = CIImage(data: veri, options: [.applyOrientationProperty: false]) else { return veri }
+        // Küçük f sayısı = güçlü bulanıklık (süzgecin ölçeği 0–22)
+        f.setValue(min(22, 16 * 1.4 / max(sanalDiyafram, 1.4)), forKey: "inputAperture")
+        guard let cikti = f.outputImage?.settingProperties(kaynak.properties) else { return veri }
+        let alan = kaynak.colorSpace ?? CGColorSpace(name: CGColorSpace.displayP3)!
+        if heif, let h = baglam.heifRepresentation(of: cikti, format: .RGBA8, colorSpace: alan, options: [:]) { return h }
+        return baglam.jpegRepresentation(of: cikti, colorSpace: alan, options: [:]) ?? veri
+    }
+}
+

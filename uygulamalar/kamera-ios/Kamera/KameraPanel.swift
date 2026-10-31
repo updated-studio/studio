@@ -80,6 +80,18 @@ struct Cetvel: View {
             } else {
                 not("Elle ISO ya da enstantane seçiliyken pozlama telafisi kapalı.")
             }
+            if !kamera.diyaframlar.isEmpty {
+                // Ayarlanabilir diyafram (iPhone 18 Pro ve sonrası): seçilince enstantane ve ISO otomatik kalır (diyafram önceliği)
+                Text("DİYAFRAM").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).padding(.top, 4)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        Secenek(yazi: "AUTO", secili: kamera.secilenDiyafram == nil) { kamera.diyaframSec(nil) }
+                        ForEach(kamera.diyaframlar, id: \.self) { f in
+                            Secenek(yazi: "f/" + String(format: "%.1f", f).replacingOccurrences(of: ".", with: ","), secili: kamera.secilenDiyafram == f) { kamera.diyaframSec(f) }
+                        }
+                    }
+                }
+            }
             Text("ISO").font(.caption.weight(.bold)).foregroundStyle(Tema.metin2).padding(.top, 4)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
