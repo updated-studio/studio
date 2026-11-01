@@ -65,6 +65,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 1 Kasım 2026
+- 01:45 (Natro Claude): Yeni fonksiyon **ozet-ses** (site "Bugün 60 saniyede" sesli bülteni; kullanıcı: "robot gibi, gerçek insan sesi, kısa özet ve yorum"). Panel (site `apps/cms/src/lib/ozetSes.ts`) haber listesi değişince POST'lar; fonksiyon sitenin en yeni 6 haberinden ücretsiz Gemini ile sunucu metni yazar, Gemini ses modeliyle (ses "Charon") ham WAV'ı `media/ozet/` altına bırakır; MP3'e çevirmeyi panel yapar (fonksiyon işlemci sınırı ~2 sn yetmiyor). Sınırlar: iki üretim arası 20 dk, günde 8. `?modeller=1` hesabın gördüğü ses modellerini listeler. anahtar.ts başlık yorumuna ozet-ses eklendi (9 kopya aynı). Göç yok.
+
 ### 29 Ekim 2026
 - 00:45 (Natro Claude): Site taraması 2 (Vercel kuralları + axe + SEO/performans, canlıda yalnız okuma). 8 küçük düzeltme yayında (site 5266a4e): varsayılan paylaşım görseli, 404 canonical/başlık, yapışkan bar odak payı, arama odak çizgisi, kaydırma sızması, ilk kapaklar eager, UPscore kontrastı, /uper boş istek. Karar bekleyenler site DURUM.md'de (HSTS, künye açıklamaları, 20 px dokunma alanları, Kulüp örnek görselleri). Ekibin göreceği değişiklik yok, yenilik notu yazılmadı.
 
