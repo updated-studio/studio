@@ -3,20 +3,19 @@
 // 1) Sitenin en yeni 6 haberi panelden okunur (yayında olanlar).
 // 2) Ücretsiz Gemini (anahtar havuzu) sunucu metnini yazar: giriş, her haber için 2-3 cümle (ne oldu, önemli nokta, kısa yorum), kapanış.
 //    Yalnız haberdeki bilgi kullanılır; uydurma yok.
-// 3) Gemini'nin ses modeli metni doğal Türkçe sesle okur; ses MP3'e çevrilir (64 kbps), "icerik" kovasına yazılır (ozet/).
-// 4) GET herkese açık: son özeti (ses adresi, metin, her haberin başladığı saniye) verir. Özet eskidiyse (haber listesi değişti ya da 12 saat
-//    geçti) arka planda yenisi üretilir; iki üretim arasında en az 20 dakika, günde en çok URETIM_MAX üretim (ücretsiz kota).
-//    Site (ana sayfa) bu GET'i okur; zamanlayıcı ya da göç gerekmez. Gizli bilgi dönmez.
+// 3) Gemini'nin ses modeli metni doğal Türkçe sesle okur; ham ses (WAV) "media" kovasına yazılır: ozet/ham-<zaman>.wav + ozet/bekleyen.json.
+// 4) MP3'e çevirme burada yapılmaz (fonksiyonların işlemci sınırı ~2 sn, çevirme ~4 sn): panel (site deposu apps/cms/src/lib/ozetSes.ts)
+//    5 dakikada bir bekleyen sesi MP3'e çevirir, ozet/son.json'u yazar; haber listesi değişince bu fonksiyonu POST ile o çağırır.
+//    Kötüye kullanıma karşı: haberleri fonksiyon kendi okur (dışarıdan metin almaz), iki üretim arası en az 20 dk, günde en çok URETIM_MAX.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { Mp3Encoder } from "npm:@breezystack/lamejs@1.2.7";
+import { decodeBase64 } from "jsr:@std/encoding@1/base64";
 import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 const yanit = (j: unknown, status = 200, ek: Record<string, string> = {}) => Response.json(j, { status, headers: { ...CORS, ...ek } });
 const PANEL = "https://panel.updated.com.tr";
-const ADRES = Deno.env.get("PUBLIC_SUPABASE_URL") || PANEL;
-const KOVA = "icerik";
-const SON = "ozet/son.json", KILIT = "ozet/kilit.json";
+const KOVA = "media";
+const SON = "ozet/son.json", BEKLEYEN = "ozet/bekleyen.json", KILIT = "ozet/kilit.json";
 const ARALIK = 20 * 60e3;          // iki üretim arası en az
 const ESKI = 12 * 3600e3;          // haber değişmese de bu kadar sonra yenilenir
 const URETIM_MAX = 8;              // günde en çok üretim (ses modeli ücretsiz kotası)
@@ -108,18 +107,19 @@ async function sesUret(metin: string): Promise<{ pcm: Int16Array; hz: number; mo
     const p = (JSON.parse(g)?.candidates?.[0]?.content?.parts ?? []).find((x: { inlineData?: { data?: string } }) => x.inlineData?.data);
     if (!p) { son = `${model} ses dönmedi`; continue; }
     const hz = Number((p.inlineData.mimeType as string).match(/rate=(\d+)/)?.[1] ?? 24000);
-    const b = Uint8Array.from(atob(p.inlineData.data), (c) => c.charCodeAt(0));
+    const b = decodeBase64(p.inlineData.data);
     return { pcm: new Int16Array(b.buffer, b.byteOffset, Math.floor(b.byteLength / 2)), hz, model };
   }
   throw new Error(`ses üretilemedi: ${son}`);
 }
 
-function mp3(pcm: Int16Array, hz: number): Uint8Array {
-  const enc = new Mp3Encoder(1, hz, 64), parca: Uint8Array[] = []
-  for (let i = 0; i < pcm.length; i += 1152) { const b = enc.encodeBuffer(pcm.subarray(i, i + 1152)); if (b.length) parca.push(new Uint8Array(b)); }
-  const s = enc.flush(); if (s.length) parca.push(new Uint8Array(s));
-  const out = new Uint8Array(parca.reduce((t, x) => t + x.length, 0)); let o = 0; for (const x of parca) { out.set(x, o); o += x.length; }
-  return out;
+/** 16 bit tek kanal PCM → WAV (yalnız başlık eklenir; işlemci yükü yok) */
+function wav(pcm: Int16Array, hz: number): Uint8Array {
+  const veri = pcm.byteLength, out = new Uint8Array(44 + veri), d = new DataView(out.buffer)
+  const yazS = (o: number, t: string) => { for (let i = 0; i < t.length; i++) out[o + i] = t.charCodeAt(i) }
+  yazS(0, "RIFF"); d.setUint32(4, 36 + veri, true); yazS(8, "WAVE"); yazS(12, "fmt "); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true)
+  d.setUint32(24, hz, true); d.setUint32(28, hz * 2, true); d.setUint16(32, 2, true); d.setUint16(34, 16, true); yazS(36, "data"); d.setUint32(40, veri, true)
+  out.set(new Uint8Array(pcm.buffer, pcm.byteOffset, veri), 44); return out
 }
 
 async function uret(sb: Sb, h: Haber[], onceki: Ozet | null): Promise<Ozet> {
@@ -132,16 +132,13 @@ async function uret(sb: Sb, h: Haber[], onceki: Ozet | null): Promise<Ozet> {
   // Her haberin başladığı saniye: metin uzunluğuna orantılı (tek parça seste kesin sınır yok; kart eşlemesi için yeterli)
   const toplam = bolumler.reduce((t, b) => t + b.length, 0); let birikim = bolumler[0].length;
   const maddeler = sira.map((y) => { const bas = Math.round((birikim / toplam) * sure * 10) / 10; birikim += y.metin.length; return { id: y.x.id, yol: y.x.yol, baslik: y.x.baslik, bas }; });
-  const zaman = Date.now(), yol = `ozet/${zaman}.mp3`;
-  await yaz(sb, yol, mp3(pcm, hz), "audio/mpeg");
+  const zaman = Date.now(), yol = `ozet/ham-${zaman}.wav`;
+  await yaz(sb, yol, wav(pcm, hz), "audio/wav");
   const bugun = gun();
-  const o: Ozet = { tarih: new Date(zaman).toISOString(), ses: `${ADRES}/storage/v1/object/public/${KOVA}/${yol}`, sure: Math.round(sure * 10) / 10, metin, maddeler, kimlik: h.map((x) => x.id).join(","),
+  const o: Ozet = { tarih: new Date(zaman).toISOString(), ses: yol, sure: Math.round(sure * 10) / 10, metin, maddeler, kimlik: h.map((x) => x.id).join(","),
     gunluk: { gun: bugun, sayi: (onceki?.gunluk?.gun === bugun ? onceki.gunluk.sayi : 0) + 1 } };
-  await yaz(sb, SON, JSON.stringify(o), "application/json");
-  // Eski ses dosyaları: son 3 kalır
-  const { data: l } = await sb.storage.from(KOVA).list("ozet", { limit: 100, sortBy: { column: "name", order: "desc" } });
-  const eski = (l ?? []).filter((f) => f.name.endsWith(".mp3")).slice(3).map((f) => `ozet/${f.name}`);
-  if (eski.length) await sb.storage.from(KOVA).remove(eski);
+  // Panel MP3'e çevirip son.json'u yazar; günlük sayaç son.json'dan devam eder
+  await yaz(sb, BEKLEYEN, JSON.stringify(o), "application/json");
   return o;
 }
 
@@ -152,6 +149,8 @@ async function gerekirseUret(sb: Sb, zorla = false): Promise<{ durum: string; oz
   const kimlik = h.map((x) => x.id).join(",");
   const tazeMi = onceki && onceki.kimlik === kimlik && Date.now() - +new Date(onceki.tarih) < ESKI;
   if (tazeMi && !zorla) return { durum: "güncel" };
+  const bek = await oku(sb, BEKLEYEN) as Ozet | null;
+  if (bek && bek.kimlik === kimlik && !zorla) return { durum: "MP3'e çevrilmeyi bekliyor" };
   if (onceki?.gunluk?.gun === gun() && onceki.gunluk.sayi >= URETIM_MAX) return { durum: "günlük sınır" };
   const kilit = await oku(sb, KILIT) as { zaman?: number } | null;
   if (kilit?.zaman && Date.now() - kilit.zaman < (zorla ? 3 * 60e3 : ARALIK)) return { durum: "kısa süre önce denendi" };
@@ -166,14 +165,8 @@ Deno.serve(async (req) => {
   try {
     // Deneme: hesabın gördüğü ses modelleri (ad listesi, gizli bilgi yok)
     if (u.searchParams.has("modeller")) { const a = await geminiAnahtarlari(); return yanit({ modeller: a.length ? await sesModelleri(a[0].deger) : [] }); }
-    if (req.method === "POST" || u.searchParams.has("simdi")) return yanit(await gerekirseUret(sb, req.method === "POST"));
-    const o = await oku(sb, SON) as Ozet | null;
-    // Okur isteğini bekletmeden arka planda tazele
-    const bg = gerekirseUret(sb).catch((e) => console.log("ozet-ses:", (e as Error).message));
-    // deno-lint-ignore no-explicit-any
-    (globalThis as any).EdgeRuntime?.waitUntil?.(bg);
-    if (!o) return yanit({ ozet: null }, 200, { "Cache-Control": "no-store" });
-    const { gunluk: _g, kimlik: _k, ...acik } = o;
-    return yanit({ ozet: acik }, 200, { "Cache-Control": "public, max-age=60" });
+    if (req.method !== "POST") return yanit({ hata: "Özet panelden çağrılır; son özet media kovasında ozet/son.json" }, 405);
+    const s = await gerekirseUret(sb, u.searchParams.has("zorla"));
+    return yanit({ durum: s.durum, sure: s.ozet?.sure });
   } catch (e) { return yanit({ hata: (e as Error).message }, 500); }
 });
