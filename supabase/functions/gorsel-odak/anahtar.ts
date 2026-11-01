@@ -2,7 +2,7 @@
 // Anahtarlar public.gemini_anahtarlari'nda (göç 0052): sırayla kullanılır; birinin günlük kotası dolunca (429) "kota_dolu" işaretlenir ve
 // sıradakine geçilir; Google kotayı Pasifik gece yarısı yeniler, ertesi gün yeniden en baştan. Geçersiz anahtar atlanır (Stüdyo'da "Dene" sıfırlar).
 // Sunucudaki ana anahtar (GEMINI_API_KEY) tabloda değeri boş satırdır. Göç uygulanmamışsa eski yol: ana + baglanti_anahtarlari.gemini_yedek.
-// BU DOSYA Gemini kullanan her fonksiyonda AYNIDIR (fonksiyonlar ayrı yüklenir): kunye-otomatik, kunye-doldur, yarisma-bul, gorsel-odak,
+// BU DOSYA Gemini kullanan her fonksiyonda AYNIDIR (fonksiyonlar ayrı yüklenir): kunye-otomatik, kunye-doldur, yarisma-bul, gorsel-odak, ozet-ses,
 // triyaj-topla, triyaj-taslak. Değişiklikte hepsine kopyalanır.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
