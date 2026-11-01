@@ -47,7 +47,7 @@ export default function Bugun() {
           <span className="ed-ust">{new Date().toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" }).toLocaleUpperCase("tr-TR")}</span>
           <h1>{selam()}, {profile!.name.split(" ")[0]}</h1>
         </div>
-        <div className="ed-hizli">
+        <div className="ed-hizli simge">
           <button className="btn ed-ana" onClick={() => git("/yaz/yeni")}><Ikon ad="plus" />Yeni haber yaz</button>
           <button className="btn ed-ana ed-turuncu" onClick={() => git("/cekim")}><Ikon ad="kamera" />Çekime başla</button>
         </div>
@@ -56,7 +56,7 @@ export default function Bugun() {
       <section aria-labelledby="ed-yap">
         <h2 id="ed-yap" className="ed-baslik">BUGÜN YAPILACAKLAR</h2>
         {!yuklendi ? <div className="muted">Yükleniyor…</div> : !kartlar.length ? (
-          <div className="ed-bos"><Ikon ad="check" /><b>Bekleyen iş yok</b><span>Haber Masası'ndan bir haber seçebilir ya da kendi haberini yazabilirsin.</span></div>
+          <div className="ed-bos simge"><Ikon ad="check" /><b>Bekleyen iş yok</b><span>Haber Masası'ndan bir haber seçebilir ya da kendi haberini yazabilirsin.</span></div>
         ) : (
           <div className="ed-kartlar">
             {kartlar.map((k, i) => (

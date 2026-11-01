@@ -1,0 +1,45 @@
+/* Simge kitleri (1 Kasım 2026, kullanıcı seçimi; marka kiti ikon bölümü). Solar kalın iki tonlu gövde (shared/Ikon.tsx).
+   Düz kullanım (düğme içi küçük ikonlar): yazı renginde, ikinci katman yarı saydam. Kit yalnız ".simge" içinde (menüler, büyük simgeler):
+   ana katman ışık geçişli, ikinci katman kitin renginde, üstte parlama, altta katlı gölge. Seçili öğede (.on / aria-current) dolgulu hâl. */
+:root { --s-ana-ust: #4A5160; --s-ana-alt: #0E1013; --s-gece-ust: #3A5BA8; --s-gece-alt: #0E1B3D; --s-isik: rgba(255, 255, 255, .85); --s-golge-yakin: rgba(22, 30, 52, .22); --s-golge-uzak: rgba(22, 40, 90, .16); --s-kalinlik: #0B0D10; }
+@media (prefers-color-scheme: dark) { :root { --s-ana-ust: #FFFFFF; --s-ana-alt: #AEB4BE; --s-gece-ust: #E6EEFF; --s-gece-alt: #9DB6F2; --s-isik: rgba(255, 255, 255, .14); --s-golge-yakin: rgba(0, 0, 0, .55); --s-golge-uzak: rgba(0, 0, 0, .45); --s-kalinlik: #000000; } }
+
+svg.i.s { fill: currentColor; stroke: none; }
+svg.i.s .sp, svg.i.s .sk, svg.i.s .sb { display: none; }
+svg.i.s [opacity] { opacity: .45; }
+
+/* Kit uygulanan yerler */
+.simge svg.i.s .sp { display: inline; fill: url(#s-parlak); }
+.simge svg.i.s .sd path:not([opacity]):not(.sp), .simge svg.i.s .sb path:not(.sp) { fill: url(#s-ana); }
+.simge svg.i.s { overflow: visible; filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 10px 16px var(--s-golge-uzak)); }
+.simge :is(.on, [aria-current="page"]) svg.i.s .sd { display: none; }
+.simge :is(.on, [aria-current="page"]) svg.i.s .sb { display: inline; }
+.simge :is(.on, [aria-current="page"]) svg.i.s .sb path:not(.sp) { fill: url(#s-beyaz); }
+.simge :is(.on, [aria-current="page"]) svg.i.s { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3)) drop-shadow(0 8px 14px rgba(0, 0, 0, .25)); }
+
+/* A1 sade */
+:is(html[data-simge="a1"] .simge:not([data-kit]), .simge[data-kit="a1"]) svg.i.s .sd [opacity] { fill: currentColor; opacity: .5; }
+/* A2 marka mavisi */
+:is(html[data-simge="a2"] .simge:not([data-kit]), .simge[data-kit="a2"]) svg.i.s .sd [opacity], :is(html[data-simge="e3"] .simge:not([data-kit]), .simge[data-kit="e3"]) svg.i.s .sd [opacity] { fill: url(#s-mavi); opacity: 1; }
+:is(html[data-simge="a2"] .simge:not([data-kit]), .simge[data-kit="a2"]) svg.i.s { filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 10px 18px color-mix(in srgb, var(--brand-blue) 40%, transparent)); }
+/* A3 cam ve E4 gece camı: ikinci katman belirgin buzlu mavi (beyaz zeminde kaybolmasın), ince mavi kenar */
+:is(html[data-simge="a3"] .simge:not([data-kit]), .simge[data-kit="a3"]) svg.i.s .sd [opacity], :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s .sd [opacity] { fill: url(#s-cam); opacity: 1; stroke: color-mix(in srgb, var(--brand-blue) 55%, transparent); stroke-width: .5; }
+:is(html[data-simge="a3"] .simge:not([data-kit]), .simge[data-kit="a3"]) svg.i.s, :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s { filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 10px 20px color-mix(in srgb, var(--brand-blue) 45%, transparent)); }
+:is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s .sd path:not([opacity]):not(.sp), :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s .sb path:not(.sp) { fill: url(#s-gece); }
+/* E2 renkli */
+:is(html[data-simge="e2"] .simge:not([data-kit]), .simge[data-kit="e2"]) svg.i.s .sd [opacity] { fill: var(--r); opacity: .95; }
+:is(html[data-simge="e2"] .simge:not([data-kit]), .simge[data-kit="e2"]) :is(.on, [aria-current="page"]) svg.i.s .sd { display: inline; }
+:is(html[data-simge="e2"] .simge:not([data-kit]), .simge[data-kit="e2"]) :is(.on, [aria-current="page"]) svg.i.s .sb { display: none; }
+:is(html[data-simge="e2"] .simge:not([data-kit]), .simge[data-kit="e2"]) :is(.on, [aria-current="page"]) svg.i.s .sd path:not([opacity]):not(.sp) { fill: url(#s-beyaz); }
+/* E3 kabartma: arkada üç katlı kalınlık */
+:is(html[data-simge="e3"] .simge:not([data-kit]), .simge[data-kit="e3"]) svg.i.s .sk { display: inline; }
+:is(html[data-simge="e3"] .simge:not([data-kit]), .simge[data-kit="e3"]) svg.i.s .sk path { fill: var(--s-kalinlik); opacity: .35; }
+:is(html[data-simge="e3"] .simge:not([data-kit]), .simge[data-kit="e3"]) :is(.on, [aria-current="page"]) svg.i.s .sk { display: none; }
+@media (prefers-reduced-transparency: reduce) { .simge svg.i.s { filter: none; } }
+/* Profilim → Simge kiti seçici */
+.kit-sec { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.kit { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); text-align: left; }
+.kit.on-kit { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+.kit .muted { font-size: 13px; }
+.kit-ornek { display: flex; gap: 10px; padding: 4px 0 8px; }
+.kit-ornek svg.i { width: 24px; height: 24px; }

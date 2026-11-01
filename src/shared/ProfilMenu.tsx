@@ -35,7 +35,7 @@ export default function ProfilMenu({ moduller }: { moduller: Modul[] }) {
               <div className="muted kisa-metin">{profile.role || profile.email}</div>
             </div>
           </div>
-          <div className="menuliste">
+          <div className="menuliste simge">
             {moduller.map((m) => (
               <NavLink key={m.id} to={"/" + m.id} role="menuitem" onClick={() => setAcik(false)}>
                 <Ikon ad={m.ikon} />{m.ad}

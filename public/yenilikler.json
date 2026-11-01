@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-01-b",
+    "tarih": "1 Kasım 2026",
+    "baslik": "Yeni simgeler ve simge kitleri",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Stüdyo'nun bütün simgeleri yenilendi: dolgun, iki tonlu, derinlikli.",
+          "Profilim → Simge kiti'nden altı görünümden birini seçebilirsin: Renkli, Kabartma, Gece camı, Sade, Marka mavisi, Cam.",
+          "Bugün, Taslaklar, Haber Masası, İçerik ve Marka Kiti simgeleri anlamına daha uygun olanlarla değişti."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-01-a",
     "tarih": "1 Kasım 2026",
     "baslik": "Yeni Stüdyo görünümü",

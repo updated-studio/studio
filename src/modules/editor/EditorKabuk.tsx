@@ -3,7 +3,7 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams }
 import { useAuth } from "../../shared/auth";
 import AltyapiUyari from "../../shared/altyapi";
 import Bildirimler from "../../shared/Bildirimler";
-import { Ikon } from "../../shared/Ikon";
+import { Ikon, SimgeTanimlari } from "../../shared/Ikon";
 import IkonUyarisi from "../../shared/IkonUyarisi";
 import ProfilMenu from "../../shared/ProfilMenu";
 import SohbetDugme from "../../shared/SohbetDugme";
@@ -58,7 +58,8 @@ export default function EditorKabuk() {
 
   return (
     <div className="ed">
-      <nav className="ed-menu" aria-label="Stüdyo menüsü">
+      <SimgeTanimlari />
+      <nav className="ed-menu simge" aria-label="Stüdyo menüsü">
         <div className="ed-marka"><span className="logo" role="img" aria-label="Updated" /><i /><span>STÜDYO</span></div>
         {ogeler.map((o) => <NavLink key={o.yol} to={o.yol} className={etkin(o) ? "on" : ""} aria-current={etkin(o) ? "page" : undefined}><Ikon ad={o.ikon} />{o.ad}</NavLink>)}
         <div className="ed-menu-alt">
@@ -96,7 +97,7 @@ export default function EditorKabuk() {
         </main>
       </div>
 
-      <nav className="ed-alt" aria-label="Alt menü">
+      <nav className="ed-alt simge" aria-label="Alt menü">
         {alt.map((o) => <NavLink key={o.yol} to={o.yol} className={etkin(o) ? "on" : ""} aria-current={etkin(o) ? "page" : undefined}><Ikon ad={o.ikon} /><span>{o.kisa ?? o.ad}</span></NavLink>)}
       </nav>
     </div>

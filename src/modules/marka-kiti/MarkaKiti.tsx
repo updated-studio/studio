@@ -97,9 +97,9 @@ export default function MarkaKiti() {
       </div>
 
       <h3>İkonlar</h3>
-      <p className="muted" style={{ margin: 0 }}>Tek set: Stüdyo, panel ve site aynı çizimleri kullanır. 24 px tuval, 2 px çizgi, düz uç, dolgu yok, tek renk (yazının rengini alır). Arayüzde etiketle birlikte; sosyal medya görselinde ikon yok.</p>
+      <p className="muted" style={{ margin: 0 }}>Tek set (1 Kasım 2026): Solar, kalın iki tonlu; seçili menü öğesinde dolgulu. 24 px tuval. Düğme içinde yazının renginde; menülerde ve büyük simgelerde kişinin seçtiği simge kitiyle (Renkli, Kabartma, Gece camı, Sade, Marka mavisi, Cam; Profilim → Simge kiti). Arayüzde etiketle birlikte; sosyal medya görselinde ikon yok. Lisans: CC BY 4.0, 480 Design.</p>
       <div className="panel mk-ikonlar">
-        {Object.keys(IKONLAR).map((ad) => <span key={ad} className="mk-ikon" title={ad}><Ikon ad={ad} /><span className="muted mono">{ad}</span></span>)}
+        {Object.keys(IKONLAR).map((ad) => <span key={ad} className="mk-ikon simge" title={ad}><Ikon ad={ad} /><span className="muted mono">{ad}</span></span>)}
       </div>
 
       <h3>Logolar</h3>

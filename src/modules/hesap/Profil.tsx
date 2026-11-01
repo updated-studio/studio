@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useAuth } from "../../shared/auth";
 import { Avatar, tekEmojiMi } from "../../shared/Avatar";
-import { Ikon } from "../../shared/Ikon";
+import { Ikon, SIMGE_KITLERI, simgeKitiSec, useSimgeKiti } from "../../shared/Ikon";
 import { sb } from "../../shared/supabase";
 import { hataMetni, useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
@@ -124,7 +124,28 @@ export default function Profil() {
           <button className="btn">Kaydet</button>
         </form>
       </div>
+      <SimgeKiti />
       <TelefonBildirimi />
     </>
+  );
+}
+
+/** Simge kiti (1 Kasım 2026, kullanıcı: "temalar kısmında simge kitlerimiz olarak birden çok seçenek"): yalnız bu cihazda saklanır */
+const ORNEK = ["bugun", "yaz", "taslak", "masa", "liste", "takvim"];
+function SimgeKiti() {
+  const kit = useSimgeKiti();
+  return (
+    <div className="panel">
+      <h3 style={{ margin: 0 }}>Simge kiti</h3>
+      <p className="muted" style={{ margin: "4px 0 12px" }}>Menülerdeki simgelerin görünümü. Yalnız bu cihazda geçerli.</p>
+      <div className="kit-sec" role="radiogroup" aria-label="Simge kiti">
+        {SIMGE_KITLERI.map(([k, ad, acik]) => (
+          <button key={k} type="button" role="radio" aria-checked={kit === k} className={kit === k ? "kit on-kit" : "kit"} onClick={() => simgeKitiSec(k)}>
+            <span className="kit-ornek simge" data-kit={k}>{ORNEK.map((x) => <Ikon key={x} ad={x} />)}</span>
+            <b>{ad}</b><span className="muted">{acik}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
