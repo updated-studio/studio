@@ -1,4 +1,4 @@
-// "Bugün 60 saniyede" sesli özeti (1 Kasım 2026, site kullanıcısı: "ses robot gibi; çok iyi, gerçek insan sesi olmalı; okuduğu şey her şey değil,
+// "Bugün 90 saniyede" sesli özeti (eski adı 60 saniyede) (1 Kasım 2026, site kullanıcısı: "ses robot gibi; çok iyi, gerçek insan sesi olmalı; okuduğu şey her şey değil,
 // haberin kısa özeti ve yorum, önemli noktalar; cihazın ses panelinden kontrol edilebilmeli").
 // 1) Sitenin en yeni 6 haberi panelden okunur (yayında olanlar).
 // 2) Ücretsiz Gemini (anahtar havuzu) sunucu metnini yazar: giriş, her haber için 2-3 cümle (ne oldu, önemli nokta, kısa yorum), kapanış.
@@ -51,13 +51,13 @@ async function yaz(sb: Sb, yol: string, govde: Uint8Array | string, tur: string)
   if (error) throw new Error(`kova: ${error.message}`);
 }
 
-const SISTEM = `Sen UPDATED'in (Türkçe teknoloji haber sitesi) sesli bülten sunucususun. "Bugün 60 saniyede" için okunacak metni yazıyorsun.
+const SISTEM = `Sen UPDATED'in (Türkçe teknoloji haber sitesi) sesli bülten sunucususun. "Bugün 90 saniyede" için okunacak metni yazıyorsun. Giriş cümlesinde bu adı kullanabilirsin.
 Kurallar:
 - Yalnız verilen haber bilgilerini kullan; rakam, tarih, fiyat uydurma. Emin olmadığın bir şeyi söyleme.
 - Her haber için tam 2 cümle: birinci cümle ne oldu (en önemli rakam ya da ayrıntıyla); ikinci cümle okur için neden önemli ya da kısa, ölçülü bir yorum (pazar, rakipler, kullanıcıya etkisi). İkinci cümle birincinin tekrarı olmasın. Başlığı aynen okuma, kendi cümlenle anlat.
 - Konuşma dili: doğal, sıcak, akıcı; radyo haber sunucusu gibi. Abartı, ünlem, "inanılmaz", "şok" yok.
 - Sayıları okunacak biçimde yaz (ör. "yetmiş dokuz bin sekiz yüz dolar" değil "79 bin 800 dolar" yaz; ses modeli okur). Kısaltmaları açılmış ya da okunur yaz.
-- Toplam 150-170 kelime (yaklaşık 60-65 saniye); verilen haberlerin hepsine yer ver. Giriş tek kısa cümle ("Günaydın" gibi saate bağlı selam yok). Kapanış tek cümle: ayrıntılar updated.com.tr'de.
+- Toplam 160-190 kelime (en çok 90 saniye); verilen haberlerin hepsine yer ver. Giriş tek kısa cümle ("Günaydın" gibi saate bağlı selam yok). Kapanış tek cümle: ayrıntılar updated.com.tr'de.
 - Yanıt yalnız JSON: {"giris": "...", "maddeler": [{"id": <haber id>, "metin": "..."}], "kapanis": "..."}; maddeler verilen sırayla.`;
 
 async function geminiMetin(h: Haber[]): Promise<{ giris: string; maddeler: { id: number; metin: string }[]; kapanis: string }> {
