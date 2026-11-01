@@ -97,7 +97,9 @@ async function sesUret(metin: string): Promise<{ pcm: Int16Array; hz: number; mo
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST", signal: AbortSignal.timeout(150_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Bir teknoloji haber bülteninin sunucusu gibi oku: doğal, sıcak, akıcı ve net bir Türkçeyle; acele etmeden, cümle aralarında kısa nefeslerle.\n\n${metin}` }] }],
+        // Yalnız okunacak metin gider (1 Kasım 2026, kullanıcı: "alakasız şeyler söylüyor"): metnin başına yazılan üslup yönergesini model de
+        // yüksek sesle okuyordu. Üslubu sesin kendisi (SES) ve metnin konuşma dili belirler.
+        contents: [{ role: "user", parts: [{ text: metin }] }],
         generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: SES } } } },
       }),
     }).catch(() => null);
