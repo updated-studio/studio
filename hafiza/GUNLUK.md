@@ -66,6 +66,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 1 Kasım 2026
+- 18:10 (Natro Claude): **Stüdyo yeni arayüz önerisi** (kullanıcı onayladı: site tasarım diline geçiş, rol bazlı editör görünümü (editör / video / yönetici; yönetici bugünkü gibi her şeyi görür), ikonlu düğmeler, ilk girişte vurgulu adım adım rehber, telefondan içerik türüne göre çekim kontrol listesi). Görsel taslak: https://claude.ai/artifact/MHuFqWTFFZuDfzfoiGxsNE (4 ekran). Çekim listesi maddeleri taslak (genel pratik + Marka Kiti); video ekibi düzeltecek. Onay bekleniyor, kod yok.
 - 01:45 (Natro Claude): Yeni fonksiyon **ozet-ses** (site "Bugün 60 saniyede" sesli bülteni; kullanıcı: "robot gibi, gerçek insan sesi, kısa özet ve yorum"). Panel (site `apps/cms/src/lib/ozetSes.ts`) haber listesi değişince POST'lar; fonksiyon sitenin en yeni 6 haberinden ücretsiz Gemini ile sunucu metni yazar, Gemini ses modeliyle (ses "Charon") ham WAV'ı `media/ozet/` altına bırakır; MP3'e çevirmeyi panel yapar (fonksiyon işlemci sınırı ~2 sn yetmiyor). Sınırlar: iki üretim arası 20 dk, günde 8. `?modeller=1` hesabın gördüğü ses modellerini listeler. anahtar.ts başlık yorumuna ozet-ses eklendi (9 kopya aynı). Göç yok.
 
 ### 29 Ekim 2026
