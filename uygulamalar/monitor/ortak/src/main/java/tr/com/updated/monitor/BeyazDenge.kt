@@ -66,15 +66,24 @@ object BeyazDenge {
         return doubleArrayOf(3.2406 * v[0] - 1.5372 * v[1] - 0.4986 * v[2], -0.9689 * v[0] + 1.8758 * v[1] + 0.0415 * v[2], 0.0557 * v[0] - 0.2040 * v[1] + 1.0570 * v[2])
     }
 
-    /** Kazançlar: G = 1 (ton ile oynar), R ve B beyazı nötr yapacak kadar. `oto`: son otomatik kazançlar (yedek yol için) */
+    /** O sıcaklıkta beyazı nötr yapan R/G ve B/G kazançları (kalibrasyon matrisi varsa ondan, yoksa sRGB kara cisimden göreli) */
+    private fun oranlar(oz: CameraCharacteristics, t: Double): Pair<Double, Double> =
+        kalib(oz)?.let { k -> val n = notr(k, t); (n[1] / n[0]) to (n[1] / n[2]) } ?: srgb(t).let { n -> (n[1] / n[0]) to (n[1] / n[2]) }
+
+    /**
+     * Kazançlar: G = 1 (ton ile oynar), R ve B beyazı nötr yapacak kadar. `oto`: son otomatik kazançlar.
+     * Otomatik kazanç biliniyorsa ona göre GÖRELİ hesaplanır: otomatikte gösterilen Kelvin (tahmin) elle seçilince görüntü
+     * otomatikle birebir aynı kalır; sıcaklık değiştikçe R ve B kalibrasyondaki oranla kayar. Böylece telefonun eksik ya da hatalı
+     * kalibrasyon matrisi tek başına renk kaydırmaz (Realme'de 4000K'nın macentaya kayması).
+     */
     fun kazanc(oz: CameraCharacteristics, kelvin: Int, ton: Int, oto: RggbChannelVector?): RggbChannelVector {
         val t = kelvin.toDouble()
-        var (r, b) = kalib(oz)?.let { k -> val n = notr(k, t); (n[1] / n[0]) to (n[1] / n[2]) } ?: run {
-            val n = srgb(t); val n0 = srgb(5500.0)
-            val oR = oto?.red?.toDouble() ?: 2.0; val oB = oto?.blue?.toDouble() ?: 1.6
-            val og = oto?.let { (it.greenEven + it.greenOdd) / 2.0 } ?: 1.0
-            (oR / og * (n0[0] / n[0]) * (n[1] / n0[1])) to (oB / og * (n0[2] / n[2]) * (n[1] / n0[1]))
-        }
+        var (r, b) = if (oto != null) {
+            val og = (oto.greenEven + oto.greenOdd) / 2.0
+            val t0 = tahmin(oz, oto).toDouble()
+            val (r1, b1) = oranlar(oz, t); val (r0, b0) = oranlar(oz, t0)
+            (oto.red / og * r1 / r0) to (oto.blue / og * b1 / b0)
+        } else oranlar(oz, t)
         // Ton: + macenta (yeşil azalır), − yeşil
         val g = 1.0 - ton * 0.005
         val en = minOf(r, b, g); if (en < 1.0) { r /= en; b /= en }
@@ -85,11 +94,10 @@ object BeyazDenge {
     /** Otomatik beyaz dengenin o anki kazançlarından tahmini Kelvin (elle ayara geçerken başlangıç) */
     fun tahmin(oz: CameraCharacteristics, oto: RggbChannelVector?): Int {
         oto ?: return 5500
-        val k = kalib(oz) ?: return 5500
         val hedef = ln(oto.red.toDouble() / oto.blue)
         var en = 5500; var fark = Double.MAX_VALUE
         var t = EN_AZ
-        while (t <= EN_COK) { val n = notr(k, t.toDouble()); val f = abs(ln((n[1] / n[0]) / (n[1] / n[2])) - hedef); if (f < fark) { fark = f; en = t }; t += ADIM }
+        while (t <= EN_COK) { val (r, b) = oranlar(oz, t.toDouble()); val f = abs(ln(r / b) - hedef); if (f < fark) { fark = f; en = t }; t += ADIM }
         return en
     }
 }

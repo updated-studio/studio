@@ -233,6 +233,20 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
     /** Wi-Fi kamera yayınında HDR kapalı: görüntü 8 bit SDR'ye çizilip Masa'ya gidiyor, HLG ton eşlemesiz soluk ve kayık görünüyordu */
     @Volatile var sdrZorla = false
     private val hdrAcik: Boolean get() = ayar.renk == 1 && hdrVar && !fotoModu && !sdrZorla
+    /**
+     * Bu kare hızının otomatik pozlama aralığı: sabit (f, f) yoksa üst sınırı f olan en dar aralık. Bazı telefonlar (Realme GT2 gibi)
+     * 60'ı başka uygulamalara yalnız (30, 60) gibi değişken aralıkla verir; o zaman da 60 fps çekilir.
+     */
+    fun fpsAralik(f: Int): Range<Int>? = yetenek.fpsler.firstOrNull { it.lower == f && it.upper == f } ?: yetenek.fpsler.filter { it.upper == f && it.lower >= f / 2 }.maxByOrNull { it.lower }
+    /** Kamera bu boyutu bu hızda verebiliyor mu (akışın en kısa kare süresi; bilinmiyorsa evet) */
+    fun boyutHizi(b: Size, f: Int): Boolean = runCatching { val d = harita?.getOutputMinFrameDuration(android.media.MediaRecorder::class.java, b) ?: 0L; d == 0L || d <= 1_000_000_000L / f + 500_000L }.getOrDefault(true)
+    /** Sensörün gerçek çözünürlüğü (MP): telefonun başka uygulamalara verdiği en büyük fotoğrafla karşılaştırmak için */
+    val sensorMp: Double by lazy {
+        val a = oz.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+        val b = if (android.os.Build.VERSION.SDK_INT >= 31) runCatching { oz.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE_MAXIMUM_RESOLUTION) }.getOrNull() else null
+        maxOf(a?.let { it.width * it.height / 1e6 } ?: 0.0, b?.let { it.width * it.height / 1e6 } ?: 0.0)
+    }
+
     fun secilenFotoBoyut(): Size? { val l = fotoBoyutlari; return ayar.fotoBoyut?.takeIf { it in l } ?: l.firstOrNull() }
 
     val yetenek: KameraYetenek by lazy {
@@ -368,6 +382,9 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
 
     /** Seçili konuyu izle (AI Kadraj): odak ve pozlama bölgesi konuyla gider; sürekli odakta kalır, tetik yok (avlanmasın) */
     @Volatile private var izliyor = false
+    /** Odak modu (dokunulan nokta yokken): 0 sürekli (AF-C), 1 tek (AF-S; dokununca odaklar ve orada kalır), 2 yüz öncelikli */
+    @Volatile var afModu = 0
+    val yuzOncelikVar: Boolean get() = sahneModuVar(CameraMetadata.CONTROL_SCENE_MODE_FACE_PRIORITY)
     fun konuIzle(u: Float, v: Float, ekranDonusu: Int) {
         odakNoktasi = sensorNoktasi(u, v, ekranDonusu); izliyor = true
         h.post { istekGonder() }
@@ -429,7 +446,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
             if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AF_REGIONS, b)
             if ((oz.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0) > 0) r.set(CaptureRequest.CONTROL_AE_REGIONS, b)
         }
-        else r.set(CaptureRequest.CONTROL_AF_MODE, if (fotoModu) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+        else r.set(CaptureRequest.CONTROL_AF_MODE, if (afModu == 1) CameraMetadata.CONTROL_AF_MODE_AUTO else if (fotoModu) CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE else CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
         ayar.diyafram?.takeIf { diyaframlar.size > 1 && diyaframlar.any { d -> d == it } }?.let { r.set(CaptureRequest.LENS_APERTURE, it) }
         // Yakınlaştırma (Android 11+: lensler arası geçiş dahil; .5 geniş açı telefon destekliyorsa)
         if (android.os.Build.VERSION.SDK_INT >= 30) zoomAralik?.let { z -> r.set(CaptureRequest.CONTROL_ZOOM_RATIO, ayar.zoomOrani.coerceIn(z.lower, z.upper)) }
@@ -507,7 +524,7 @@ class KameraKaynak(private val ctx: Context, val id: String, override val ad: St
         fun awb(m: Int) { if (m in yetenek.awbModlari) r.set(CaptureRequest.CONTROL_AWB_MODE, m) }
         fun sonsuz() { if (yetenek.minOdak > 0f) { r.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF); r.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0f) } }
         when (sahne) {
-            Sahne.KAPALI -> {}
+            Sahne.KAPALI -> if (afModu == 2) mod(CameraMetadata.CONTROL_SCENE_MODE_FACE_PRIORITY)
             Sahne.GUN_BATIMI -> if (!mod(CameraMetadata.CONTROL_SCENE_MODE_SUNSET)) { awb(CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT); r.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, evAdimi(-0.7f)) }
             Sahne.SPOR -> if (!mod(CameraMetadata.CONTROL_SCENE_MODE_SPORTS)) {
                 // Sabit yüksek kare hızı: otomatik pozlama enstantaneyi kısa tutmak zorunda kalır
