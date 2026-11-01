@@ -1,65 +1,12 @@
-import { Suspense } from "react";
-import { HashRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { AuthGate, useAuth } from "./shared/auth";
-import { Ikon } from "./shared/Ikon";
-import ProfilMenu from "./shared/ProfilMenu";
-import { MODULLER } from "./modules";
-import Bildirimler from "./shared/Bildirimler";
-import SohbetDugme from "./shared/SohbetDugme";
-import SurumUyarisi from "./shared/SurumUyarisi";
-import AltyapiUyari from "./shared/altyapi";
-import IkonUyarisi from "./shared/IkonUyarisi";
-import Yenilikler from "./shared/Yenilikler";
-import YayinKuyrugu from "./shared/YayinKuyrugu";
+import { lazy, Suspense } from "react";
+import { HashRouter } from "react-router-dom";
+import { AuthGate } from "./shared/auth";
 import { ToastProvider } from "./shared/toast";
 import { VeriProvider } from "./shared/veri";
-import { lazy } from "react";
-import { editorGorunumu } from "./modules/editor/gorev";
-// Editör görünümü (1 Kasım 2026): yönetici olmayan herkes sade, işine göre menülü ekranı görür; yönetici bu kabuğu görür
-const EditorKabuk = lazy(() => import("./modules/editor/EditorKabuk"));
 
-function Kabuk() {
-  const { profile } = useAuth();
-  if (editorGorunumu(profile)) return <Suspense fallback={<div className="wrap muted">Yükleniyor…</div>}><EditorKabuk /></Suspense>;
-  return <YoneticiKabuk />;
-}
-
-function YoneticiKabuk() {
-  const { profile } = useAuth();
-  const gorunen = MODULLER.filter((m) => !m.sadeceYonetici || profile?.is_admin);
-  const dock = gorunen.filter((m) => (m.yer ?? "dock") === "dock");
-  const profilde = gorunen.filter((m) => m.yer === "profil");
-  return (
-    <div className="wrap">
-      <header className="row" style={{ gap: 12 }}>
-        <div className="brand" style={{ marginRight: "auto" }}><span className="logo" role="img" aria-label="Updated" /><span>Stüdyo</span></div>
-        <SohbetDugme />
-        <Bildirimler />
-        <ProfilMenu moduller={profilde} />
-      </header>
-      <SurumUyarisi />
-      <AltyapiUyari />
-      <IkonUyarisi />
-      <Yenilikler />
-      <YayinKuyrugu />
-      <nav className="dock" aria-label="Ana menü">
-        {dock.map((m) => (
-          <NavLink key={m.id} to={"/" + m.id} title={m.ad} style={{ "--k": `var(--${m.renk ?? "blue"})` } as React.CSSProperties}>
-            <span className="kare"><Ikon ad={m.ikon} /></span><span className="ad">{m.ad}</span>
-          </NavLink>
-        ))}
-      </nav>
-      <main style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Suspense fallback={<div className="muted" style={{ padding: 16 }}>Yükleniyor…</div>}>
-          <Routes>
-            {gorunen.map((m) => <Route key={m.id} path={"/" + m.id} element={<m.bilesen />} />)}
-            <Route path="*" element={<Navigate to={"/" + dock[0].id} replace />} />
-          </Routes>
-        </Suspense>
-      </main>
-    </div>
-  );
-}
+// Tek kabuk (1 Kasım 2026, kullanıcı: "tüm tasarım herkeste aynı; editörlerde bazı ayarlar, ekranlar, menüler görünmeyecek"):
+// modules/editor/EditorKabuk.tsx. Yönetici ve yayın yönetmeni menüde yönetim bölümlerini de görür. Eski dock'lu kabuk kalktı.
+const Kabuk = lazy(() => import("./modules/editor/EditorKabuk"));
 
 export default function App() {
   return (
@@ -67,7 +14,7 @@ export default function App() {
       <AuthGate>
         <VeriProvider>
           <HashRouter>
-            <Kabuk />
+            <Suspense fallback={<div className="wrap muted">Yükleniyor…</div>}><Kabuk /></Suspense>
           </HashRouter>
         </VeriProvider>
       </AuthGate>

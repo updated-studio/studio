@@ -1,22 +1,12 @@
 import type { Profile } from "../../shared/supabase";
 
-// Kişinin Stüdyo'daki işleri (1 Kasım 2026, göç 0061): bir kişi birden çok iş yapabilir (haber + video gibi).
-// profiles.gorevler boşsa site rolünden çıkarılır: video → video, tasarımcı → tasarim, sosyal medya → sosyal, diğerleri → haber.
-export type Gorev = "haber" | "video" | "tasarim" | "sosyal";
-export const GOREVLER: [Gorev, string][] = [["haber", "Haber"], ["video", "Video çekimi"], ["tasarim", "Tasarım"], ["sosyal", "Sosyal medya"]];
+// Stüdyo herkeste aynı tasarımda (1 Kasım 2026, kullanıcı: "tüm tasarım herkeste aynı; editörlerde bazı ayarlar, ekranlar, menüler görünmeyecek;
+// video rolü yok, editörler hem video çekebiliyor hem haber girebiliyor"). Yönetim bölümlerini yönetici ve yayın yönetmeni görür.
+export const yonetirMi = (p: Profile | null | undefined) => !!p && (p.is_admin || p.site_rol === "yayin-yonetmeni");
 
-export function gorevleri(p: Profile | null | undefined): Gorev[] {
-  if (!p) return [];
-  if (p.gorevler?.length) return p.gorevler as Gorev[];
-  const r = p.site_rol;
-  return r === "video" ? ["video"] : r === "tasarimci" ? ["tasarim"] : r === "sosyal" ? ["sosyal"] : ["haber"];
-}
-
-/** Yönetici kendi ekranında editör görünümünü deneyebilir (yalnız o tarayıcıda) */
+/** Yönetici kendi ekranında editörün gördüğünü deneyebilir (yalnız o tarayıcıda) */
 export const ONIZLEME_ANAHTARI = "editor-gorunumu";
-// Yayın yönetmeni onay kuyruğunu ve bütün site içeriğini gördüğü için tam görünümde kalır
-export function editorGorunumu(p: Profile | null | undefined): boolean {
-  if (!p) return false;
-  if (!p.is_admin && p.site_rol !== "yayin-yonetmeni") return true;
+export function editorGibi(p: Profile | null | undefined): boolean {
+  if (!yonetirMi(p)) return true;
   try { return localStorage.getItem(ONIZLEME_ANAHTARI) === "1"; } catch { return false; }
 }

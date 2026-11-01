@@ -2,21 +2,20 @@
   {
     "id": "2026-11-01-a",
     "tarih": "1 Kasım 2026",
-    "baslik": "Editörler için sade Stüdyo",
+    "baslik": "Yeni Stüdyo görünümü",
     "bolumler": [
       {
-        "ad": "Editörler",
+        "ad": "Herkes",
         "maddeler": [
-          "Açılışta Bugün ekranı: sana atanan haberler, yarım taslakların ve onaydakiler tek yerde.",
+          "Solda ikonlu menü, telefonda alt çubuk; açılışta Bugün ekranı.",
           "Haber yazarken rehber adım adım neye dikkat edeceğini gösteriyor; menüden yeniden açılır.",
-          "Video çekenler telefonda içerik türüne göre çekim kontrol listesi görüyor."
+          "Çekim listesi: içerik türünü seç, adımları telefonda işaretle."
         ]
       },
       {
         "ad": "Yöneticiler",
         "maddeler": [
-          "Görünüm değişmedi; profil menüsünden editör görünümünü deneyebilirsin.",
-          "Ekip → Yönetim'de herkesin işlerini (haber, video, tasarım, sosyal) seçebilirsin."
+          "Site, Sistem ve Yönetim gibi bölümler yalnız yöneticilerde; profil menüsünden editörün gördüğünü deneyebilirsin."
         ]
       }
     ]

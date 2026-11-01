@@ -8,8 +8,8 @@ import Duzenle from "../site/Duzenle";
 import Rehber, { HABER_ADIMLARI } from "./Rehber";
 import "../site/site.css";
 
-// Editörün kendi haberleri (1 Kasım 2026): yalnız onun açtığı taslaklar (workflow.ownerUser). Haber yazma ekranı Site modülünün haber
-// editörüdür (Duzenle), üstünde ilk giriş rehberi açılır. Yeni haber editör görünümünden açılınca sahibi kendiliğinden o olur.
+// Taslaklar (1 Kasım 2026): sitedeki taslak ve incelemedeki haberler, herkesinki (kullanıcı: "sahiplikleri kaldır"). Haber yazma ekranı
+// Site modülünün haber editörüdür (Duzenle), üstünde ilk giriş rehberi açılır.
 
 let benOnbellek: Promise<PanelKullanici | null> | null = null;
 export function usePanelKullanici() {
@@ -21,18 +21,13 @@ export function usePanelKullanici() {
 
 export const kontrolSayisi = (x: Icerik) => Object.values(((x.workflow?.checklist ?? {}) as Record<string, boolean>)).filter(Boolean).length;
 const zaman = (s?: string) => { if (!s) return ""; const f = (Date.now() - +new Date(s)) / 6e4; return f < 60 ? `${Math.max(1, Math.round(f))} dk önce` : f < 1440 ? `${Math.round(f / 60)} sa önce` : new Date(s).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }); };
-const sahibim = (id: number) => ({ ekle: (p: URLSearchParams, o: string) => p.set(`${o}[workflow.ownerUser][equals]`, String(id)) });
-
-export async function benimTaslaklarim(k: PanelKullanici) {
-  const [t, i] = await Promise.all([api.liste("news", "taslak", "", 1, sahibim(k.id)), api.liste("news", "incelemede", "", 1, sahibim(k.id))]);
+export async function taslaklar() {
+  const [t, i] = await Promise.all([api.liste("news", "taslak", ""), api.liste("news", "incelemede", "")]);
   const tek = new Map([...t.docs, ...i.docs].map((x) => [x.id, x]))
   return [...tek.values()].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
 }
 
-export async function yeniHaber(k: PanelKullanici) {
-  const r = await api.istekYap<{ doc: { id: number } }>("/news?draft=true&depth=0", { method: "POST", body: JSON.stringify({ title: "", _status: "draft", workflow: { state: "taslak", ownerUser: k.id } }) });
-  return r.doc.id;
-}
+export const yeniHaber = () => api.yeniTaslak("news").then((d) => d.id);
 
 /** Haber yazma ekranı: id verilirse o taslak, "yeni" ise yeni taslak açılır */
 export function HaberYaz({ id }: { id: number | "yeni" }) {
@@ -41,13 +36,13 @@ export function HaberYaz({ id }: { id: number | "yeni" }) {
   const toast = useToast(), git = useNavigate();
   useEffect(() => {
     if (id !== "yeni" || !kullanici || acik) return;
-    yeniHaber(kullanici).then((x) => { setAcik(x); git(`/yaz/${x}`, { replace: true }); }).catch((e) => toast((e as Error).message));
+    yeniHaber().then((x) => { setAcik(x); git(`/yaz/${x}`, { replace: true }); }).catch((e) => toast((e as Error).message));
   }, [id, kullanici, acik, git, toast]);
   if (hata) return <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
   if (kullanici === null) return <SiteYetkisiYok />;
   if (!kullanici || !acik) return <div className="muted">Hazırlanıyor…</div>;
   return <>
-    <Duzenle key={acik} k="news" id={acik} kullanici={kullanici} kapat={() => git("/taslaklarim")} ac={(x) => git(`/yaz/${x}`)} />
+    <Duzenle key={acik} k="news" id={acik} kullanici={kullanici} kapat={() => git("/taslaklar")} ac={(x) => git(`/yaz/${x}`)} />
     <Rehber ad="haber-yaz" adimlar={HABER_ADIMLARI} />
   </>;
 }
@@ -58,18 +53,18 @@ export default function Taslaklarim() {
   const { kullanici, hata } = usePanelKullanici();
   const [liste, setListe] = useState<Icerik[] | null>(null);
   const git = useNavigate();
-  const yukle = useCallback(() => { if (kullanici) benimTaslaklarim(kullanici).then(setListe).catch(() => setListe([])); }, [kullanici]);
+  const yukle = useCallback(() => { if (kullanici) taslaklar().then(setListe).catch(() => setListe([])); }, [kullanici]);
   useEffect(yukle, [yukle]);
   if (hata) return <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
   if (kullanici === null) return <SiteYetkisiYok />;
   return (
     <div className="ed-sayfa">
       <div className="ed-bas">
-        <div><span className="ed-ust">KENDİ HABERLERİN</span><h1>Taslaklarım</h1></div>
+        <div><span className="ed-ust">TASLAK VE İNCELEMEDE</span><h1>Taslaklar</h1></div>
         <button className="btn ed-ana" onClick={() => git("/yaz/yeni")}><Ikon ad="plus" />Yeni haber yaz</button>
       </div>
       {!liste ? <div className="muted">Yükleniyor…</div> : !liste.length ? (
-        <div className="ed-bos"><Ikon ad="taslak" /><b>Henüz taslağın yok</b><span>İlk haberini yazmaya başla; rehber adım adım gösterecek.</span><button className="btn" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Haber yaz</button></div>
+        <div className="ed-bos"><Ikon ad="taslak" /><b>Bekleyen taslak yok</b><span>Yeni bir haber yazmaya başla; rehber adım adım gösterecek.</span><button className="btn" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Haber yaz</button></div>
       ) : (
         <div className="ed-liste">
           {liste.map((x) => (

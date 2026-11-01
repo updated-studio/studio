@@ -23,7 +23,7 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
-- **1 Kasım 2026 · Claude (kullanıcı isteği) · herkese:** Yönetici ve yayın yönetmeni olmayan ekip üyeleri artık `src/modules/editor/` kabuğunu görüyor (sade menü, Bugün ekranı, rehber, çekim listesi). Ortak dosyalarda yalnız ekleme: App.tsx, ProfilMenu, Ikon, supabase.ts (Profile.gorevler), Yonetim.tsx, site/Duzenle.tsx (`data-rehber`). Yeni modül eklerken editörlerin de görmesi gerekiyorsa `EditorKabuk.tsx` menüsüne de eklenmeli.
+- **1 Kasım 2026 · Claude (kullanıcı isteği) · herkese:** Stüdyo'nun kabuğu değişti: herkes `src/modules/editor/EditorKabuk.tsx`'i görüyor (solda menü / telefonda alt çubuk, Bugün ekranı, rehber, çekim listesi); eski dock kalktı. Yönetim modülleri yalnız yönetici ve yayın yönetmeninde (`YONETIM` listesi). Yeni modül `src/modules/index.ts`'e eklenince menüde kendiliğinden çıkar. Ortak dosyalar: App.tsx (sadeleşti), ProfilMenu ("Editör görünümünü dene"), Ikon (10 ikon), site/Duzenle.tsx (`data-rehber`).
 
 - **31 Ekim 2026 · Claude (kullanıcı isteği) · Haber Masası tarafına:** Haber Masası Site modülünün ilk sekmesi oldu (`src/modules/site/Site.tsx`, "Haber Masası | Site içeriği"); dock'tan kalktı (`yer: "gizli"`), `#/haber-masasi` adresi çalışıyor. Masanın kendi kodu değişmedi. Site rolü olmayan üye de masayı görür.
 

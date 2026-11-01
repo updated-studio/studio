@@ -128,3 +128,8 @@
   .ed-hizli .btn.ed-ana { justify-content: center; padding: 0 12px; }
   .ed-cekim-alt { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
+.ed-uyarilar { display: flex; flex-direction: column; gap: 10px; padding: 10px 32px 0; max-width: 1240px; width: 100%; margin: 0 auto; }
+.ed-uyarilar:empty { display: none; }
+.ed-tamam { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+@media (max-width: 900px) { .ed-uyarilar { padding: 8px 16px 0; } }
+.ed-cekim .ed-cekim-alt { position: static; background: none; } /* liste maddelerinin üstüne binmesin */
