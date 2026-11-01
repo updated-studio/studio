@@ -59,7 +59,7 @@ export function SimgeTanimlari() {
       <defs>
         <linearGradient id="s-ana" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: "var(--s-ana-ust)" }} /><stop offset="1" style={{ stopColor: "var(--s-ana-alt)" }} /></linearGradient>
         <linearGradient id="s-mavi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7FA8FF" /><stop offset="1" stopColor="#1D4ED8" /></linearGradient>
-        <linearGradient id="s-cam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#D6E4FF" /><stop offset="1" stopColor="#5B8DEF" /></linearGradient>
+        <linearGradient id="s-cam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: "var(--s-cam-ust)" }} /><stop offset="1" style={{ stopColor: "var(--s-cam-alt)" }} /></linearGradient>
         <linearGradient id="s-gece" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: "var(--s-gece-ust)" }} /><stop offset="1" style={{ stopColor: "var(--s-gece-alt)" }} /></linearGradient>
         <linearGradient id="s-parlak" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" stopOpacity=".55" /><stop offset=".45" stopColor="#FFFFFF" stopOpacity=".08" /><stop offset=".5" stopColor="#FFFFFF" stopOpacity="0" /></linearGradient>
         <linearGradient id="s-beyaz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#DCE6FF" /></linearGradient>
