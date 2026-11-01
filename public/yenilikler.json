@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-11-01-a",
+    "tarih": "1 Kasım 2026",
+    "baslik": "Editörler için sade Stüdyo",
+    "bolumler": [
+      {
+        "ad": "Editörler",
+        "maddeler": [
+          "Açılışta Bugün ekranı: sana atanan haberler, yarım taslakların ve onaydakiler tek yerde.",
+          "Haber yazarken rehber adım adım neye dikkat edeceğini gösteriyor; menüden yeniden açılır.",
+          "Video çekenler telefonda içerik türüne göre çekim kontrol listesi görüyor."
+        ]
+      },
+      {
+        "ad": "Yöneticiler",
+        "maddeler": [
+          "Görünüm değişmedi; profil menüsünden editör görünümünü deneyebilirsin.",
+          "Ekip → Yönetim'de herkesin işlerini (haber, video, tasarım, sosyal) seçebilirsin."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-10-31-b",
     "tarih": "31 Ekim 2026",
     "baslik": "Telefonda daha derli toplu Stüdyo",

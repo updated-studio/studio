@@ -164,7 +164,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
         {!canli && <button className="btn ghost sm" disabled={mesgul} onClick={onizle}>Önizle ↗</button>}
         {kullanici.role === "admin" && <a className="btn ghost sm" href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
         <button className="btn ghost sm" disabled={mesgul || kilitli || !degisti} onClick={() => kaydet()}>{degisti ? "Kaydet" : "Kaydedildi"}</button>
-        {!yayinda && !yayinci && doc.workflow?.state !== "incelemede" && <button className="btn sm" disabled={mesgul || kilitli} onClick={() => kaydet("incelemede", "İncelemeye gönderildi.")}>İncelemeye gönder</button>}
+        {!yayinda && !yayinci && doc.workflow?.state !== "incelemede" && <button className="btn sm" data-rehber="gonder" disabled={mesgul || kilitli} onClick={() => kaydet("incelemede", "İncelemeye gönderildi.")}>İncelemeye gönder</button>}
         {yayinci && <button className="btn sm" disabled={mesgul || kilitli} onClick={yayinla}>{yayinda ? "Değişiklikleri yayınla" : "Yayınla"}</button>}
       </div>
       {kilit.durum.tur === "baskasi" && (
@@ -178,25 +178,25 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
       <div className={canli ? "site-canli-duzen" : "site-canli-yok"}>
       <div className="site-izgara">
         <div className="site-form">
-          <label>Başlık <Sayac deger={f.title} sinir={sema.limit.title} />
+          <label data-rehber="baslik">Başlık <Sayac deger={f.title} sinir={sema.limit.title} />
             <input type="text" value={f.title} onChange={(e) => set("title", e.target.value)} />
             <span className="muted">Kim/ne + ne oldu + neden önemli.{yasak && <b className="site-uyari"> Başlıkta "{yasak}" kullanılmaz.</b>}</span>
           </label>
-          <label>Spot <Sayac deger={f.spot} sinir={sema.limit.spot} />
+          <label data-rehber="spot">Spot <Sayac deger={f.spot} sinir={sema.limit.spot} />
             <textarea rows={2} value={f.spot} onChange={(e) => set("spot", e.target.value)} />
             <span className="muted">Tek cümle.</span>
           </label>
-          <div className="site-kapak">
+          <div className="site-kapak" data-rehber="kapak">
             <span className="site-etiket">Kapak (16:9)</span>
             {kapak ? <img src={api.medyaAdres(kapak.sizes?.card?.url || kapak.url || "")} alt={kapak.alt ?? ""} /> : <div className="empty">Kapak yok</div>}
             {kapak && <span className="muted">{api.duzMetin(kapak.credit)}</span>}
             <button type="button" className="btn ghost sm" onClick={() => setKapakSec(true)}>{kapak ? "Kapağı değiştir" : "Kapak seç"}</button>
             {kapak && <KapakOnizleme m={kapak} degisti={setKapak} />}
           </div>
-          <label>Kısa cevap <span className="muted">(2–3 cümle; arama ve yapay zekâ yanıtları için)</span>
+          <label data-rehber="kisa">Kısa cevap <span className="muted">(2–3 cümle; arama ve yapay zekâ yanıtları için)</span>
             <textarea rows={3} value={f.shortAnswer} onChange={(e) => set("shortAnswer", e.target.value)} />
           </label>
-          <div>
+          <div data-rehber="metin">
             <span className="site-etiket">Metin</span>
             {bilinmeyen.length ? (
               <div className="msg err">Bu haberin metninde Stüdyo editörünün henüz tanımadığı öğe var ({bilinmeyen.join(", ")}); bozulmasın diye metni <a href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">panelde düzenle ↗</a>. Diğer alanlar burada düzenlenebilir.</div>
@@ -208,7 +208,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
         </div>
 
         <div className="site-form site-yan">
-          <label>Kategori
+          <label data-rehber="kategori">Kategori
             <select value={f.category ?? ""} onChange={(e) => set("category", e.target.value ? Number(e.target.value) : null)}>
               <option value="">Seç…</option>
               {kategoriler.map((x) => <option key={x.id} value={x.id}>{x.ad}</option>)}
@@ -234,7 +234,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
             <label>Açıklama <Sayac deger={f.seoDescription} sinir={sema.limit.spot} /><textarea rows={3} value={f.seoDescription} onChange={(e) => set("seoDescription", e.target.value)} /></label>
             {(() => { const a = alanYapisi.find((x) => x.name === "seo"); return a ? <Alanlar fs={a.fields ?? []} deger={(ek.seo as Record<string, unknown>) ?? {}} set={(v) => { setEk({ ...ek, seo: v }); degis(); }} haric={new Set(["title", "description"])} /> : null; })()}
           </details>
-          <div className="site-kontrol">
+          <div className="site-kontrol" data-rehber="kontrol">
             <span className="site-etiket">Yayın öncesi kontrol {eksik ? <span className="muted">· {eksik} eksik</span> : <span className="muted">· tamam</span>}</span>
             {sema.checklist.map(([a, metin]) => (
               <label key={a} className="site-kutu"><input type="checkbox" checked={!!f.checklist[a]} onChange={(e) => set("checklist", { ...f.checklist, [a]: e.target.checked })} /> {metin}</label>

@@ -15,6 +15,7 @@ export type Profile = {
   org: string;
   is_admin: boolean;
   site_rol: string; // sitedeki rol (shared/siteRolleri.ts); "yok" = sitede yetkisi yok
+  gorevler?: string[] | null; // 0061: Stüdyo işleri (haber, video, tasarim, sosyal); boşsa site rolünden çıkarılır (modules/editor/gorev.ts)
   notify_email: boolean;
   avatar_url: string | null;
   emoji: string | null;

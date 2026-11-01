@@ -41,6 +41,7 @@ export default function ProfilMenu({ moduller }: { moduller: Modul[] }) {
                 <Ikon ad={m.ikon} />{m.ad}
               </NavLink>
             ))}
+            {profile.is_admin && <button role="menuitem" onClick={() => { try { localStorage.setItem("editor-gorunumu", "1"); } catch { /* */ } location.hash = "#/bugun"; location.reload(); }}><Ikon ad="profil" />Editör görünümünü dene</button>}
             <button role="menuitem" onClick={() => sb.auth.signOut()}><Ikon ad="cikis" />Çıkış</button>
           </div>
         </div>

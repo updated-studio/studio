@@ -8,6 +8,7 @@ import { hataMetni, useToast } from "../../shared/toast";
 import { useVeri } from "../../shared/veri";
 import { adOf, bosGunler, KATEGORILER } from "./ortak";
 import { SITE_ROLLERI, siteRolAdi } from "../../shared/siteRolleri";
+import { GOREVLER, gorevleri } from "../editor/gorev";
 
 type Sonuc = PromiseLike<{ error: { message: string } | null }>;
 
@@ -131,6 +132,13 @@ function Yonetim({ bitti }: { bitti: (isler?: boolean) => void }) {
                   {SITE_ROLLERI.map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}
                 </select>
               </label>
+              {/* Stüdyo'daki işleri (0061): editör görünümünde menü bunlara göre; birden çok seçilebilir */}
+              <span className="row" style={{ gap: 4 }} role="group" aria-label={`${m.name} işleri`}>
+                {GOREVLER.map(([k, ad]) => { const g = gorevleri(m), on = g.includes(k); return (
+                  <button key={k} className={on ? "btn sm" : "btn ghost sm"} aria-pressed={on} title="Editör görünümünde bu işin bölümleri açılır"
+                    onClick={() => { const y = on ? g.filter((x) => x !== k) : [...g, k]; if (!y.length) return; yap(sb.from("profiles").update({ gorevler: y }).eq("id", m.id), "İşleri güncellendi."); }}>{ad}</button>
+                ); })}
+              </span>
               {m.id !== uid && <button className="btn ghost sm" onClick={() => yap(sb.from("profiles").update({ is_admin: !m.is_admin }).eq("id", m.id))}>{m.is_admin ? "Yöneticiliği kaldır" : "Yönetici yap"}</button>}
             </div>
           ))}

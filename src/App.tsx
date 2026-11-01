@@ -13,8 +13,18 @@ import Yenilikler from "./shared/Yenilikler";
 import YayinKuyrugu from "./shared/YayinKuyrugu";
 import { ToastProvider } from "./shared/toast";
 import { VeriProvider } from "./shared/veri";
+import { lazy } from "react";
+import { editorGorunumu } from "./modules/editor/gorev";
+// Editör görünümü (1 Kasım 2026): yönetici olmayan herkes sade, işine göre menülü ekranı görür; yönetici bu kabuğu görür
+const EditorKabuk = lazy(() => import("./modules/editor/EditorKabuk"));
 
 function Kabuk() {
+  const { profile } = useAuth();
+  if (editorGorunumu(profile)) return <Suspense fallback={<div className="wrap muted">Yükleniyor…</div>}><EditorKabuk /></Suspense>;
+  return <YoneticiKabuk />;
+}
+
+function YoneticiKabuk() {
   const { profile } = useAuth();
   const gorunen = MODULLER.filter((m) => !m.sadeceYonetici || profile?.is_admin);
   const dock = gorunen.filter((m) => (m.yer ?? "dock") === "dock");

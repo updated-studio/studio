@@ -29,6 +29,17 @@ const P: Record<string, string> = {
   okuma: "M3 5h6a3 3 0 013 3v12a2 2 0 00-2-2H3zM21 5h-6a3 3 0 00-3 3v12a2 2 0 012-2h7z",
   guncel: "M20 12a8 8 0 11-2.34-5.66M20 4v5h-5",
   ara: "M11 18a7 7 0 100-14 7 7 0 000 14zM20 20l-4-4",
+  // Editör görünümü (1 Kasım 2026)
+  bugun: "M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z",
+  yaz: "M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4",
+  taslak: "M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6",
+  masa: "M4 13l3-8h10l3 8v6H4zM4 13h5l1 2h4l1-2h5",
+  liste: "M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2",
+  yardim: "M12 21a9 9 0 100-18 9 9 0 000 18zM9.5 9a2.5 2.5 0 113.5 2.3c-.7.4-1 1-1 1.7M12 17h.01",
+  gonder: "M4 12l16-8-6 16-2-7z",
+  uyari: "M12 4l9 16H3zM12 10v4M12 17h.01",
+  ileri: "M9 5l7 7-7 7",
+  geri: "M15 5l-7 7 7 7",
 };
 export const IKONLAR = P;
 

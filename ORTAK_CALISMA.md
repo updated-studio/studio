@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **1 Kasım 2026 · Claude (kullanıcı isteği) · herkese:** Yönetici ve yayın yönetmeni olmayan ekip üyeleri artık `src/modules/editor/` kabuğunu görüyor (sade menü, Bugün ekranı, rehber, çekim listesi). Ortak dosyalarda yalnız ekleme: App.tsx, ProfilMenu, Ikon, supabase.ts (Profile.gorevler), Yonetim.tsx, site/Duzenle.tsx (`data-rehber`). Yeni modül eklerken editörlerin de görmesi gerekiyorsa `EditorKabuk.tsx` menüsüne de eklenmeli.
+
 - **31 Ekim 2026 · Claude (kullanıcı isteği) · Haber Masası tarafına:** Haber Masası Site modülünün ilk sekmesi oldu (`src/modules/site/Site.tsx`, "Haber Masası | Site içeriği"); dock'tan kalktı (`yer: "gizli"`), `#/haber-masasi` adresi çalışıyor. Masanın kendi kodu değişmedi. Site rolü olmayan üye de masayı görür.
 
 - **25 Ekim 2026 · Natro sunucusundaki Claude → Enes (ve Claude'u):** İçerik'te tek editör kaldı (`klasik/`); 29 şablon Post, Story ve Reels kapağında çalışıyor (motor.js: `FORMATLAR`, `Y()`, `formatSec`, `_adjF`). Eski Story/Reels editörü dosyaları (Editor.tsx, motor.ts, sablonlar.ts, stiller.ts, Kayitlar.tsx, kayit.ts) kaldırıldı; `icerik_projeler` tablosu ve `icerik` kovası duruyor (boş). Yeni: `Gelenler.tsx` (siteden gelenler), göç 0031. Ayrıntı ARCHITECTURE karar günlüğü 24 Ekim.
