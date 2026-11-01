@@ -11,14 +11,16 @@ import UIKit
 /// Baz ISO: etkin biçimin en düşük ISO'su (Android'de SENSOR_INFO_SENSITIVITY_RANGE alt sınırı ile aynı mantık).
 final class Kamera: NSObject, ObservableObject {
     enum Mod: String, CaseIterable {
-        // UZMAN (eski PRO MODLAR; Fatih 31 Ekim: "kamera zaten Pro") şeridin en sağında; ham değer kayıtlı ayarlar için aynı kalır
+        // MODLAR (eski PRO MODLAR → UZMAN → MODLAR, Fatih 1 Kasım) şeridin en sağında; ham değer kayıtlı ayarlar için aynı kalır
         case timelapse = "TIMELAPSE", video = "VİDEO", foto = "FOTO", portre = "PORTRE", pro = "PRO MODLAR"
         var foto: Bool { self == .foto || self == .pro || self == .portre }
         /// Mod şeridinde görünen ad; yan tutuşta daha kısa (Fatih: "yatayda isimler uzun kalıyor")
-        var ad: String { self == .pro ? "UZMAN" : rawValue }
+        var ad: String { self == .pro ? "MODLAR" : rawValue }
         var kisa: String { self == .timelapse ? "TL" : ad }
     }
     enum Lens { case ultra, genis, tele }
+    /// Otomatik odak davranışı (Fatih 1 Kasım: "kamera nereye odaklanacağını bizden de bilgi alarak yapmalı")
+    enum OdakModu: String, CaseIterable { case surekli = "AF-C", tek = "AF-S", yuz = "Yüz" }
     enum Flas: Int { case kapali, oto, acik, fener }
 
     static let ud = UserDefaults.standard
@@ -98,6 +100,12 @@ final class Kamera: NSObject, ObservableObject {
     @Published var mercekUyari = Kamera.ud.object(forKey: "k.mercekUyari") as? Bool ?? true { didSet { Kamera.ud.set(mercekUyari, forKey: "k.mercekUyari") } }
     var pusSayac = 0
     var sonMercekUyari = Date.distantPast
+    /// AF-C: dokunulan noktayı izler · AF-S: dokununca bir kez odaklar, sabit kalır · Yüz: yüz bulunca ona odaklanır
+    @Published var odakModu = OdakModu(rawValue: Kamera.ud.string(forKey: "k.odakModu") ?? "") ?? .surekli {
+        didSet { Kamera.ud.set(odakModu.rawValue, forKey: "k.odakModu"); kuyruk.async { self.yuzCiktiAyarla() } }
+    }
+    /// Pro denetimler (ISO, enstantane, beyaz denge, elle odak, göstergeler, LUT, kodek): basit kullanıcıda gizli
+    @Published var proDenetim = Kamera.ud.bool(forKey: "k.proDenetim") { didSet { Kamera.ud.set(proDenetim, forKey: "k.proDenetim") } }
     @Published var deklansorSesi = Kamera.ud.object(forKey: "k.deklansor") as? Bool ?? true { didSet { Kamera.ud.set(deklansorSesi, forKey: "k.deklansor") } }
     @Published var sesKapatilabilir = false
     // Video
@@ -472,7 +480,7 @@ final class Kamera: NSObject, ObservableObject {
         kayitImza = ""
         if mod == .video { kayitBicimiUygula() }
         kareCiktiAyarla()
-        yuzCikti.metadataObjectTypes = mod == .portre && yuzCikti.availableMetadataObjectTypes.contains(.face) ? [.face] : []
+        yuzCiktiAyarla()
 
         // Fotoğraf çözünürlüğü ve RAW
         let boyutlar = Kamera.fotoBoyutlariSuz(d.activeFormat.supportedMaxPhotoDimensions)
@@ -741,7 +749,12 @@ final class Kamera: NSObject, ObservableObject {
     /// Seçilen enstantane tek karede verilemiyor: kareler birleştirilecek
     var uzunPozlama: Bool { secilenEnst.map { $0 > enUzunEnst + 0.01 } ?? false }
     func evSec(_ v: Float) { ev = v; kuyruk.async { self.normalUygula() } }
-    func bdSec(_ k: Float?) { bd = k; if k == nil { renkTon = 0 }; kuyruk.async { self.normalUygula() } }
+    func bdSec(_ k: Float?) {
+        // Otodan elle geçerken o anki ton korunur: Oto'da 4000 K görünen sahne, elle 4000 K seçilince aynı kalır (Fatih 1 Kasım)
+        if k != nil, bd == nil, let d = cihaz { renkTon = min(max(d.temperatureAndTintValues(for: d.deviceWhiteBalanceGains).tint, -150), 150) }
+        bd = k; if k == nil { renkTon = 0 }
+        kuyruk.async { self.normalUygula() }
+    }
     func odakSec(_ o: Float?) { odakKonum = o; kuyruk.async { self.cihazUyumla(); self.normalUygula() } }
 
     func flasDegistir() {
@@ -781,7 +794,10 @@ final class Kamera: NSObject, ObservableObject {
         }
         if let k = bd, d.isWhiteBalanceModeSupported(.locked) {
             var g = d.deviceWhiteBalanceGains(for: AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: k, tint: renkTon))
+            // Kazançlar oranı bozulmadan ölçeklenir (en küçüğü 1); tek tek kırpmak rengi yeşil/macentaya kaydırıyordu (Fatih 1 Kasım)
             let ust = d.maxWhiteBalanceGain
+            let enKucuk = min(g.redGain, g.greenGain, g.blueGain)
+            if enKucuk > 0, enKucuk < 1 { g.redGain /= enKucuk; g.greenGain /= enKucuk; g.blueGain /= enKucuk }
             g.redGain = min(max(g.redGain, 1), ust); g.greenGain = min(max(g.greenGain, 1), ust); g.blueGain = min(max(g.blueGain, 1), ust)
             d.setWhiteBalanceModeLocked(with: g)
         } else if d.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
@@ -845,6 +861,12 @@ final class Kamera: NSObject, ObservableObject {
         }
     }
 
+    /// Kuyrukta: yüz algılama Portre'de ve "Yüz" odak modunda açık
+    func yuzCiktiAyarla() {
+        let ac = (mod == .portre || odakModu == .yuz) && yuzCikti.availableMetadataObjectTypes.contains(.face)
+        yuzCikti.metadataObjectTypes = ac ? [.face] : []
+    }
+
     func odakla(_ nokta: CGPoint) {
         if aeafKilit { DispatchQueue.main.async { self.aeafKilit = false } }
         kuyruk.async {
@@ -853,7 +875,8 @@ final class Kamera: NSObject, ObservableObject {
             let elleOdak = pro ? (self.proAyar.odak == .sonsuz || self.proAyar.odak == .iki) : self.odakKonum != nil
             if !elleOdak, d.isFocusPointOfInterestSupported {
                 d.focusPointOfInterest = nokta
-                d.focusMode = pro && self.proAyar.odak == .afc ? .continuousAutoFocus : .autoFocus
+                let surekli = pro ? self.proAyar.odak == .afc : self.odakModu != .tek
+                d.focusMode = surekli && d.isFocusModeSupported(.continuousAutoFocus) ? .continuousAutoFocus : .autoFocus
             }
             if !pro, self.secilenIso == nil, self.secilenEnst == nil, d.isExposurePointOfInterestSupported { d.exposurePointOfInterest = nokta; d.exposureMode = .continuousAutoExposure }
             d.unlockForConfiguration()
@@ -1413,7 +1436,7 @@ extension Kamera: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDa
 extension Kamera: AVCaptureMetadataOutputObjectsDelegate {
     /// PORTRE: en büyük yüze odak ve pozlama (kuyrukta, saniyede en çok iki kez)
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        guard mod == .portre, !konuSecili, Date().timeIntervalSince(sonYuzOdak) > 0.5,
+        guard mod == .portre || (odakModu == .yuz && mod != .pro), !konuSecili, !aeafKilit, Date().timeIntervalSince(sonYuzOdak) > 0.5,
               let y = metadataObjects.filter({ $0.type == .face }).max(by: { $0.bounds.width * $0.bounds.height < $1.bounds.width * $1.bounds.height }),
               let d = cihaz, (try? d.lockForConfiguration()) != nil else { return }
         sonYuzOdak = Date()

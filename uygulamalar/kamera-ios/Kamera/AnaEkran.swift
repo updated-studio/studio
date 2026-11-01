@@ -28,6 +28,11 @@ struct AnaEkran: View {
     @State private var duzenleme = false
     /// "Dok" tasarımı (Fatih 31 Ekim 19:54 "bir de böyle deneyelim"): sabitlenenler deklanşörün üstünde tek cam şeritte
     @AppStorage("k.dok") private var dok = true
+    /// Zoom tekerleği yalnız mercek düğmelerinde kaydırınca / basılı tutunca görünür, bırakınca kaybolur (Fatih 1 Kasım)
+    @State private var zoomGoster = false
+    @State private var zoomBas: CGFloat?
+    @State private var zoomDurak: CGFloat?
+    @State private var zoomGizle: Task<Void, Never>?
     @State private var yedekFavoriler: [Favori] = []
     @State private var uyariMod: ProMod?
     @State private var arayuz: UIInterfaceOrientation = .portrait
@@ -165,11 +170,12 @@ struct AnaEkran: View {
                 Spacer(minLength: 0)
                 if let b = kamera.bildirim { bildirimKutusu(b) }
                 if kamera.mod == .timelapse && panel == nil { sureSira(dikey: false).padding(.bottom, 14) }
+                if panel == nil { aiOneri.padding(.bottom, 12) }
                 if panel == nil {
                     if let f = acikSatir { FavoriSatir(f: f, kamera: kamera).padding(.bottom, 14) } else {
                         VStack(spacing: 10) {
                             // Fatih 31 Ekim (9): pozlama cetveli yerine zoom tekerleği; merceklerde kesin optik geçiş
-                            if !kamera.onde { ZoomTekerlegi(kamera: kamera).yardimBalonu(yardim, "Kaydır: yakınlaştır") }
+                            if !kamera.onde { zoomTekeri }
                             if kamera.mod == .portre { sanalDiyaframSirasi }
                             mercekler(dikey: false)
                         }
@@ -177,10 +183,7 @@ struct AnaEkran: View {
                     }
                 }
                 if dok && panel == nil && !duzenleme { dokSeridi.padding(.bottom, 14) }
-                // Apple Kamera gibi: mod şeridi tam genişlikte (VLOG dahil hepsi okunur), altında son çekim · deklanşör · ön/arka
-                if panel == nil {
-                    modSecici(dikey: false, genislik: g.size.width).padding(.bottom, 8)
-                }
+                // Her modda aynı düzen (Fatih 1 Kasım): deklanşör sırası üstte, mod şeridi en altta (tam genişlikte, VLOG dahil)
                 HStack(spacing: 0) {
                     sonCekim
                     Spacer()
@@ -191,7 +194,10 @@ struct AnaEkran: View {
                     cevirDugme
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, panel == nil ? 14 : 10)
+                .padding(.bottom, panel == nil ? 10 : 10)
+                if panel == nil {
+                    modSecici(dikey: false, genislik: g.size.width).padding(.bottom, 6)
+                }
                 if let p = panel {
                     panelKabi(p, enYuksek: g.size.height * 0.48)
                 }
@@ -227,7 +233,7 @@ struct AnaEkran: View {
                         if panel == nil && acikSatir == nil {
                             HStack(alignment: .bottom) {
                                 VStack(spacing: 8) {
-                                    if !kamera.onde { ZoomTekerlegi(kamera: kamera) }
+                                    if !kamera.onde { zoomTekeri }
                                     mercekler(dikey: false)
                                 }
                                 .padding(.leading, 16)
@@ -335,7 +341,7 @@ struct AnaEkran: View {
                         .font(.subheadline.weight(.bold))
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(Capsule().fill(Color(red: 18 / 255, green: 20 / 255, blue: 24 / 255).opacity(0.72)))
-                        .position(x: tam.size.width / 2, y: tam.size.height * 0.62)
+                        .position(x: tam.size.width / 2, y: tam.size.height * (tam.size.height > tam.size.width ? 0.42 : 0.5))
                         .allowsHitTesting(false)
                 }
             }
@@ -542,13 +548,16 @@ struct AnaEkran: View {
         if !duzenleme, !kamera.favoriler.isEmpty {
             HStack(spacing: 10) {
                 // Biçim zaten sağ üstte (simgeli); burada tekrarlanmaz
-                ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) }) { f in
+                ForEach(kamera.gorunenSabitler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) }) { f in
                     // Fatih 31 Ekim (26): dokununca titreşimle şeffaf (sistem camı) açılır menü; seçenekler, Ayrıntılı…, sabitlemeyi kaldır
                     Menu {
                         HizliMenu(f: f, kamera: kamera, ayrinti: { ayrintiAc(f) })
                     } label: {
-                        SabitKapsul(f: f, kamera: kamera)
+                        // Menü etiketi seçimden sonra yenilenmiyordu (Fatih 1 Kasım: ISO pencere kapanana kadar göstergede görünmüyor);
+                        // simge menünün dışında çizilir, menü üstünde görünmez dokunma alanı
+                        Color.clear.frame(width: 40, height: 36).contentShape(Rectangle())
                     }
+                    .background(SabitKapsul(f: f, kamera: kamera))
                     .menuOrder(.fixed)
                     .simultaneousGesture(TapGesture().onEnded { UIImpactFeedbackGenerator(style: .light).impactOccurred() })
                     .overlay(alignment: .bottom) { if acikSatir == f || panel == .favori(f) { Circle().fill(Tema.sari).frame(width: 4, height: 4).offset(y: 7) } }
@@ -572,12 +581,13 @@ struct AnaEkran: View {
                 .accessibilityLabel("Flaş")
                 Rectangle().fill(Color.white.opacity(0.16)).frame(width: 0.5, height: 22).padding(.horizontal, 4)
             }
-            ForEach(kamera.favoriler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) && $0 != .flas }) { f in
+            ForEach(kamera.gorunenSabitler.filter { $0.uygun(kamera.mod) && !(kamera.mod == .pro ? [.cozunurluk] : AnaEkran.ustteGorunen).contains($0) && $0 != .flas }) { f in
                 Menu {
                     HizliMenu(f: f, kamera: kamera, ayrinti: { ayrintiAc(f) })
                 } label: {
-                    SabitKapsul(f: f, kamera: kamera)
+                    Color.clear.frame(width: 40, height: 36).contentShape(Rectangle())
                 }
+                .background(SabitKapsul(f: f, kamera: kamera))
                 .menuOrder(.fixed)
                 .simultaneousGesture(TapGesture().onEnded { UIImpactFeedbackGenerator(style: .light).impactOccurred() })
                 .overlay(alignment: .bottom) {
@@ -662,6 +672,11 @@ struct AnaEkran: View {
 
     /// Kısayola ya da Denetimler dairesine dokununca
     private func kisayolDokun(_ f: Favori) {
+        guard kamera.destekli(f) else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            kamera.bildirim = "\(f.ad): bu telefonda desteklenmiyor"
+            return
+        }
         if f.anahtar { kamera.favoriDegistir(f); return }
         if FavoriSatir.satirli(f) {
             withAnimation(AnaEkran.yay) { panel = nil; acikSatir = acikSatir == f ? nil : f }
@@ -721,7 +736,14 @@ struct AnaEkran: View {
                 cip(Text(kamera.proMod.ozet(kamera.proAyar) + "  ›"), simge: kamera.proMod.simge, renk: Tema.sari) { panelAc(.proAyar) }
                     .yardimBalonu(yardim, "Dokun: ISO, S, WB, mercek")
             }
-            // AI Kadraj: düşünürken yalnız küçük bir işaret; öneri oturunca tek öneri, tetik kelimeye dokununca uygulanır
+            // Dikeyde öneri alttaki düğmelerin üstünde (aiOneri); yan tutuşta burada
+            if yatay { aiOneri }
+        }
+    }
+
+    /// AI Kadraj: düşünürken yalnız küçük bir işaret; öneri oturunca tek öneri, tetik kelimeye dokununca uygulanır.
+    /// Fatih 1 Kasım: önünde hiçbir şey olmasın, düğmelerin biraz üstünde
+    @ViewBuilder private var aiOneri: some View {
             if kamera.asistanAcik && !kamera.kayitta {
                 if let o = kamera.kompOneri {
                     cip(Text("Kadraj: ") + Text(o.tur.ad).bold().foregroundColor(AnaEkran.mavi), simge: "sparkles", renk: AnaEkran.mavi) { kamera.kompOneriUygula() }
@@ -733,7 +755,6 @@ struct AnaEkran: View {
                         .transition(.opacity)
                 }
             }
-        }
     }
 
     private func cip(_ yazi: Text, simge: String, renk: Color, eylem: @escaping () -> Void) -> some View {
@@ -777,8 +798,48 @@ struct AnaEkran: View {
         }
         .padding(dikey ? 0 : 3)
         .background { if !dikey { Capsule().fill(Color.black.opacity(0.28)).overlay(Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)) } }
+        .simultaneousGesture(merceklerKaydir(dikey: dikey))
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+            UIImpactFeedbackGenerator(style: .light).impactOccurred(); zoomEtkilesim(true); zoomEtkilesim(false)
+        })
         .disabled(kamera.kayitta || kamera.proCalisiyor)
         .yardimBalonu(yardim, kamera.mod == .pro ? "Mercek (moda kaydedilir)" : "Mercek")
+    }
+
+    /// Yer hep ayrılır (mercekler kaymaz), tekerlek yalnız etkileşimde görünür
+    private var zoomTekeri: some View {
+        ZoomTekerlegi(kamera: kamera, etkilesim: { zoomEtkilesim($0) })
+            .opacity(zoomGoster ? 1 : 0)
+            .allowsHitTesting(zoomGoster)
+            .animation(.easeOut(duration: 0.2), value: zoomGoster)
+    }
+
+    private func zoomEtkilesim(_ suruyor: Bool) {
+        zoomGizle?.cancel()
+        if suruyor { if !zoomGoster { zoomGoster = true }; return }
+        zoomGizle = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if !Task.isCancelled { zoomGoster = false }
+        }
+    }
+
+    /// Mercek düğmeleri üzerinde kaydır: Apple Kamera gibi sürekli zoom (tekerlek açılır)
+    private func merceklerKaydir(dikey: Bool) -> some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { d in
+                zoomEtkilesim(true)
+                if zoomBas == nil { zoomBas = kamera.zoom }
+                let alt = kamera.zoomDuraklari.first ?? 1, ust = kamera.zoomUst
+                let yol: CGFloat = dikey ? d.translation.height : -d.translation.width
+                var z: CGFloat = (zoomBas ?? 1) * pow(2, yol / 70)
+                z = min(max(z, alt), ust)
+                if let durak = kamera.zoomDuraklari.first(where: { abs(log2($0) - log2(z)) < 0.06 }) {
+                    z = durak
+                    if zoomDurak != durak { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(); zoomDurak = durak }
+                } else { zoomDurak = nil }
+                kamera.yakinlastir(z, kaydir: true)
+            }
+            .onEnded { _ in zoomBas = nil; zoomEtkilesim(false) }
     }
 
     static func fmt(_ v: CGFloat) -> String {
@@ -1040,7 +1101,7 @@ struct AnaEkran: View {
 
     private func panelBaslik(_ p: Panel) -> String {
         switch p {
-        case .proKartlar: return "UZMAN"
+        case .proKartlar: return "MODLAR"
         case .proAyar: return kamera.proMod.ad.uppercased(with: Locale(identifier: "tr"))
         case .poz: return "POZLAMA"
         case .bd: return "BEYAZ DENGE"
@@ -1166,7 +1227,7 @@ struct AnaEkran: View {
         VStack(spacing: 14) {
             if duzenleme {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 14) {
-                    ForEach(Favori.gorunenler) { f in
+                    ForEach(Favori.gorunenler.filter { kamera.proDenetim || !$0.pro }) { f in
                         let secili = kamera.favoriler.contains(f)
                         Button { UISelectionFeedbackGenerator().selectionChanged(); withAnimation(AnaEkran.yay) { kamera.favoriAcKapa(f) } } label: {
                             DenetimDaire(f: f, kamera: kamera, kucuk: true, soluk: secili)
@@ -1182,7 +1243,7 @@ struct AnaEkran: View {
                 .buttonStyle(.plain)
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 16) {
-                    ForEach(Favori.gorunenler.filter { $0.uygun(kamera.mod) }) { f in
+                    ForEach(Favori.gorunenler.filter { $0.uygun(kamera.mod) && (kamera.proDenetim || !$0.pro) }) { f in
                         // Dokun: ayar; basılı tut: ana ekrana sabitle / kaldır (Fatih 31 Ekim: "sabitlemek ve kaldırmak daha kolay olsun")
                         DenetimDaire(f: f, kamera: kamera, sabit: kamera.favoriler.contains(f))
                             .contentShape(Rectangle())
@@ -1193,6 +1254,11 @@ struct AnaEkran: View {
                     }
                 }
                 HStack(spacing: 10) {
+                    kucukGecis(kamera.proDenetim ? "slider.horizontal.3" : "slider.horizontal.below.square.filled.and.square",
+                               kamera.proDenetim ? "Pro denetimler açık" : "Pro denetimler") {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        withAnimation(AnaEkran.yay) { kamera.proDenetim.toggle() }
+                    }
                     kucukGecis("gearshape", "Genel Ayarlar") { panel = nil; ayarlar = true }
                 }
             }
@@ -1430,6 +1496,8 @@ struct OdakKaresi: View {
 /// Değer ortada sarı; tekerlek parmakla birlikte kayar, çarpan ortadaki iğnenin altındadır
 struct ZoomTekerlegi: View {
     @ObservedObject var kamera: Kamera
+    /// true: kaydırılıyor, false: bırakıldı
+    var etkilesim: (Bool) -> Void = { _ in }
     @State private var bas: CGFloat?
     @State private var sonDurak: CGFloat?
     private let gen: CGFloat = 300
@@ -1471,6 +1539,7 @@ struct ZoomTekerlegi: View {
                                          .init(color: .black, location: 0.82), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 2).onChanged { d in
+                etkilesim(true)
                 if bas == nil { bas = kamera.zoom }
                 var z = (bas ?? 1) * pow(2, -d.translation.width / adim)
                 z = min(max(z, alt), ust)
@@ -1480,7 +1549,7 @@ struct ZoomTekerlegi: View {
                     if sonDurak != durak { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(); sonDurak = durak }
                 } else { sonDurak = nil }
                 kamera.yakinlastir(z, kaydir: true)
-            }.onEnded { _ in bas = nil })
+            }.onEnded { _ in bas = nil; etkilesim(false) })
         }
         .shadow(color: .black.opacity(0.5), radius: 2)
         .disabled(kamera.proCalisiyor || (kamera.kayitta && !kamera.sanalda))

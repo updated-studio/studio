@@ -67,6 +67,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ### 29 Ekim 2026
 
+- 02:30 (1 Kasım) Fatih cihazda denedi ("genel denemeler fena değil keyifli") ve 15 maddelik liste verdi (bellek: kamera-1kasim-liste). iOS 0.22.0: menü etiketi güncelleme, öneri çipi yeri, WB kazanç oranı + ton, desteklenmeyen = üstü çizili, gizli zoom tekerleği, köşe çentikleri, AF-C/AF-S/Yüz, MODLAR, Pro denetimler anahtarı, mod şeridi en altta. Android RC'de (Realme GT2 4K60 / ön 16 MP ölçerek açma). Android "ikili kayıt" ne demek Fatih'e soruldu.
 - 20:58 (31 Ekim) Fatih "Dok"u onayladı ("bir de böyle deneyelim"). iOS 0.21.0: sabitlenenler deklanşör üstünde cam şeritte (flaş · sabitlenenler · Denetimler oku), Ayarlar'dan eskisine dönülebilir. Android RC'de.
 - 20:00 (31 Ekim) Fatih: "vlog modülünde dikey kamera yan görünüyor, yan çevirince çalışmaya da bak". iOS 0.20.4: döndürme açısı bağlantı eklendikten sonra RotationCoordinator ile; yan tutuşta 16:9 Vlog. Yeni tasarım alternatifi "Dok" 2 görseli hazır (/mnt/project-files/kamera-onizleme/tasarim-dok.png), Fatih onayı bekleniyor.
 - 19:50 (31 Ekim) iOS 0.20.2: Vlog'a kayıt öncesi sayaç ve ön kamera penceresi köşe seçimi (19). 27 maddeden iPhone'da hepsi kodlandı, cihazda denenmedi. Sırada yeni tasarım alternatifi (önce 1-2 görsel).

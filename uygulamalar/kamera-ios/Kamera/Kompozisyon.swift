@@ -143,7 +143,8 @@ struct KompozisyonKatman: View {
             let iyiK = konu.flatMap { Kompozisyon.hedef(tur, yon: yon, oran: r.width / r.height, konu: $0, analiz: analiz) }?.tamam == true
             let dik = ekran.height > ekran.width, u: CGFloat = 16
             let sol = dik ? 20 : ekran.width * 0.08, sag = dik ? ekran.width - 20 : ekran.width * 0.78
-            let ust = ekran.height * (dik ? 0.19 : 0.18), alt = ekran.height * (dik ? 0.64 : 0.82)
+            // Üst bilgi şeridi (Multi Cam durumu, çipler) ve alttaki mercek / zoom düğmeleriyle çakışmasın (Fatih 1 Kasım)
+            let ust = ekran.height * (dik ? 0.25 : 0.22), alt = ekran.height * (dik ? 0.6 : 0.66)
             if alt - ust > 80 {
                 var p = Path()
                 for (x, y, sx, sy) in [(sol, ust, 1.0, 1.0), (sag, ust, -1.0, 1.0), (sol, alt, 1.0, -1.0), (sag, alt, -1.0, -1.0)] {

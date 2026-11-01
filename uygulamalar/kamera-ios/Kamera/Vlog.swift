@@ -258,7 +258,7 @@ struct ModSeridi: View {
                                 UISelectionFeedbackGenerator().selectionChanged()
                                 sec(ad)
                             } label: {
-                                Text(ad == "PRO MODLAR" ? "UZMAN" : ad).font(.system(size: 12, weight: .semibold)).tracking(1.4).lineLimit(1)
+                                Text(ad == "PRO MODLAR" ? "MODLAR" : ad).font(.system(size: 12, weight: .semibold)).tracking(1.4).lineLimit(1)
                                     .foregroundStyle(ad == secili ? Color.white : Tema.ikincil)
                                     .padding(.horizontal, 11).frame(height: 30)
                                     .background(Capsule().fill(ad == secili ? Color.white.opacity(0.12) : .clear))

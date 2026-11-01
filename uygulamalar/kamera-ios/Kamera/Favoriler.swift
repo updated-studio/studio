@@ -118,6 +118,14 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    /// Pro denetim (Fatih 1 Kasım: basit kullanıcı karışmasın): "Pro denetimler" kapalıyken gizli
+    var pro: Bool {
+        switch self {
+        case .iso, .enst, .bd, .odak, .lut, .zebra, .falseColor, .peaking, .histogram, .monokrom, .gostergeler, .kodek, .renk: return true
+        default: return false
+        }
+    }
+
     /// Dokununca hemen açılıp kapanan (panel açmayan)
     var anahtar: Bool {
         switch self {
@@ -128,6 +136,26 @@ enum Favori: String, CaseIterable, Identifiable, Codable {
 }
 
 extension Kamera {
+    /// Bu telefon ayarı kendi donanımıyla yapabiliyor mu (Fatih 1 Kasım: desteklenmiyorsa taklit etme, üstü çizili göster)
+    func destekli(_ f: Favori) -> Bool {
+        guard let d = cihaz else { return true }
+        switch f {
+        case .iso, .enst: return d.isExposureModeSupported(.custom)
+        case .bd: return d.isWhiteBalanceModeSupported(.locked)
+        case .odak: return elleOdakVar
+        case .flas: return flasVar
+        case .renk: return renkModlari.count > 1
+        case .sabitleme: return sabitlemeler.count > 1
+        default: return true
+        }
+    }
+
+    /// Ana ekranda görünen sabitlenenler (pro kapalıyken pro olanlar gizli; hiçbiri kalmazsa pozlama ve stil)
+    var gorunenSabitler: [Favori] {
+        let l = favoriler.filter { proDenetim || !$0.pro }
+        return l.isEmpty && !proDenetim ? [.ev, .stil] : l
+    }
+
     func favoriAcKapa(_ f: Favori) {
         if let i = favoriler.firstIndex(of: f) { favoriler.remove(at: i); return }
         guard favoriler.count < Favori.enCok else { bildirim = "En çok \(Favori.enCok) ayar sabitlenebilir."; return }
@@ -262,13 +290,20 @@ struct DenetimDaire: View {
                 }
             }
             .frame(width: cap, height: cap)
+            .overlay {
+                if !kamera.destekli(f) {
+                    // Desteklenmiyor: simgenin üstü çizili
+                    Capsule().fill(Color.white.opacity(0.85)).frame(width: 1.5, height: cap * 0.62).rotationEffect(.degrees(-45))
+                }
+            }
             .overlay { if sabit { Circle().strokeBorder(Tema.sari.opacity(0.55), lineWidth: 1) } }
             .shadow(color: sabit ? Tema.sari.opacity(0.45) : .clear, radius: 8)
             .foregroundStyle(d.etkin || sabit ? Tema.sari : .white)
             Text(FavoriSatir.baslik(f)).font(.system(size: kucuk ? 10 : 11, weight: .medium)).tracking(0.8)
                 .lineLimit(1).minimumScaleFactor(0.7)
         }
-        .opacity(soluk ? 0.4 : 1)
+        .opacity(soluk || !kamera.destekli(f) ? 0.4 : 1)
+        .accessibilityHint(kamera.destekli(f) ? "" : "Bu telefonda desteklenmiyor")
     }
 
     private var icYazi: (String, String)? {

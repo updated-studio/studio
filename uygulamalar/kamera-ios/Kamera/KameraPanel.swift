@@ -181,6 +181,14 @@ struct Cetvel: View {
         Group {
             let deger = kamera.odakKonum.map { $0 >= 0.99 ? "Sonsuz" : "MF" } ?? "Oto"
             baslik("Odak", "scope", deger, oto: kamera.odakKonum == nil) { kamera.odakSerbest() }
+            HStack(spacing: 6) {
+                ForEach(Kamera.OdakModu.allCases, id: \.self) { m in
+                    Secenek(yazi: m.rawValue, alt: m == .surekli ? "izler" : (m == .tek ? "bir kez" : "yüze"), secili: kamera.odakModu == m && kamera.odakKonum == nil) {
+                        kamera.odakModu = m
+                        if kamera.odakKonum != nil { kamera.odakSerbest() }
+                    }
+                }
+            }
             if kamera.elleOdakVar {
                 // Android'deki gibi: sola uzak (sonsuz), sağa yakın; iOS'ta mercek konumu 1 uzak, 0 yakın
                 Slider(value: Binding(get: { 1 - (kamera.odakKonum ?? 1) }, set: { kamera.odakSec(1 - $0) }), in: 0...1)

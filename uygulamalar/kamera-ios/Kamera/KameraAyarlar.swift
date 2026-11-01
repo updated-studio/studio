@@ -25,6 +25,7 @@ struct KameraAyarlar: View {
                     NavigationLink { gostergeler } label: { satir("chart.bar", .green, "Göstergeler", kamera.gostergeEtkin ? "Açık" : (kamera.kompTur == .kapali ? "" : kamera.kompTur.ad)) }
                     NavigationLink { FavoriDuzenle(kamera: kamera) } label: { satir("pin", .yellow, "Sabitlenenler", "\(kamera.favoriler.count)") }
                     Toggle(isOn: $dok) { Label("Sabitlenenler deklanşörün üstünde", systemImage: "dock.rectangle") }
+                    Toggle(isOn: $kamera.proDenetim) { Label("Pro denetimler (ISO, enstantane, beyaz denge, göstergeler)", systemImage: "slider.horizontal.3") }
                 }
                 if kamera.mod == .video {
                     Section {
