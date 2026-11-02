@@ -11,20 +11,20 @@ svg.i.s [opacity] { opacity: .45; }
 /* Kit uygulanan yerler */
 .simge svg.i.s .sp { display: inline; fill: url(#s-parlak); }
 .simge svg.i.s .sd path:not([opacity]):not(.sp), .simge svg.i.s .sb path:not(.sp) { fill: url(#s-ana); }
-.simge svg.i.s { overflow: visible; filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 6px 8px var(--s-golge-uzak)); }
+.simge svg.i.s { overflow: visible; filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 4px 5px var(--s-golge-uzak)); }
 .simge :is(.on, [aria-current="page"]) svg.i.s .sd { display: none; }
 .simge :is(.on, [aria-current="page"]) svg.i.s .sb { display: inline; }
 .simge :is(.on, [aria-current="page"]) svg.i.s .sb path:not(.sp) { fill: url(#s-beyaz); }
-.simge :is(.on, [aria-current="page"]) svg.i.s { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3)) drop-shadow(0 5px 7px rgba(0, 0, 0, .2)); }
+.simge :is(.on, [aria-current="page"]) svg.i.s { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3)) drop-shadow(0 3px 5px rgba(0, 0, 0, .16)); }
 
 /* A1 sade */
 :is(html[data-simge="a1"] .simge:not([data-kit]), .simge[data-kit="a1"]) svg.i.s .sd [opacity] { fill: currentColor; opacity: .5; }
 /* A2 marka mavisi */
 :is(html[data-simge="a2"] .simge:not([data-kit]), .simge[data-kit="a2"]) svg.i.s .sd [opacity], :is(html[data-simge="e3"] .simge:not([data-kit]), .simge[data-kit="e3"]) svg.i.s .sd [opacity] { fill: url(#s-mavi); opacity: 1; }
-:is(html[data-simge="a2"] .simge:not([data-kit]), .simge[data-kit="a2"]) svg.i.s { filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 5px 8px color-mix(in srgb, var(--brand-blue) 20%, transparent)); }
+:is(html[data-simge="a2"] .simge:not([data-kit]), .simge[data-kit="a2"]) svg.i.s { filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 3px 5px color-mix(in srgb, var(--brand-blue) 12%, transparent)); }
 /* A3 cam ve E4 gece camı: ikinci katman belirgin buzlu mavi (beyaz zeminde kaybolmasın), ince mavi kenar */
 :is(html[data-simge="a3"] .simge:not([data-kit]), .simge[data-kit="a3"]) svg.i.s .sd [opacity], :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s .sd [opacity] { fill: url(#s-cam); opacity: 1; stroke: color-mix(in srgb, var(--brand-blue) 55%, transparent); stroke-width: .5; }
-:is(html[data-simge="a3"] .simge:not([data-kit]), .simge[data-kit="a3"]) svg.i.s, :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s { filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 5px 8px color-mix(in srgb, var(--brand-blue) 22%, transparent)); }
+:is(html[data-simge="a3"] .simge:not([data-kit]), .simge[data-kit="a3"]) svg.i.s, :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s { filter: drop-shadow(0 -1.5px 0 var(--s-isik)) drop-shadow(0 1px 1px var(--s-golge-yakin)) drop-shadow(0 4px 4px var(--s-golge-yakin)) drop-shadow(0 3px 5px color-mix(in srgb, var(--brand-blue) 13%, transparent)); }
 :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s .sd path:not([opacity]):not(.sp), :is(html[data-simge="e4"] .simge:not([data-kit]), .simge[data-kit="e4"]) svg.i.s .sb path:not(.sp) { fill: url(#s-gece); }
 /* E2 renkli */
 :is(html[data-simge="e2"] .simge:not([data-kit]), .simge[data-kit="e2"]) svg.i.s .sd [opacity] { fill: var(--r); opacity: .95; }
