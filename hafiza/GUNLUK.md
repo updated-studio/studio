@@ -65,6 +65,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 2 Kasım 2026
+- 16:30 (Natro Claude): Haber görseli (kullanıcı: "temsili olmaz, birebir"; son 2 haftada taslakların %69u görselsizdi, seçilenlerin bir kısmı yanlış model). triyaj-taslak/gorsel.ts `kaynakGorselleri`: kaynak haberin og:image ve figure görselleri; künyede marka/resmi kaynak varsa doğrulanmış, ajans/sitenin kendisi geçiyorsa elenir, künyesizi yapay zekâ görerek değerlendirir (yalnız resmi materyal). Stok/konu aramaları ve temsili seçim kalktı; yoksa "Görsel bulunamadı". Altyazı "Görsel: Marka". Görseli değiştirerek telif dışına çıkarma isteği uygulanmadı (telifi kaldırmaz).
+
 ### 1 Kasım 2026
 - 21:30 (Natro Claude): İkon seti Solar'a geçti, 6 simge kiti (Profilim → Simge kiti). Ortak dosyalar: shared/Ikon.tsx (yeniden yazıldı, IKONLAR artık SOLAR), shared/solar.ts (yeni), shared/simge.css (yeni, main.tsx'te en son), ProfilMenu (.simge), MarkaKiti (metin). Site tarafındaki ikonlar (apps/web/src/lib/ui.ts) henüz eski set.
 - 20:30 (Natro Claude): Kullanıcı düzeltti: rol/iş ayrımı yok, kişiye atama ve sahiplik yok, tasarım herkeste aynı (yöneticide fazladan yönetim bölümleri). Göç 0061 silindi (uygulanmamıştı), Yönetim'deki iş düğmeleri ve Profile.gorevler kalktı; tek kabuk EditorKabuk; Taslaklar herkesin; Çekim listesi işe bağlı değil (cihazda).
