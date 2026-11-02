@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-02-b",
+    "tarih": "2 Kasım 2026",
+    "baslik": "Otomatik taslakları Claude yazıyor",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Otomatik taslağı Claude Sonnet yazar, Claude Opus kaynaklara karşı denetler.",
+          "Denetim artık başlık-metin uyumu, tarih sırası ve çelişkilere de bakar.",
+          "Claude kredisi biterse sistem kendiliğinden Gemini ile devam eder."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-02-a",
     "tarih": "2 Kasım 2026",
     "baslik": "Taslaklarda editör yorumu satırı kalktı",

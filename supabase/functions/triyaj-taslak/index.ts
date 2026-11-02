@@ -9,7 +9,7 @@
 // Yayın: main'e gelince Natro sunucusu kendiliğinden yükler (site deposu deploy/altyapi/studyo); dosyalar birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
-import { claudeJson, SECIM_SEMA } from "./claude.ts";
+import { CLAUDE_MODEL, claudeJson, SECIM_SEMA } from "./claude.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
@@ -111,6 +111,18 @@ async function gemini(sistem: string, kullanici: string, modeller: string[], bit
     catch (e) { son += " | Yedek (Groq): " + String((e as Error).message ?? e).slice(0, 200); }
   }
   throw new Error("Yapay zeka yanıt vermedi. " + son);
+}
+
+/** Önce Claude (rolün modeli; Bağlantı anahtarları "claude"), anahtar yoksa ya da hata verirse Gemini (2 Kasım 2026).
+ *  claudeBitis: Claude'a ayrılan son an; hata verirse Gemini'ye kalan süre kalsın diye bitis'ten önce tutulur. */
+async function yz(rol: keyof typeof CLAUDE_MODEL, sistem: string, kullanici: string, modeller: string[], bitis: number,
+  o: { claudeBitis?: number; resimler?: { mime: string; b64: string; etiket?: string }[]; maxTokens?: number } = {}) {
+  let claudeHata = "";
+  try {
+    const c = await claudeJson({ sistem, kullanici, model: CLAUDE_MODEL[rol], ms: (o.claudeBitis ?? bitis) - Date.now(), resimler: o.resimler, maxTokens: o.maxTokens });
+    if (c) return { ...c, claudeHata };
+  } catch (e) { claudeHata = String((e as Error).message ?? e).slice(0, 120); }
+  return { ...(await gemini(sistem, kullanici, modeller, bitis, o.resimler ?? [])), claudeHata };
 }
 
 async function geminiAnahtarla(key: string, sistem: string, kullanici: string, modeller: string[], bitis: number, resimler: { mime: string; b64: string; etiket?: string }[]): Promise<{ sonuc?: { veri: Record<string, any>; model: string }; son: string; hepsiKota: boolean; gecersiz: boolean }> { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -230,10 +242,10 @@ async function kayitliKategoriler(sb: Sb): Promise<Kategori[]> {
 
 /** Yapay zekânın önerdiği kategori sitede yoksa: listeden en uygununu ucuz modelle seçtir. */
 const kategoriSec = async (baslik: string, oneri: string, liste: Kategori[]) => {
-  const { veri } = await gemini(
+  const { veri } = await yz("kucuk",
     'Bir Türkçe teknoloji haberi için verilen kategori listesinden en uygun TEK kategoriyi seç. Listede olmayan ad yazma. Sadece {"kategori":"listedeki ad aynen"} döndür.',
     `Haber başlığı: ${baslik}\nÖnerilen: ${oneri}\nKategoriler: ${liste.map((k) => k.name).join(" | ")}`,
-    ["gemini-3.5-flash-lite", "gemini-3.5-flash"], Date.now() + 25_000);
+    ["gemini-3.5-flash-lite", "gemini-3.5-flash"], Date.now() + 25_000, { claudeBitis: Date.now() + 12_000 });
   return String(veri.kategori ?? "");
 };
 
@@ -271,7 +283,7 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
       const ekler = gorunen.map((i) => ({ ...resimler[i]!, etiket: `Aday ${i}` }));
       // Önce Claude (Bağlantı anahtarları "claude"; 2 Kasım 2026); anahtar yoksa ya da hata verirse Gemini
       let c: Awaited<ReturnType<typeof claudeJson>> = null;
-      try { c = await claudeJson(sb, { sistem: SECIM_SISTEM, kullanici: istem, sema: SECIM_SEMA, resimler: ekler, ms: Math.min(40_000, bitis - Date.now() - 30_000) }); }
+      try { c = await claudeJson({ sistem: SECIM_SISTEM, kullanici: istem, model: CLAUDE_MODEL.gorsel, sema: SECIM_SEMA, resimler: ekler, ms: Math.min(40_000, bitis - Date.now() - 30_000) }); }
       catch (e) { iz.push("Claude: " + String((e as Error).message ?? e).slice(0, 80)); }
       if (c) veri = { ...c.veri, neden: String(c.veri.neden ?? "") + " (Claude)" };
       else ({ veri } = await gemini(SECIM_SISTEM, istem, ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 30_000, Date.now() + 30_000), ekler));
@@ -307,7 +319,7 @@ async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici:
       const metin = await makaleCek(it.link, 10000);
       if (metin.length < 300) throw new Error("Kaynak sitenin metni otomatik alınamadı. Linke tıklayıp tarayıcının çeviri özelliğini kullan.");
       await nabiz();
-      const { veri } = await gemini(CEVIRI_SISTEM, metin, ["gemini-3.5-flash-lite", "gemini-3.5-flash"], bitis);
+      const { veri } = await yz("kucuk", CEVIRI_SISTEM, metin, ["gemini-3.5-flash-lite", "gemini-3.5-flash"], bitis, { claudeBitis: bitis - 25_000, maxTokens: 16_000 });
       await sb.from("tr_items").update({ translation: String(veri.ceviri ?? "").slice(0, 45000), work_state: "", work_error: "" }).eq("id", itemId);
       return;
     }
@@ -340,9 +352,10 @@ ${metinler.join("\n\n---\n\n")}`;
 
     const uslup = await uslupAl(sb);
     await nabiz();
-    const { veri: t, model } = await gemini(taslakSistem(uslup), istem, MODELLER, bitis);
+    const { veri: t, model, claudeHata } = await yz("taslak", taslakSistem(uslup), istem, MODELLER, bitis, { claudeBitis: bitis - 25_000, maxTokens: 8000 });
     await nabiz();
     const notlar: string[] = metinListe(t.editor_notlari);
+    if (claudeHata) notlar.push("Claude taslağı yazamadı (" + claudeHata + "); taslağı Gemini yazdı.");
     if (ana.metin.length < 300) notlar.push("Kaynak sitenin tam metni otomatik alınamadı; taslak kısıtlı bilgiyle yazıldı. Kaynağı mutlaka oku.");
     const okunan = 1 + ekler.filter((e) => e.metin.length >= 300).length;
     if (diger.length) notlar.push(`${okunan}/${diger.length + 1} kaynak okunarak yazıldı.`);
@@ -486,9 +499,11 @@ async function kontrol(sb: Sb, id: number) {
     if (qc.kaynak && bitis - Date.now() > 60_000) {
       try {
         const uslup = await uslupAl(sb);
-        const { veri: k } = await gemini(KONTROL_SISTEM(uslup),
+        // Denetleyen yazandan bir üst model (Claude Opus; kullanıcı 2 Kasım: "sonnet yazarsa opus denetler"); yoksa Gemini
+        const { veri: k, claudeHata } = await yz("kontrol", KONTROL_SISTEM(uslup),
           `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik, spot, govde })}`,
-          MODELLER, Math.min(bitis - 45_000, Date.now() + 55_000));
+          MODELLER, bitis - 30_000, { claudeBitis: bitis - 45_000, maxTokens: 10_000 });
+        if (claudeHata) notlar.push("Claude denetimi çalışmadı (" + claudeHata + "); kontrolü Gemini yaptı.");
         sorunlar = metinListe(k.sorunlar);
         const yeniGovde = linkTemizle(String(k.govde ?? ""), (qc.ilgili ?? []).map((x) => x.link));
         const araBaslik = (x: string) => (x.match(/^## /gm) ?? []).length;

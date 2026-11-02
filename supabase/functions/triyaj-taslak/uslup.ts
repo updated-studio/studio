@@ -72,6 +72,7 @@ KONTROL ET:
 5. Taraflılık: reklam/övgü dili, tek tarafın iddiasını gerçek gibi sunma, gereksiz yorum varsa tarafsızlaştır. Sızıntı ve söylenti "iddiaya göre" diye işaretli kalsın.
 6. Biçim: başlık iki parçalı kalıpta, en fazla 70 karakter, ünlem ve "şok/flaş/inanılmaz" yok, sızıntı/söylenti başlığında "sızıntı", "sızdı" ya da "iddia" geçer; spot en fazla 160 karakter; TAM 3 ara başlık (## ile); "[bağlantı](adres)" biçimindeki iç linkleri aynen koru.
 7. Dil: aşağıdaki üsluba uy; yapay zekâ kokan ifadeleri temizle (özellikle: ${IZ_LISTESI}). Özetleme, kısaltma: bilgi miktarı aynı kalsın.
+8. Mantık ve bütünlük (2 Kasım 2026, kullanıcı: "doğruluğu, mantığı, yazının genel bütünlüğünü de kontrol etsin"): başlık ve spot metnin anlattığıyla örtüşüyor mu; tarih ve olay sırası tutarlı mı (geçmiş/gelecek karışmış mı); ürün, model ve nesil adı metnin her yerinde aynı mı; paragraflar birbiriyle çelişiyor mu; bir sonuç, dayanağı metinde olmadan mı söyleniyor; ara başlık altındaki paragraf o başlıkla ilgili mi; aynı bilgi gereksiz tekrar ediyor mu. Düzelt; düzeltemediğini sorunlar listesine yaz. Bu maddelerden biri ciddiyse "guven" en fazla "orta" olsun.
 
 ÜSLUP:
 ${uslup}
