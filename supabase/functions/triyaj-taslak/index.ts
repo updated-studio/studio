@@ -13,7 +13,7 @@ import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, type Kategori } from "./site.ts";
-import { adayListesi, commons, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
+import { adayListesi, commons, kaynakGorselleri, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -246,18 +246,19 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     const { data: bk } = it.brand ? await sb.from("tr_press").select("url").ilike("brand", it.brand) : { data: [] };
     const linkler = [it.link, ...((it.other_sources ?? []).map((o) => o.link))].filter(Boolean);
     const iz: string[] = [];
-    // Commons ve Openverse: önce marka + ürün, sonra konu aramaları (ilk ikisi). Alakasız olanları seçim adımı eler.
-    const [r1, c1, o1, o2, s1, s2, c2, o3] = await Promise.all([
+    // Sıra (2 Kasım 2026): resmi basın sayfası → kaynak haberlerdeki üretici görselleri → ürünün kendisini gösteren serbest fotoğraf.
+    // Konu aramalı stok/temsili fotoğraflar kalktı (kullanıcı: "temsili görsel olmaz").
+    const [r1, k1, c1, o1] = await Promise.all([
       resmiGorsel({ linkler, marka: it.brand, basin: ((bk ?? []) as { url: string }[]).map((x) => x.url), urun: it.product, baslik: it.title }, iz),
-      commons(urun, 6, iz), openverse(urun, 4, iz), aramalar[0] ? openverse(aramalar[0], 3, iz) : Promise.resolve([]),
-      aramalar[0] ? stokFoto(aramalar[0], 3, anahtar) : Promise.resolve([]), aramalar[1] ? stokFoto(aramalar[1], 2, anahtar) : Promise.resolve([]),
-      aramalar[0] ? commons(aramalar[0], 3, iz) : Promise.resolve([]), aramalar[1] ? openverse(aramalar[1], 2, iz) : Promise.resolve([]),
+      kaynakGorselleri({ linkler, marka: it.brand, urun }, iz),
+      urun ? commons(urun, 4, iz) : Promise.resolve([]), urun ? openverse(urun, 3, iz) : Promise.resolve([]),
     ]);
+    void aramalar; void anahtar;
     const goruldu = new Set<string>();
-    const adaylar = [...r1, ...c1, ...o1, ...o2, ...c2, ...o3, ...s1, ...s2].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 10);
+    const adaylar = [...r1, ...k1.filter((a) => a.dogrulandi), ...k1.filter((a) => !a.dogrulandi), ...c1, ...o1].filter((a) => a.buyuk && !goruldu.has(a.buyuk) && goruldu.add(a.buyuk)).slice(0, 10);
     if (!adaylar.length) {
       const durum = Object.entries(kaynakDurumu).map(([k, v]) => `${k}: ${v}`).join(", ");
-      return { ...bos, neden: `Uygun fotoğraf bulunamadı (resmi ${r1.length} aday; ${iz.join("; ")}${durum ? "; " + durum : ""}).` };
+      return { ...bos, neden: `Görsel bulunamadı (resmi ${r1.length}, kaynak haber ${k1.length} aday; ${iz.join("; ")}${durum ? "; " + durum : ""}).` };
     }
     let veri: Record<string, unknown>;
     try {
@@ -276,7 +277,7 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
     const yz = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50; };
     const odak = o && typeof o === "object" ? { x: yz(o.x), y: yz(o.y) } : undefined;
     const secilen = Number.isInteger(i) && i >= 0 && i < adaylar.length ? { ...adaylar[i], ...(odak ? { odak } : {}) } : null;
-    return { secilen, adaylar: adaylar.slice(0, 8), neden: (String(veri.neden ?? "").slice(0, 200) || (secilen ? "" : "Uygun görsel yok.")) + (secilen ? "" : ` (${iz.join("; ")})`) };
+    return { secilen, adaylar: adaylar.slice(0, 8), neden: (secilen ? "" : "Görsel bulunamadı: ") + (String(veri.neden ?? "").slice(0, 200) || (secilen ? "" : "birebir uyan görsel yok.")) + (secilen ? "" : ` (${iz.join("; ")})`) };
   } catch (e) {
     return { ...bos, neden: "Görsel seçilemedi: " + String((e as Error).message ?? e).slice(0, 120) };
   }

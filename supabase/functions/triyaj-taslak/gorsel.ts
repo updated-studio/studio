@@ -9,12 +9,12 @@
 //   3) Pexels, Pixabay: sadece anahtar tanımlıysa (PEXELS_API_KEY, PIXABAY_API_KEY); şu an yok.
 // Unsplash yüklenmez: API kuralları görselin kendi sunucularından gösterilmesini istiyor (sadece öneri olarak kalır).
 // Bu dosya Deno'ya özgü bir şey kullanmaz (ekran da tiplerini içe aktarıyor); anahtarlar çağırandan gelir.
-// Başka haber sitelerinin görselleri ALINMAZ (16 Ekim'de Fatih "filigransız olanları kullan" dedi; telif riski nedeniyle
-// uygulanmadı, ARCHITECTURE.md 16 Ekim (4)): filigran olmaması görselin kullanım izni olduğu anlamına gelmez.
+// Haber sitelerinin görselleri (2 Kasım 2026): yalnız üreticinin görseli olanlar (künyeden ya da görerek doğrulanır, kaynakGorselleri);
+// ajans ve sitenin kendi fotoğrafları alınmaz. Temsili görsel yok: birebir değilse görselsiz.
 // Hangi adayın kullanılacağına yapay zekâ karar verir; uygun aday yoksa görsel eklenmez. Yayına basma kararı yine editörde.
 
 export type GorselAday = {
-  kaynak: "Resmi basın" | "Wikimedia Commons" | "Openverse" | "Pexels" | "Pixabay" | "Yapay zekâ (Flux)";
+  kaynak: "Resmi basın" | "Üretici görseli" | "Wikimedia Commons" | "Openverse" | "Pexels" | "Pixabay" | "Yapay zekâ (Flux)";
   sayfa: string;      // görselin kendi sayfası (altyazıda bağlantı)
   buyuk: string;      // indirilecek dosya (en fazla ~1600 px)
   thumb: string;      // ekranda küçük önizleme
@@ -22,7 +22,8 @@ export type GorselAday = {
   lisans: string;     // ör. "CC BY-SA 4.0", "Pexels Lisansı"
   aciklama: string;   // yapay zekânın seçerken okuyacağı metin
   w: number; h: number;
-  odak?: { x: number; y: number }; // konunun yeri (yüzde, soldan/üstten); yapay zekâ seçerken verir, panelde odak noktası olur (28 Ekim 2026)
+  odak?: { x: number; y: number };
+  dogrulandi?: boolean; // Üretici görseli: künyesinde marka yazıyor (true) ya da yalnız görerek doğrulanacak (false) // konunun yeri (yüzde, soldan/üstten); yapay zekâ seçerken verir, panelde odak noktası olur (28 Ekim 2026)
 };
 
 const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; haber gorseli secimi)";
@@ -153,6 +154,53 @@ export async function resmiGorsel(o: { linkler: string[]; marka: string; basin: 
   return sonuc.filter((x): x is GorselAday => !!x);
 }
 
+/** Kaynak haberin görselleri (2 Kasım 2026, kullanıcı: "doğrudan haberle ilgili görsel; çektiği yerden seç"). Haber siteleri çoğu zaman
+ *  üreticinin basın görselini kullanır; künyesinden (figcaption, credit, alt) kimin olduğu okunur:
+ *  - künyede marka ya da "press/official/courtesy/handout/render" geçiyorsa: üretici görseli (dogrulandi)
+ *  - künyede ajans/fotoğrafçı/haber sitesinin kendisi geçiyorsa: alınmaz (Getty, Reuters, AP, AFP, "Photo by", "Image: Engadget"…)
+ *  - künye yoksa: aday olur ama seçimde yapay zekâ görerek resmi materyal mi (stüdyo görseli, render, resmi etkinlik) karar verir. */
+const AJANS = /getty|reuters|associated press|\bap photo|\bafp\b|shutterstock|alamy|\bepa\b|bloomberg|imago|anadolu|dpa\b|photo by|photograph by|fotoğraf:|fotograf:|image by|staff|our own|hands-on|hands on/i;
+const RESMI = /press (image|photo|release|kit)|official (image|photo|render)|courtesy|handout|render|newsroom|media kit|basın görseli|resmi görsel/i;
+// Künyede markanın görselin sahibi olarak geçtiği kalıplar: "Image: Apple", "Credit: Samsung", "Source: Sony", "© Nikon", "via Google"
+const sahibi = (k: string, m: string) => new RegExp(`(image|photo|picture|credit|credits|source|görsel|fotoğraf|kaynak|via|by|©|\\(c\\))\\s*[:/\\-–]?\\s*${m.replace(/[^a-z0-9 ]/g, "")}`, "i").test(k);
+function kunyeler(h: string): { url: string; kunye: string }[] {
+  const out: { url: string; kunye: string }[] = [];
+  for (const f of h.matchAll(/<figure\b[\s\S]{0,4000}?<\/figure>/gi)) {
+    const g = f[0], src = g.match(/<img[^>]+(?:data-src|src)=["']([^"']+\.(?:jpe?g|png|webp)[^"']*)["']/i)?.[1];
+    if (!src) continue;
+    const alt = g.match(/alt=["']([^"']*)["']/i)?.[1] ?? "";
+    const cap = duz(g.match(/<figcaption[\s\S]*?<\/figcaption>/i)?.[0] ?? "");
+    out.push({ url: src, kunye: `${cap} ${alt}`.trim() });
+  }
+  return out;
+}
+export async function kaynakGorselleri(o: { linkler: string[]; marka: string; urun: string }, iz?: string[]): Promise<GorselAday[]> {
+  const m = o.marka.trim().toLowerCase();
+  const out: GorselAday[] = [];
+  for (const u of o.linkler.filter((x) => x && !ENGELLI_HOST.test(hostAl(x))).slice(0, 3)) {
+    const h = await html(u);
+    if (!h) { iz?.push(`Kaynak ${hostAl(u)}: açılmadı`); continue; }
+    const site = hostAl(u).split(".")[0];
+    const og = meta(h, "og:image(?::secure_url)?") ?? meta(h, "twitter:image(?::src)?");
+    const liste = [...(og ? [{ url: og, kunye: duz(meta(h, "og:image:alt") ?? "") }] : []), ...kunyeler(h)];
+    let say = 0;
+    for (const x of liste) {
+      let resim = ""; try { resim = new URL(x.url.replace(/&amp;/g, "&"), u).href; } catch { continue; }
+      if (/logo|favicon|avatar|placeholder|sprite|icon|author|\.svg|\.gif/i.test(resim)) continue;
+      const k = x.kunye.toLowerCase();
+      if (AJANS.test(k) || (site.length > 3 && k.includes(site))) continue; // ajans ya da haber sitesinin kendi fotoğrafı
+      const dogrulandi = (m.length >= 2 && sahibi(k, m)) || RESMI.test(k);
+      const yol = resim.split("?")[0].replace(/-\d+x\d+(?=\.\w+$)/, "");
+      if (out.some((a) => a.buyuk.split("?")[0].replace(/-\d+x\d+(?=\.\w+$)/, "") === yol)) continue; // aynı görselin farklı boyları
+      out.push({ kaynak: "Üretici görseli", sayfa: u, buyuk: resim, thumb: resim, yazar: o.marka, lisans: "Üretici görseli", dogrulandi,
+        aciklama: `${hostAl(u)} haberindeki görsel${x.kunye ? ` — künye: ${x.kunye.slice(0, 120)}` : " — künye yok"}${dogrulandi ? " (künyede marka/resmi kaynak var)" : ""}`.slice(0, 220), w: 1200, h: 675 });
+      if (++say >= 4) break;
+    }
+    iz?.push(`Kaynak ${hostAl(u)}: ${say} görsel`);
+  }
+  return out;
+}
+
 /** Openverse: anahtarsız, serbest lisanslı, yatay ve büyük fotoğraflar */
 export async function openverse(q: string, adet = 5, iz?: string[]): Promise<GorselAday[]> {
   if (!q.trim()) return [];
@@ -199,7 +247,7 @@ export async function stokFoto(q: string, adet: number, anahtar: { pexels?: stri
 /** Görsel künyesi (panelde kapak künyesi; eskiden WordPress altyazısı). Fatih: haberlerde kaynak belirtmek zorunlu değil. Ama CC BY / CC BY-SA lisansı yazar ve lisans adını
  *  ZORUNLU tutar; bu yüzden sadece onlarda altyazı yazılır. CC0, kamu malı, Pexels, Pixabay: altyazı yok. Resmi basın: "Görsel: Marka". */
 export function altyazi(g: GorselAday): string {
-  if (g.kaynak === "Resmi basın") return `Görsel: ${g.yazar.replace(/[<>&]/g, "")}`;
+  if (g.kaynak === "Resmi basın" || g.kaynak === "Üretici görseli") return `Görsel: ${g.yazar.replace(/[<>&]/g, "")}`;
   if (g.kaynak === "Yapay zekâ (Flux)") return "Görsel yapay zekâ ile üretilmiştir.";
   if (!/^cc[- ]by/i.test(g.lisans)) return "";
   const k = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -232,18 +280,18 @@ export function adayListesi(adaylar: GorselAday[]): string {
 }
 
 export const SECIM_SISTEM = `Bir Türkçe teknoloji haberine öne çıkan görsel seçiyorsun. Sana haber başlığı ve numaralı görsel adayları verilecek.
-KURALLAR:
-- Haberin konusu olan ürünü/şirketi/olayı en doğru gösteren GERÇEK fotoğrafı seç.
-- [Resmi basın] adayı haberin konusu olan ürünün/duyurunun resmi görseliyse onu tercih et (logo ya da genel kurumsal görsel değilse).
-- Ürünün kendisinin fotoğrafı (aynı model) varsa onu tercih et. Eski modeli ya da başka bir ürünü haberin ürünüymüş gibi sunma.
-- Ürünün kendisi yoksa AYNI ÜRÜN TÜRÜNÜ ya da konuyu açıkça temsil eden gerçekçi bir fotoğrafı SEÇ (ör. ekran kartı haberine bir ekran kartı fotoğrafı, oyun haberine oyun kumandası, yazılım/güvenlik haberine kod ekranı, akıllı gözlük haberine akıllı gözlük). Bu temsili görsel kabul edilir; editör yayından önce değiştirebilir. Gerekçede "temsili" yaz.
-- Başka bir markanın ürününü öne çıkaran (logosu/adı belirgin) fotoğrafı temsili olarak bile seçme.
-- ÜZERİNDE YAZI OLAN GÖRSEL SEÇME (Fatih, 18 Ekim): başlık/slogan/fiyat yazılı banner, afiş, kampanya görseli, yazı bindirmeli tanıtım kartı, kolaj, filigranlı görsel, infografik, ekran görüntüsü seçilmez. Ürünün üzerindeki kendi küçük logosu sorun değil. Görseller sana resim olarak da verildiyse bunu görerek denetle; resmi verilmeyen adayda açıklamada "banner, poster, logo, text, infographic, screenshot" geçiyorsa seçme.
-- Logo, ekran görüntüsü, belge, harita, çizim, kişi portresi (haber o kişi hakkında değilse) seçme.
-- KONU ORTADA OLSUN (28 Ekim 2026): görsel sitede kart, manşet ve telefonda farklı oranlarda kenarlardan kırpılır. Konusu (ürün, nesne) kenarda ya da köşede kalan, önemli ayrıntısı kenara yakın olan, kenarlarında yazı/logo bulunan görseli seçme; konusu kadrajın ortasında ve etrafında pay olan görseli tercih et.
-- Hiçbiri uygun değilse -1 döndür. Uydurma yapma.
-Seçtiğin görselde haberin konusunun (ürün, cihaz, nesne) MERKEZİNİN yerini de ver: "odak" = {"x": soldan yüzde 0-100, "y": üstten yüzde 0-100}. Site görseli kart, manşet ve telefonda kenarlardan kırpar; bu nokta hep görünür kalır. Emin değilsen 50/50.
-Sadece şu JSON'u döndür: {"secim": numara, "neden": "kısa gerekçe", "odak": {"x": 50, "y": 50}}`;
+KURAL 1 (2 Kasım 2026, Fatih: "temsili görsel olmaz, birebir haberle ilgili"): Görsel haberin konusu olan ÜRÜNÜN/ŞİRKETİN/OLAYIN KENDİSİNİ göstermeli. Başka model, eski nesil, benzer ürün, genel "temsili" fotoğraf SEÇİLMEZ. Emin değilsen -1 döndür; yanlış görsel koymaktansa görselsiz bırakmak doğru.
+ADAY TÜRLERİ:
+- [Resmi basın]: markanın kendi sitesindeki görsel. Konu ürünse öncelikli.
+- [Üretici görseli]: haberi yapan sitedeki görsel. Künyesinde marka/resmi kaynak varsa üreticinindir. Künyesi yoksa resme BAKARAK karar ver: üreticinin basın/tanıtım görseli (stüdyo çekimi, render, düz/temiz arka plan, resmi tanıtım etkinliği, oyunun resmi ekran görüntüsü ya da tanıtım görseli) ise seçilebilir; haber sitesinin kendi çektiği fotoğraf (elde tutma, masa üstü inceleme, fuar standı kalabalığı, muhabir fotoğrafı) ise SEÇİLMEZ.
+- [Wikimedia Commons]/[Openverse]: yalnız aynı ürünü (aynı model) gösteriyorsa.
+DİĞER KURALLAR:
+- ÜZERİNDE BÜYÜK YAZI OLAN GÖRSEL SEÇME: başlık/slogan/fiyat yazılı banner, afiş, kolaj, filigranlı görsel, infografik. Ürünün üzerindeki kendi küçük logosu sorun değil.
+- Logo tek başına, belge, harita, haberle ilgisiz kişi portresi seçilmez.
+- DİKEY (portre) görsel seçme; kapak yatay 16:9 kullanılır.
+- KONU ORTADA OLSUN: konusu kenarda/köşede kalan görseli seçme; görsel kart, manşet ve telefonda kenarlardan kırpılır.
+Seçtiğin görselde konunun MERKEZİNİ ver: "odak" = {"x": soldan yüzde 0-100, "y": üstten yüzde 0-100}; emin değilsen 50/50.
+Sadece şu JSON'u döndür: {"secim": numara ya da -1, "neden": "kısa gerekçe", "odak": {"x": 50, "y": 50}}`;
 
 const kelimeler = (s: string) => (s ?? "").toLowerCase().replace(/ı/g, "i").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length >= 2);
 
@@ -252,5 +300,7 @@ const kelimeler = (s: string) => (s ?? "").toLowerCase().replace(/ı/g, "i").nor
 export function kuralSecim(adaylar: GorselAday[], urun: string): GorselAday | null {
   const aranan = kelimeler(urun);
   if (aranan.length < 2) return null;
-  return adaylar.find((a) => (a.kaynak === "Wikimedia Commons" || a.kaynak === "Openverse") && aranan.every((w) => kelimeler(a.aciklama).includes(w))) ?? null;
+  // Yapay zekâsız yalnız künyesi doğrulanmış üretici görseli ya da ürün adı birebir geçen serbest fotoğraf
+  return adaylar.find((a) => a.kaynak === "Üretici görseli" && a.dogrulandi)
+    ?? adaylar.find((a) => (a.kaynak === "Wikimedia Commons" || a.kaynak === "Openverse") && aranan.every((w) => kelimeler(a.aciklama).includes(w))) ?? null;
 }
