@@ -9,6 +9,7 @@
 // Yayın: main'e gelince Natro sunucusu kendiliğinden yükler (site deposu deploy/altyapi/studyo); dosyalar birlikte yüklenir. "Verify JWT" kapalı olmalı (üyelik kodda kontrol edilir; zamanlanmış görev anahtarsız çağırır).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
+import { claudeJson, SECIM_SEMA } from "./claude.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
@@ -266,8 +267,14 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
       // Yapay zekâ adayların kendisini de görür (yazılı banner, logo, kolaj elensin; Fatih 18 Ekim). Küçük kopya alınamayan aday sadece açıklamayla değerlendirilir.
       const resimler = await Promise.all(adaylar.map((a) => kucukResim(a.thumb || a.buyuk)));
       const gorunen = resimler.map((g, i) => g ? i : -1).filter((i) => i >= 0);
-      ({ veri } = await gemini(SECIM_SISTEM, `Haber başlığı: ${baslik}\nÜrün: ${urun || "-"}\nOrijinal başlık: ${it.title}\n\nAdaylar:\n${adayListesi(adaylar)}\n\nResmi gösterilen adaylar: ${gorunen.join(", ") || "yok"} (resimler sırayla "Aday N:" etiketiyle ekte).`,
-        ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 30_000, Date.now() + 30_000), gorunen.map((i) => ({ ...resimler[i]!, etiket: `Aday ${i}` }))));
+      const istem = `Haber başlığı: ${baslik}\nÜrün: ${urun || "-"}\nOrijinal başlık: ${it.title}\n\nAdaylar:\n${adayListesi(adaylar)}\n\nResmi gösterilen adaylar: ${gorunen.join(", ") || "yok"} (resimler sırayla "Aday N:" etiketiyle ekte).`;
+      const ekler = gorunen.map((i) => ({ ...resimler[i]!, etiket: `Aday ${i}` }));
+      // Önce Claude (Bağlantı anahtarları "claude"; 2 Kasım 2026); anahtar yoksa ya da hata verirse Gemini
+      let c: Awaited<ReturnType<typeof claudeJson>> = null;
+      try { c = await claudeJson(sb, { sistem: SECIM_SISTEM, kullanici: istem, sema: SECIM_SEMA, resimler: ekler, ms: Math.min(40_000, bitis - Date.now() - 30_000) }); }
+      catch (e) { iz.push("Claude: " + String((e as Error).message ?? e).slice(0, 80)); }
+      if (c) veri = { ...c.veri, neden: String(c.veri.neden ?? "") + " (Claude)" };
+      else ({ veri } = await gemini(SECIM_SISTEM, istem, ["gemini-3.5-flash-lite", ...MODELLER], Math.min(bitis - 30_000, Date.now() + 30_000), ekler));
     } catch {
       const k = kuralSecim(adaylar, urun);
       return { secilen: k, adaylar: adaylar.slice(0, 8), neden: k ? "Yapay zekâ yanıt vermedi; ürün adıyla birebir eşleşen serbest lisanslı fotoğraf seçildi." : "Yapay zekâ yanıt vermedi ve ürün adıyla eşleşen fotoğraf yok; görsel eklenmedi." };
@@ -340,7 +347,7 @@ ${metinler.join("\n\n---\n\n")}`;
     const okunan = 1 + ekler.filter((e) => e.metin.length >= 300).length;
     if (diger.length) notlar.push(`${okunan}/${diger.length + 1} kaynak okunarak yazıldı.`);
 
-    // Gövde: ara başlıklar + editör yorumu yeri
+    // Gövde: ara başlıklar (editör yorumu yeri 2 Kasım 2026'da kaldırıldı: editör isterse kendisi ekler)
     const parcalar: string[] = [];
     for (const b of t.govde ?? []) {
       if (b?.h2) parcalar.push("## " + b.h2);
@@ -349,7 +356,6 @@ ${metinler.join("\n\n---\n\n")}`;
     // "Dikkat edilmesi gerekenler" sitedeki yazılarda yok: editör notlarına gider, metne girmez
     const dikkat = metinListe(t.dikkat_edilmesi_gerekenler);
     if (dikkat.length) notlar.unshift(...dikkat.map((x: string) => "Dikkat: " + x));
-    parcalar.push("**[EDİTÖR YORUMU: Buraya kendi değerlendirmeni ekle]**");
     const baslik = String(t.baslik ?? "");
     const spot = spotKisalt(String(t.spot ?? ""));
     const govdeMd = linkTemizle(parcalar.join("\n\n"), ilgili.map((x) => x.link));
@@ -486,8 +492,8 @@ async function kontrol(sb: Sb, id: number) {
         sorunlar = metinListe(k.sorunlar);
         const yeniGovde = linkTemizle(String(k.govde ?? ""), (qc.ilgili ?? []).map((x) => x.link));
         const araBaslik = (x: string) => (x.match(/^## /gm) ?? []).length;
-        // Güvenlik: editör yorumu yeri duruyor, ara başlık sayısı 2-4, metin özetlenmemiş
-        if (yeniGovde.includes("[EDİTÖR YORUMU") && araBaslik(yeniGovde) >= 2 && araBaslik(yeniGovde) <= 4 && yeniGovde.length > govde.length * 0.75) {
+        // Güvenlik: ara başlık sayısı 2-4, metin özetlenmemiş
+        if (araBaslik(yeniGovde) >= 2 && araBaslik(yeniGovde) <= 4 && yeniGovde.length > govde.length * 0.75) {
           govde = yeniGovde; baslik = String(k.baslik ?? "") || baslik; spot = spotKisalt(String(k.spot ?? "") || spot);
           durum = "kontrol edildi";
         } else { notlar.push("Kalite kontrolünün önerdiği metin güvenlik denetiminden geçmedi (yapı bozuldu ya da kısaldı); ilk taslak korundu."); durum = "kontrol uygulanmadı"; }

@@ -47,6 +47,9 @@ export function mdHtml(md: string): string {
 }
 
 /** Yazının gövdesi: kalın spot + metin. Editör notları, sorular, doğrulama listesi buraya girmez. */
+// Eski taslaklarda kalan "[EDİTÖR YORUMU: ...]" satırı gösterilmez ve panele gitmez (yer 2 Kasım 2026'da kaldırıldı)
+export const yorumYeriSil = (md: string) => md.replace(/\n*\**\[EDİTÖR YORUMU[^\]]*\]\**\s*/g, "\n\n").trim();
+
 export function yaziHtml(spot: string, body: string): string {
-  return (spot ? paragraf(`<strong>${kacis(spot)}</strong>`) + "\n\n" : "") + mdHtml(body);
+  return (spot ? paragraf(`<strong>${kacis(spot)}</strong>`) + "\n\n" : "") + mdHtml(yorumYeriSil(body));
 }

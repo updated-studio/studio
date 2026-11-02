@@ -6,6 +6,7 @@
 // kategori yalnız paneldeki listeden; etiket en fazla 3-4 (panelde sayfa açmaz, yalnız varlık); editör notları/sorular/doğrulama gitmez;
 // panelde yayınlanmış ya da editörün değiştirdiği taslağın üzerine yazılmaz ("Üzerine yaz" hariç).
 import { altyazi, type GorselAday } from "./gorsel.ts";
+import { yorumYeriSil } from "./html.ts";
 
 // deno-lint-ignore no-explicit-any
 type Sb = any;
@@ -204,7 +205,7 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
     const qc = (t.qc ?? {}) as { onem?: number | null };
 
     const govde = {
-      studioId: String(t.id), title: t.title, spot: t.spot ?? "", markdown: t.body ?? "",
+      studioId: String(t.id), title: t.title, spot: t.spot ?? "", markdown: yorumYeriSil(t.body ?? ""),
       category: kat.slug, label: etiketTuru(tur),
       sources: kaynakListesi(t.sources ?? ""),
       ...(img.secilen?.buyuk ? { image: gorselGovde(img.secilen, img.alt_text || t.title) } : {}),

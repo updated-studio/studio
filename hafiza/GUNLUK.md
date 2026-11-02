@@ -66,6 +66,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 2 Kasım 2026
+- 18:00 (Natro Claude): Otomatik taslaktan "[EDİTÖR YORUMU]" satırı kaldırıldı (kullanıcı: "gerek yok, editör isterse kendisi ekler"): üretim, KONTROL güvenlik koşulu, uslup kuralı, Taslaklar uyarısı; eski taslaklardaki satır önizlemede gösterilmez, panele gitmez (`html.ts` `yorumYeriSil`). Claude anahtarı: Bağlantı anahtarları'nda "claude" kartı + göç 0061 (UYGULANMADI, izin bekliyor); `triyaj-taslak/claude.ts`, görsel seçimi önce Claude Sonnet 5.5 (görerek, JSON şema), yoksa/hatada Gemini. Kredi: Console 100 $ tek seferlik promosyon (27.11.2026), Enes'in hesabındaki 100 $ (5 Kasım) Console'da görünüyorsa önce o hesabın anahtarı girilecek. Taslak yazımı şimdilik Gemini'de; Claude ile yan yana deneme önerildi (üslup ayarları aynı istemle gider).
 - 16:30 (Natro Claude): Haber görseli (kullanıcı: "temsili olmaz, birebir"; son 2 haftada taslakların %69u görselsizdi, seçilenlerin bir kısmı yanlış model). triyaj-taslak/gorsel.ts `kaynakGorselleri`: kaynak haberin og:image ve figure görselleri; künyede marka/resmi kaynak varsa doğrulanmış, ajans/sitenin kendisi geçiyorsa elenir, künyesizi yapay zekâ görerek değerlendirir (yalnız resmi materyal). Stok/konu aramaları ve temsili seçim kalktı; yoksa "Görsel bulunamadı". Altyazı "Görsel: Marka". Görseli değiştirerek telif dışına çıkarma isteği uygulanmadı (telifi kaldırmaz).
 
 ### 1 Kasım 2026

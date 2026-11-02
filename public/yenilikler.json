@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-02-a",
+    "tarih": "2 Kasım 2026",
+    "baslik": "Taslaklarda editör yorumu satırı kalktı",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Otomatik taslakların sonundaki \"Editör yorumu\" satırı kaldırıldı; eklemek istersen kendin eklersin.",
+          "Bağlantı anahtarları'na Claude anahtarı eklendi; girilince görsel seçimini Claude yapar."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-01-b",
     "tarih": "1 Kasım 2026",
     "baslik": "Yeni simgeler ve simge kitleri",

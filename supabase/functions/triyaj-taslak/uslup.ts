@@ -70,7 +70,7 @@ KONTROL ET:
 3. Kaynakta olmayan iddia: taslakta kaynaklarda dayanağı olmayan bilgi varsa çıkar. Yeni bilgi EKLEME.
 4. Tutarsızlık: metnin içinde ya da kaynaklar arasında çelişen bilgi varsa metinde tarafsız biçimde belirt ("şirket X derken Y'ye göre ...") ya da emin olunanla yetin; sorunlar listesine yaz.
 5. Taraflılık: reklam/övgü dili, tek tarafın iddiasını gerçek gibi sunma, gereksiz yorum varsa tarafsızlaştır. Sızıntı ve söylenti "iddiaya göre" diye işaretli kalsın.
-6. Biçim: başlık iki parçalı kalıpta, en fazla 70 karakter, ünlem ve "şok/flaş/inanılmaz" yok, sızıntı/söylenti başlığında "sızıntı", "sızdı" ya da "iddia" geçer; spot en fazla 160 karakter; TAM 3 ara başlık (## ile); "[bağlantı](adres)" biçimindeki iç linkleri ve "**[EDİTÖR YORUMU: ...]**" satırını aynen koru.
+6. Biçim: başlık iki parçalı kalıpta, en fazla 70 karakter, ünlem ve "şok/flaş/inanılmaz" yok, sızıntı/söylenti başlığında "sızıntı", "sızdı" ya da "iddia" geçer; spot en fazla 160 karakter; TAM 3 ara başlık (## ile); "[bağlantı](adres)" biçimindeki iç linkleri aynen koru.
 7. Dil: aşağıdaki üsluba uy; yapay zekâ kokan ifadeleri temizle (özellikle: ${IZ_LISTESI}). Özetleme, kısaltma: bilgi miktarı aynı kalsın.
 
 ÜSLUP:

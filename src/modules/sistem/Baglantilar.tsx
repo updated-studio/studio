@@ -2,6 +2,7 @@
 // Girilen değer bir daha ekrana gelmez (veritabanında okuma izni yok; yalnız sunucu fonksiyonları okur). Göç 0040.
 // - Google (Gemini) anahtarları: 30 Ekim 2026'dan beri birden çok anahtarlı havuz (GeminiHavuzu.tsx, göç 0052).
 // - Instagram erişim anahtarı: instagram-reels fonksiyonu son Reels'leri çeker, anahtarı 60 günü dolmadan kendisi yeniler.
+// - Claude (Anthropic API) anahtarı (göç 0061, 2 Kasım 2026): otomatik taslakta görsel seçimi; yoksa Gemini kullanılır.
 // - Cloudflare görsel programı (adres + ortak anahtar, göç 0044): künye görsellerinin arka planını siler (public/cloudflare/gorsel-worker.js).
 import { useCallback, useEffect, useState } from "react";
 import { sb } from "../../shared/supabase";
@@ -49,6 +50,15 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ],
   },
   {
+    ad: "claude", baslik: "Claude anahtarı (otomatik taslak)", ikon: "sohbet",
+    aciklama: "Otomatik taslaklarda öne çıkan görseli Claude seçer; görseli gerçekten görüp haberdeki ürünle karşılaştırır. Anahtar yoksa ya da kredi biterse sistem kendiliğinden Gemini'ye döner. Ücret Anthropic hesabındaki krediden düşer.",
+    adimlar: [
+      { metin: "Kredisi olan hesapla Anthropic Console'a gir ve sol menüde \"Billing\" bölümünde kredinin göründüğünü kontrol et", link: "https://console.anthropic.com/settings/billing" },
+      { metin: "\"API keys\" → \"Create key\" → ad: updated-studyo → oluştur", link: "https://console.anthropic.com/settings/keys" },
+      { metin: "Çıkan anahtarı kopyala (sk-ant- ile başlar), aşağıya yapıştır → Kaydet. Anahtarı sohbete yapıştırma" },
+    ],
+  },
+  {
     ad: "cloudflare_anahtar", baslik: "Cloudflare görsel programı: anahtar", ikon: "yonetim",
     aciklama: "Programa yalnız bizim sistemimizin erişebilmesi için ortak şifre. Cloudflare'de ANAHTAR adıyla girdiğin şifrenin aynısı.",
     adimlar: [{ metin: "Yukarıdaki 5. adımda oluşturduğun şifreyi buraya yapıştır → Kaydet" }],
@@ -65,6 +75,7 @@ function bicimHatasi(ad: string, v: string): string {
   }
   if (ad === "gemini_yedek" && (/^gen-lang-client/i.test(v) || /^https?:/i.test(v) || /\s/.test(v) || !/^[A-Za-z0-9._-]{30,200}$/.test(v))) return "Bu Google (Gemini) anahtarına benzemiyor. AI Studio'da anahtarın satırındaki kopyala simgesine bas; proje adını (gen-lang-client…) değil anahtarı yapıştır.";
   if (ad === "cloudflare_adres" && !/^https:\/\/[A-Za-z0-9.-]+\/?$/.test(v)) return "Programın adresi https:// ile başlamalı (ör. https://updated-gorsel.ad.workers.dev).";
+  if (ad === "claude" && !/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(v)) return "Bu Claude anahtarına benzemiyor: anahtar sk-ant- ile başlar. Console'da \"Create key\" sonrası çıkan anahtarın tamamını kopyala.";
   if (ad === "cloudflare_anahtar" && v.length < 24) return "Anahtar en az 24 karakter olmalı.";
   return "";
 }

@@ -182,7 +182,6 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
           ? <textarea className="alan" rows={22} value={d.body} onChange={(e) => alan("body", e.target.value)} aria-label="Haber metni" />
           // Önizleme kendi ürettiğimiz kaçışlı HTML'dir.
           : <div className="onizleme" dangerouslySetInnerHTML={{ __html: yaziHtml(d.spot, d.body) }} />}
-        {d.body.includes("[EDİTÖR YORUMU") && <div className="msg err">Yayınlamadan önce "Editör yorumu" alanını doldur.</div>}
       </div>
       <div className="panel">
         <h3>SEO</h3>
