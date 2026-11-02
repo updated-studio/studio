@@ -3,10 +3,13 @@
 // ürünü 1600×900 şeffaf tuvalin ortasına yerleştirir. Yalnız UPDATED Stüdyo çağırır (x-anahtar başlığı = ANAHTAR sırrı).
 // Kurulum: Stüdyo → Bağlantı anahtarları → Cloudflare. Gerekenler: "IMAGES" adlı Images bağlaması, "ANAHTAR" adlı sır.
 // Ücretsiz planda ayda 5.000 işlem; sınır aşılırsa ücret çıkmaz, istek reddedilir.
+// 2 Kasım 2026: "/uret" yolu: haber için uygun görsel bulunamazsa Workers AI (Flux schnell) ile görsel üretir, 1600×900'e kırpar.
+// Gereken: "AI" adlı Workers AI bağlaması. Ücretsiz planda günlük ücretsiz kullanım payı var; aşılırsa istek reddedilir.
 export default {
   async fetch(req, env) {
     if (req.method !== "POST") return new Response("UPDATED görsel programı çalışıyor.", { status: 200 });
     if (!env.ANAHTAR || req.headers.get("x-anahtar") !== env.ANAHTAR) return new Response("yetkisiz", { status: 401 });
+    if (new URL(req.url).pathname === "/uret") return uret(req, env);
     if (!env.IMAGES) return new Response("IMAGES bağlaması eksik", { status: 500 });
     if (Number(req.headers.get("content-length") || 0) > 20e6) return new Response("görsel 20 MB üstü", { status: 413 });
     try {
@@ -24,3 +27,17 @@ export default {
     }
   },
 };
+
+async function uret(req, env) {
+  if (!env.AI) return new Response("AI bağlaması eksik", { status: 500 });
+  try {
+    const { istem } = await req.json();
+    const r = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", { prompt: String(istem || "").slice(0, 2000), steps: 8 });
+    const ham = Uint8Array.from(atob(r.image), (c) => c.charCodeAt(0));
+    if (!env.IMAGES) return new Response(ham, { headers: { "content-type": "image/jpeg" } });
+    const son = await env.IMAGES.input(new Blob([ham]).stream()).transform({ width: 1600, height: 900, fit: "cover" }).output({ format: "image/webp", quality: 88 });
+    return son.response();
+  } catch (e) {
+    return new Response("üretilemedi: " + String(e && e.message || e).slice(0, 200), { status: 422 });
+  }
+}

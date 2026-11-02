@@ -7,8 +7,9 @@
       {
         "ad": "Haber Masası",
         "maddeler": [
-          "Otomatik taslağı Claude Sonnet yazar, Claude Opus kaynaklara karşı denetler.",
-          "Denetim artık başlık-metin uyumu, tarih sırası ve çelişkilere de bakar.",
+          "Otomatik taslağı Claude Sonnet yazar, Claude Opus kaynaklara karşı denetler ve sorunları düzeltir.",
+          "Denetim sorun bulursa metin bir kez daha denetlenir.",
+          "Uygun fotoğraf yoksa görsel yapay zekâyla üretilir, denetlenir ve taslağa not düşülür.",
           "Claude kredisi biterse sistem kendiliğinden Gemini ile devam eder."
         ]
       }

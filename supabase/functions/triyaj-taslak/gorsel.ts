@@ -271,8 +271,18 @@ export async function kucukResim(url: string, ms = 6_000): Promise<{ mime: strin
 /** Flux (Fatih'in bilgisayarında, çevrimdışı) için görsel istemi: gerçekçi fotoğraf, yazısız, logosuz */
 export function fluxIstem(konu: string): string {
   const k = konu.replace(/\s+/g, " ").trim().slice(0, 400);
-  return `${k}. Photorealistic editorial technology news photo, natural lighting, shallow depth of field, clean composition, 16:9. No text, no letters, no words, no captions, no logos, no watermark, no brand names, no UI overlays.`;
+  return `${k}. Photorealistic editorial technology news photo, natural lighting, shallow depth of field, clean composition, subject centered, 16:9. Generic unbranded design: do not imitate any specific manufacturer design signature (no emblems, no signature grilles, no recognizable silhouette of a specific brand product). No real human faces. No text, no letters, no words, no captions, no logos, no watermark, no brand names, no UI overlays.`;
 }
+
+/** Üretilen görselin denetimi (2 Kasım 2026, kullanıcı: "BMW haberinde Mercedes üretirse ne olacak"): görsel haberle çelişmemeli. */
+export const URETIM_DENETIM = `Bir Türkçe teknoloji haberi için yapay zekâyla üretilmiş öne çıkan görseli denetliyorsun. Sana haber başlığı, marka ve ürün verilecek, ekte görsel var.
+REDDET (uygun=false):
+- Haberdeki markadan BAŞKA bir markayı çağrıştıran logo, amblem ya da belirgin tasarım imzası (ör. haber BMW ise Mercedes yıldızı ya da Audi halkaları; haber Apple ise başka markanın bilinen telefon tasarımı).
+- Görselde okunur yazı, harf, rakam, logo, filigran.
+- Bozuk ya da anlamsız nesne, eğri çizgiler, fazla parmak, erimiş yüzeyler; gerçekçi olmayan, yapay duran sahne.
+- Haberin konusuyla ilgisiz sahne; tanınabilir gerçek kişi yüzü.
+KABUL: haberin konusunu genel ve gerçekçi anlatan, markasız ya da nötr görünen, temiz bir sahne. Emin değilsen reddet.
+Sadece şu JSON'u döndür: {"uygun": true ya da false, "neden": "kısa gerekçe"}`;
 
 /** Yapay zekâya gösterilecek aday listesi */
 export function adayListesi(adaylar: GorselAday[]): string {

@@ -14,7 +14,7 @@ import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, type Kategori } from "./site.ts";
-import { adayListesi, commons, kaynakGorselleri, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, type GorselAday } from "./gorsel.ts";
+import { adayListesi, commons, kaynakGorselleri, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, URETIM_DENETIM, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -488,10 +488,11 @@ async function kontrol(sb: Sb, id: number) {
     .eq("id", id).or(`qc_state.eq.bekliyor,and(qc_state.eq.calisiyor,qc_at.lt.${asili})`).select("*");
   const t = kilit?.[0];
   if (!t) return { atlandi: "Kontrol beklemiyor" };
-  const qc = (t.qc ?? {}) as { kaynak?: string; ilgili?: { baslik: string; link: string }[]; tam_metin?: boolean; ilk_govde?: string };
+  const qc = (t.qc ?? {}) as { kaynak?: string; ilgili?: { baslik: string; link: string }[]; tam_metin?: boolean; ilk_govde?: string; tur?: number; onceki_sorunlar?: string[] };
   const { data: it } = await sb.from("tr_items").select("*").eq("id", t.item_id ?? 0).maybeSingle();
   const notlar: string[] = [];
-  let durum = "";
+  let durum = "", guven = "";
+  const tur = qc.tur === 2 ? 2 : 1;
   try {
     // 1) Doğrulama + düzeltme + insanlaştırma
     let { title: baslik, spot, body: govde } = t as { title: string; spot: string; body: string };
@@ -499,21 +500,37 @@ async function kontrol(sb: Sb, id: number) {
     if (qc.kaynak && bitis - Date.now() > 60_000) {
       try {
         const uslup = await uslupAl(sb);
-        // Denetleyen yazandan bir üst model (Claude Opus; kullanıcı 2 Kasım: "sonnet yazarsa opus denetler"); yoksa Gemini
+        // Denetleyen yazandan bir üst model (Claude Opus; kullanıcı 2 Kasım: "sonnet yazarsa opus denetler"); yoksa Gemini.
+        // Amaç insanı aradan çıkarmak (kullanıcı 2 Kasım: "not düşmesi güzel ama düzeltsin"): güven yüksek değilse düzeltilmiş metin
+        // önceki sorunlarla birlikte bir sonraki çağrıda ikinci kez denetlenir (aşağıda "ikinci tur"); görsel ve panel o turda yapılır.
+        const onceki = tur === 2 && qc.onceki_sorunlar?.length ? `\n\n===\n\nÖNCEKİ DENETİMİN BULDUĞU SORUNLAR (hepsini metinde çöz; çözülemeyen bilgiyi metinden çıkar):\n- ${qc.onceki_sorunlar.join("\n- ")}` : "";
         const { veri: k, claudeHata } = await yz("kontrol", KONTROL_SISTEM(uslup),
-          `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik, spot, govde })}`,
+          `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik, spot, govde })}${onceki}`,
           MODELLER, bitis - 30_000, { claudeBitis: bitis - 45_000, maxTokens: 10_000 });
         if (claudeHata) notlar.push("Claude denetimi çalışmadı (" + claudeHata + "); kontrolü Gemini yaptı.");
         sorunlar = metinListe(k.sorunlar);
+        guven = String(k.guven ?? "");
         const yeniGovde = linkTemizle(String(k.govde ?? ""), (qc.ilgili ?? []).map((x) => x.link));
         const araBaslik = (x: string) => (x.match(/^## /gm) ?? []).length;
         // Güvenlik: ara başlık sayısı 2-4, metin özetlenmemiş
         if (araBaslik(yeniGovde) >= 2 && araBaslik(yeniGovde) <= 4 && yeniGovde.length > govde.length * 0.75) {
           govde = yeniGovde; baslik = String(k.baslik ?? "") || baslik; spot = spotKisalt(String(k.spot ?? "") || spot);
           durum = "kontrol edildi";
-        } else { notlar.push("Kalite kontrolünün önerdiği metin güvenlik denetiminden geçmedi (yapı bozuldu ya da kısaldı); ilk taslak korundu."); durum = "kontrol uygulanmadı"; }
-        if (k.guven === "dusuk") notlar.push("Kalite kontrolü: güven DÜŞÜK, kaynakları mutlaka oku.");
+        } else { notlar.push("Kalite kontrolünün önerdiği metin güvenlik denetiminden geçmedi (yapı bozuldu ya da kısaldı); " + (tur === 2 ? "ilk denetimin metni korundu." : "ilk taslak korundu.")); durum = tur === 2 ? "kontrol edildi" : "kontrol uygulanmadı"; }
+        if (guven === "dusuk") notlar.push("Kalite kontrolü: güven DÜŞÜK, kaynakları mutlaka oku.");
       } catch (e) { notlar.push("Kalite kontrolü çalışmadı (" + String((e as Error).message ?? e).slice(0, 100) + "); metni kaynaklarla sen karşılaştır."); durum = "kontrol çalışmadı"; }
+    }
+    // İkinci tur: güven yüksek değilse ve sorun bulunduysa düzeltilmiş metin bir kez daha denetlensin (kaynak metinler saklı kalır)
+    if (tur === 1 && durum === "kontrol edildi" && guven !== "yuksek" && sorunlar.length) {
+      const { data: sim } = await sb.from("tr_drafts").select("body,notes").eq("id", id).single();
+      await sb.from("tr_drafts").update({
+        ...(sim?.body === t.body ? { title: baslik, spot, body: govde } : {}),
+        notes: [...((sim?.notes ?? []) as string[]), ...notlar],
+        qc: { ...qc, tur: 2, onceki_sorunlar: sorunlar, ilk_guven: guven }, qc_state: "bekliyor", qc_at: new Date().toISOString(),
+      }).eq("id", id);
+      if (sim?.body === t.body) { await kontrolBaslat(id); return { ikinci_tur: true, sorunlar }; }
+      await sb.from("tr_drafts").update({ qc_state: "tamam", qc: { ...qc, kaynak: undefined, sorunlar, durum: "kontrol edildi", bitti: new Date().toISOString() } }).eq("id", id);
+      return { atlandi: "Editör metni değiştirmiş, ikinci tur yapılmadı" };
     }
     // Önem (10'luk) ve ana sayfa adaylığı editöre not olarak
     const d = it ? degerlendir(it) : null;
@@ -536,8 +553,17 @@ async function kontrol(sb: Sb, id: number) {
     const img = (t.image ?? {}) as Record<string, unknown> & { aramalar?: string[]; ai_istem?: string; secilen?: GorselAday | null };
     if (it && !img.secilen) {
       const oneCikan = await gorselSec(sb, it, baslik || it.title, img.aramalar ?? [], bitis);
-      const flux = !oneCikan.secilen ? { durum: "bekliyor", istem: fluxIstem(String(img.ai_istem || baslik)), istendi: new Date().toISOString() } : null;
-      await sb.from("tr_drafts").update({ image: { ...img, secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: oneCikan.neden, ...(flux ? { flux } : {}) } }).eq("id", id);
+      // Uygun fotoğraf yoksa yapay zekâ ile üretilir ve denetlenir; o da olmazsa eski yol: Fatih'in bilgisayarındaki Flux işçisine istek
+      let uretim: { secilen: GorselAday | null; neden: string } | null = null;
+      if (!oneCikan.secilen) uretim = await yzGorselUret(sb, id, { baslik: baslik || it.title, marka: it.brand ?? "", urun: it.product ?? "", istem: String(img.ai_istem || baslik) }, bitis);
+      const secilen = oneCikan.secilen ?? uretim?.secilen ?? null;
+      const neden = uretim ? (uretim.secilen ? uretim.neden : oneCikan.neden + " " + uretim.neden) : oneCikan.neden;
+      const flux = !secilen ? { durum: "bekliyor", istem: fluxIstem(String(img.ai_istem || baslik)), istendi: new Date().toISOString() } : null;
+      await sb.from("tr_drafts").update({ image: { ...img, secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: neden, ...(uretim?.secilen ? { yz_uretim: true } : {}), ...(flux ? { flux } : {}) } }).eq("id", id);
+      if (uretim?.secilen) {
+        const { data: n } = await sb.from("tr_drafts").select("notes").eq("id", id).single();
+        await sb.from("tr_drafts").update({ notes: [...((n?.notes ?? []) as string[]), "Görsel: uygun fotoğraf bulunamadı, öne çıkan görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan."] }).eq("id", id);
+      }
     }
 
     // 3) Panele taslak haber olarak: otomatik ve elle hazırlanan bütün taslaklar (Fatih, 23 Ekim 2026: "hazırlayınca panelde görünsün").
@@ -561,6 +587,43 @@ async function kontrol(sb: Sb, id: number) {
     await sb.from("tr_drafts").update({ qc_state: "hata", editor_note: [String(t.editor_note ?? ""), "Kalite kontrolü hata verdi: " + String((e as Error).message ?? e).slice(0, 200)].filter(Boolean).join("\n") }).eq("id", id);
     return { hata: String(e) };
   }
+}
+
+// ---------- Yapay zekâ ile görsel üretimi (2 Kasım 2026, kullanıcı: "sadece bulunamayan aşamada devreye girer, editöre bilgisini verir") ----------
+// Uygun fotoğraf yoksa Cloudflare görsel programının "/uret" yolu (Workers AI, Flux schnell) görsel üretir; Claude (yoksa Gemini) görseli
+// görerek denetler: başka markayı çağrıştıran tasarım, yazı, bozuk nesne varsa reddedilir. İki deneme; ikisi de geçmezse görselsiz kalır.
+async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: string; urun: string; istem: string }, bitis: number): Promise<{ secilen: GorselAday | null; neden: string }> {
+  const { data } = await sb.from("baglanti_anahtarlari").select("ad,deger").in("ad", ["cloudflare_adres", "cloudflare_anahtar"]);
+  const m = Object.fromEntries(((data ?? []) as { ad: string; deger: string }[]).map((r) => [r.ad, r.deger]));
+  if (!m.cloudflare_adres || !m.cloudflare_anahtar) return { secilen: null, neden: "Cloudflare görsel programı bağlı değil." };
+  const sonuclar: string[] = [];
+  for (let deneme = 0; deneme < 2; deneme++) {
+    if (bitis - Date.now() < 30_000) { sonuclar.push("süre yetmedi"); break; }
+    const istem = fluxIstem(o.istem) + (deneme ? " Show the subject as a neutral concept or a close-up detail, not a full branded product." : "");
+    let b: Uint8Array, mime: string;
+    try {
+      const r = await fetch(String(m.cloudflare_adres).replace(/\/$/, "") + "/uret", { method: "POST", headers: { "x-anahtar": m.cloudflare_anahtar, "Content-Type": "application/json" }, body: JSON.stringify({ istem }), signal: AbortSignal.timeout(25_000) });
+      if (!r.ok) { sonuclar.push("üretilemedi (" + (await r.text()).slice(0, 80) + ")"); if (r.status === 500 || r.status === 401) break; continue; }
+      mime = (r.headers.get("content-type") ?? "image/webp").split(";")[0]; b = new Uint8Array(await r.arrayBuffer());
+    } catch (e) { sonuclar.push("üretim hatası: " + String((e as Error).message ?? e).slice(0, 60)); continue; }
+    let s2 = ""; for (let i = 0; i < b.length; i += 0x8000) s2 += String.fromCharCode(...b.subarray(i, i + 0x8000));
+    let uygun = false, neden = "";
+    try {
+      const { veri } = await yz("gorsel", URETIM_DENETIM, `Haber başlığı: ${o.baslik}\nMarka: ${o.marka || "-"}\nÜrün: ${o.urun || "-"}`, ["gemini-3.5-flash", ...MODELLER],
+        Math.min(bitis - 10_000, Date.now() + 30_000), { claudeBitis: Math.min(bitis - 20_000, Date.now() + 20_000), resimler: [{ mime, b64: btoa(s2), etiket: "Üretilen görsel" }] });
+      uygun = veri.uygun === true; neden = String(veri.neden ?? "").slice(0, 160);
+    } catch (e) { neden = "denetlenemedi: " + String((e as Error).message ?? e).slice(0, 60); }
+    if (!uygun) { sonuclar.push(`${deneme + 1}. deneme reddedildi: ${neden}`); continue; }
+    const yol = `flux/${id}-${Date.now()}.${mime === "image/png" ? "png" : mime === "image/jpeg" ? "jpg" : "webp"}`;
+    const y = await sb.storage.from("haber-gorsel").upload(yol, b, { contentType: mime, upsert: true });
+    if (y.error) return { secilen: null, neden: "Üretilen görsel depolamaya yüklenemedi: " + y.error.message };
+    const url = sb.storage.from("haber-gorsel").getPublicUrl(yol).data.publicUrl;
+    return {
+      secilen: { kaynak: "Yapay zekâ (Flux)", sayfa: url, buyuk: url, thumb: url, yazar: "Updated (yapay zekâ)", lisans: "Yapay zekâ üretimi", aciklama: istem, w: 1600, h: 900 },
+      neden: `Uygun fotoğraf bulunamadı; görsel yapay zekâ destekli üretildi ve denetlendi (${neden}). Daha iyi bir görsel bulursan değiştir.`,
+    };
+  }
+  return { secilen: null, neden: "Yapay zekâ görseli de uygun bulunmadı: " + sonuclar.join("; ") };
 }
 
 // ---------- Flux (Fatih'in bilgisayarında çevrimdışı görsel üretimi; scripts/flux-isci) ----------
