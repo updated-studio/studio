@@ -162,6 +162,7 @@ export default function Baglantilar() {
               {d.ek?.hesap ? ` · hesap @${d.ek.hesap}` : ""}{d.ek?.bitis ? ` · geçerli: ${tarih(d.ek.bitis)}` : ""}{d.ek?.son_cekim ? ` · son çekim ${tarih(d.ek.son_cekim)}` : ""}
               {d.ek?.hata ? <div className="msg err" style={{ marginTop: 6 }}>{d.ek.hata}</div> : null}</div>}
             {a.ad === "cloudflare_adres" && d && <CloudflareGuncelle />}
+            {a.ad === "claude" && d && <ClaudeDene />}
             {(!d || d.ek?.hata) && <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
               {a.adimlar.map((s) => <li key={s.metin}>{s.metin}{s.link && <> · <a href={s.link} target="_blank" rel="noopener noreferrer">aç</a></>}</li>)}
             </ol>}
@@ -212,6 +213,24 @@ function CloudflareGuncelle() {
         <button type="button" className="btn sm" disabled={mesgul} onClick={dene}>{mesgul ? "Görsel üretiliyor…" : "Dene"}</button>
       </div>
       {sonuc && (sonuc.ok ? <div className="msg good">Çalışıyor: {sonuc.model} ile görsel üretildi ({Math.round((sonuc.sure ?? 0) / 1000)} sn).</div> : <div className="msg err">{sonuc.hata}</div>)}
+    </div>
+  );
+}
+
+// Claude anahtarını dene (3 Kasım 2026): en küçük modelle tek kısa istek; kredi, anahtar ya da bağlantı sorununu söyler
+function ClaudeDene() {
+  const [sonuc, setSonuc] = useState<{ ok?: boolean; hata?: string; model?: string; sure?: number } | null>(null);
+  const [mesgul, setMesgul] = useState(false);
+  async function dene() {
+    setMesgul(true); setSonuc(null);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { claude_dene: true } });
+    setMesgul(false);
+    setSonuc(error ? { hata: error.message } : (data as typeof sonuc));
+  }
+  return (
+    <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <button type="button" className="btn sm" disabled={mesgul} onClick={dene}>{mesgul ? "Deneniyor…" : "Dene"}</button>
+      {sonuc && (sonuc.ok ? <span className="msg good">Çalışıyor: {sonuc.model} yanıt verdi ({Math.round((sonuc.sure ?? 0) / 100) / 10} sn).</span> : <span className="msg err">{sonuc.hata}</span>)}
     </div>
   );
 }

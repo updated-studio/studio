@@ -857,6 +857,15 @@ Deno.serve(async (req) => {
     const r = await adaySec(sb, Number(govde.gorsel_sec), String(govde.model ?? ""), p.name ?? "");
     return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
   }
+  // Claude anahtarını dene (yönetici): en küçük modelle tek kısa istek
+  if (govde?.claude_dene) {
+    if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
+    const t0 = Date.now();
+    try {
+      const c = await claudeJson({ sistem: 'Sadece {"tamam": true} döndür.', kullanici: "Bağlantı denemesi.", model: CLAUDE_MODEL.kucuk, ms: 30_000, maxTokens: 50 });
+      return Response.json(c ? { ok: true, model: c.model, sure: Date.now() - t0 } : { ok: false, hata: "Claude anahtarı kayıtlı değil." }, { headers: CORS });
+    } catch (e) { return Response.json({ ok: false, hata: String((e as Error).message ?? e).slice(0, 200) }, { headers: CORS }); }
+  }
   // Cloudflare görsel programını dene (yönetici): yeni kod ve yapay zekâ bağlaması yerinde mi
   if (govde?.uret_dene) {
     if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
