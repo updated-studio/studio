@@ -53,7 +53,7 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
   },
   {
     ad: "claude", baslik: "Claude anahtarı (otomatik taslak)", ikon: "sohbet",
-    aciklama: "Otomatik taslaklarda öne çıkan görseli Claude seçer; görseli gerçekten görüp haberdeki ürünle karşılaştırır. Anahtar yoksa ya da kredi biterse sistem kendiliğinden Gemini'ye döner. Ücret Anthropic hesabındaki krediden düşer.",
+    aciklama: "Otomatik taslağı Claude Sonnet yazar, Claude Opus kaynaklara karşı denetler; görsel seçimi ve üretilen görselin denetimi de Claude'da. Anahtar yoksa ya da kredi biterse sistem kendiliğinden Gemini'ye döner. Ücret Anthropic hesabındaki krediden düşer.",
     adimlar: [
       { metin: "Kredisi olan hesapla Anthropic Console'a gir ve sol menüde \"Billing\" bölümünde kredinin göründüğünü kontrol et", link: "https://console.anthropic.com/settings/billing" },
       { metin: "\"API keys\" → \"Create key\" → ad: updated-studyo → oluştur", link: "https://console.anthropic.com/settings/keys" },
