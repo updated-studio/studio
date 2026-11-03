@@ -98,13 +98,20 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
   const eksik = sema.checklist.filter(([a]) => !f.checklist[a]).length;
   const degis = () => { setDegisti(true); noRef.current += 1; setNo(noRef.current); };
   const set = <K extends keyof Form>(a: K, v: Form[K]) => { setF({ ...f, [a]: v }); degis(); };
+  // Yazar (3 Kasım 2026, kullanıcı: "kim hangi hesaptan girdiyse o editör olarak paylaşım yapsın, başkasının adına haber girilemesin"):
+  // seçilemez. Yazarı boş ya da "Updated Stüdyo" (otomatik taslak) olan haber, kaydeden hesabın yazar profiline geçer; başkasının haberi
+  // ona kalır (inceleyen yayın yönetmeni yazar olmaz).
+  const benimYazar = typeof kullanici.author === "object" ? kullanici.author?.id ?? null : kullanici.author ?? null;
+  const sistemYazar = yazarlar.find((x) => /stüdyo|studyo/i.test(x.ad))?.id ?? null;
+  const yazarKaydi = f.author && f.author !== sistemYazar ? f.author : benimYazar ?? f.author;
+  const yazarAdi = yazarlar.find((x) => x.id === yazarKaydi)?.ad ?? (yazarKaydi === benimYazar ? kullanici.name : "");
 
   /** Sunucuya gidecek veri: değişen alanlar + grup alanları bütün hâlde */
   const genelVeri = Object.fromEntries(veriAlanlari(alanYapisi).filter((a) => !OZEL.has(a.name!) && !a.admin?.readOnly && a.name! in ek).map((a) => [a.name!, ek[a.name!]]));
   const veri = (durum?: string): Record<string, unknown> => ({
     ...genelVeri,
     title: f.title, spot: f.spot, category: f.category, label: f.label, cover: f.cover, shortAnswer: f.shortAnswer,
-    author: f.author, publishedAt: f.publishedAt || null,
+    author: yazarKaydi, publishedAt: f.publishedAt || null,
     ...(bilinmeyen.length ? {} : { body: f.body }),
     seo: { ...(ek.seo as object), title: f.seoTitle, description: f.seoDescription },
     workflow: { ...(ek.workflow as object), checklist: f.checklist, ...(durum ? { state: durum } : {}) },
@@ -219,12 +226,11 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
               {sema.labels.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
             </select>
           </label>
-          <label>Yazar
-            <select value={f.author ?? ""} onChange={(e) => set("author", e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Seç…</option>
-              {yazarlar.map((x) => <option key={x.id} value={x.id}>{x.ad}</option>)}
-            </select>
-          </label>
+          <div className="site-yazar">
+            <span>Yazar</span>
+            <b>{yazarAdi || "—"}</b>
+            <span className="muted">{yazarKaydi === benimYazar ? (yazarKaydi !== f.author ? "Kaydedince senin adınla yayımlanır" : "Sen") : "Haberi yazan; değiştirilemez"}</span>
+          </div>
           <label>Yayın zamanı <span className="muted">(boşsa yayınlandığı an)</span>
             <input type="datetime-local" value={yerel(f.publishedAt)} onChange={(e) => set("publishedAt", e.target.value ? new Date(e.target.value).toISOString() : "")} />
           </label>

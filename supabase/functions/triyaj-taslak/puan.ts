@@ -5,7 +5,7 @@
 // Kural değişince: değerleri güncelle, ONCELIK_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz (CLAUDE.md kural 10).
 // Enes'in kararları: puan markadan bağımsız; Öncelikli marka listesi puanı etkilemez (sadece elemede kullanılır).
 
-export const ONCELIK_SURUMU = "24 Ekim 2026";
+export const ONCELIK_SURUMU = "3 Kasım 2026";
 
 // 1) Haberin türü: markadan bağımsız temel değer. Yapay zekâ her haberi bu listeden birine koyar ("tip" etiketi).
 export const HABER_TURLERI: { ad: string; puan: number; aciklama: string }[] = [
@@ -33,7 +33,8 @@ export const KONU_ILGI: Record<string, number> = {
 // 2) Ek puanlar
 export const EK = {
   kaynakBasina: 8, kaynakEnFazla: 24,                        // aynı haberi yazan her ek kaynak
-  taze: [[3, 20], [12, 12], [24, 6]] as [number, number][],   // [saatten yeni, puan]
+  // Tazelik (3 Kasım 2026, kullanıcı: "puan bir anda o kadar düşmemeli"): basamak yerine düz azalma; yeni haber +20, 24 saatte 0.
+  taze: { enFazla: 20, saat: 24 },
   turkiyeZayif: -16,                                          // Öncelikli marka olduğu için elenmeyen "Türkiye'de yok" haberi
   gundem: 10,                                                 // konusu Türkiye gündeminde (Google Trends TR terimi haberde geçiyor; sadece sinyal, içerik alınmaz)
 };
@@ -62,6 +63,9 @@ export function haberTuru(h: Pick<PuanHaber, "news_type" | "kind">): string {
   return ESKI_TUR[h.kind] ?? "Diğer";
 }
 
+/** Tazelik puanı: yayından bu yana geçen saate göre düz azalır (en fazla EK.taze.enFazla, EK.taze.saat saatte 0) */
+export const tazelik = (saat: number) => Math.max(0, Math.round(EK.taze.enFazla * (1 - Math.max(0, saat) / EK.taze.saat)));
+
 export function degerlendir(h: PuanHaber, simdi = Date.now()): Degerlendirme {
   const tur = haberTuru(h);
   const gerekce: string[] = [tur];
@@ -72,8 +76,8 @@ export function degerlendir(h: PuanHaber, simdi = Date.now()): Degerlendirme {
   const kaynak = new Set((h.other_sources ?? []).map((o) => o.name).filter((n) => n && n !== h.source_name)).size;
   if (kaynak) { puan += Math.min(EK.kaynakEnFazla, kaynak * EK.kaynakBasina); gerekce.push(`${kaynak + 1} kaynak`); }
   const saat = (simdi - Date.parse(h.published_at ?? h.created_at)) / 3_600_000;
-  const t = EK.taze.find(([s]) => saat < s);
-  if (t) { puan += t[1]; gerekce.push(saat < 1 ? "yeni" : `${Math.round(saat)} sa önce`); }
+  const t = tazelik(saat);
+  if (t > 0) { puan += t; gerekce.push(saat < 1 ? "yeni" : `${Math.round(saat)} sa önce`); }
   if (h.trend) { puan += EK.gundem; gerekce.push(`gündemde: ${h.trend}`); }
   if (h.turkey === "yok") { puan += EK.turkiyeZayif; gerekce.push("Türkiye ilgisi zayıf"); }
   if (h.turkey === "global") gerekce.push("global ilgi");

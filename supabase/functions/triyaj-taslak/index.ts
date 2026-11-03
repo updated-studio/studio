@@ -117,10 +117,10 @@ async function gemini(sistem: string, kullanici: string, modeller: string[], bit
 /** Önce Claude (rolün modeli; Bağlantı anahtarları "claude"), anahtar yoksa ya da hata verirse Gemini (2 Kasım 2026).
  *  claudeBitis: Claude'a ayrılan son an; hata verirse Gemini'ye kalan süre kalsın diye bitis'ten önce tutulur. */
 async function yz(rol: keyof typeof CLAUDE_MODEL, sistem: string, kullanici: string, modeller: string[], bitis: number,
-  o: { claudeBitis?: number; resimler?: { mime: string; b64: string; etiket?: string }[]; maxTokens?: number } = {}) {
+  o: { claudeBitis?: number; resimler?: { mime: string; b64: string; etiket?: string }[]; maxTokens?: number; caba?: "low" | "medium" | "high" } = {}) {
   let claudeHata = "";
   try {
-    const c = await claudeJson({ sistem, kullanici, model: CLAUDE_MODEL[rol], ms: (o.claudeBitis ?? bitis) - Date.now(), resimler: o.resimler, maxTokens: o.maxTokens });
+    const c = await claudeJson({ sistem, kullanici, model: CLAUDE_MODEL[rol], ms: (o.claudeBitis ?? bitis) - Date.now(), resimler: o.resimler, maxTokens: o.maxTokens, caba: o.caba });
     if (c) return { ...c, claudeHata };
   } catch (e) { claudeHata = String((e as Error).message ?? e).slice(0, 120); }
   return { ...(await gemini(sistem, kullanici, modeller, bitis, o.resimler ?? [])), claudeHata };
@@ -513,7 +513,8 @@ async function kontrol(sb: Sb, id: number) {
         const onceki = tur === 2 && qc.onceki_sorunlar?.length ? `\n\n===\n\nÖNCEKİ DENETİMİN BULDUĞU SORUNLAR (hepsini metinde çöz; çözülemeyen bilgiyi metinden çıkar):\n- ${qc.onceki_sorunlar.join("\n- ")}` : "";
         const { veri: k, claudeHata } = await yz("kontrol", KONTROL_SISTEM(uslup),
           `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik, spot, govde })}${onceki}`,
-          MODELLER, bitis - 30_000, { claudeBitis: bitis - 45_000, maxTokens: 10_000 });
+          // Denetim daha derin düşünür (3 Kasım 2026: başlıktaki çıkarım kaçmıştı); görsel ayrı çağrıda olduğu için süre buna ayrılır
+          MODELLER, bitis - 8_000, { claudeBitis: bitis - 25_000, maxTokens: 12_000, caba: "medium" });
         if (claudeHata) notlar.push("Claude denetimi çalışmadı (" + claudeHata + "); kontrolü Gemini yaptı.");
         sorunlar = metinListe(k.sorunlar);
         guven = String(k.guven ?? "");

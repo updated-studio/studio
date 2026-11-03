@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
-import { useKisi, zamanOnce } from "./ortak";
+import { Seviye, useKisi, zamanOnce } from "./ortak";
+import { degerlendir } from "./oncelik";
+import Bilgi from "../../shared/Bilgi";
 import { useMasa, type Taslak } from "./veri";
 
 // Markdown → HTML ortak dosyada: ekrandaki önizleme ve "HTML kopyala" aynı çıktıyı kullanır (panele Markdown gider).
@@ -195,6 +197,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       {haber && <div className="muted">Haber: <a href={haber.link} target="_blank" rel="noreferrer">{haber.event || haber.title}</a></div>}
       {t.auto && <div className="muted">🤖 Bu taslağı Stüdyo en güçlü haberlerden otomatik hazırladı{t.author ? " ve ilgi alanına göre sana verdi" : ""}. Yayından önce doğrulama listesine bak.</div>}
       {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel ve panele gönderim). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
+      <OnemSatiri t={t} haber={haber} />
       {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
       {t.site_id && <div className="msg good">Panelde taslak haber olarak duruyor{t.site_gonderim ? " (" + zamanOnce(t.site_gonderim) + " önce gönderildi)" : ""}. {t.site_onizleme && <a href={t.site_onizleme} target="_blank" rel="noreferrer">Son taslağı aç ↗</a>}{t.site_admin && <> · <a href={t.site_admin} target="_blank" rel="noreferrer">Panelde aç ↗</a></>}</div>}
       {!t.site_id && t.site_eksik?.kaldirildi && <div className="muted">Panelde {t.site_eksik.gun} gün kimse dokunmadığı için {zamanOnce(t.site_eksik.kaldirildi)} önce panelden kaldırıldı. Yeniden göndermek için "Panele gönder"e bas.</div>}
@@ -267,5 +270,26 @@ function Duzeltmeler({ qc }: { qc: Taslak["qc"] }) {
         );
       })}
     </>
+  );
+}
+
+// Önem: şu an ve taslak anında (3 Kasım 2026, kullanıcı: "ikisi eşit görünsün, neden düşük olduğunu da bilsin, i balonu"). Haber Masası'ndaki
+// puan o anki saate göre hesaplanır; taslaktaki kontrol anında sabitlenir. Fark tazelik payından gelir (puan.ts tazelik).
+function OnemSatiri({ t, haber }: { t: Taslak; haber?: Parameters<typeof degerlendir>[0] }) {
+  if (!haber) return null;
+  const simdi = degerlendir(haber);
+  const once = t.qc?.onem ?? null;
+  const saat = Math.max(0, (Date.now() - Date.parse(haber.published_at ?? haber.created_at)) / 36e5);
+  const fark = once != null ? Math.round((once - simdi.onem) * 10) / 10 : 0;
+  return (
+    <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <Seviye d={simdi} />
+      <span className="muted">şu an{once != null && once !== simdi.onem ? ` · taslak hazırlanırken ${once.toLocaleString("tr")}` : ""}</span>
+      <Bilgi baslik="Önem neden değişiyor?">
+        Puanın bir kısmı tazelik payıdır: yeni haber +20 alır, bu pay 24 saatte düzgünce 0'a iner. Haber {Math.round(saat)} saat önce yayımlandı.
+        {fark > 0 ? ` Taslak hazırlandığından bu yana önem ${fark.toLocaleString("tr")} düştü; bu yalnız zamandan, haberin kendisinden değil.` : ""}
+        {" "}Gerekçe: {simdi.gerekce.join(", ")}.
+      </Bilgi>
+    </div>
   );
 }

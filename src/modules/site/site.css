@@ -186,3 +186,13 @@
 /* Site'nin üst seçimi: Haber Masası | Site içeriği (31 Ekim 2026) */
 .site-ust { align-self: flex-start; }
 .site-ust button { font-size: 15px; font-weight: 600; padding-inline: 16px; }
+
+/* Yazar alanı seçilemez (3 Kasım 2026): kaydeden hesap */
+.site-yazar { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.site-yazar > span:first-child { font-weight: 600; }
+.site-yazar .muted { font-size: 12px; }
+/* Dar ekranda dizi satırları ve alanlar kutudan taşmasın (3 Kasım 2026: mobilde Kaynaklar taşıyordu) */
+.site-dizi-satir, .site-satir-duzen > * { min-width: 0; }
+.site-satir-duzen { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.site-dizi-ust { flex-wrap: wrap; gap: 6px; }
+.site-form input, .site-form textarea, .site-form select { max-width: 100%; min-width: 0; }

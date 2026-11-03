@@ -53,7 +53,7 @@ export function OncelikBilgisi() {
         <div className="satir"><div className="ana"><b>Haber türü</b> (temel puan)<div className="muted">{HABER_TURLERI.map((t) => `${t.ad} ${t.puan}`).join(" · ")}</div></div></div>
         <div className="satir"><div className="ana"><b>Konunun Türkiye'deki genel ilgisi</b><div className="muted">{Object.entries(KONU_ILGI).map(([k, p]) => `${k} ${p > 0 ? "+" : ""}${p}`).join(" · ")}</div></div></div>
         <div className="satir"><div className="ana"><b>Aynı haberi yazan her ek kaynak</b><div className="muted">+{EK.kaynakBasina}, en fazla +{EK.kaynakEnFazla}</div></div></div>
-        <div className="satir"><div className="ana"><b>Tazelik</b><div className="muted">{EK.taze.map(([s, p]) => `${s} saatten yeni +${p}`).join(" · ")}</div></div></div>
+        <div className="satir"><div className="ana"><b>Tazelik</b><div className="muted">Yeni haber +{EK.taze.enFazla}; saat geçtikçe düzgünce azalır, {EK.taze.saat} saatte 0 olur. Bu yüzden puan zamanla yavaşça düşer.</div></div></div>
         <div className="satir"><div className="ana"><b>Konusu Türkiye gündeminde</b><div className="muted">+{EK.gundem} (Google Trends Türkiye'deki terim haberde geçiyorsa; Türk haber sitelerinden içerik alınmaz)</div></div></div>
         <div className="satir"><div className="ana"><b>Öncelikli marka olduğu için elenmeyen "Türkiye'de yok" haberi</b><div className="muted">{EK.turkiyeZayif}</div></div></div>
         <div className="satir"><div className="ana"><b>Seviye</b><div className="muted">Önem 10 üzerinden = puan ÷ 10. {SEVIYELER.map((s) => `${s.ad} (${s.aciklama}): ${(s.enAz / 10).toLocaleString("tr")}+`).join(" · ")}. Otomatik taslak eşiği Ayarlar'da.</div></div></div>

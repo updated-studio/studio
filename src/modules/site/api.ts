@@ -7,7 +7,7 @@ export const SITE = "https://updated.com.tr";
 
 export type Koleksiyon = "news" | "reviews" | "comparisons";
 export type Durum = "taslak" | "incelemede" | "planlandi" | "yayinda" | "arsiv";
-export type PanelKullanici = { id: number; name: string; email: string; role: string };
+export type PanelKullanici = { id: number; name: string; email: string; role: string; author?: number | { id: number; name?: string } | null };
 export type Icerik = {
   id: number;
   title?: string;

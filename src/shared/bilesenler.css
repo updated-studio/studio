@@ -224,3 +224,10 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 /* Süzgeç ızgarası (Hareket geçmişi): seçimler yan yana, dar ekranda alt alta */
 .suzgec-izgara { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 8px; }
 @media (max-width: 560px) { .filtre:has(> .chip) { display: flex; } }
+
+/* Bilgi balonu (shared/Bilgi.tsx, 3 Kasım 2026) */
+.bilgi { position: relative; display: inline-flex; }
+.bilgi-dugme { background: none; border: 0; padding: 4px; color: var(--muted); display: grid; place-items: center; cursor: pointer; border-radius: 50%; }
+.bilgi-dugme:hover, .bilgi-dugme[aria-expanded="true"] { color: var(--blue); }
+.bilgi-balon { position: absolute; z-index: 30; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: min(300px, 80vw); display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 24px rgb(0 0 0 / .18); font-size: 13px; font-weight: 400; color: var(--ink); line-height: 1.45; }
+@media (max-width: 640px) { .bilgi-balon { left: auto; right: -8px; transform: none; } }

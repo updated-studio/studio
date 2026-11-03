@@ -55,7 +55,8 @@ export async function claudeJson(o: { sistem: string; kullanici: string; model: 
   icerik.push({ type: "text", text: o.kullanici });
   try {
     const m = await client.messages.create({
-      model: o.model, max_tokens: o.maxTokens ?? 2048, system: o.sistem,
+      // Sistem istemi önbelleğe alınır (aynı üslup ve kontrol yönergesi her taslakta tekrar gider; tekrar okunması %90 ucuz)
+      model: o.model, max_tokens: o.maxTokens ?? 2048, system: [{ type: "text", text: o.sistem, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: icerik }],
       output_config: { effort: o.caba ?? "low", ...(o.sema ? { format: { type: "json_schema", schema: o.sema } } : {}) },
     } as Anthropic.MessageCreateParamsNonStreaming);

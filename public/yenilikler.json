@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-11-03-e",
+    "tarih": "3 Kasım 2026",
+    "baslik": "Önem ve yazar düzeltmeleri",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Önem puanı artık zamanla yavaşça düşüyor, bir anda inmiyor.",
+          "Taslakta önem 'şu an' ve 'taslak hazırlanırken' birlikte görünür; (i) balonu nedenini anlatır."
+        ]
+      },
+      {
+        "ad": "Haber yaz",
+        "maddeler": [
+          "Yazar seçilemez: haber, kaydeden hesabın adıyla yayımlanır.",
+          "Telefonda kaynaklar alanı ekrandan taşmıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-03-d",
     "tarih": "3 Kasım 2026",
     "baslik": "Bağlantı anahtarları yenilendi",
