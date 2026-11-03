@@ -69,7 +69,8 @@ struct Duzenleyici: View {
                     TextField("Başlık", text: depo.baslikBaglama(m.id))
                         .textFieldStyle(.plain)
                         .font(.system(size: 24, weight: .bold))
-                    Spacer(minLength: 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
                     Button(oturum.panelGorunur ? "Prompter'ı gizle" : "Prompter'ı göster") {
                         PanelYoneticisi.ortak.degistir()
                     }
@@ -119,10 +120,7 @@ struct AyarPaneli: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 if ayarlar.kip == .ses, oturum.mikrofon.sorunlu {
-                    Text(oturum.mikrofon.yazi + ". Sistem Ayarları › Gizlilik ve Güvenlik'te Mikrofon ve Konuşma Tanıma altında UPrompter'a izin verin.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                    MikrofonSorunu(durum: oturum.mikrofon)
                 }
                 Kaydirici(ad: "Sabit hız", deger: $ayarlar.hiz, aralik: 10...160, adim: 2, birim: "pt/sn")
 
@@ -167,6 +165,48 @@ struct AyarPaneli: View {
     }
 }
 
+/// Sese göre kaydırma çalışmadığında ne yapılacağını söyler ve ilgili ayarı açar.
+struct MikrofonSorunu: View {
+    let durum: MikrofonDurumu
+
+    private var aciklama: String {
+        switch durum {
+        case .dikteKapali:
+            return "Türkçe konuşma tanıma için Mac'te Dikte açık olmalı. Sistem Ayarları › Klavye › Dikte'yi açın, dil olarak Türkçe'yi ekleyin, sonra Başlat'a yeniden basın."
+        case .izinYok:
+            return "Sistem Ayarları › Gizlilik ve Güvenlik'te Mikrofon ve Konuşma Tanıma altında UPrompter'ı açın."
+        case .desteklenmiyor:
+            return "Bu Mac'te Türkçe konuşma tanıma şu an kullanılamıyor. Dikte'nin açık olduğunu ve internete bağlı olduğunuzu kontrol edin."
+        default:
+            return durum.yazi
+        }
+    }
+
+    private var ayarAdresi: String {
+        switch durum {
+        case .izinYok: return "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+        default: return "x-apple.systempreferences:com.apple.Keyboard-Settings.extension"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(durum.yazi).font(.system(size: 13, weight: .semibold))
+            Text(aciklama)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(durum == .izinYok ? "Gizlilik ayarlarını aç" : "Klavye ayarlarını aç") {
+                if let url = URL(string: ayarAdresi) { NSWorkspace.shared.open(url) }
+            }
+            .controlSize(.small)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.12)))
+    }
+}
+
 struct Bolum: View {
     let ad: String
     init(_ ad: String) { self.ad = ad }
@@ -195,7 +235,10 @@ struct Kaydirici: View {
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            Slider(value: $deger, in: aralik, step: adim)
+            Slider(value: Binding(
+                get: { deger },
+                set: { deger = min(aralik.upperBound, max(aralik.lowerBound, ($0 / adim).rounded() * adim)) }
+            ), in: aralik)
         }
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 
 enum MikrofonDurumu: Equatable {
-    case kapali, acik, dinliyor, izinYok, desteklenmiyor
+    case kapali, acik, dinliyor, izinYok, desteklenmiyor, dikteKapali
     case hata(String)
 
     var yazi: String {
@@ -12,13 +12,14 @@ enum MikrofonDurumu: Equatable {
         case .dinliyor: return "Sesi takip ediyor"
         case .izinYok: return "Mikrofon ya da konuşma tanıma izni yok"
         case .desteklenmiyor: return "Türkçe konuşma tanıma kullanılamıyor"
+        case .dikteKapali: return "Mac'te Dikte kapalı"
         case .hata(let m): return "Hata: \(m)"
         }
     }
 
     var sorunlu: Bool {
         switch self {
-        case .izinYok, .desteklenmiyor, .hata: return true
+        case .izinYok, .desteklenmiyor, .dikteKapali, .hata: return true
         default: return false
         }
     }

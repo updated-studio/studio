@@ -151,6 +151,13 @@ final class SesTakipci {
             if sonuc.isFinal { yeniGorevGecikmeli() }
         } else if let hata {
             let ns = hata as NSError
+            // Türkçe cihazda tanınamıyorsa Apple sunucusu kullanılır; bunun için Mac'te Dikte açık olmalı.
+            let metin = ns.localizedDescription.lowercased()
+            if metin.contains("dictation") || metin.contains("siri") || metin.contains("dikte") {
+                durdur()
+                durumDegisti?(.dikteKapali)
+                return
+            }
             // 1110: konuşma duyulmadı. Sessizlik hata sayılmaz.
             let sessizlik = ns.code == 1110
             if !sessizlik { ardisikHata += 1 }
