@@ -190,6 +190,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 ## 12. Karar günlüğü
 
+- **3 Kasım 2026:** Öncelik puanında tazelik basamaktan düz azalmaya geçti (`puan.ts` `tazelik`: +20, 24 saatte 0; ONCELIK_SURUMU 3 Kasım). Taslakta önem "şu an" ve "taslak anında" birlikte, bilgi balonuyla. Stüdyo'da haber yazarı seçilemez (kaydeden hesabın yazar profili). Görsel model kıyası ve Claude ile taslak yazımı/denetimi (Gemini yedek).
 - **28 Ekim 2026:** Kapak görselleri: yapay zekâ seçerken konunun yerini (odak) de verir; editör Stüdyo'da kapağın altında sitedeki kırpmaları görür, odağı otomatik ya da elle ayarlar (`gorsel-odak` fonksiyonu, `KapakOnizleme`). Uygunsuz görsel (kenarda yazı, köşede konu) seçilmez; odak yalnız kırpma penceresini kaydırır, yakınlaştırmaz.
 - **28 Ekim 2026:** Hareket geçmişi: panel ve Stüdyo'daki her işlem `public.hareketler` tablosunda (yalnız ekleme, yöneticiler okur; göç 0045). Panel kancası site deposunda, Stüdyo tarafı tetikleyicilerle; silinen içerik Stüdyo'dan geri getirilir.
 - **8 Ekim 2026:** Ekip paneli için Supabase seçildi; giriş davet listesiyle.
