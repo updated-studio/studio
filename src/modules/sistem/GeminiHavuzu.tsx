@@ -22,7 +22,7 @@ const ADIMLAR: { metin: string; link?: string }[] = [
 /** Fonksiyonların ekrandaki adları (kullanım tablosu) */
 const AD: Record<string, string> = { "triyaj-topla": "Haber Masası · haber toplama ve kümeleme", "triyaj-taslak": "Haber Masası · taslak yazımı, görsel, kontrol", "kunye-otomatik": "Künye otomasyonu", "kunye-doldur": "Künye doldur (elle)", "yarisma-bul": "Yarışma tarama", "gorsel-odak": "Görsel odak noktası", "gemini-dene": "Anahtar denemesi" };
 
-export default function GeminiHavuzu() {
+export default function GeminiHavuzu({ gomulu = false }: { gomulu?: boolean }) {
   const toast = useToast();
   const [liste, setListe] = useState<Satir[] | null>(null);
   const [hata, setHata] = useState("");
@@ -75,9 +75,9 @@ export default function GeminiHavuzu() {
   }
 
   return (
-    <div className="panel" style={{ marginTop: 4, gap: 10 }}>
+    <div className={gomulu ? undefined : "panel"} style={{ marginTop: gomulu ? 0 : 4, gap: 10, display: "flex", flexDirection: "column" }}>
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}><Ikon ad="triyaj" /> Google (Gemini) anahtarları</h3>
+        {gomulu ? <span /> : <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}><Ikon ad="triyaj" /> Google (Gemini) anahtarları</h3>}
         <button className="btn ghost sm" disabled={!!mesgul || !liste?.length} onClick={dene}>{mesgul === "dene" ? "Deneniyor…" : "Anahtarları dene"}</button>
       </div>
       <div className="muted">Haber Masası, künye, yarışma tarama ve görsel odak Gemini'yi kullanır. Anahtarlar yukarıdan aşağı sırayla kullanılır: birinin günlük kotası dolunca sıradakine geçilir, ertesi gün yeniden baştan. Kota Google projesi başına sayılır; her anahtar ayrı bir Google hesabından olursa toplam kota artar.</div>

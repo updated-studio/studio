@@ -8,8 +8,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
-import { Ikon } from "../../shared/Ikon";
 import GeminiHavuzu from "./GeminiHavuzu";
+import { Logo } from "../../shared/Logolar";
+import "./baglantilar.css";
 
 type Durum = { ad: string; son4: string; ek: Record<string, string>; updated_at: string };
 const tarih = (s?: string) => (s ? new Date(s).toLocaleString("tr-TR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
@@ -102,17 +103,53 @@ function bicimHatasi(ad: string, v: string): string {
   return "";
 }
 
+// Ekran (3 Kasım 2026, onaylı taslak claude.ai/artifact/4Y2vWyaML1ksnfQ7b6Psss; kullanıcı: "logo ekle, arayüzü daha anlaşılır yap"):
+// üstte durum özeti; servisler işe göre üç grupta; her servis tek satır (logo, ne yaptığı, durum, son 4, tek eylem), tıklayınca açılır:
+// solda adımlar ve anahtar kutusu, sağda ne için / ücret / olmazsa.
+type Servis = {
+  id: string; grup: "yazi" | "gorsel" | "site"; logo: string; ad: string; ne: string; anahtarlar: string[];
+  neIcin: string; ucret: string; olmazsa: string; eylem?: "claude" | "cloudflare" | "instagram" | "gemini";
+};
+const GRUPLAR: { id: Servis["grup"]; ad: string; ne: string }[] = [
+  { id: "yazi", ad: "Yazı ve denetim", ne: "Taslağı yazar, kaynaklara karşı denetler. Biri yoksa diğeri devralır." },
+  { id: "gorsel", ad: "Görsel", ne: "Fotoğraf bulunamayan haberde görsel üretir; modeller kıyaslanır. Künye görsellerinin arka planını siler." },
+  { id: "site", ad: "Site ve veri", ne: "Sitedeki Reels ve künye otomasyonu." },
+];
+const SERVISLER: Servis[] = [
+  { id: "claude", grup: "yazi", logo: "claude", ad: "Claude", ne: "Taslağı yazar (Sonnet), denetler (Opus)", anahtarlar: ["claude"], eylem: "claude",
+    neIcin: "Otomatik taslağı yazar ve kaynaklara karşı denetler; öne çıkan görseli seçer, üretilen görseli denetler.", ucret: "Anthropic hesabındaki krediden düşer.", olmazsa: "Sistem kendiliğinden Gemini ile devam eder." },
+  { id: "gemini", grup: "yazi", logo: "gemini", ad: "Google Gemini havuzu", ne: "Yedek yazar, haber eleme; ücretsiz", anahtarlar: [], eylem: "gemini",
+    neIcin: "Haber toplama ve eleme, künye, radar, sesli özet; Claude yoksa taslak yazımı.", ucret: "Ücretsiz kota; birden çok Google hesabının anahtarı sırayla kullanılır.", olmazsa: "Haber Masası ve künye otomasyonu durur." },
+  { id: "cloudflare", grup: "gorsel", logo: "cloudflare", ad: "Cloudflare görsel programı", ne: "Arka plan siler; FLUX.2 ve Lucid ile görsel üretir", anahtarlar: ["cloudflare_adres", "cloudflare_anahtar"], eylem: "cloudflare",
+    neIcin: "Künye görsellerinin arka planını siler; fotoğrafı bulunamayan haberde görsel üretir.", ucret: "Ücretsiz: ayda 5.000 arka plan silme, günde yaklaşık 7 görsel üretimi. Aşılırsa ücret çıkmaz, istek reddedilir.", olmazsa: "Künye görseli olduğu gibi kalır; yapay zekâ görseli üretilmez." },
+  { id: "openai", grup: "gorsel", logo: "openai", ad: "OpenAI · GPT Image", ne: "Kıyasta görsel üretir", anahtarlar: ["openai"],
+    neIcin: "Görsel model kıyası: fotoğrafı bulunamayan haberde GPT Image da görsel üretir.", ucret: "Görsel başına yaklaşık 4 sent, OpenAI bakiyesinden.", olmazsa: "Kıyas diğer modellerle sürer." },
+  { id: "banana", grup: "gorsel", logo: "gemini", ad: "Google görsel · Nano Banana", ne: "Kıyasta görsel üretir; ücretli proje", anahtarlar: ["gemini_gorsel"],
+    neIcin: "Görsel model kıyası: Nano Banana da görsel üretir.", ucret: "Görsel başına yaklaşık 4 sent, Google faturasından. Yazı işlerindeki ücretsiz anahtarlardan ayrı proje.", olmazsa: "Kıyas diğer modellerle sürer." },
+  { id: "instagram", grup: "site", logo: "instagram", ad: "Instagram", ne: "Sitedeki Reels sütunu için son videoları çeker", anahtarlar: ["instagram"], eylem: "instagram",
+    neIcin: "Sitedeki Reels sütunu. Anahtar yalnız okuma izni taşır, paylaşım yapamaz.", ucret: "Ücretsiz. Süresi 60 gün; sistem dolmadan kendisi yeniler.", olmazsa: "Reels sütunu YouTube kısa videolarını gösterir." },
+  { id: "brave", grup: "site", logo: "brave", ad: "Brave arama", ne: "Künye için ürünün resmî sayfasını bulur", anahtarlar: ["brave_arama"],
+    neIcin: "Künye otomasyonu ürünün resmî özellik sayfasını bulur; sayfayı sistem okur.", ucret: "Ücretsiz planla; ürün başına bir arama.", olmazsa: "Künye otomasyonu özellikleri bulamaz." },
+];
+const ADLAR: Record<string, string> = { cloudflare_adres: "Programın adresi", cloudflare_anahtar: "Ortak şifre (ANAHTAR)" };
+const kisaTarih = (s?: string) => (s ? new Date(s).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) : "");
+
 export default function Baglantilar() {
   const toast = useToast();
   const [durum, setDurum] = useState<Record<string, Durum>>({});
   const [deger, setDeger] = useState<Record<string, string>>({});
   const [mesgul, setMesgul] = useState("");
   const [hata, setHata] = useState("");
+  const [acik, setAcik] = useState("");
+  const [sonuc, setSonuc] = useState<Record<string, { ok: boolean; metin: string }>>({});
+  const [gemini, setGemini] = useState<{ durum: string }[] | null>(null);
 
   const yukle = useCallback(async () => {
     const { data, error } = await sb.rpc("anahtar_durum");
     if (error) { setHata(error.message); return; }
     setHata(""); setDurum(Object.fromEntries(((data ?? []) as Durum[]).map((d) => [d.ad, d])));
+    const { data: g } = await sb.rpc("gemini_liste");
+    setGemini((g ?? []) as { durum: string }[]);
   }, []);
   useEffect(() => { yukle(); }, [yukle]);
 
@@ -133,104 +170,137 @@ export default function Baglantilar() {
     await yukle();
     if (!sil && ad === "instagram") await instagramCek();
   }
-
   async function instagramCek() {
-    setMesgul("instagram");
+    setMesgul("instagram-cek");
     const { data, error } = await sb.functions.invoke("instagram-reels", { body: {} });
     setMesgul("");
-    if (error || (data as { hata?: string })?.hata) { toast("Instagram'a bağlanılamadı: " + ((data as { hata?: string })?.hata ?? error?.message)); await yukle(); return; }
-    toast(`Instagram bağlandı: ${(data as { reels?: number }).reels ?? 0} Reels alındı. Sitede bir sonraki yayında görünür.`);
+    if (error || (data as { hata?: string })?.hata) { setSonuc((s) => ({ ...s, instagram: { ok: false, metin: "Instagram'a bağlanılamadı: " + ((data as { hata?: string })?.hata ?? error?.message) } })); await yukle(); return; }
+    setSonuc((s) => ({ ...s, instagram: { ok: true, metin: `${(data as { reels?: number }).reels ?? 0} Reels alındı; sitede bir sonraki yayında görünür.` } }));
     await yukle();
   }
+  async function dene(s: Servis) {
+    if (s.eylem === "instagram") return instagramCek();
+    if (s.eylem === "gemini") { setAcik(acik === s.id ? "" : s.id); return; }
+    setMesgul(s.id + "-dene");
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: s.eylem === "claude" ? { claude_dene: true } : { uret_dene: true } });
+    setMesgul("");
+    const r = (error ? { ok: false, hata: error.message } : data) as { ok?: boolean; hata?: string; model?: string; sure?: number };
+    setSonuc((x) => ({ ...x, [s.id]: r.ok ? { ok: true, metin: `Çalışıyor: ${r.model} ${s.eylem === "claude" ? "yanıt verdi" : "ile görsel üretildi"} (${Math.round((r.sure ?? 0) / 100) / 10} sn).` } : { ok: false, metin: r.hata ?? "Yanıt yok" } }));
+  }
+
+  // Durum: bütün anahtarları girilmişse bağlı; biri hata kaydı taşıyorsa sorunlu. Gemini havuzu: en az bir anahtar.
+  const durumu = (s: Servis): "ok" | "yok" | "sorun" => {
+    if (s.id === "gemini") return !gemini ? "yok" : !gemini.length ? "yok" : gemini.every((g) => g.durum === "gecersiz") ? "sorun" : "ok";
+    if (s.anahtarlar.some((a) => durum[a]?.ek?.hata)) return "sorun";
+    return s.anahtarlar.every((a) => durum[a]) ? "ok" : "yok";
+  };
+  const metaYaz = (s: Servis) => {
+    if (s.id === "gemini") return gemini ? `${gemini.length} anahtar${gemini.filter((g) => g.durum === "kota_dolu").length ? ` · ${gemini.filter((g) => g.durum === "kota_dolu").length}'i kotada` : ""}` : "";
+    const d = durum[s.anahtarlar[s.anahtarlar.length - 1]];
+    if (!d) return "";
+    if (s.id === "instagram") return [d.ek?.hesap && "@" + d.ek.hesap, d.ek?.bitis && kisaTarih(d.ek.bitis) + "'e kadar"].filter(Boolean).join(" · ");
+    return `…${d.son4} · ${kisaTarih(d.updated_at)}`;
+  };
+  const bagli = SERVISLER.filter((s) => durumu(s) === "ok");
+  const eksik = SERVISLER.filter((s) => durumu(s) !== "ok");
+  const ETIKET = { ok: ["Bağlı", "ok"], yok: ["Girilmedi", "off"], sorun: ["Sorun var", "rose"] } as const;
 
   return (
-    <section className="panel">
-      <h2>Bağlantı anahtarları</h2>
-      <div className="muted">Dış servislerin anahtarları burada girilir ve yalnız sunucuda saklanır. Kaydettikten sonra anahtarın kendisi bir daha görünmez; yalnız son 4 karakteri ve tarihi görünür.</div>
+    <section className="bg">
+      <div>
+        <h1 className="bg-h1">Bağlantı anahtarları</h1>
+        <p className="bg-ozet"><b>{SERVISLER.length} servisten {bagli.length}'{bagli.length === 1 ? "i" : "ı"} bağlı.</b>{eksik.length ? ` Eksik ya da sorunlu: ${eksik.map((s) => s.ad).join(", ")}.` : " Hepsi bağlı."} Anahtarlar yalnız sunucuda saklanır, yalnız son 4 karakteri görünür.</p>
+      </div>
       {hata && <div className="msg err">{hata}</div>}
-      <GeminiHavuzu />
-      {ANAHTARLAR.map((a) => {
-        const d = durum[a.ad];
-        return (
-          <div key={a.ad} className="panel" style={{ marginTop: 4, gap: 10 }}>
-            <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}><Ikon ad={a.ikon} /> {a.baslik}</h3>
-              <span className={"pill " + (d ? (d.ek?.hata ? "rose" : "ok") : "wait")}>{d ? (d.ek?.hata ? "Sorun var" : "Bağlı") : "Girilmedi"}</span>
-            </div>
-            <div className="muted">{a.aciklama}</div>
-            {d && <div className="muted">Son 4 karakter: <b>…{d.son4}</b> · kaydedildi {tarih(d.updated_at)}
-              {d.ek?.hesap ? ` · hesap @${d.ek.hesap}` : ""}{d.ek?.bitis ? ` · geçerli: ${tarih(d.ek.bitis)}` : ""}{d.ek?.son_cekim ? ` · son çekim ${tarih(d.ek.son_cekim)}` : ""}
-              {d.ek?.hata ? <div className="msg err" style={{ marginTop: 6 }}>{d.ek.hata}</div> : null}</div>}
-            {a.ad === "cloudflare_adres" && d && <CloudflareGuncelle />}
-            {a.ad === "claude" && d && <ClaudeDene />}
-            {(!d || d.ek?.hata) && <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
-              {a.adimlar.map((s) => <li key={s.metin}>{s.metin}{s.link && <> · <a href={s.link} target="_blank" rel="noopener noreferrer">aç</a></>}</li>)}
-            </ol>}
-            <label>{d ? "Yeni anahtar (eskisinin yerine geçer)" : "Anahtar"}
-              <input type="password" autoComplete="off" spellCheck={false} value={deger[a.ad] ?? ""} onChange={(e) => setDeger((x) => ({ ...x, [a.ad]: e.target.value }))} placeholder="Buraya yapıştır" />
-            </label>
-            <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-              <button className="btn sm" disabled={!!mesgul || !(deger[a.ad] ?? "").trim()} onClick={() => kaydet(a.ad)}>{mesgul === a.ad ? "Kaydediliyor…" : "Kaydet"}</button>
-              {a.ad === "cloudflare_anahtar" && !d && <button className="btn ghost sm" type="button" onClick={async () => { const s = sifreUret(); setDeger((x) => ({ ...x, [a.ad]: s })); try { await navigator.clipboard.writeText(s); toast("Şifre üretildi ve panoya kopyalandı: Cloudflare'de ANAHTAR değerine yapıştır, burada Kaydet'e bas."); } catch { toast("Şifre üretildi; kutudan kopyalayıp Cloudflare'de ANAHTAR değerine yapıştır, burada Kaydet'e bas."); } }}>Şifre üret</button>}
-              {d && a.ad === "instagram" && <button className="btn ghost sm" disabled={!!mesgul} onClick={instagramCek}>Reels'leri şimdi çek</button>}
-              {d && <button className="btn ghost sm" disabled={!!mesgul} onClick={() => kaydet(a.ad, true)}>Sil</button>}
-            </div>
+      {GRUPLAR.map((g) => (
+        <section key={g.id} className="bg-grup" aria-labelledby={"bg-" + g.id}>
+          <div className="bg-grup-sol"><h2 id={"bg-" + g.id}>{g.ad}</h2><p>{g.ne}</p></div>
+          <div className="bg-liste">
+            {SERVISLER.filter((s) => s.grup === g.id).map((s) => {
+              const dr = durumu(s), [etiket, renk] = ETIKET[dr], ac = acik === s.id, r = sonuc[s.id];
+              const eylemAd = dr !== "ok" ? "Bağla" : s.eylem === "instagram" ? "Şimdi çek" : s.eylem === "gemini" ? "Yönet" : s.eylem ? "Dene" : "";
+              return (
+                <div key={s.id} className={"bg-srv" + (ac ? " acik" : "")}>
+                  <div className="bg-bas">
+                    <button type="button" className="bg-ac" aria-expanded={ac} onClick={() => setAcik(ac ? "" : s.id)}>
+                      <Logo ad={s.logo} />
+                      <span className="bg-ad"><b>{s.ad}</b><span>{s.ne}</span></span>
+                      <span className="bg-durum"><span className={"pill " + renk}>{etiket}</span><span className="bg-meta">{metaYaz(s)}</span></span>
+                    </button>
+                    {eylemAd && <button type="button" className={"btn sm" + (dr === "ok" ? " ghost" : "")} disabled={mesgul.startsWith(s.id)} onClick={() => (dr === "ok" ? dene(s) : setAcik(s.id))}>{mesgul.startsWith(s.id) ? "Bekle…" : eylemAd}</button>}
+                    <button type="button" className="bg-ok" aria-label={ac ? "Kapat" : "Aç"} onClick={() => setAcik(ac ? "" : s.id)}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button>
+                  </div>
+                  {r && <div className={"msg " + (r.ok ? "good" : "err") + " bg-sonuc"}>{r.metin}</div>}
+                  {ac && (
+                    <div className="bg-ic">
+                      <div className="bg-sol">
+                        {s.id === "gemini" ? <GeminiHavuzu gomulu /> : <>
+                          {s.id === "cloudflare" && dr === "ok" && <CloudflareGuncelle />}
+                          {s.anahtarlar.map((ad) => {
+                            const d = durum[ad], adim = ANAHTARLAR.find((a) => a.ad === ad)?.adimlar ?? [];
+                            return (
+                              <div key={ad} className="bg-anahtar">
+                                {adim.length > 0 && (d ? <details><summary>Kurulum adımları</summary><Adimlar adim={adim} /></details> : <Adimlar adim={adim} />)}
+                                {d && <div className="muted bg-kayit">Kayıtlı: …{d.son4} · {tarih(d.updated_at)}{d.ek?.son_cekim ? ` · son çekim ${tarih(d.ek.son_cekim)}` : ""}</div>}
+                                {d?.ek?.hata && <div className="msg err">{d.ek.hata}</div>}
+                                <label>{ADLAR[ad] ?? (d ? "Yeni anahtar (eskisinin yerine geçer)" : "Anahtar")}
+                                  <span className="bg-birlesik">
+                                    <input type="password" autoComplete="off" spellCheck={false} value={deger[ad] ?? ""} onChange={(e) => setDeger((x) => ({ ...x, [ad]: e.target.value }))} placeholder="Buraya yapıştır" />
+                                    <button className="btn" disabled={!!mesgul || !(deger[ad] ?? "").trim()} onClick={() => kaydet(ad)}>{mesgul === ad ? "Kaydediliyor…" : "Kaydet"}</button>
+                                  </span>
+                                </label>
+                                <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                                  {ad === "cloudflare_anahtar" && !d && <button className="btn ghost sm" type="button" onClick={async () => { const v = sifreUret(); setDeger((x) => ({ ...x, [ad]: v })); try { await navigator.clipboard.writeText(v); toast("Şifre üretildi ve panoya kopyalandı: Cloudflare'de ANAHTAR değerine yapıştır, burada Kaydet'e bas."); } catch { toast("Şifre üretildi; kutudan kopyalayıp Cloudflare'de ANAHTAR değerine yapıştır, burada Kaydet'e bas."); } }}>Şifre üret</button>}
+                                  {d && <button className="btn ghost sm" disabled={!!mesgul} onClick={() => kaydet(ad, true)}>Sil</button>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <p className="muted bg-not">Anahtar yalnız sunucuda saklanır; kaydedince bir daha gösterilmez. Sohbete yapıştırma.</p>
+                        </>}
+                      </div>
+                      <dl className="bg-bilgi">
+                        <div><dt>Ne için</dt><dd>{s.neIcin}</dd></div>
+                        <div><dt>Ücret</dt><dd>{s.ucret}</dd></div>
+                        <div><dt>Olmazsa</dt><dd>{s.olmazsa}</dd></div>
+                      </dl>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </section>
+      ))}
     </section>
   );
+}
+
+function Adimlar({ adim }: { adim: { metin: string; link?: string }[] }) {
+  return <ol className="bg-adim">{adim.map((s) => <li key={s.metin}>{s.metin}{s.link && <a href={s.link} target="_blank" rel="noopener noreferrer">aç ↗</a>}</li>)}</ol>;
 }
 
 // Cloudflare görsel programının güncellemesi (3 Kasım 2026): yapay zekâ ile görsel üretimi için yeni kod + "AI" bağlaması gerekir.
 // Program zaten bağlı olduğu için kurulum adımları gizli; güncelleme adımları ve "Dene" burada.
 function CloudflareGuncelle() {
   const toast = useToast();
-  const [sonuc, setSonuc] = useState<{ ok?: boolean; hata?: string; model?: string; sure?: number } | null>(null);
-  const [mesgul, setMesgul] = useState(false);
   async function kopyala() {
     try { const k = await (await fetch("/cloudflare/gorsel-worker.js", { cache: "no-store" })).text(); await navigator.clipboard.writeText(k); toast("Program kodu panoya kopyalandı."); }
     catch { toast("Kopyalanamadı; \"Kodu aç\" ile açıp elle kopyala."); }
   }
-  async function dene() {
-    setMesgul(true); setSonuc(null);
-    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { uret_dene: true } });
-    setMesgul(false);
-    setSonuc(error ? { hata: error.message } : (data as typeof sonuc));
-  }
   return (
     <div className="msg" style={{ display: "grid", gap: 6 }}>
-      <b>Güncelleme: yapay zekâ ile görsel üretimi</b>
+      <b>Güncelleme: yapay zekâ ile görsel üretimi</b><span className="muted">Satırdaki "Dene" çalışıyorsa güncelleme yapılmış demektir.</span>
       <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
         <li>Cloudflare'de <b>Workers &amp; Pages → updated-gorsel → Edit code</b> · <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer">aç</a></li>
         <li>Soldaki kodun tamamını sil; aşağıdaki "Kodu kopyala" ile yeni kodu kopyalayıp yapıştır → <b>Deploy</b></li>
         <li>Programın sayfasında <b>Settings → Bindings → Add binding → Workers AI</b> → Variable name: <b>AI</b> → Add Binding</li>
-        <li>Buradan "Dene"ye bas</li>
+        <li>Satırdaki "Dene"ye bas</li>
       </ol>
       <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
         <button type="button" className="btn ghost sm" onClick={kopyala}>Kodu kopyala</button>
         <a className="btn ghost sm" href="/cloudflare/gorsel-worker.js" target="_blank" rel="noopener noreferrer">Kodu aç</a>
-        <button type="button" className="btn sm" disabled={mesgul} onClick={dene}>{mesgul ? "Görsel üretiliyor…" : "Dene"}</button>
       </div>
-      {sonuc && (sonuc.ok ? <div className="msg good">Çalışıyor: {sonuc.model} ile görsel üretildi ({Math.round((sonuc.sure ?? 0) / 1000)} sn).</div> : <div className="msg err">{sonuc.hata}</div>)}
-    </div>
-  );
-}
-
-// Claude anahtarını dene (3 Kasım 2026): en küçük modelle tek kısa istek; kredi, anahtar ya da bağlantı sorununu söyler
-function ClaudeDene() {
-  const [sonuc, setSonuc] = useState<{ ok?: boolean; hata?: string; model?: string; sure?: number } | null>(null);
-  const [mesgul, setMesgul] = useState(false);
-  async function dene() {
-    setMesgul(true); setSonuc(null);
-    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { claude_dene: true } });
-    setMesgul(false);
-    setSonuc(error ? { hata: error.message } : (data as typeof sonuc));
-  }
-  return (
-    <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-      <button type="button" className="btn sm" disabled={mesgul} onClick={dene}>{mesgul ? "Deneniyor…" : "Dene"}</button>
-      {sonuc && (sonuc.ok ? <span className="msg good">Çalışıyor: {sonuc.model} yanıt verdi ({Math.round((sonuc.sure ?? 0) / 100) / 10} sn).</span> : <span className="msg err">{sonuc.hata}</span>)}
     </div>
   );
 }

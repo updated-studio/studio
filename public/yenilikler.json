@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-03-d",
+    "tarih": "3 Kasım 2026",
+    "baslik": "Bağlantı anahtarları yenilendi",
+    "bolumler": [
+      {
+        "ad": "Sistem",
+        "maddeler": [
+          "Servisler işe göre üç grupta, logolarıyla; üstte kaçının bağlı olduğu yazıyor.",
+          "Satıra basınca adımlar, anahtar kutusu ve ne işe yaradığı açılıyor.",
+          "Claude ve Cloudflare satırındaki \"Dene\" bağlantıyı sınar."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-03-c",
     "tarih": "3 Kasım 2026",
     "baslik": "Görsel model kıyası",
