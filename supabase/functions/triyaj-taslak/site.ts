@@ -134,13 +134,13 @@ const gorselGovde = (g: GorselAday, alt: string) => ({
 });
 
 /** Sonradan gelen görseli (Flux) paneldeki taslağın kapağı yapar: haber hâlâ taslaksa ve kapağı yoksa. */
-export async function siteKapakEkle(sb: Sb, taslakId: number): Promise<{ ok: boolean; hata?: string }> {
+export async function siteKapakEkle(sb: Sb, taslakId: number, s: { degistir?: boolean } = {}): Promise<{ ok: boolean; hata?: string }> {
   const a = siteAyar();
   if (!a) return { ok: false, hata: "Panel bağlantısı yok" };
   const { data: t } = await sb.from("tr_drafts").select("id,title,image,site_id").eq("id", taslakId).single();
   const img = (t?.image ?? {}) as { secilen?: GorselAday | null; alt_text?: string };
   if (!t?.site_id || !img.secilen?.buyuk) return { ok: false, hata: "Haber ya da görsel yok" };
-  const r = await panel(a, "/triyaj/kapak", { method: "POST", body: { studioId: String(taslakId), image: gorselGovde(img.secilen, img.alt_text || t.title) }, ms: 45_000 });
+  const r = await panel(a, "/triyaj/kapak", { method: "POST", body: { studioId: String(taslakId), image: gorselGovde(img.secilen, img.alt_text || t.title), ...(s.degistir ? { degistir: true } : {}) }, ms: 45_000 });
   const v = r.veri as { updatedAt?: string; error?: string; eksikler?: string[] } | null;
   if (r.ok && v?.updatedAt) {
     const { data: o } = await sb.from("tr_drafts").select("site_eksik").eq("id", taslakId).single();

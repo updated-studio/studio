@@ -3,6 +3,7 @@
 // - Google (Gemini) anahtarları: 30 Ekim 2026'dan beri birden çok anahtarlı havuz (GeminiHavuzu.tsx, göç 0052).
 // - Instagram erişim anahtarı: instagram-reels fonksiyonu son Reels'leri çeker, anahtarı 60 günü dolmadan kendisi yeniler.
 // - Claude (Anthropic API) anahtarı (göç 0061, 2 Kasım 2026): otomatik taslakta görsel seçimi; yoksa Gemini kullanılır.
+// - OpenAI (GPT Image) ve Google görsel (Nano Banana) anahtarları (göç 0062, 3 Kasım 2026): görsel model kıyası.
 // - Cloudflare görsel programı (adres + ortak anahtar, göç 0044): künye görsellerinin arka planını siler (public/cloudflare/gorsel-worker.js).
 import { useCallback, useEffect, useState } from "react";
 import { sb } from "../../shared/supabase";
@@ -60,6 +61,24 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ],
   },
   {
+    ad: "openai", baslik: "OpenAI anahtarı (GPT Image, görsel kıyası)", ikon: "foto",
+    aciklama: "Uygun fotoğraf bulunamayan haberlerde görseli GPT Image da üretir; kıyas tablosunda diğer modellerle yan yana değerlendirilir. Görsel başına yaklaşık 4 sent; ücret OpenAI hesabından düşer.",
+    adimlar: [
+      { metin: "OpenAI geliştirici sayfasına gir; \"Billing\" bölümünde ödeme yöntemi ekle ve küçük bir bakiye yükle (ör. 10 $). İstersen aylık harcama sınırı koy", link: "https://platform.openai.com/settings/organization/billing/overview" },
+      { metin: "\"API keys\" → \"Create new secret key\" → ad: updated-studyo → Create", link: "https://platform.openai.com/api-keys" },
+      { metin: "Çıkan anahtarı kopyala (sk- ile başlar), aşağıya yapıştır → Kaydet. Anahtarı sohbete yapıştırma" },
+    ],
+  },
+  {
+    ad: "gemini_gorsel", baslik: "Google görsel anahtarı (Nano Banana, görsel kıyası)", ikon: "foto",
+    aciklama: "Nano Banana görsel üretimi ücretsiz Gemini kotasında yok; faturalandırması açık AYRI bir Google projesinden anahtar gerekir (yazı işlerinde kullandığımız ücretsiz anahtarlar ücretsiz kalsın diye). Görsel başına yaklaşık 4 sent.",
+    adimlar: [
+      { metin: "Google AI Studio'da anahtar sayfasını aç → \"Create API key\" → \"Create API key in new project\"", link: "https://aistudio.google.com/apikey" },
+      { metin: "Yeni anahtarın satırında \"Set up billing\" (Faturalandırmayı ayarla) → kartını ekle. Google Cloud'da Bütçe ve uyarılar bölümünden aylık sınır koyabilirsin" },
+      { metin: "Anahtarı kopyala, aşağıya yapıştır → Kaydet. Ücretsiz Gemini anahtarlarını buraya girme" },
+    ],
+  },
+  {
     ad: "cloudflare_anahtar", baslik: "Cloudflare görsel programı: anahtar", ikon: "yonetim",
     aciklama: "Programa yalnız bizim sistemimizin erişebilmesi için ortak şifre. Cloudflare'de ANAHTAR adıyla girdiğin şifrenin aynısı.",
     adimlar: [{ metin: "Yukarıdaki 5. adımda oluşturduğun şifreyi buraya yapıştır → Kaydet" }],
@@ -77,6 +96,8 @@ function bicimHatasi(ad: string, v: string): string {
   if (ad === "gemini_yedek" && (/^gen-lang-client/i.test(v) || /^https?:/i.test(v) || /\s/.test(v) || !/^[A-Za-z0-9._-]{30,200}$/.test(v))) return "Bu Google (Gemini) anahtarına benzemiyor. AI Studio'da anahtarın satırındaki kopyala simgesine bas; proje adını (gen-lang-client…) değil anahtarı yapıştır.";
   if (ad === "cloudflare_adres" && !/^https:\/\/[A-Za-z0-9.-]+\/?$/.test(v)) return "Programın adresi https:// ile başlamalı (ör. https://updated-gorsel.ad.workers.dev).";
   if (ad === "claude" && !/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(v)) return "Bu Claude anahtarına benzemiyor: anahtar sk-ant- ile başlar. Console'da \"Create key\" sonrası çıkan anahtarın tamamını kopyala.";
+  if (ad === "openai" && !/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) return "Bu OpenAI anahtarına benzemiyor: anahtar sk- ile başlar.";
+  if (ad === "gemini_gorsel" && !/^[A-Za-z0-9._-]{30,200}$/.test(v)) return "Bu Google anahtarına benzemiyor. AI Studio'da anahtarın satırındaki kopyala simgesine bas.";
   if (ad === "cloudflare_anahtar" && v.length < 24) return "Anahtar en az 24 karakter olmalı.";
   return "";
 }
@@ -140,6 +161,7 @@ export default function Baglantilar() {
             {d && <div className="muted">Son 4 karakter: <b>…{d.son4}</b> · kaydedildi {tarih(d.updated_at)}
               {d.ek?.hesap ? ` · hesap @${d.ek.hesap}` : ""}{d.ek?.bitis ? ` · geçerli: ${tarih(d.ek.bitis)}` : ""}{d.ek?.son_cekim ? ` · son çekim ${tarih(d.ek.son_cekim)}` : ""}
               {d.ek?.hata ? <div className="msg err" style={{ marginTop: 6 }}>{d.ek.hata}</div> : null}</div>}
+            {a.ad === "cloudflare_adres" && d && <CloudflareGuncelle />}
             {(!d || d.ek?.hata) && <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
               {a.adimlar.map((s) => <li key={s.metin}>{s.metin}{s.link && <> · <a href={s.link} target="_blank" rel="noopener noreferrer">aç</a></>}</li>)}
             </ol>}
@@ -156,5 +178,40 @@ export default function Baglantilar() {
         );
       })}
     </section>
+  );
+}
+
+// Cloudflare görsel programının güncellemesi (3 Kasım 2026): yapay zekâ ile görsel üretimi için yeni kod + "AI" bağlaması gerekir.
+// Program zaten bağlı olduğu için kurulum adımları gizli; güncelleme adımları ve "Dene" burada.
+function CloudflareGuncelle() {
+  const toast = useToast();
+  const [sonuc, setSonuc] = useState<{ ok?: boolean; hata?: string; model?: string; sure?: number } | null>(null);
+  const [mesgul, setMesgul] = useState(false);
+  async function kopyala() {
+    try { const k = await (await fetch("/cloudflare/gorsel-worker.js", { cache: "no-store" })).text(); await navigator.clipboard.writeText(k); toast("Program kodu panoya kopyalandı."); }
+    catch { toast("Kopyalanamadı; \"Kodu aç\" ile açıp elle kopyala."); }
+  }
+  async function dene() {
+    setMesgul(true); setSonuc(null);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { uret_dene: true } });
+    setMesgul(false);
+    setSonuc(error ? { hata: error.message } : (data as typeof sonuc));
+  }
+  return (
+    <div className="msg" style={{ display: "grid", gap: 6 }}>
+      <b>Güncelleme: yapay zekâ ile görsel üretimi</b>
+      <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 4 }}>
+        <li>Cloudflare'de <b>Workers &amp; Pages → updated-gorsel → Edit code</b> · <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer">aç</a></li>
+        <li>Soldaki kodun tamamını sil; aşağıdaki "Kodu kopyala" ile yeni kodu kopyalayıp yapıştır → <b>Deploy</b></li>
+        <li>Programın sayfasında <b>Settings → Bindings → Add binding → Workers AI</b> → Variable name: <b>AI</b> → Add Binding</li>
+        <li>Buradan "Dene"ye bas</li>
+      </ol>
+      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <button type="button" className="btn ghost sm" onClick={kopyala}>Kodu kopyala</button>
+        <a className="btn ghost sm" href="/cloudflare/gorsel-worker.js" target="_blank" rel="noopener noreferrer">Kodu aç</a>
+        <button type="button" className="btn sm" disabled={mesgul} onClick={dene}>{mesgul ? "Görsel üretiliyor…" : "Dene"}</button>
+      </div>
+      {sonuc && (sonuc.ok ? <div className="msg good">Çalışıyor: {sonuc.model} ile görsel üretildi ({Math.round((sonuc.sure ?? 0) / 1000)} sn).</div> : <div className="msg err">{sonuc.hata}</div>)}
+    </div>
   );
 }

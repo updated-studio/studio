@@ -274,15 +274,22 @@ export function fluxIstem(konu: string): string {
   return `${k}. Photorealistic editorial technology news photo, natural lighting, shallow depth of field, clean composition, subject centered, 16:9. Generic unbranded design: do not imitate any specific manufacturer design signature (no emblems, no signature grilles, no recognizable silhouette of a specific brand product). No real human faces. No text, no letters, no words, no captions, no logos, no watermark, no brand names, no UI overlays.`;
 }
 
-/** Üretilen görselin denetimi (2 Kasım 2026, kullanıcı: "BMW haberinde Mercedes üretirse ne olacak"): görsel haberle çelişmemeli. */
+/** Üretilen görselin denetimi: yedi katman + puan (3 Kasım 2026, kullanıcı: "kolaya kaçmışsın, eleme usulümüzde katmanlar vardı").
+ *  Fotoğraf seçimindeki kurallar (SECIM_SISTEM) üretim için uyarlandı; ilk beş katman eleyici, puan adaylar arasında sıralar. */
 export const URETIM_DENETIM = `Bir Türkçe teknoloji haberi için yapay zekâyla üretilmiş öne çıkan görseli denetliyorsun. Sana haber başlığı, marka ve ürün verilecek, ekte görsel var.
-REDDET (uygun=false):
-- Haberdeki markadan BAŞKA bir markayı çağrıştıran logo, amblem ya da belirgin tasarım imzası (ör. haber BMW ise Mercedes yıldızı ya da Audi halkaları; haber Apple ise başka markanın bilinen telefon tasarımı).
-- Görselde okunur yazı, harf, rakam, logo, filigran.
-- Bozuk ya da anlamsız nesne, eğri çizgiler, fazla parmak, erimiş yüzeyler; gerçekçi olmayan, yapay duran sahne.
-- Haberin konusuyla ilgisiz sahne; tanınabilir gerçek kişi yüzü.
-KABUL: haberin konusunu genel ve gerçekçi anlatan, markasız ya da nötr görünen, temiz bir sahne. Emin değilsen reddet.
-Sadece şu JSON'u döndür: {"uygun": true ya da false, "neden": "kısa gerekçe"}`;
+Görsel sitede üç yerde kırpılır: manşet 16:10 (masaüstü), manşet 4:3 (telefon), kart 16:9. Manşette alttaki yaklaşık %40'ın üstüne başlık yazısı biner.
+Her katmanı ayrı değerlendir:
+1. marka: Haberdeki markadan BAŞKA bir markayı çağrıştıran logo, amblem ya da belirgin tasarım imzası var mı (ör. haber BMW ise Mercedes yıldızı, Audi halkaları; haber Apple ise başka markanın bilinen telefon tasarımı)? Haberdeki ürün türüyle uyumsuz nesne (telefon haberinde tablet) de sorun.
+2. yazi: Okunur ya da harfe benzeyen bozuk yazı, rakam, logo, filigran, arayüz metni var mı? Uzakta, dikkat çekmeyen, okunmayan doku sorun değil; göze batan her yazı sorundur.
+3. bozukluk: Fazla/eksik parmak, eriyen ya da birbirine geçen nesneler, eğri düz çizgiler, fiziksel olmayan yansıma ve gölge, anlamsız parçalar.
+4. ilgi: Sahne haberin konusunu anlatıyor mu? Genel "teknoloji" süsü ya da konuyla ilgisiz sahne sorun.
+5. etik: Tanınabilir gerçek kişi yüzü; belirli gerçek bir ürünün fotoğrafı sanılacak kadar ayrıntılı taklidi (okuru yanıltır); şiddet, uygunsuz içerik.
+6. kirpma: Konu ortada mı; üç kırpmada da konu kalıyor mu; konunun önemli kısmı alttaki başlık alanında mı kalıyor?
+7. kalite: Editoryal fotoğraf kalitesi: doğal ışık ve doku; plastik, aşırı parlak, aşırı doygun "yapay zekâ işi" görünüm puanı düşürür.
+"gecti": 1-5. katmanların hepsi sorunsuzsa true; biri bile sorunluysa false. Emin değilsen false.
+"puan": 0-10 genel kalite (6. ve 7. katman ağırlıklı; 1-5'ten biri sorunluysa en fazla 3).
+"odak": konunun merkezi, {"x": soldan yüzde, "y": üstten yüzde}.
+Sadece şu JSON'u döndür: {"katmanlar":{"marka":"tamam ya da kısa sorun","yazi":"","bozukluk":"","ilgi":"","etik":"","kirpma":"","kalite":""},"gecti":true,"puan":0,"odak":{"x":50,"y":50},"neden":"tek cümle özet"}`;
 
 /** Yapay zekâya gösterilecek aday listesi */
 export function adayListesi(adaylar: GorselAday[]): string {

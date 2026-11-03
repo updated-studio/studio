@@ -26,6 +26,8 @@ export type Taslak = {
   image: {
     oneri?: string; alt_text?: string; aramalar?: string[]; ai_istem?: string; basin?: { url: string; kesin: boolean } | null; stok?: Stok[]; stok_anahtar?: boolean;
     secilen?: GorselAday | null; gorsel_adaylar?: GorselAday[]; gorsel_neden?: string; wp_media_id?: number | null; yukleme_hata?: string; // öne çıkan görsel (gorsel.ts)
+    yz_bekliyor?: boolean; yz_model?: string; yz_secen?: "otomatik" | "editor"; yz_kiyas?: boolean;
+    yz_adaylar?: { model: string; surum?: string; url?: string; gecti: boolean; puan: number; katmanlar?: Record<string, string>; neden: string; hata?: string; sure: number }[]; // görsel model kıyası (3 Kasım 2026)
     yz_uretim?: boolean; // öne çıkan görsel yapay zekâ ile üretildi (3 Kasım 2026; eski "flux" kuyruğu kaldırıldı)
   };
   created_at: string; updated_at: string;

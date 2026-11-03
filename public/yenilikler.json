@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-03-c",
+    "tarih": "3 Kasım 2026",
+    "baslik": "Görsel model kıyası",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Fotoğrafı bulunamayan taslakta birden çok yapay zekâ modeli aynı anda görsel üretir.",
+          "Her görsel yedi katmanlı denetimden geçer; en iyisi kapak olur, taslakta başkasını seçebilirsin.",
+          "Ayarlar'da hangi modelin kaç kez seçildiği tabloda görünür."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-03-b",
     "tarih": "3 Kasım 2026",
     "baslik": "Kapak önizlemesinde başlık",

@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { MODEL_AD, MODEL_UCRET } from "./gorselModel";
 import { sb } from "../../shared/supabase";
 import { hataMetni, useToast } from "../../shared/toast";
 import { ANA_SAYFA_ESIK, HABER_TURLERI, YAYIN_ESIK } from "./oncelik";
@@ -37,6 +38,7 @@ export default function Ayarlar() {
     <>
       <OtomatikTaslak ayar={ayar} />
       <YazimUslubu ayar={ayar} />
+      <GorselKiyas ayar={ayar} />
       <SitePaneli ayar={ayar} />
       <div className="panel">
         <h3>Saklama</h3>
@@ -184,6 +186,53 @@ function YazimUslubu({ ayar }: { ayar: AyarYaz }) {
         <button className="btn ghost sm" onClick={() => { setMetin(USLUP_VARSAYILAN); ayar("yazim_uslubu", "", "Varsayılan üsluba dönüldü."); }}>Varsayılana dön</button>
         <span className="muted">{kayitli ? "Özelleştirilmiş üslup kullanılıyor." : "Varsayılan üslup kullanılıyor."}</span>
       </div>
+    </div>
+  );
+}
+
+// Görsel model kıyası (3 Kasım 2026, kullanıcı: "birkaç gün birden çok modele ürettirsin, hangisi daha iyi sonuç veriyor bakalım").
+// Fotoğraf bulunamayan taslaklarda (günlük sınır kadarında) bütün bağlı modeller aynı anda üretir; tablo son 30 günü sayar.
+type Aday = { model: string; url?: string; gecti: boolean; puan: number; hata?: string; sure: number };
+function GorselKiyas({ ayar }: { ayar: (k: string, v: unknown, m: string) => Promise<void> }) {
+  const { v } = useMasa();
+  const k = { acik: true, gunluk: 3, ...((v.ayarlar.gorsel_kiyas ?? {}) as { acik?: boolean; gunluk?: number }) };
+  const [gunluk, setGunluk] = useState(String(k.gunluk));
+  const [satirlar, setSatirlar] = useState<{ image: Record<string, unknown> }[] | null>(null);
+  useEffect(() => {
+    sb.from("tr_drafts").select("image").eq("image->>yz_kiyas", "true").gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(300)
+      .then(({ data }) => setSatirlar((data ?? []) as { image: Record<string, unknown> }[]));
+  }, []);
+  const tablo = new Map<string, { uretildi: number; denendi: number; gecti: number; puan: number; otomatik: number; editor: number; sure: number }>();
+  for (const r of satirlar ?? []) {
+    const img = r.image as { yz_adaylar?: Aday[]; yz_model?: string; yz_secen?: string };
+    for (const a of img.yz_adaylar ?? []) {
+      const t = tablo.get(a.model) ?? { uretildi: 0, denendi: 0, gecti: 0, puan: 0, otomatik: 0, editor: 0, sure: 0 };
+      t.denendi++; if (!a.hata) { t.uretildi++; t.puan += a.puan; t.sure += a.sure; } if (a.gecti) t.gecti++;
+      if (img.yz_model === a.model) img.yz_secen === "editor" ? t.editor++ : t.otomatik++;
+      tablo.set(a.model, t);
+    }
+  }
+  const sirali = [...tablo.entries()].sort((a, b) => (b[1].editor + b[1].otomatik) - (a[1].editor + a[1].otomatik) || b[1].puan / Math.max(1, b[1].uretildi) - a[1].puan / Math.max(1, a[1].uretildi));
+  return (
+    <div className="panel">
+      <h3>Görsel model kıyası</h3>
+      <div className="muted">Uygun fotoğraf bulunamayan taslaklarda bağlı bütün modeller (Cloudflare FLUX.2 klein ve dev, Lucid Origin; anahtar girilmişse GPT Image ve Nano Banana) aynı anda görsel üretir. Her görsel yedi katmanlı denetimden geçer; en yüksek puanlı kapak olur, editör taslakta başkasını seçebilir. Günlük sınırın dışındaki taslaklarda tek model çalışır.</div>
+      <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={k.acik} onChange={(e) => ayar("gorsel_kiyas", { ...k, acik: e.target.checked }, e.target.checked ? "Kıyas açıldı." : "Kıyas kapatıldı.")} /> Kıyas açık</label>
+        <label className="row" style={{ gap: 6 }}>Günde en çok <input type="number" min={1} max={50} value={gunluk} onChange={(e) => setGunluk(e.target.value)} style={{ width: 70 }} /> taslak</label>
+        <button className="btn sm" onClick={() => ayar("gorsel_kiyas", { ...k, gunluk: Math.max(1, Math.min(50, Number(gunluk) || 3)) }, "Günlük sınır kaydedildi.")}>Kaydet</button>
+      </div>
+      {!satirlar ? <div className="muted">Yükleniyor…</div> : !sirali.length ? <div className="muted">Henüz kıyas yok; ilk görselsiz taslakta başlar.</div> : (
+        <div className="tbl"><table>
+          <thead><tr><th>Model</th><th>Denendi</th><th>Üretti</th><th>Denetimden geçti</th><th>Ort. puan</th><th>Kapak oldu</th><th>Editör seçti</th><th>Ort. süre</th><th>Tahmini maliyet</th></tr></thead>
+          <tbody>{sirali.map(([m, t]) => (
+            <tr key={m}><td><b>{MODEL_AD[m] ?? m}</b></td><td>{t.denendi}</td><td>{t.uretildi}</td><td>{t.gecti}</td>
+              <td>{t.uretildi ? (t.puan / t.uretildi).toLocaleString("tr", { maximumFractionDigits: 1 }) : "–"}</td><td>{t.otomatik + t.editor}</td><td>{t.editor}</td>
+              <td>{t.uretildi ? Math.round(t.sure / t.uretildi / 1000) + " sn" : "–"}</td><td>{(t.uretildi * (MODEL_UCRET[m] ?? 0)).toLocaleString("tr", { style: "currency", currency: "USD" })}</td></tr>
+          ))}</tbody>
+        </table></div>
+      )}
+      <div className="muted">Cloudflare modelleri günlük ücretsiz payla çalışır; pay biterse o gün "üretilemedi" görünür ve ücret çıkmaz. Maliyet sütunu bu durumda üst sınırdır.</div>
     </div>
   );
 }

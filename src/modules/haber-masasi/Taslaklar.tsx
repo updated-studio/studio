@@ -7,6 +7,7 @@ import { useMasa, type Taslak } from "./veri";
 
 // Markdown → HTML ortak dosyada: ekrandaki önizleme ve "HTML kopyala" aynı çıktıyı kullanır (panele Markdown gider).
 import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
+import { MODEL_AD } from "./gorselModel";
 
 /** Yapay zekâ bazen liste öğesini metin yerine nesne döndürür ({iddia, kaynak} gibi): ekran çökmesin diye metne çevrilir */
 const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof x === "object" ? Object.values(x as Record<string, unknown>).map((v) => metinYap(v)).filter(Boolean).join(" — ") : String(x ?? "");
@@ -24,8 +25,36 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     const hata = (data as { hata?: string } | null)?.hata;
     toast(hata ?? (error ? "Görsel üretilemedi: " + error.message : "Görsel üretildi ve denetlendi."));
   }
-  const yzSatir = g.yz_uretim && g.secilen ? <div className="muted">Bu görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan.</div>
-    : !g.secilen ? <div><button className="btn ghost sm" onClick={uret} disabled={uretiliyor}>{uretiliyor ? "Üretiliyor, denetleniyor…" : "Yapay zekâ ile görsel üret"}</button></div> : null;
+  const [seciliyor, setSeciliyor] = useState("");
+  async function adaySec(model: string) {
+    setSeciliyor(model);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { gorsel_sec: t.id, model } });
+    setSeciliyor("");
+    const r = data as { hata?: string; site?: { ok: boolean; hata?: string } } | null;
+    toast(r?.hata ?? (error ? error.message : r?.site && !r.site.ok ? "Kapak değişti; panele aktarılamadı: " + r.site.hata : "Kapak değişti."));
+  }
+  const adaylar = g.yz_adaylar ?? [];
+  const yzSatir = <>
+    {g.yz_bekliyor && !g.secilen && <div className="muted">Yapay zekâ ile görsel üretiliyor ve denetleniyor…</div>}
+    {g.yz_uretim && g.secilen && <div className="muted">Bu görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan.</div>}
+    {adaylar.length > 1 && <>
+      <b>Yapay zekâ adayları (model kıyası)</b>
+      <div className="yz-adaylar">
+        {adaylar.map((a) => {
+          const secili = g.yz_model === a.model && !!g.secilen && g.secilen.buyuk === a.url;
+          return (
+            <figure key={a.model} className={secili ? "secili" : ""} title={a.katmanlar ? Object.entries(a.katmanlar).map(([k, v]) => `${k}: ${v}`).join("\n") : undefined}>
+              {a.url ? <img src={a.url} alt="" loading="lazy" /> : <div className="yz-bos">{a.hata ? "Üretilemedi" : "Denetimden geçmedi"}</div>}
+              <figcaption><b>{MODEL_AD[a.model] ?? a.model}</b> · {a.hata ? a.hata : `${a.puan}/10`}{!a.hata && a.neden && <span className="muted"> · {a.neden}</span>}</figcaption>
+              {a.url && !secili && <button className="btn ghost sm" disabled={!!seciliyor} onClick={() => adaySec(a.model)}>{seciliyor === a.model ? "Seçiliyor…" : "Bunu kullan"}</button>}
+              {secili && <span className="pill ok">Kapak</span>}
+            </figure>
+          );
+        })}
+      </div>
+    </>}
+    {!g.secilen && !g.yz_bekliyor && <div><button className="btn ghost sm" onClick={uret} disabled={uretiliyor}>{uretiliyor ? "Üretiliyor, denetleniyor…" : "Yapay zekâ ile görsel üret"}</button></div>}
+  </>;
   const stok = g.stok ?? [];
   if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem && !g.secilen && !g.gorsel_neden) return null;
   const sec = g.secilen;

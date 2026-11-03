@@ -154,6 +154,12 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .stok { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .stok a { display: flex; flex-direction: column; gap: 4px; font-size: 12px; text-decoration: none; color: var(--muted); }
 .stok img { width: 100%; aspect-ratio: 3/2; object-fit: cover; border-radius: 8px; background: var(--sunk); }
+/* Görsel model kıyası adayları (3 Kasım 2026) */
+.yz-adaylar { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.yz-adaylar figure { margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font-size: 12px; }
+.yz-adaylar img, .yz-bos { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: var(--sunk); border: 2px solid transparent; }
+.yz-adaylar .secili img { border-color: var(--brand-blue); }
+.yz-bos { display: grid; place-items: center; color: var(--muted); }
 .bildirim { padding: 8px; border-radius: 8px; }
 .bildirim.yeni { background: var(--orange-soft); }
 
