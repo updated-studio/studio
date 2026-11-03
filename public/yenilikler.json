@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-03-b",
+    "tarih": "3 Kasım 2026",
+    "baslik": "Kapak önizlemesinde başlık",
+    "bolumler": [
+      {
+        "ad": "Site içeriği",
+        "maddeler": [
+          "Kapak önizlemesi başlık ve kategoriyle birlikte sitedeki gibi görünür.",
+          "Manşet önizlemesi sitenin yeni 16:10 manşetine göre."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-03-a",
     "tarih": "3 Kasım 2026",
     "baslik": "Kalite kontrolünün düzelttikleri görünüyor",

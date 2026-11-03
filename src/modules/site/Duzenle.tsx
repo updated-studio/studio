@@ -191,7 +191,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
             {kapak ? <img src={api.medyaAdres(kapak.sizes?.card?.url || kapak.url || "")} alt={kapak.alt ?? ""} /> : <div className="empty">Kapak yok</div>}
             {kapak && <span className="muted">{api.duzMetin(kapak.credit)}</span>}
             <button type="button" className="btn ghost sm" onClick={() => setKapakSec(true)}>{kapak ? "Kapağı değiştir" : "Kapak seç"}</button>
-            {kapak && <KapakOnizleme m={kapak} degisti={setKapak} />}
+            {kapak && <KapakOnizleme m={kapak} degisti={setKapak} baslik={f.title} kategori={kategoriler.find((x) => x.id === f.category)?.ad ?? ""} />}
           </div>
           <label data-rehber="kisa">Kısa cevap <span className="muted">(2–3 cümle; arama ve yapay zekâ yanıtları için)</span>
             <textarea rows={3} value={f.shortAnswer} onChange={(e) => set("shortAnswer", e.target.value)} />

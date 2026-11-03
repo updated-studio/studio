@@ -27,10 +27,21 @@
 .site-kapak img { width: 100%; max-width: 480px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; }
 .site-kontrol { display: flex; flex-direction: column; gap: 6px; }
 /* Kapak önizleme şeridi (28 Ekim 2026): aynı görsel sitede nerede nasıl kırpılır; odak noktası object-position */
-.ko { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 560px; }
-.ko-serit { display: grid; grid-template-columns: 2fr 1fr 1fr 0.7fr; gap: 8px; align-items: end; }
+.ko { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 640px; }
+.ko-serit { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1.1fr; gap: 10px; align-items: start; }
 .ko-serit figure { margin: 0; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .ko-serit img { width: 100%; object-fit: cover; border-radius: 8px; background: var(--sunk); display: block; }
+/* Önizlemede yazı (3 Kasım 2026): sitedeki manşetin küçültülmüş hâli; yazı boyu kutunun genişliğine göre (cqw) */
+.ko-sahne { position: relative; container-type: inline-size; border-radius: 8px; overflow: hidden; }
+.ko-sahne img { border-radius: 0; }
+.ko-yazi { position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 1.2cqw; padding: 0 4cqw 5cqw; isolation: isolate; }
+.ko-yazi::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, rgb(2 6 18 / .94) 0%, rgb(5 16 44 / .8) 38%, rgb(14 40 110 / .38) 76%, rgb(37 99 235 / 0) 100%); }
+.ko-yazi b { color: #fff; font-family: var(--baslik); font-size: 4.9cqw; line-height: 1.12; text-shadow: 0 1px 2px rgb(2 6 18 / .5); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ko-manset-tel .ko-yazi b { font-size: 6.7cqw; }
+.ko-kat { justify-self: start; font-family: var(--mono); font-size: max(6px, 1.6cqw); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #111; background: var(--brand-orange, #FF6B1A); padding: .4cqw 1cqw; border-radius: 4px; }
+.ko-manset-tel .ko-kat { font-size: max(6px, 3cqw); }
+.ko-kart-b, .ko-yan b { font-size: 11px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ko-yan { display: grid; grid-template-columns: 44% 1fr; gap: 5px; align-items: start; }
 .ko-serit figcaption { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ko-duzen { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
 @media (max-width: 640px) { .ko-serit { grid-template-columns: 1fr 1fr; } }
