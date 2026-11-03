@@ -17,6 +17,12 @@
           "Yazar seçilemez: haber, kaydeden hesabın adıyla yayımlanır.",
           "Telefonda kaynaklar alanı ekrandan taşmıyor."
         ]
+      },
+      {
+        "ad": "Taslaklar",
+        "maddeler": [
+          "Taslak listelerinde sıralama ve süzgeç var; varsayılan en yeni hazırlanan en üstte."
+        ]
       }
     ]
   },

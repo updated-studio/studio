@@ -96,22 +96,66 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   );
 }
 
+type TaslakSuzgec = { kim: "benim" | "hepsi" | "oto"; sira: "yeni" | "guncel" | "onem" | "haber"; durum: "hepsi" | "taslak" | "hazir" | "panelde" | "eksik"; model: "hepsi" | "claude" | "gemini"; gorsel: "hepsi" | "var" | "yz" | "yok"; tarih: "hepsi" | "bugun" | "hafta"; anaSayfa: boolean; ara: string };
+const SUZGEC_VARSAYILAN: TaslakSuzgec = { kim: "benim", sira: "yeni", durum: "hepsi", model: "hepsi", gorsel: "hepsi", tarih: "hepsi", anaSayfa: false, ara: "" };
+const SUZGEC_ANAHTARI = "haber-masasi:taslak-suzgec";
+const suzgecOku = (): TaslakSuzgec => { try { return { ...SUZGEC_VARSAYILAN, ...JSON.parse(localStorage.getItem(SUZGEC_ANAHTARI) || "{}") }; } catch { return SUZGEC_VARSAYILAN; } };
+
 const DURUM: Record<Taslak["status"], string> = { taslak: "Taslak", hazir: "Yayına hazır", gonderildi: "Siteye gönderildi" };
 
 export default function Taslaklar({ acik, setAcik }: { acik: number | null; setAcik: (id: number | null) => void }) {
   const { v } = useMasa();
   const kisi = useKisi();
   const { profile } = useAuth();
-  const [filtre, setFiltre] = useState<"benim" | "hepsi">("benim");
+  const [f, setF] = useState<TaslakSuzgec>(suzgecOku);
   const t = acik ? v.taslaklar.find((x) => x.id === acik) : undefined;
+  useEffect(() => { try { localStorage.setItem(SUZGEC_ANAHTARI, JSON.stringify(f)); } catch { /* depolama kapalı */ } }, [f]);
   if (t) return <Duzenleyici key={t.id} t={t} kapat={() => setAcik(null)} />;
 
-  const liste = v.taslaklar.filter((x) => filtre === "hepsi" || x.author === profile!.id);
+  // Sıralama ve süzgeç (3 Kasım 2026, kullanıcı: "son hazırlattığım en üste gelmiyor; detaylı filtreleme ve sıralama"); seçim tarayıcıda hatırlanır
+  const haberOf = new Map(v.haberler.map((h) => [h.id, h]));
+  const onemOf = (x: Taslak) => { const h = haberOf.get(x.item_id ?? -1); return h ? degerlendir(h).puan : -1; };
+  const haberSaati = (x: Taslak) => { const h = haberOf.get(x.item_id ?? -1); return h ? Date.parse(h.published_at ?? h.created_at) : 0; };
+  const kucuk = f.ara.trim().toLocaleLowerCase("tr");
+  const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
+  const liste = v.taslaklar.filter((x) =>
+    (f.kim === "hepsi" || (f.kim === "benim" ? x.author === profile!.id : x.auto))
+    && (f.durum === "hepsi" || (f.durum === "panelde" ? !!x.site_id : f.durum === "eksik" ? !!x.site_eksik?.eksikler?.length || !!x.site_hata : x.status === f.durum))
+    && (f.model === "hepsi" || (f.model === "claude" ? /claude/.test(x.model ?? "") : !/claude/.test(x.model ?? "")))
+    && (f.gorsel === "hepsi" || (f.gorsel === "yok" ? !x.image?.secilen : f.gorsel === "yz" ? !!x.image?.yz_uretim && !!x.image?.secilen : !!x.image?.secilen && !x.image?.yz_uretim))
+    && (!f.anaSayfa || !!x.qc?.ana_sayfa)
+    && (f.tarih === "hepsi" || Date.parse(x.created_at) >= (f.tarih === "bugun" ? +bugun : Date.now() - 7 * 864e5))
+    && (!kucuk || (x.title ?? "").toLocaleLowerCase("tr").includes(kucuk)))
+    .sort((a, b) => f.sira === "guncel" ? Date.parse(b.updated_at) - Date.parse(a.updated_at)
+      : f.sira === "onem" ? onemOf(b) - onemOf(a)
+      : f.sira === "haber" ? haberSaati(b) - haberSaati(a)
+      : Date.parse(b.created_at) - Date.parse(a.created_at));
+  const sec = <K extends keyof TaslakSuzgec>(k: K, deger: TaslakSuzgec[K]) => setF((x) => ({ ...x, [k]: deger }));
+  const suzgecli = f.durum !== "hepsi" || f.model !== "hepsi" || f.gorsel !== "hepsi" || f.anaSayfa || f.tarih !== "hepsi" || !!kucuk;
   return (
     <>
-      <div className="segment" role="group">
-        <button aria-pressed={filtre === "benim"} onClick={() => setFiltre("benim")}>Benim</button>
-        <button aria-pressed={filtre === "hepsi"} onClick={() => setFiltre("hepsi")}>Hepsi</button>
+      <div className="taslak-suzgec">
+        <div className="segment" role="group" aria-label="Kimin taslakları">
+          {([["benim", "Benim"], ["hepsi", "Hepsi"], ["oto", "Otomatik"]] as const).map(([k, ad]) => <button key={k} aria-pressed={f.kim === k} onClick={() => sec("kim", k)}>{ad}</button>)}
+        </div>
+        <input type="search" placeholder="Başlıkta ara" aria-label="Başlıkta ara" value={f.ara} onChange={(e) => sec("ara", e.target.value)} />
+        <label>Sırala<select value={f.sira} onChange={(e) => sec("sira", e.target.value as TaslakSuzgec["sira"])}>
+          <option value="yeni">En yeni hazırlanan</option><option value="guncel">Son güncellenen</option><option value="onem">Önem (şu an)</option><option value="haber">Haberin saati</option>
+        </select></label>
+        <label>Durum<select value={f.durum} onChange={(e) => sec("durum", e.target.value as TaslakSuzgec["durum"])}>
+          <option value="hepsi">Hepsi</option><option value="taslak">Taslak</option><option value="hazir">Yayına hazır</option><option value="panelde">Panelde</option><option value="eksik">Eksiği ya da hatası var</option>
+        </select></label>
+        <label>Yazan<select value={f.model} onChange={(e) => sec("model", e.target.value as TaslakSuzgec["model"])}>
+          <option value="hepsi">Hepsi</option><option value="claude">Claude</option><option value="gemini">Gemini / diğer</option>
+        </select></label>
+        <label>Görsel<select value={f.gorsel} onChange={(e) => sec("gorsel", e.target.value as TaslakSuzgec["gorsel"])}>
+          <option value="hepsi">Hepsi</option><option value="var">Fotoğraf var</option><option value="yz">Yapay zekâ görseli</option><option value="yok">Görsel yok</option>
+        </select></label>
+        <label>Tarih<select value={f.tarih} onChange={(e) => sec("tarih", e.target.value as TaslakSuzgec["tarih"])}>
+          <option value="hepsi">Hepsi</option><option value="bugun">Bugün</option><option value="hafta">Son 7 gün</option>
+        </select></label>
+        <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={f.anaSayfa} onChange={(e) => sec("anaSayfa", e.target.checked)} /> Ana sayfa adayı</label>
+        <span className="muted">{liste.length} taslak{suzgecli && <> · <button className="linkbtn" onClick={() => setF({ ...SUZGEC_VARSAYILAN, kim: f.kim, sira: f.sira })}>süzgeci temizle</button></>}</span>
       </div>
       {!liste.length && <div className="empty">Taslak yok. Benim aldıklarım bölümünde "Taslak hazırla"ya bas.</div>}
       <div className="liste panel">

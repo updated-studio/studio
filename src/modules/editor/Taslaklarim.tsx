@@ -53,8 +53,21 @@ export default function Taslaklarim() {
   const { kullanici, hata } = usePanelKullanici();
   const [liste, setListe] = useState<Icerik[] | null>(null);
   const git = useNavigate();
+  // Sıralama ve süzgeç (3 Kasım 2026, kullanıcı: "son hazırlattığım en üste gelmiyor; detaylı filtreleme ve sıralama")
+  const [sira, setSira] = useState<"yeni" | "guncel" | "kontrol">("yeni");
+  const [kim, setKim] = useState<"hepsi" | "benim">("hepsi");
+  const [durum, setDurum] = useState<"hepsi" | "taslak" | "incelemede">("hepsi");
+  const [ara, setAra] = useState("");
   const yukle = useCallback(() => { if (kullanici) taslaklar().then(setListe).catch(() => setListe([])); }, [kullanici]);
   useEffect(yukle, [yukle]);
+  const benimYazar = kullanici ? (typeof kullanici.author === "object" ? kullanici.author?.id : kullanici.author) ?? null : null;
+  const yazarId = (x: Icerik) => { const a = (x as { author?: number | { id: number } | null }).author; return typeof a === "object" ? a?.id ?? null : a ?? null; };
+  const suz = (l: Icerik[]) => l
+    .filter((x) => (kim === "hepsi" || yazarId(x) === benimYazar) && (durum === "hepsi" || (x.workflow?.state ?? "taslak") === durum)
+      && (!ara.trim() || (x.title ?? "").toLocaleLowerCase("tr").includes(ara.trim().toLocaleLowerCase("tr"))))
+    .sort((a, b) => sira === "kontrol" ? kontrolSayisi(b) - kontrolSayisi(a)
+      : sira === "guncel" ? +new Date(b.updatedAt) - +new Date(a.updatedAt)
+      : +new Date((b as { createdAt?: string }).createdAt ?? b.updatedAt) - +new Date((a as { createdAt?: string }).createdAt ?? a.updatedAt));
   if (hata) return <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
   if (kullanici === null) return <SiteYetkisiYok />;
   return (
@@ -66,8 +79,17 @@ export default function Taslaklarim() {
       {!liste ? <div className="muted">Yükleniyor…</div> : !liste.length ? (
         <div className="ed-bos"><Ikon ad="taslak" /><b>Bekleyen taslak yok</b><span>Yeni bir haber yazmaya başla; rehber adım adım gösterecek.</span><button className="btn" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Haber yaz</button></div>
       ) : (
+        <>
+        <div className="taslak-suzgec">
+          <div className="segment" role="group" aria-label="Kimin taslakları">
+            {([["hepsi", "Hepsi"], ["benim", "Benim"]] as const).map(([k, ad]) => <button key={k} aria-pressed={kim === k} onClick={() => setKim(k)}>{ad}</button>)}
+          </div>
+          <input type="search" placeholder="Başlıkta ara" aria-label="Başlıkta ara" value={ara} onChange={(e) => setAra(e.target.value)} />
+          <label>Sırala<select value={sira} onChange={(e) => setSira(e.target.value as typeof sira)}><option value="yeni">En yeni hazırlanan</option><option value="guncel">Son güncellenen</option><option value="kontrol">Kontrolü en çok biten</option></select></label>
+          <label>Durum<select value={durum} onChange={(e) => setDurum(e.target.value as typeof durum)}><option value="hepsi">Hepsi</option><option value="taslak">Taslak</option><option value="incelemede">Yayın onayında</option></select></label>
+        </div>
         <div className="ed-liste">
-          {liste.map((x) => (
+          {suz(liste).map((x) => (
             <button key={x.id} className="ed-satir" onClick={() => git(`/yaz/${x.id}`)}>
               <span className="ed-satir-m"><b>{x.title || "Başlıksız taslak"}</b><span className="muted">{api.ad(x.category as never) || "Kategori yok"} · {zaman(x.updatedAt)}</span></span>
               <span className={`site-durum site-durum--${x.workflow?.state ?? "taslak"}`}>{api.DURUMLAR[x.workflow?.state ?? "taslak"]}</span>
@@ -76,6 +98,7 @@ export default function Taslaklarim() {
             </button>
           ))}
         </div>
+        </>
       )}
     </div>
   );
