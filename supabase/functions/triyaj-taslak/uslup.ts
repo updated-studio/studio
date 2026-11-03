@@ -78,4 +78,5 @@ KONTROL ET:
 ${uslup}
 
 Sadece şu JSON'u döndür:
-{"baslik":"","spot":"","govde":"Markdown metin","sorunlar":["editörün bilmesi gereken, düzeltilen ya da çözülemeyen her sorun; kısa"],"guven":"yuksek|orta|dusuk"}`;
+{"baslik":"","spot":"","govde":"Markdown metin","duzeltmeler":[{"tur":"rakam|ad|iddia|tutarsizlik|taraflilik|bicim|mantik|dil","once":"metindeki eski ifade (kısa, birebir)","sonra":"yerine yazılan (çıkarıldıysa boş)","neden":"kısa gerekçe"}],"sorunlar":["yalnız ÇÖZÜLEMEYEN ve editörün bilmesi gereken sorunlar; kısa"],"guven":"yuksek|orta|dusuk"}
+"duzeltmeler" yalnız anlamı ya da bilgiyi değiştiren düzeltmeleri içerir (en fazla 15); tek kelimelik üslup rötuşlarını tek tek yazma, "dil" türünde tek satırda özetle.`;

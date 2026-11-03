@@ -201,7 +201,8 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       <div className="panel">
         <h3>Editör için (yayına girmez)</h3>
         {(t.questions ?? []).length > 0 && <><b>Senin katkın için sorular</b><div className="muted">Cevabını gövdede ilgili ara başlığın içine yerleştir.</div><ul>{t.questions.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
-        {(t.qc?.sorunlar ?? []).length > 0 && <><b>Kalite kontrolünün bulduğu</b><ul>{t.qc!.sorunlar!.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
+        <Duzeltmeler qc={t.qc} />
+        {(t.qc?.sorunlar ?? []).length > 0 && <><b>Kalite kontrolünün çözemedikleri</b><ul>{t.qc!.sorunlar!.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
         {(t.checks ?? []).length > 0 && <><b>Yayından önce doğrula</b><ul>{t.checks.map((x, i) => <li key={i}>{metinYap(x)}</li>)}</ul></>}
         <label>Notlar (yapay zekânın emin olmadıkları)<textarea className="alan" rows={3} value={d.editor_note} onChange={(e) => alan("editor_note", e.target.value)} /></label>
       </div>
@@ -212,6 +213,29 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
         <button className="btn sm" onClick={() => siteGonder()} disabled={siteSuruyor}>{siteSuruyor ? "Gönderiliyor…" : t.site_id ? "Paneldeki taslağı güncelle" : "Panele gönder"}</button>
         <button className="btn ghost sm" onClick={sil}>{silOnay ? "Emin misin? Tekrar bas" : "Sil"}</button>
       </div>
+    </>
+  );
+}
+
+// Kalite kontrolünün hangi turda neyi düzelttiği (2 Kasım 2026, kullanıcı: "nerelerin kaçıncı kontrolde düzeldiği belli olsun").
+// Liste denetleyen modelin beyanı; "paragraf değişti" sayısı eski ve yeni metnin karşılaştırmasından (nesnel).
+const DUZELTME_TUR: Record<string, string> = { rakam: "Rakam", ad: "Ad", iddia: "Dayanaksız bilgi", tutarsizlik: "Tutarsızlık", taraflilik: "Taraflılık", bicim: "Biçim", mantik: "Mantık", dil: "Dil" };
+function Duzeltmeler({ qc }: { qc: Taslak["qc"] }) {
+  const liste = qc?.duzeltmeler ?? [], degisen = qc?.degisen ?? {};
+  const turlar = [1, 2].filter((n) => degisen[String(n)] !== undefined || liste.some((x) => x.kontrol === n));
+  if (!turlar.length) return null;
+  return (
+    <>
+      <b>Kalite kontrolünün düzelttikleri</b>
+      {turlar.map((n) => {
+        const l = liste.filter((x) => x.kontrol === n);
+        return (
+          <div key={n} className="dz-tur">
+            <div className="muted">{n}. kontrol · {degisen[String(n)] ?? 0} paragraf değişti{l.length ? ` · ${l.length} düzeltme` : ""}</div>
+            {l.length > 0 && <ul>{l.map((x, i) => <li key={i}><b>{DUZELTME_TUR[x.tur] ?? x.tur}:</b> {x.once && <del>{x.once}</del>}{x.once && " → "}{x.sonra || <i>metinden çıkarıldı</i>}{x.neden && <span className="muted"> ({x.neden})</span>}</li>)}</ul>}
+          </div>
+        );
+      })}
     </>
   );
 }

@@ -480,6 +480,11 @@ async function kontrolBaslat(id: number) {
   } catch { /* zamanlanmış tur devralır */ } finally { clearTimeout(t); }
 }
 
+/** Kalite kontrolünün yaptığı düzeltme (Stüdyo'da "hangi kontrolde ne düzeldi" diye gösterilir; kullanıcı 2 Kasım 2026) */
+type Duzeltme = { kontrol: number; tur: string; once: string; sonra: string; neden: string };
+/** Nesnel ölçü: yeni metinde eskisinde birebir bulunmayan paragraf sayısı (modelin kendi beyanına ek) */
+const degisenParagraf = (eski: string, yeni: string) => { const e = new Set(eski.split(/\n{2,}/).map((x) => x.trim())); return yeni.split(/\n{2,}/).map((x) => x.trim()).filter((x) => x && !e.has(x)).length; };
+
 async function kontrol(sb: Sb, id: number) {
   const bitis = Date.now() + BUTCE_MS;
   // Kilit: sadece bekleyen ya da 4 dakikadır asılı kalmış kontrol alınır
@@ -488,11 +493,12 @@ async function kontrol(sb: Sb, id: number) {
     .eq("id", id).or(`qc_state.eq.bekliyor,and(qc_state.eq.calisiyor,qc_at.lt.${asili})`).select("*");
   const t = kilit?.[0];
   if (!t) return { atlandi: "Kontrol beklemiyor" };
-  const qc = (t.qc ?? {}) as { kaynak?: string; ilgili?: { baslik: string; link: string }[]; tam_metin?: boolean; ilk_govde?: string; tur?: number; onceki_sorunlar?: string[] };
+  const qc = (t.qc ?? {}) as { kaynak?: string; ilgili?: { baslik: string; link: string }[]; tam_metin?: boolean; ilk_govde?: string; tur?: number; onceki_sorunlar?: string[]; duzeltmeler?: Duzeltme[]; degisen?: Record<string, number> };
   const { data: it } = await sb.from("tr_items").select("*").eq("id", t.item_id ?? 0).maybeSingle();
   const notlar: string[] = [];
   let durum = "", guven = "";
   const tur = qc.tur === 2 ? 2 : 1;
+  let duzeltmeler: Duzeltme[] = [], degisen = 0;
   try {
     // 1) Doğrulama + düzeltme + insanlaştırma
     let { title: baslik, spot, body: govde } = t as { title: string; spot: string; body: string };
@@ -514,6 +520,8 @@ async function kontrol(sb: Sb, id: number) {
         const araBaslik = (x: string) => (x.match(/^## /gm) ?? []).length;
         // Güvenlik: ara başlık sayısı 2-4, metin özetlenmemiş
         if (araBaslik(yeniGovde) >= 2 && araBaslik(yeniGovde) <= 4 && yeniGovde.length > govde.length * 0.75) {
+          degisen = degisenParagraf(govde, yeniGovde);
+          duzeltmeler = (Array.isArray(k.duzeltmeler) ? k.duzeltmeler : []).slice(0, 15).map((x: Record<string, unknown>) => ({ kontrol: tur, tur: String(x?.tur ?? ""), once: String(x?.once ?? "").slice(0, 300), sonra: String(x?.sonra ?? "").slice(0, 300), neden: String(x?.neden ?? "").slice(0, 200) })).filter((x: Duzeltme) => x.once || x.sonra);
           govde = yeniGovde; baslik = String(k.baslik ?? "") || baslik; spot = spotKisalt(String(k.spot ?? "") || spot);
           durum = "kontrol edildi";
         } else { notlar.push("Kalite kontrolünün önerdiği metin güvenlik denetiminden geçmedi (yapı bozuldu ya da kısaldı); " + (tur === 2 ? "ilk denetimin metni korundu." : "ilk taslak korundu.")); durum = tur === 2 ? "kontrol edildi" : "kontrol uygulanmadı"; }
@@ -526,7 +534,7 @@ async function kontrol(sb: Sb, id: number) {
       await sb.from("tr_drafts").update({
         ...(sim?.body === t.body ? { title: baslik, spot, body: govde } : {}),
         notes: [...((sim?.notes ?? []) as string[]), ...notlar],
-        qc: { ...qc, tur: 2, onceki_sorunlar: sorunlar, ilk_guven: guven }, qc_state: "bekliyor", qc_at: new Date().toISOString(),
+        qc: { ...qc, tur: 2, onceki_sorunlar: sorunlar, ilk_guven: guven, duzeltmeler, degisen: { "1": degisen } }, qc_state: "bekliyor", qc_at: new Date().toISOString(),
       }).eq("id", id);
       if (sim?.body === t.body) { await kontrolBaslat(id); return { ikinci_tur: true, sorunlar }; }
       await sb.from("tr_drafts").update({ qc_state: "tamam", qc: { ...qc, kaynak: undefined, sorunlar, durum: "kontrol edildi", bitti: new Date().toISOString() } }).eq("id", id);
@@ -546,7 +554,7 @@ async function kontrol(sb: Sb, id: number) {
       ...(degismedi ? { title: baslik, spot, body: govde } : {}),
       editor_note: [String(simdi?.editor_note ?? ""), ...kontrolNot].filter(Boolean).join("\n"),
       notes: [...((simdi?.notes ?? []) as string[]), ...kontrolNot],
-      qc: { ...qc, kaynak: undefined, sorunlar, durum, onem: d?.onem ?? null, ana_sayfa: !!d && d.puan >= ANA_SAYFA_ESIK, bitti: new Date().toISOString() },
+      qc: { ...qc, kaynak: undefined, onceki_sorunlar: undefined, sorunlar, durum, guven, duzeltmeler: [...(tur === 2 ? qc.duzeltmeler ?? [] : []), ...(degismedi ? duzeltmeler : [])], degisen: { ...(tur === 2 ? qc.degisen ?? {} : {}), ...(degismedi && durum === "kontrol edildi" ? { [String(tur)]: degisen } : {}) }, onem: d?.onem ?? null, ana_sayfa: !!d && d.puan >= ANA_SAYFA_ESIK, bitti: new Date().toISOString() },
     }).eq("id", id);
 
     // 2) Öne çıkan görsel (yoksa Flux isteği)
