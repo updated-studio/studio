@@ -1,0 +1,40 @@
+# UPrompter (Mac): uygulamalar/uprompter-mac değişince GitHub'ın Mac sunucusunda derlenir,
+# "uprompter" yayınına UPrompter.zip + surum.json konur. Kurulu uygulamalar açılışta
+# surum.json'a bakıp kendini günceller. İndirme linki hep aynı:
+# https://github.com/updated-studio/studio/releases/download/uprompter/UPrompter.zip
+name: UPrompter (Mac)
+on:
+  push:
+    paths:
+      - 'uygulamalar/uprompter-mac/**'
+      - '.github/workflows/uprompter-mac.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: uprompter-mac
+  cancel-in-progress: false
+jobs:
+  derle:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Derle ve paketle
+        env:
+          YAPI: ${{ github.run_number }}
+        run: |
+          export NOT="$(git log -1 --pretty=%s)"
+          bash uygulamalar/uprompter-mac/paketle.sh
+      - name: Yayınla
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd uygulamalar/uprompter-mac/build
+          SURUM=$(python3 -c 'import json;d=json.load(open("surum.json"));print(d["surum"], "· yapı", d["yapi"])')
+          if ! gh release view uprompter >/dev/null 2>&1; then
+            gh release create uprompter --prerelease --target "${{ github.sha }}" \
+              --title "UPrompter (Mac)" --notes "Kurulum ve güncelleme için uygulamalar/uprompter-mac/OKUBENI.md"
+          fi
+          gh release upload uprompter UPrompter.zip surum.json --clobber
+          gh release edit uprompter --title "UPrompter (Mac) $SURUM"
+          echo "::notice title=UPrompter yayında::$SURUM · https://github.com/${{ github.repository }}/releases/download/uprompter/UPrompter.zip"
