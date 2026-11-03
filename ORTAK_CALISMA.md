@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **3 Kasım 2026 · Claude (Fatih'in isteği) · herkese:** Yeni ayrı uygulama **UPrompter** (Mac teleprompter): `uygulamalar/uprompter-mac/` ve `.github/workflows/uprompter-mac.yml`. Stüdyo'nun web koduna, ortak dosyalara ve veritabanına dokunmuyor. Bu klasör değişince GitHub Mac sunucusunda derlenip `uprompter` yayınına konuyor.
+
 - **1 Kasım 2026 · Claude (kullanıcı isteği) · herkese:** Stüdyo'nun kabuğu değişti: herkes `src/modules/editor/EditorKabuk.tsx`'i görüyor (solda menü / telefonda alt çubuk, Bugün ekranı, rehber, çekim listesi); eski dock kalktı. Yönetim modülleri yalnız yönetici ve yayın yönetmeninde (`YONETIM` listesi). Yeni modül `src/modules/index.ts`'e eklenince menüde kendiliğinden çıkar. Ortak dosyalar: App.tsx (sadeleşti), ProfilMenu ("Editör görünümünü dene"), Ikon (10 ikon), site/Duzenle.tsx (`data-rehber`).
 
 - **31 Ekim 2026 · Claude (kullanıcı isteği) · Haber Masası tarafına:** Haber Masası Site modülünün ilk sekmesi oldu (`src/modules/site/Site.tsx`, "Haber Masası | Site içeriği"); dock'tan kalktı (`yer: "gizli"`), `#/haber-masasi` adresi çalışıyor. Masanın kendi kodu değişmedi. Site rolü olmayan üye de masayı görür.
