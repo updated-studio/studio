@@ -3,7 +3,7 @@
 // ürünü 1600×900 şeffaf tuvalin ortasına yerleştirir. Yalnız UPDATED Stüdyo çağırır (x-anahtar başlığı = ANAHTAR sırrı).
 // Kurulum: Stüdyo → Bağlantı anahtarları → Cloudflare. Gerekenler: "IMAGES" adlı Images bağlaması, "ANAHTAR" adlı sır.
 // Ücretsiz planda ayda 5.000 işlem; sınır aşılırsa ücret çıkmaz, istek reddedilir.
-// 2 Kasım 2026: "/uret" yolu: haber için uygun görsel bulunamazsa Workers AI (Flux schnell) ile görsel üretir, 1600×900'e kırpar.
+// 2 Kasım 2026: "/uret" yolu: haber için uygun görsel bulunamazsa Workers AI ile görsel üretir (FLUX.2 [klein] 9B, olmazsa FLUX.1 [schnell]), 1600×900'e kırpar.
 // Gereken: "AI" adlı Workers AI bağlaması. Ücretsiz planda günlük ücretsiz kullanım payı var; aşılırsa istek reddedilir.
 export default {
   async fetch(req, env) {
@@ -32,8 +32,19 @@ async function uret(req, env) {
   if (!env.AI) return new Response("AI bağlaması eksik", { status: 500 });
   try {
     const { istem } = await req.json();
-    const r = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", { prompt: String(istem || "").slice(0, 2000), steps: 8 });
-    const ham = Uint8Array.from(atob(r.image), (c) => c.charCodeAt(0));
+    const prompt = String(istem || "").slice(0, 2000);
+    let b64 = "", hata = "";
+    // Önce FLUX.2 [klein] 9B (daha gerçekçi); günlük ücretsiz pay biterse ya da hata verirse FLUX.1 [schnell]
+    try {
+      const form = new FormData();
+      form.append("prompt", prompt); form.append("width", "1600"); form.append("height", "896");
+      const fr = new Response(form);
+      const r = await env.AI.run("@cf/black-forest-labs/flux-2-klein-9b", { multipart: { body: fr.body, contentType: fr.headers.get("content-type") } });
+      b64 = r && r.image || "";
+    } catch (e) { hata = String(e && e.message || e).slice(0, 120); }
+    if (!b64) { const r = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", { prompt, steps: 8 }); b64 = r && r.image || ""; }
+    if (!b64) return new Response("üretilemedi: " + hata, { status: 422 });
+    const ham = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     if (!env.IMAGES) return new Response(ham, { headers: { "content-type": "image/jpeg" } });
     const son = await env.IMAGES.input(new Blob([ham]).stream()).transform({ width: 1600, height: 900, fit: "cover" }).output({ format: "image/webp", quality: 88 });
     return son.response();

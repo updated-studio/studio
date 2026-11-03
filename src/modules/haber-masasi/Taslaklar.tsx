@@ -7,7 +7,6 @@ import { useMasa, type Taslak } from "./veri";
 
 // Markdown → HTML ortak dosyada: ekrandaki önizleme ve "HTML kopyala" aynı çıktıyı kullanır (panele Markdown gider).
 import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
-import { fluxIstem } from "../../../supabase/functions/triyaj-taslak/gorsel.ts";
 
 /** Yapay zekâ bazen liste öğesini metin yerine nesne döndürür ({iddia, kaynak} gibi): ekran çökmesin diye metne çevrilir */
 const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof x === "object" ? Object.values(x as Record<string, unknown>).map((v) => metinYap(v)).filter(Boolean).join(" — ") : String(x ?? "");
@@ -16,17 +15,19 @@ const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof
 function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   const toast = useToast();
   const g = t.image ?? {};
-  // Flux: Fatih'in bilgisayarındaki işçi bekleyen istekleri alır, üretip yükler (bilgisayar açık ve işçi çalışıyorsa)
-  async function fluxIste() {
-    const r = await sb.from("tr_drafts").update({ image: { ...g, flux: { durum: "bekliyor", istem: fluxIstem(g.ai_istem || t.title), istendi: new Date().toISOString() } } }).eq("id", t.id);
-    toast(r.error ? r.error.message : "Flux isteği sıraya alındı; bilgisayar açıkken üretilir ve buraya gelir.");
+  // Yapay zekâ ile görsel (3 Kasım 2026): sunucu üretir (Cloudflare), Claude denetler (başka marka tasarımı, yazı, bozuk nesne reddedilir)
+  const [uretiliyor, setUretiliyor] = useState(false);
+  async function uret() {
+    setUretiliyor(true);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { gorsel_uret: t.id } });
+    setUretiliyor(false);
+    const hata = (data as { hata?: string } | null)?.hata;
+    toast(hata ?? (error ? "Görsel üretilemedi: " + error.message : "Görsel üretildi ve denetlendi."));
   }
-  const flux = g.flux;
-  const fluxSatir = flux?.durum === "bekliyor" ? <div className="muted">🎨 Flux ile yazısız bir görsel üretilecek (Fatih'in bilgisayarı açıkken). İstem: {flux.istem}</div>
-    : flux?.durum === "hata" ? <div className="msg err">Flux görseli üretilemedi: {flux.hata} <button className="linkbtn" onClick={fluxIste}>Tekrar dene</button></div>
-    : !g.secilen ? <div><button className="btn ghost sm" onClick={fluxIste}>Flux ile görsel üret</button></div> : null;
+  const yzSatir = g.yz_uretim && g.secilen ? <div className="muted">Bu görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan.</div>
+    : !g.secilen ? <div><button className="btn ghost sm" onClick={uret} disabled={uretiliyor}>{uretiliyor ? "Üretiliyor, denetleniyor…" : "Yapay zekâ ile görsel üret"}</button></div> : null;
   const stok = g.stok ?? [];
-  if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem && !g.secilen && !g.gorsel_neden && !flux) return null;
+  if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem && !g.secilen && !g.gorsel_neden) return null;
   const sec = g.secilen;
   return (
     <div className="panel">
@@ -43,7 +44,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
           </div>
         </div>
       ) : g.gorsel_neden ? <div className="muted">Öne çıkan görsel eklenmedi: {g.gorsel_neden}</div> : null}
-      {fluxSatir}
+      {yzSatir}
       <ul>
         <li>Öneri: {g.oneri || t.image_note}</li>
         {g.alt_text && <li>Alt text: {g.alt_text}</li>}

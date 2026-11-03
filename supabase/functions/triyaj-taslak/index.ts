@@ -438,7 +438,7 @@ ${metinler.join("\n\n---\n\n")}`;
 
 // ---------- Son kalite kontrolü (ARCHITECTURE.md, 18 Ekim 2026) ----------
 // Taslak yazıldıktan hemen sonra ayrı bir çağrıyla çalışır (her çağrının kendi ~150 sn sınırı var):
-// 1) kaynaklara karşı doğrulama + düzeltme + insanlaştırma (uslup.ts KONTROL_SISTEM), 2) öne çıkan görsel (yoksa Flux isteği),
+// 1) kaynaklara karşı doğrulama + düzeltme + insanlaştırma (uslup.ts KONTROL_SISTEM), 2) öne çıkan görsel (yoksa yapay zekâ üretimi),
 // 3) panele taslak haber olarak gönderim (otomatik ve elle hazırlanan taslaklar). Editör bu arada metni değiştirdiyse düzeltme metne uygulanmaz, notlara yazılır.
 
 const spotKisalt = (s: string, n = 160) => {
@@ -557,17 +557,16 @@ async function kontrol(sb: Sb, id: number) {
       qc: { ...qc, kaynak: undefined, onceki_sorunlar: undefined, sorunlar, durum, guven, duzeltmeler: [...(tur === 2 ? qc.duzeltmeler ?? [] : []), ...(degismedi ? duzeltmeler : [])], degisen: { ...(tur === 2 ? qc.degisen ?? {} : {}), ...(degismedi && durum === "kontrol edildi" ? { [String(tur)]: degisen } : {}) }, onem: d?.onem ?? null, ana_sayfa: !!d && d.puan >= ANA_SAYFA_ESIK, bitti: new Date().toISOString() },
     }).eq("id", id);
 
-    // 2) Öne çıkan görsel (yoksa Flux isteği)
+    // 2) Öne çıkan görsel (yoksa yapay zekâ üretimi)
     const img = (t.image ?? {}) as Record<string, unknown> & { aramalar?: string[]; ai_istem?: string; secilen?: GorselAday | null };
     if (it && !img.secilen) {
       const oneCikan = await gorselSec(sb, it, baslik || it.title, img.aramalar ?? [], bitis);
-      // Uygun fotoğraf yoksa yapay zekâ ile üretilir ve denetlenir; o da olmazsa eski yol: Fatih'in bilgisayarındaki Flux işçisine istek
+      // Uygun fotoğraf yoksa yapay zekâ ile üretilir ve denetlenir; o da olmazsa görselsiz kalır (3 Kasım 2026: Fatih'in bilgisayarındaki Flux işçisi kaldırıldı)
       let uretim: { secilen: GorselAday | null; neden: string } | null = null;
       if (!oneCikan.secilen) uretim = await yzGorselUret(sb, id, { baslik: baslik || it.title, marka: it.brand ?? "", urun: it.product ?? "", istem: String(img.ai_istem || baslik) }, bitis);
       const secilen = oneCikan.secilen ?? uretim?.secilen ?? null;
       const neden = uretim ? (uretim.secilen ? uretim.neden : oneCikan.neden + " " + uretim.neden) : oneCikan.neden;
-      const flux = !secilen ? { durum: "bekliyor", istem: fluxIstem(String(img.ai_istem || baslik)), istendi: new Date().toISOString() } : null;
-      await sb.from("tr_drafts").update({ image: { ...img, secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: neden, ...(uretim?.secilen ? { yz_uretim: true } : {}), ...(flux ? { flux } : {}) } }).eq("id", id);
+      await sb.from("tr_drafts").update({ image: { ...img, secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: neden, ...(uretim?.secilen ? { yz_uretim: true } : {}) } }).eq("id", id);
       if (uretim?.secilen) {
         const { data: n } = await sb.from("tr_drafts").select("notes").eq("id", id).single();
         await sb.from("tr_drafts").update({ notes: [...((n?.notes ?? []) as string[]), "Görsel: uygun fotoğraf bulunamadı, öne çıkan görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan."] }).eq("id", id);
@@ -586,7 +585,7 @@ async function kontrol(sb: Sb, id: number) {
     if (t.auto) {
       const { data: son } = await sb.from("tr_drafts").select("image,site_id").eq("id", id).maybeSingle();
       const im = (son?.image ?? {}) as { secilen?: unknown; flux?: unknown };
-      const gDurum = im.secilen ? (son?.site_id ? "görsel kapak oldu" : "görsel seçildi") : im.flux ? "görsel Flux'ta üretilecek" : "görselsiz";
+      const gDurum = im.secilen ? (son?.site_id ? "görsel kapak oldu" : "görsel seçildi") : "görselsiz";
       await otoOzet(sb, { durum: `Taslak hazır · ${durum || "kontrolsüz"} · ${siteDurum} · ${gDurum}`, haber: baslik });
     }
     await sb.from("tr_drafts").update({ qc_state: "tamam" }).eq("id", id);
@@ -634,29 +633,18 @@ async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: stri
   return { secilen: null, neden: "Yapay zekâ görseli de uygun bulunmadı: " + sonuclar.join("; ") };
 }
 
-// ---------- Flux (Fatih'in bilgisayarında çevrimdışı görsel üretimi; scripts/flux-isci) ----------
-// İşçi FLUX_TOKEN ile gelir: bekleyen işleri alır, ürettiği görseli yükler. Token Supabase Secrets'ta ve işçinin yerel ayarında.
-async function fluxIsler(sb: Sb) {
-  const { data } = await sb.from("tr_drafts").select("id,title,image").eq("image->flux->>durum", "bekliyor").order("id", { ascending: false }).limit(5);
-  return ((data ?? []) as { id: number; title: string; image: { flux?: { istem?: string } } }[]).map((d) => ({ id: d.id, baslik: d.title, istem: d.image?.flux?.istem ?? "" }));
-}
-
-async function fluxYukle(sb: Sb, id: number, b64: string, mime: string) {
-  if (!/^image\/(jpeg|png|webp)$/.test(mime)) return { hata: "Görsel türü desteklenmiyor" };
-  const veri = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  if (veri.byteLength > 8_000_000) return { hata: "Görsel çok büyük" };
-  const yol = `flux/${id}-${Date.now()}.${mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg"}`;
-  const y = await sb.storage.from("haber-gorsel").upload(yol, veri, { contentType: mime, upsert: true });
-  if (y.error) return { hata: "Depolamaya yüklenemedi: " + y.error.message };
-  const url = sb.storage.from("haber-gorsel").getPublicUrl(yol).data.publicUrl;
-  const { data: t } = await sb.from("tr_drafts").select("image,site_id").eq("id", id).single();
-  const img = (t?.image ?? {}) as Record<string, unknown> & { secilen?: GorselAday | null; flux?: Record<string, unknown> };
-  const secilen: GorselAday = { kaynak: "Yapay zekâ (Flux)", sayfa: url, buyuk: url, thumb: url, yazar: "Updated (Flux)", lisans: "Yapay zekâ üretimi", aciklama: String(img.flux?.istem ?? ""), w: 1344, h: 768 };
-  // Elle seçilmiş/yüklenmiş görsel varsa ona dokunulmaz; Flux görseli sadece görselsiz taslağa konur
-  const bos = !img.secilen;
-  await sb.from("tr_drafts").update({ image: { ...img, ...(bos ? { secilen, gorsel_neden: "Uygun fotoğraf bulunamadı; Flux ile üretildi (yazısız). Yayından önce kontrol et." } : {}), flux: { ...(img.flux ?? {}), durum: "tamam", url, bitti: new Date().toISOString() } } }).eq("id", id);
-  if (bos && t?.site_id) return { ok: true, url, site: await siteKapakEkle(sb, id) };
-  return { ok: true, url };
+/** Stüdyo'daki "Yapay zekâ ile görsel üret" düğmesi: görselsiz taslağa üretir, denetler, kapak yapar. Elle seçilmiş görsele dokunmaz. */
+async function elleUret(sb: Sb, id: number) {
+  const bitis = Date.now() + BUTCE_MS;
+  const { data: t } = await sb.from("tr_drafts").select("id,title,item_id,image,site_id").eq("id", id).single();
+  if (!t) return { hata: "Taslak bulunamadı" };
+  const img = (t.image ?? {}) as Record<string, unknown> & { ai_istem?: string; secilen?: GorselAday | null };
+  if (img.secilen) return { hata: "Taslağın zaten görseli var" };
+  const { data: it } = await sb.from("tr_items").select("brand,product,title").eq("id", t.item_id ?? 0).maybeSingle();
+  const u = await yzGorselUret(sb, id, { baslik: t.title || it?.title || "", marka: it?.brand ?? "", urun: it?.product ?? "", istem: String(img.ai_istem || t.title) }, bitis);
+  await sb.from("tr_drafts").update({ image: { ...img, secilen: u.secilen, gorsel_neden: u.neden, ...(u.secilen ? { yz_uretim: true } : {}) } }).eq("id", id);
+  if (u.secilen && t.site_id) return { ok: true, neden: u.neden, site: await siteKapakEkle(sb, id) };
+  return u.secilen ? { ok: true, neden: u.neden } : { hata: u.neden };
 }
 
 // ---------- Otomatik taslak (ARCHITECTURE.md, 15 Ekim 2026) ----------
@@ -783,23 +771,6 @@ Deno.serve(async (req) => {
     return Response.json({ basladi: true }, { status: 202, headers: CORS });
   }
 
-  // Flux işçisi (Fatih'in bilgisayarı): FLUX_TOKEN ile; token tanımlı değilse kapalı
-  if (govde?.flux) {
-    const tok = Deno.env.get("FLUX_TOKEN");
-    if (!tok || govde.token !== tok) return Response.json({ hata: "Yetkisiz" }, { status: 401, headers: CORS });
-    if (govde.flux === "isler") return Response.json({ isler: await fluxIsler(sb) }, { headers: CORS });
-    if (govde.flux === "yukle") return Response.json(await fluxYukle(sb, Number(govde.id), String(govde.b64 ?? ""), String(govde.mime ?? "image/jpeg")), { headers: CORS });
-    if (govde.flux === "hata") {
-      const { data: t } = await sb.from("tr_drafts").select("image").eq("id", Number(govde.id)).single();
-      const img = (t?.image ?? {}) as Record<string, unknown> & { flux?: Record<string, unknown> };
-      await sb.from("tr_drafts").update({ image: { ...img, flux: { ...(img.flux ?? {}), durum: "hata", hata: String(govde.mesaj ?? "").slice(0, 200) } } }).eq("id", Number(govde.id));
-      return Response.json({ ok: true }, { headers: CORS });
-    }
-    return Response.json({ hata: "Bilinmeyen istek" }, { status: 400, headers: CORS });
-  }
-
-  const auth = req.headers.get("Authorization") ?? "";
-  const { data: u } = await sb.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
   if (!u?.user) return Response.json({ hata: "Giriş gerekli" }, { status: 401, headers: CORS });
   const { data: p } = await sb.from("profiles").select("id,name,is_admin").eq("id", u.user.id).maybeSingle();
   if (!p) return Response.json({ hata: "Ekip üyesi değil" }, { status: 403, headers: CORS });
@@ -808,6 +779,11 @@ Deno.serve(async (req) => {
   if (govde?.site_dene) {
     if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
     return Response.json(await siteDene(sb), { headers: CORS });
+  }
+  // Görselsiz taslağa yapay zekâ ile görsel (ekip üyesi)
+  if (govde?.gorsel_uret) {
+    const r = await elleUret(sb, Number(govde.gorsel_uret));
+    return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
   }
   // Taslağı panele gönder (ekip üyesi)
   if (govde?.site) {

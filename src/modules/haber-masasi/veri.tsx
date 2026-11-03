@@ -26,7 +26,7 @@ export type Taslak = {
   image: {
     oneri?: string; alt_text?: string; aramalar?: string[]; ai_istem?: string; basin?: { url: string; kesin: boolean } | null; stok?: Stok[]; stok_anahtar?: boolean;
     secilen?: GorselAday | null; gorsel_adaylar?: GorselAday[]; gorsel_neden?: string; wp_media_id?: number | null; yukleme_hata?: string; // öne çıkan görsel (gorsel.ts)
-    flux?: { durum: "bekliyor" | "tamam" | "hata"; istem?: string; url?: string; hata?: string; istendi?: string; bitti?: string }; // Flux (Fatih'in bilgisayarı)
+    yz_uretim?: boolean; // öne çıkan görsel yapay zekâ ile üretildi (3 Kasım 2026; eski "flux" kuyruğu kaldırıldı)
   };
   created_at: string; updated_at: string;
   qc_state?: "" | "bekliyor" | "calisiyor" | "tamam" | "hata"; qc?: { sorunlar?: string[]; duzeltmeler?: { kontrol: number; tur: string; once: string; sonra: string; neden: string }[]; degisen?: Record<string, number>; tur?: number; guven?: string; durum?: string; onem?: number | null; ana_sayfa?: boolean; bitti?: string }; // son kalite kontrolü

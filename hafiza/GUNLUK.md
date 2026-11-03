@@ -66,6 +66,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 3 Kasım 2026
+- (Natro Claude): Fatih'in Mac'indeki Flux işçisi kaldırıldı (kullanıcı: "evet temizleyelim"; 513 iş hiç üretilmemişti): `scripts/flux-isci`, `flux` uç noktaları, kuyruk yedeği. Eski taslaklardaki `image.flux` alanı artık okunmuyor (veritabanına dokunulmadı). Taslaklar'da "Yapay zekâ ile görsel üret" düğmesi sunucuda üretir + denetler (`gorsel_uret`). Cloudflare programı: FLUX.2 [klein] 9B (1600×896), olmazsa FLUX.1 [schnell]. Son 24 saatte 34 taslağın 16'sı görselsiz (üretim gerekecek sayı ~16/gün).
 - (Natro Claude): Kalite kontrolü düzeltmeleri kaydediliyor (kullanıcı: "nerelerin kaçıncı kontrolde düzeldiği belli olsun"): KONTROL JSON'una `duzeltmeler` (tür, önce, sonra, neden; en çok 15), `sorunlar` artık yalnız çözülemeyenler; `qc.duzeltmeler` (kontrol 1/2) ve nesnel ölçü `qc.degisen` (yeni metinde birebir olmayan paragraf sayısı). Taslaklar ekranında "Kalite kontrolünün düzelttikleri". Fatih'in Console'unda 100 $ var; Claude anahtarı oradan girilecek. Enes'inki bırakıldı.
 
 ### 2 Kasım 2026

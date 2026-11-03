@@ -9,7 +9,8 @@
         "maddeler": [
           "Taslakta kalite kontrolünün neyi, kaçıncı kontrolde düzelttiği listelenir.",
           "Her kontrolde kaç paragrafın değiştiği yazılır.",
-          "Çözülemeyen sorunlar ayrı başlıkta durur."
+          "Çözülemeyen sorunlar ayrı başlıkta durur.",
+          "Görselsiz taslakta \"Yapay zekâ ile görsel üret\" düğmesi var; görseli üretip denetler."
         ]
       }
     ]
