@@ -67,7 +67,7 @@ Yayından önceki son kontrolü yap ve düzeltilmiş taslağı döndür.
 KONTROL ET:
 1. Rakamlar: her sayı, fiyat, para birimi, yüzde, tarih, kapasite, ölçü kaynakla birebir aynı mı? Yanlışsa düzelt; kaynakta yoksa cümleden çıkar.
 2. Özel adlar: şirket, ürün, model, kişi, unvan adları kaynaktaki gibi mi (yazım dahil)? Düzelt.
-3. Kaynakta olmayan iddia: taslakta kaynaklarda dayanağı olmayan bilgi varsa çıkar. Yeni bilgi EKLEME.
+3. Kaynakta olmayan iddia: taslakta kaynaklarda dayanağı olmayan bilgi varsa çıkar. Yeni bilgi EKLEME. Kaynağın açıkça söylemediği, çıkarım ya da yorumla varılan bilgi (ör. şehir adından mekân tahmini) kesin bilgi gibi yazılmaz: "... olduğu düşünülüyor", "... işaret ediyor" diye yazılır ya da çıkarılır. BAŞLIK VE SPOT DA bu denetimden geçer: metinde düzelttiğin ya da yumuşattığın bir bilgi başlıkta ve spotta kesin hâliyle kalmaz (3 Kasım 2026: başlıkta "Oyun Hammerfell'de Geçecek" kaldı, metinde dayanağı yoktu).
 4. Tutarsızlık: metnin içinde ya da kaynaklar arasında çelişen bilgi varsa metinde tarafsız biçimde belirt ("şirket X derken Y'ye göre ...") ya da emin olunanla yetin; sorunlar listesine yaz.
 5. Taraflılık: reklam/övgü dili, tek tarafın iddiasını gerçek gibi sunma, gereksiz yorum varsa tarafsızlaştır. Sızıntı ve söylenti "iddiaya göre" diye işaretli kalsın.
 6. Biçim: başlık iki parçalı kalıpta, en fazla 70 karakter, ünlem ve "şok/flaş/inanılmaz" yok, sızıntı/söylenti başlığında "sızıntı", "sızdı" ya da "iddia" geçer; spot en fazla 160 karakter; TAM 3 ara başlık (## ile); "[bağlantı](adres)" biçimindeki iç linkleri aynen koru.
@@ -78,5 +78,5 @@ KONTROL ET:
 ${uslup}
 
 Sadece şu JSON'u döndür:
-{"baslik":"","spot":"","govde":"Markdown metin","duzeltmeler":[{"tur":"rakam|ad|iddia|tutarsizlik|taraflilik|bicim|mantik|dil","once":"metindeki eski ifade (kısa, birebir)","sonra":"yerine yazılan (çıkarıldıysa boş)","neden":"kısa gerekçe"}],"sorunlar":["yalnız ÇÖZÜLEMEYEN ve editörün bilmesi gereken sorunlar; kısa"],"guven":"yuksek|orta|dusuk"}
+{"baslik":"","spot":"","govde":"Markdown metin","duzeltmeler":[{"tur":"rakam|ad|iddia|tutarsizlik|taraflilik|bicim|mantik|baslik|dil","once":"metindeki eski ifade (kısa, birebir)","sonra":"yerine yazılan (çıkarıldıysa boş)","neden":"kısa gerekçe"}],"sorunlar":["yalnız ÇÖZÜLEMEYEN ve editörün bilmesi gereken sorunlar; kısa"],"guven":"yuksek|orta|dusuk"}
 "duzeltmeler" yalnız anlamı ya da bilgiyi değiştiren düzeltmeleri içerir (en fazla 15); tek kelimelik üslup rötuşlarını tek tek yazma, "dil" türünde tek satırda özetle.`;

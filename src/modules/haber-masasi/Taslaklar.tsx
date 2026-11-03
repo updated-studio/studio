@@ -249,7 +249,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
 
 // Kalite kontrolünün hangi turda neyi düzelttiği (2 Kasım 2026, kullanıcı: "nerelerin kaçıncı kontrolde düzeldiği belli olsun").
 // Liste denetleyen modelin beyanı; "paragraf değişti" sayısı eski ve yeni metnin karşılaştırmasından (nesnel).
-const DUZELTME_TUR: Record<string, string> = { rakam: "Rakam", ad: "Ad", iddia: "Dayanaksız bilgi", tutarsizlik: "Tutarsızlık", taraflilik: "Taraflılık", bicim: "Biçim", mantik: "Mantık", dil: "Dil" };
+const DUZELTME_TUR: Record<string, string> = { rakam: "Rakam", ad: "Ad", iddia: "Dayanaksız bilgi", tutarsizlik: "Tutarsızlık", taraflilik: "Taraflılık", bicim: "Biçim", mantik: "Mantık", baslik: "Başlık", dil: "Dil" };
 function Duzeltmeler({ qc }: { qc: Taslak["qc"] }) {
   const liste = qc?.duzeltmeler ?? [], degisen = qc?.degisen ?? {};
   const turlar = [1, 2].filter((n) => degisen[String(n)] !== undefined || liste.some((x) => x.kontrol === n));
