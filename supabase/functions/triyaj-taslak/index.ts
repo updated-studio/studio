@@ -771,6 +771,8 @@ Deno.serve(async (req) => {
     return Response.json({ basladi: true }, { status: 202, headers: CORS });
   }
 
+  const auth = req.headers.get("Authorization") ?? "";
+  const { data: u } = await sb.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
   if (!u?.user) return Response.json({ hata: "Giriş gerekli" }, { status: 401, headers: CORS });
   const { data: p } = await sb.from("profiles").select("id,name,is_admin").eq("id", u.user.id).maybeSingle();
   if (!p) return Response.json({ hata: "Ekip üyesi değil" }, { status: 403, headers: CORS });
