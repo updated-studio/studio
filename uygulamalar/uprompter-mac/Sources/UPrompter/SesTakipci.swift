@@ -24,6 +24,14 @@ final class SesTakipci {
     private var tazeleZamanlayici: Timer?
     private var ardisikHata = 0
 
+    // Bekçi: Apple'ın tanıması uzun bir duraklamadan sonra hata vermeden susabiliyor.
+    // Mikrofonda ses varken tanıma bir süre sonuç vermezse görev yeniden başlatılır.
+    private var bekci: Timer?
+    private var sonSesZamani: CFAbsoluteTime = 0      // ses dinleme iş parçacığında yazılır (kilit ile)
+    private var sonSonucZamani: CFAbsoluteTime = 0
+    private var gorevBaslangici: CFAbsoluteTime = 0
+    private static let sesEsigi: Float = 0.012         // RMS; bunun üstü konuşma sayılır
+
     func tokenlariAyarla(_ t: [String]) {
         tokenlar = t
         if konum >= t.count { konum = max(0, t.count - 1) }
@@ -82,8 +90,10 @@ final class SesTakipci {
         giris.removeTap(onBus: 0)
         giris.installTap(onBus: 0, bufferSize: 1024, format: bicim) { [weak self] tampon, _ in
             guard let self else { return }
+            let konusma = SesTakipci.seviye(tampon) > SesTakipci.sesEsigi
             self.kilit.lock()
             let r = self.istek
+            if konusma { self.sonSesZamani = CFAbsoluteTimeGetCurrent() }
             self.kilit.unlock()
             r?.append(tampon)
         }
@@ -100,6 +110,35 @@ final class SesTakipci {
         ardisikHata = 0
         durumDegisti?(.acik)
         yeniGorev()
+        bekci?.invalidate()
+        let b = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in self?.bekle() }
+        RunLoop.main.add(b, forMode: .common)
+        bekci = b
+    }
+
+    private func bekle() {
+        guard acik else { return }
+        let simdi = CFAbsoluteTimeGetCurrent()
+        kilit.lock()
+        let ses = sonSesZamani
+        kilit.unlock()
+        let gorevYasi = simdi - gorevBaslangici
+        let sonuctanBeri = simdi - max(sonSonucZamani, gorevBaslangici)
+        // Konuşuluyor ama 1,5 sn'dir sonuç yok: tanıma takılmış.
+        let takildi = simdi - ses < 0.6 && sonuctanBeri > 1.5 && gorevYasi > 2.5
+        // Hiç sonuç gelmeden 6 sn geçti: sessizlikte de tazele.
+        let bayat = sonuctanBeri > 6 && gorevYasi > 6
+        if takildi || bayat { yeniGorev() }
+    }
+
+    private static func seviye(_ tampon: AVAudioPCMBuffer) -> Float {
+        guard let kanal = tampon.floatChannelData?[0] else { return 0 }
+        let n = Int(tampon.frameLength)
+        if n == 0 { return 0 }
+        var toplam: Float = 0
+        var i = 0
+        while i < n { let v = kanal[i]; toplam += v * v; i += 2 }
+        return (toplam / Float((n + 1) / 2)).squareRoot()
     }
 
     private func yeniGorev() {
@@ -121,6 +160,8 @@ final class SesTakipci {
         taban = konum
         atla = 0
         sonSayi = 0
+        gorevBaslangici = CFAbsoluteTimeGetCurrent()
+        sonSonucZamani = 0
         gorev = tanici.recognitionTask(with: r) { [weak self] sonuc, hata in
             DispatchQueue.main.async { self?.isle(sonuc, hata, r) }
         }
@@ -147,6 +188,7 @@ final class SesTakipci {
                 ilerledi?(yeni)
             }
             ardisikHata = 0
+            sonSonucZamani = CFAbsoluteTimeGetCurrent()
             durumDegisti?(.dinliyor)
             if sonuc.isFinal { yeniGorevGecikmeli() }
         } else if let hata {
@@ -179,6 +221,8 @@ final class SesTakipci {
         acik = false
         tazeleZamanlayici?.invalidate()
         tazeleZamanlayici = nil
+        bekci?.invalidate()
+        bekci = nil
         if dinleniyor {
             motor.stop()
             motor.inputNode.removeTap(onBus: 0)
