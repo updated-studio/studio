@@ -65,15 +65,20 @@ struct Duzenleyici: View {
     var body: some View {
         if let m = depo.secili {
             VStack(alignment: .leading, spacing: 10) {
+                TextField("Başlık", text: depo.baslikBaglama(m.id))
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 24, weight: .bold))
                 HStack(spacing: 10) {
-                    TextField("Başlık", text: depo.baslikBaglama(m.id))
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 24, weight: .bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .layoutPriority(1)
+                    Text(Ozet.ayrinti(m.govde))
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 8)
                     Button(oturum.panelGorunur ? "Prompter'ı gizle" : "Prompter'ı göster") {
                         PanelYoneticisi.ortak.degistir()
                     }
+                    .fixedSize()
                     Button {
                         oturum.degistir()
                     } label: {
@@ -82,10 +87,8 @@ struct Duzenleyici: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.return, modifiers: .command)
+                    .fixedSize()
                 }
-                Text(Ozet.ayrinti(m.govde))
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
                 TextEditor(text: depo.govdeBaglama(m.id))
                     .font(.system(size: 15))
                     .scrollContentBackground(.hidden)
