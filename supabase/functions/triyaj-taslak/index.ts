@@ -319,10 +319,11 @@ async function videoSec(a: Awaited<ReturnType<typeof videoAdaylari>> | null, o: 
   if (!a?.videolar.length || bitis - Date.now() < 25_000) return null;
   const istem = `Haber başlığı: ${o.baslik}\nOrijinal başlık: ${o.orijinal}\nMarka: ${o.marka || "-"} · Ürün: ${o.urun || "-"}\n\nVİDEO ADAYLARI:\n${a.videolar.map((v, i) => `${i}. "${v.baslik}" · KANAL: ${v.kanal} (${v.kanalUrl}) · ${v.tur} · bulunduğu yer: ${v.nereden}`).join("\n")}\n\nRESMÎ SAYFA ADAYLARI:\n${a.sayfalar.length ? a.sayfalar.map((p, i) => `${i}. ${p.url} — ${p.metin}`).join("\n") : "yok"}`;
   const { veri } = await yz("gorsel", VIDEO_SISTEM, istem, ["gemini-3.5-flash", ...MODELLER], Math.min(bitis - 10_000, Date.now() + 40_000), { claudeBitis: Math.min(bitis - 15_000, Date.now() + 30_000), maxTokens: 6000 });
-  const v = a.videolar[Number(veri.video)];
-  if (!Number.isInteger(Number(veri.video)) || !v) return null;
+  const v = Number.isInteger(Number(veri.video)) ? a.videolar[Number(veri.video)] : undefined;
   const sayfa = a.sayfalar[Number(veri.sayfa)];
-  return { url: v.url, baslik: v.baslik.slice(0, 140), kanal: v.kanal.slice(0, 80), resmiSayfa: sayfa?.url ?? "", spotAltinda: veri.en_ustte === true };
+  // Emin olunmasa da adaylar editöre gösterilir (4 Kasım 2026, kullanıcı: "emin değilse bile ihtimali olanların önizlemesini göstersin")
+  const adaylar = a.videolar.filter((x) => x !== v).slice(0, 4).map((x) => ({ url: x.url, baslik: x.baslik.slice(0, 140), kanal: x.kanal.slice(0, 80), tur: x.tur, id: x.id }));
+  return { video: v ? { url: v.url, baslik: v.baslik.slice(0, 140), kanal: v.kanal.slice(0, 80), resmiSayfa: sayfa?.url ?? "", spotAltinda: veri.en_ustte === true } : null, adaylar, resmiSayfa: sayfa?.url ?? "", neden: String(veri.neden ?? "").slice(0, 200) };
 }
 
 /** Modelin JSON yanıtından başlık, spot ve Markdown gövde (ara başlıklar + paragraflar; marka yazımı düzeltilmiş) */
@@ -405,8 +406,10 @@ ${metinler.join("\n\n---\n\n")}`;
     const dikkat = metinListe(t.dikkat_edilmesi_gerekenler);
     if (dikkat.length) notlar.unshift(...dikkat.map((x: string) => "Dikkat: " + x));
     const { baslik, spot, govdeMd } = metinYap(t, ilgili);
-    const video = await videoSec(await videoSoz, { baslik, marka: it.brand ?? "", urun: it.product ?? "", orijinal: it.title }, bitis).catch(() => null);
+    const vs = await videoSec(await videoSoz, { baslik, marka: it.brand ?? "", urun: it.product ?? "", orijinal: it.title }, bitis).catch(() => null);
+    const video = vs?.video ?? null;
     if (video) notlar.push(`Resmî video eklendi: ${video.baslik} (${video.kanal}). İstemezsen panelde "Gömülü video"yu boşalt.`);
+    else if (vs?.adaylar.length) notlar.push(`Resmî olduğundan emin olunamayan ${vs.adaylar.length} video bulundu; taslakta "Video adayları"na bak.`);
     const ab = gAlt ? { gemini: { ...(({ baslik: b, spot: sp, govdeMd: g }) => ({ baslik: b, spot: sp, govde: g }))(metinYap(gAlt.veri, ilgili)), model: gAlt.model }, durum: "bekliyor" } : undefined;
 
     // Kaynaklar (panelde haberin "Kaynaklar" listesine gider; ilk satır birincil): ilk yazan + diğerleri + asıl kaynak
@@ -428,6 +431,7 @@ ${metinler.join("\n\n---\n\n")}`;
       seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: etiketSuz(metinListe(t.etiketler), [it.source_name, ...diger.map((o) => o.name)]),
         kisa_cevap: String(t.kisa_cevap ?? "").trim(),
         ...(video ? { video } : {}),
+        ...(vs?.adaylar.length ? { video_adaylar: vs.adaylar, video_resmi_sayfa: vs.resmiSayfa } : {}),
         sizinti: { bilinenler: metinListe(t.sizinti?.bilinenler), bilinmeyenler: metinListe(t.sizinti?.bilinmeyenler), kesinlik: String(t.sizinti?.kesinlik ?? "").replace(/\D/g, "").slice(0, 1) } },
       sources: kaynaklar.join("\n"), image_note: String(g.oneri ?? ""), editor_note: notlar.join("\n"),
       questions: metinListe(t.editor_sorulari), checks: metinListe(t.dogrulama), notes: notlar,
@@ -676,8 +680,8 @@ async function yukle(sb: Sb, id: number, g: Uretilen): Promise<string> {
 
 const adayGorsel = (a: YzAday, istem: string): GorselAday => ({ kaynak: "Yapay zekâ (Flux)", sayfa: a.url!, buyuk: a.url!, thumb: a.url!, yazar: `Updated (yapay zekâ, ${MODEL_AD[a.model] ?? a.model})`, lisans: "Yapay zekâ üretimi", aciklama: istem, w: 1600, h: 900, ...(a.odak ? { odak: a.odak } : {}) });
 
-async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: string; urun: string; istem: string }, bitis: number, kiyasla: boolean): Promise<{ secilen: GorselAday | null; neden: string; adaylar: YzAday[]; model?: string }> {
-  const modeller = await kullanilabilir(sb);
+async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: string; urun: string; istem: string }, bitis: number, kiyasla: boolean, izinli?: string[]): Promise<{ secilen: GorselAday | null; neden: string; adaylar: YzAday[]; model?: string }> {
+  const modeller = (await kullanilabilir(sb)).filter((m) => !izinli || izinli.includes(m));
   if (!modeller.length) return { secilen: null, neden: "Görsel üretecek servis bağlı değil (Bağlantı anahtarları → Cloudflare).", adaylar: [] };
   const istem = fluxIstem(o.istem);
   const tek = async (model: UretimModeli | "", ist: string): Promise<YzAday> => {
@@ -712,6 +716,54 @@ async function uretimBaslat(id: number) {
 }
 
 /** Görselsiz taslağa üretim (otomatik: yz_bekliyor bayrağıyla; elle: Stüdyo düğmesi). Elle seçilmiş görsele dokunmaz. */
+// Ücretli görsel modelleri (yeniden üretmede yalnız yöneticiler; 4 Kasım 2026, kullanıcı: "ücretli olanları yöneticiler yeniden çizdirebilsin")
+const UCRETLI_MODEL = ["gpt", "banana"];
+const UCRETSIZ_MODEL = ["klein", "dev", "lucid"];
+
+/** Editör görseli beğenmedi: yeniden üret (görseli olan taslakta da). Adaylar eklenir/yenilenir; seçili görsel değişmez, editör seçer. */
+async function yenidenUret(sb: Sb, id: number, ucretli: boolean) {
+  const bitis = Date.now() + BUTCE_MS;
+  const { data: t } = await sb.from("tr_drafts").select("id,title,item_id,image").eq("id", id).single();
+  if (!t) return { hata: "Taslak bulunamadı" };
+  const img = (t.image ?? {}) as Record<string, unknown> & { ai_istem?: string; secilen?: GorselAday | null; yz_adaylar?: YzAday[] };
+  const { data: it } = await sb.from("tr_items").select("brand,product,title").eq("id", t.item_id ?? 0).maybeSingle();
+  const izinli = ucretli ? [...UCRETSIZ_MODEL, ...UCRETLI_MODEL] : UCRETSIZ_MODEL;
+  const u = await yzGorselUret(sb, id, { baslik: t.title || it?.title || "", marka: it?.brand ?? "", urun: it?.product ?? "", istem: String(img.ai_istem || t.title) }, bitis, true, izinli);
+  if (!u.adaylar.length) return { hata: u.neden };
+  const { data: son } = await sb.from("tr_drafts").select("image").eq("id", id).single();
+  const simdi = (son?.image ?? {}) as Record<string, unknown> & { secilen?: GorselAday | null; yz_adaylar?: YzAday[] };
+  const yeniModeller = new Set(u.adaylar.map((a) => a.model));
+  const adaylar = [...u.adaylar, ...(simdi.yz_adaylar ?? []).filter((a) => !yeniModeller.has(a.model))];
+  await sb.from("tr_drafts").update({ image: { ...simdi, yz_adaylar: adaylar, yz_kiyas: true, ...(!simdi.secilen && u.secilen ? { secilen: u.secilen, yz_uretim: true, yz_secen: "otomatik", yz_model: u.model, gorsel_neden: u.neden } : {}) } }).eq("id", id);
+  return { ok: true, gecen: u.adaylar.filter((a) => a.gecti).length, toplam: u.adaylar.length };
+}
+
+/** Fotoğrafları yeniden tara: resmî basın, kaynak haberlerdeki üretici görselleri, serbest lisanslı arşivler. Adaylar listelenir; görseli
+ *  olmayan taslakta en uygunu kapak olur, olanda editör seçer. */
+async function fotoTara(sb: Sb, id: number) {
+  const { data: t } = await sb.from("tr_drafts").select("id,title,item_id,image,site_id").eq("id", id).single();
+  if (!t) return { hata: "Taslak bulunamadı" };
+  const { data: it } = await sb.from("tr_items").select("brand,product,title,link,other_sources").eq("id", t.item_id ?? 0).maybeSingle();
+  if (!it) return { hata: "Haber bulunamadı" };
+  const img = (t.image ?? {}) as Record<string, unknown> & { aramalar?: string[]; secilen?: GorselAday | null };
+  const r = await gorselSec(sb, it as Parameters<typeof gorselSec>[1], t.title || it.title, img.aramalar ?? [], Date.now() + BUTCE_MS);
+  const ekle = !img.secilen && r.secilen;
+  await sb.from("tr_drafts").update({ image: { ...img, gorsel_adaylar: r.adaylar, gorsel_neden: r.neden, ...(ekle ? { secilen: r.secilen, yz_uretim: false } : {}) } }).eq("id", id);
+  if (ekle && t.site_id) await siteKapakEkle(sb, id);
+  return { ok: true, aday: r.adaylar.length, neden: r.neden };
+}
+
+/** Editör fotoğraf adaylarından birini kapak yapar */
+async function fotoSec(sb: Sb, id: number, sira: number) {
+  const { data: t } = await sb.from("tr_drafts").select("image,site_id").eq("id", id).single();
+  const img = (t?.image ?? {}) as Record<string, unknown> & { gorsel_adaylar?: GorselAday[] };
+  const a = img.gorsel_adaylar?.[sira];
+  if (!a) return { hata: "Aday bulunamadı" };
+  await sb.from("tr_drafts").update({ image: { ...img, secilen: a, yz_uretim: false, yz_model: null, yz_secen: "editor" } }).eq("id", id);
+  if (t?.site_id) return { ok: true, site: await siteKapakEkle(sb, id, { degistir: true }) };
+  return { ok: true };
+}
+
 async function elleUret(sb: Sb, id: number, otomatik = false) {
   const bitis = Date.now() + BUTCE_MS;
   const { data: t } = await sb.from("tr_drafts").select("id,title,item_id,image,site_id,notes").eq("id", id).single();
@@ -903,9 +955,17 @@ Deno.serve(async (req) => {
   }
   // Görselsiz taslağa yapay zekâ ile görsel (ekip üyesi)
   if (govde?.gorsel_uret) {
+    if (govde.yeniden) {
+      if (govde.ucretli && !p.is_admin) return Response.json({ hata: "Ücretli modellerle yeniden üretimi yalnız yöneticiler başlatabilir." }, { status: 403, headers: CORS });
+      const r = await yenidenUret(sb, Number(govde.gorsel_uret), !!govde.ucretli);
+      return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
+    }
     const r = await elleUret(sb, Number(govde.gorsel_uret));
     return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
   }
+  // Fotoğrafları yeniden tara / adaylardan kapak seç (ekip üyesi)
+  if (govde?.gorsel_tara) { const r = await fotoTara(sb, Number(govde.gorsel_tara)); return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS }); }
+  if (govde?.foto_sec) { const r = await fotoSec(sb, Number(govde.foto_sec), Number(govde.sira)); return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS }); }
   // Kör karşılaştırma: editör metni seçer (ekip üyesi). Gemini seçilirse taslağın metni onunkiyle değişir; panele gitmişse güncellenir.
   if (govde?.ab_sec) {
     const id = Number(govde.ab_sec), secim = govde.secim === "gemini" ? "gemini" : "claude";

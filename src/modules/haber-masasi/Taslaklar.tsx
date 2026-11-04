@@ -35,11 +35,46 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     const r = data as { hata?: string; site?: { ok: boolean; hata?: string } } | null;
     toast(r?.hata ?? (error ? error.message : r?.site && !r.site.ok ? "Kapak değişti; panele aktarılamadı: " + r.site.hata : "Kapak değişti."));
   }
+  // Görseli beğenmeyen editör için (4 Kasım 2026): fotoğrafları yeniden tara, ücretsiz modellerle yeniden üret; ücretli modeller (GPT Image,
+  // Nano Banana) yalnız yöneticide ve onaylı. Adaylar aşağıda yan yana, "Bunu kullan" ile kapak olur.
+  const { profile } = useAuth();
+  const [is_, setIs] = useState("");
+  const [ucretliOnay, setUcretliOnay] = useState(false);
+  async function cagir(ad: string, govde: Record<string, unknown>, basari: (r: Record<string, unknown>) => string) {
+    setIs(ad);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: govde });
+    setIs(""); setUcretliOnay(false);
+    const r = (data ?? {}) as Record<string, unknown>;
+    toast((r.hata as string) ?? (error ? error.message : basari(r)));
+  }
+  const fotolar = g.gorsel_adaylar ?? [];
   const adaylar = g.yz_adaylar ?? [];
+  const islemler = <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+    <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("tara", { gorsel_tara: t.id }, (r) => `Tarandı: ${r.aday ?? 0} fotoğraf adayı.`)}>{is_ === "tara" ? "Taranıyor…" : "Fotoğrafları yeniden tara"}</button>
+    <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("uret", { gorsel_uret: t.id, yeniden: true }, (r) => `Üretildi: ${r.toplam ?? 0} görselden ${r.gecen ?? 0}'i denetimden geçti.`)}>{is_ === "uret" ? "Üretiliyor…" : "Yapay zekâ ile yeniden üret (ücretsiz)"}</button>
+    {profile?.is_admin && (ucretliOnay
+      ? <><span className="muted">GPT Image ve Nano Banana da çalışır; görsel başına yaklaşık 4 sent.</span><button className="btn sm" disabled={!!is_} onClick={() => cagir("ucretli", { gorsel_uret: t.id, yeniden: true, ucretli: true }, (r) => `Üretildi: ${r.toplam ?? 0} görselden ${r.gecen ?? 0}'i denetimden geçti.`)}>{is_ === "ucretli" ? "Üretiliyor…" : "Onayla, üret"}</button><button className="btn ghost sm" onClick={() => setUcretliOnay(false)}>Vazgeç</button></>
+      : <button className="btn ghost sm" disabled={!!is_} onClick={() => setUcretliOnay(true)}>Tüm modellerle üret (ücretli)</button>)}
+  </div>;
+  const fotoSatir = fotolar.length > 0 && <>
+    <b>Fotoğraf adayları</b>
+    <div className="yz-adaylar">
+      {fotolar.map((f, i) => {
+        const secili = !!g.secilen && g.secilen.buyuk === f.buyuk;
+        return (
+          <figure key={f.buyuk + i} className={secili ? "secili" : ""}>
+            <img src={f.thumb || f.buyuk} alt="" loading="lazy" />
+            <figcaption><b>{f.kaynak}</b> · {f.yazar}</figcaption>
+            {secili ? <span className="pill ok">Kapak</span> : <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("foto" + i, { foto_sec: t.id, sira: i }, () => "Kapak değişti.")}>{is_ === "foto" + i ? "Seçiliyor…" : "Bunu kullan"}</button>}
+          </figure>
+        );
+      })}
+    </div>
+  </>;
   const yzSatir = <>
     {g.yz_bekliyor && !g.secilen && <div className="muted">Yapay zekâ ile görsel üretiliyor ve denetleniyor…</div>}
     {g.yz_uretim && g.secilen && <div className="muted">Bu görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan.</div>}
-    {adaylar.length > 1 && <>
+    {adaylar.length > 0 && <>
       <b>Yapay zekâ adayları (model kıyası)</b>
       <div className="yz-adaylar">
         {adaylar.map((a) => {
@@ -56,6 +91,8 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
       </div>
     </>}
     {!g.secilen && !g.yz_bekliyor && <div><button className="btn ghost sm" onClick={uret} disabled={uretiliyor}>{uretiliyor ? "Üretiliyor, denetleniyor…" : "Yapay zekâ ile görsel üret"}</button></div>}
+    {fotoSatir}
+    {islemler}
   </>;
   const stok = g.stok ?? [];
   if (!g.oneri && !t.image_note && !g.basin && !stok.length && !g.ai_istem && !g.secilen && !g.gorsel_neden) return null;
@@ -248,6 +285,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel ve panele gönderim). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
       <OnemSatiri t={t} haber={haber} />
       <Karsilastirma t={t} />
+      <VideoAdaylari t={t} d={d} />
       {d.seo?.video?.url && <div className="panel">
         <h3 style={{ margin: 0 }}>Resmî video</h3>
         <div><a href={d.seo.video.url} target="_blank" rel="noreferrer">{d.seo.video.baslik || d.seo.video.url}</a> <span className="muted">· {d.seo.video.kanal}{d.seo.video.resmiSayfa ? " · resmî sayfa var" : ""}</span></div>
@@ -387,6 +425,39 @@ function Karsilastirma({ t }: { t: Taslak }) {
           </div>
         ))}
       </div>}
+    </div>
+  );
+}
+
+// Video adayları (4 Kasım 2026, kullanıcı: "emin değilse bile ihtimali olanların önizlemesini göstersin"): resmî olduğundan emin olunamayan
+// videolar; editör izleyip uygun bulursa ekler. Panele gitmiş taslakta panelin "Gömülü video" alanı boşsa oraya da gider.
+function VideoAdaylari({ t, d }: { t: Taslak; d: Taslak }) {
+  const toast = useToast();
+  const [mesgul, setMesgul] = useState("");
+  const liste = d.seo?.video_adaylar ?? [];
+  if (!liste.length) return null;
+  async function ekle(v: (typeof liste)[number]) {
+    setMesgul(v.url);
+    const seo = { ...d.seo, video: { url: v.url, baslik: v.baslik, kanal: v.kanal, resmiSayfa: d.seo.video_resmi_sayfa ?? "", spotAltinda: false } };
+    const r = await sb.from("tr_drafts").update({ seo }).eq("id", t.id);
+    if (r.error) { setMesgul(""); return toast(r.error.message); }
+    if (t.site_id) await sb.functions.invoke("triyaj-taslak", { body: { site: true, draft_id: t.id, zorla: true } });
+    setMesgul("");
+    toast(t.site_id ? "Video eklendi; paneldeki habere de gitti (orada video boşsa)." : "Video eklendi.");
+  }
+  return (
+    <div className="panel">
+      <h3 style={{ margin: 0 }}>Video adayları</h3>
+      <div className="muted">Resmî kanaldan olduğu kesinleşmeyen videolar. İzle; habere uygunsa ekle.</div>
+      <div className="yz-adaylar">
+        {liste.map((v) => (
+          <figure key={v.url}>
+            <a href={v.url} target="_blank" rel="noreferrer">{v.tur === "youtube" ? <img src={`https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`} alt="" loading="lazy" /> : <div className="yz-bos">Vimeo</div>}</a>
+            <figcaption><b>{v.baslik}</b> · {v.kanal}</figcaption>
+            {d.seo?.video?.url === v.url ? <span className="pill ok">Eklendi</span> : <button className="btn ghost sm" disabled={!!mesgul} onClick={() => ekle(v)}>{mesgul === v.url ? "Ekleniyor…" : "Bunu ekle"}</button>}
+          </figure>
+        ))}
+      </div>
     </div>
   );
 }

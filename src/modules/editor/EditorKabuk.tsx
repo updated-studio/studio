@@ -20,6 +20,7 @@ import "./editor.css";
 // yayın yönetmeninde. Masaüstünde solda menü, telefonda altta sekme çubuğu; sığmayanlar profil menüsünde.
 const Bugun = lazy(() => import("./Bugun"));
 const Taslaklar = lazy(() => import("./Taslaklarim"));
+const Yayindakiler = lazy(() => import("./Taslaklarim").then((m) => ({ default: m.Yayindakiler })));
 const HaberYazSayfa = lazy(() => import("./Taslaklarim").then((m) => ({ default: () => <YazRota Yaz={m.HaberYaz} /> })));
 const Cekim = lazy(() => import("./Cekim"));
 
@@ -42,6 +43,7 @@ export default function EditorKabuk() {
     { yol: "/bugun", ad: "Bugün", ikon: "bugun" },
     { yol: "/yaz/yeni", ad: "Haber yaz", ikon: "yaz", esles: "/yaz" },
     { yol: "/taslaklar", ad: "Taslaklar", ikon: "taslak" },
+    { yol: "/yayinda", ad: "Yayındakiler", ikon: "site" },
     { yol: "/haber-masasi", ad: "Haber Masası", ikon: "masa", kisa: "Masa" },
     { yol: "/cekim", ad: "Çekim listesi", ikon: "liste", kisa: "Çekim" },
     ...izinli.filter((m) => (m.yer ?? "dock") === "dock").map(modulOge),
@@ -87,6 +89,7 @@ export default function EditorKabuk() {
               <Route path="/bugun" element={<Bugun />} />
               <Route path="/yaz/:id" element={<HaberYazSayfa />} />
               <Route path="/taslaklar" element={<Taslaklar />} />
+              <Route path="/yayinda" element={<Yayindakiler />} />
               <Route path="/taslaklarim" element={<Navigate to="/taslaklar" replace />} />
               <Route path="/masa" element={<Navigate to="/haber-masasi" replace />} />
               <Route path="/cekim" element={<Cekim />} />

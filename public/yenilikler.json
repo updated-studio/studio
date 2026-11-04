@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-11-04-c",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Yayındakiler ve görsel seçenekleri",
+    "bolumler": [
+      {
+        "ad": "Menü",
+        "maddeler": [
+          "Yeni bölüm: Yayındakiler. Sitedeki haberi buradan açıp düzeltirsin."
+        ]
+      },
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Taslakta görseli beğenmezsen: fotoğrafları yeniden tara ya da yapay zekâ ile yeniden üret.",
+          "Ücretli modellerle (GPT Image, Nano Banana) üretimi yalnız yöneticiler başlatır.",
+          "Resmî olduğu kesinleşmeyen videolar \"Video adayları\"nda; izleyip ekleyebilirsin."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-b",
     "tarih": "4 Kasım 2026",
     "baslik": "Claude ve Gemini kör karşılaştırması",

@@ -20,7 +20,7 @@ export type Etkinlik = { id: number; created_at: string; kind: string; actor: st
 export type Stok = { kaynak: string; url: string; thumb: string; yazar: string; w: number; h: number };
 export type Taslak = {
   id: number; item_id: number | null; author: string | null; title: string; spot: string; body: string;
-  seo: { focus?: string; title_tag?: string; slug?: string; meta?: string; kategori?: string; etiketler?: string[]; video?: { url: string; baslik?: string; kanal?: string; resmiSayfa?: string; spotAltinda?: boolean } | null };
+  seo: { focus?: string; title_tag?: string; slug?: string; meta?: string; kategori?: string; etiketler?: string[]; video?: { url: string; baslik?: string; kanal?: string; resmiSayfa?: string; spotAltinda?: boolean } | null; video_adaylar?: { url: string; baslik: string; kanal: string; tur: string; id: string }[]; video_resmi_sayfa?: string };
   sources: string; image_note: string; editor_note: string; status: "taslak" | "hazir" | "gonderildi"; model: string;
   questions: string[]; checks: string[]; notes: string[];
   image: {
