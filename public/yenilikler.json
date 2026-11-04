@@ -11,6 +11,12 @@
           "Taslakta \"Metin A · Metin B\" yan yana; hangisinin kimden olduğu seçince görünür.",
           "Ayarlar'da hangi modelin kaç kez seçildiği tabloda."
         ]
+      },
+      {
+        "ad": "Resmî video",
+        "maddeler": [
+          "Haberin resmî fragmanı ya da tanıtım videosu varsa taslağa kendiliğinden eklenir; sitede ilk paragraftan sonra oynar."
+        ]
       }
     ]
   },

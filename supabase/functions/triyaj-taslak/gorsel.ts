@@ -76,7 +76,7 @@ const markaAnahtar = (m: string) => m.toLowerCase().replace(/[^a-z0-9]/g, "");
 const ENGELLI_HOST = /(^|\.)(twitter|x|facebook|instagram|youtube|youtu|reddit|wikipedia|amazon|t|linkedin|tiktok|threads|google|apple\.news|bsky\.app|news\.ycombinator|flipboard|pinterest)\.(com|be|co|org|net|app)$/i;
 const hostAl = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } };
 
-async function html(u: string, ms = 8_000): Promise<string> {
+export async function html(u: string, ms = 8_000): Promise<string> {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try { const r = await fetch(u, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: c.signal, redirect: "follow" }); return r.ok ? (await r.text()).slice(0, 1_500_000) : ""; }
   catch { return ""; } finally { clearTimeout(t); }
@@ -84,7 +84,7 @@ async function html(u: string, ms = 8_000): Promise<string> {
 const meta = (h: string, ad: string) => h.match(new RegExp(`<meta[^>]+(?:property|name)=["']${ad}["'][^>]+content=["']([^"']+)["']`, "i"))?.[1]
   ?? h.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${ad}["']`, "i"))?.[1];
 /** Sayfadaki bağlantılar: [adres, bağlantı metni] */
-function baglantilar(h: string, taban: string): [string, string][] {
+export function baglantilar(h: string, taban: string): [string, string][] {
   const out: [string, string][] = [];
   for (const m of h.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,300}?)<\/a>/gi)) {
     try { out.push([new URL(m[1].replace(/&amp;/g, "&"), taban).href, duz(m[2])]); } catch { /* geçersiz */ }

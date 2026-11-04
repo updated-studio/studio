@@ -209,6 +209,7 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
       category: kat.slug, label: etiketTuru(tur),
       sources: kaynakListesi(t.sources ?? ""),
       ...(img.secilen?.buyuk ? { image: gorselGovde(img.secilen, img.alt_text || t.title) } : {}),
+      ...((seo as { video?: { url?: string } }).video?.url ? { video: (seo as { video: unknown }).video } : {}),
       seo: { title: seo.title_tag ?? "", description: seo.meta ?? "", slug: seo.slug ?? "" },
       shortAnswer: seo.kisa_cevap || undefined,
       ...(seo.sizinti ? { leak: { knowns: seo.sizinti.bilinenler ?? [], unknowns: seo.sizinti.bilinmeyenler ?? [], certainty: seo.sizinti.kesinlik || undefined } } : {}),

@@ -12,6 +12,7 @@ import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
 import { CLAUDE_MODEL, claudeJson, SECIM_SEMA } from "./claude.ts";
 import { markaYazimi } from "./html.ts";
 import { kullanilabilir, MODEL_AD, uret, type Uretilen, type UretimModeli } from "./uretim.ts";
+import { VIDEO_SISTEM, videoAdaylari } from "./video.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
@@ -313,6 +314,17 @@ function metinListe(x: unknown): string[] {
   return (Array.isArray(x) ? x : x ? [x] : []).map(duz).map((s) => s.trim()).filter(Boolean);
 }
 
+/** Resmî video seçimi (video.ts adaylarından): kanal resmî ve video bu haberin konusuysa; değilse null */
+async function videoSec(a: Awaited<ReturnType<typeof videoAdaylari>> | null, o: { baslik: string; marka: string; urun: string; orijinal: string }, bitis: number) {
+  if (!a?.videolar.length || bitis - Date.now() < 25_000) return null;
+  const istem = `Haber başlığı: ${o.baslik}\nOrijinal başlık: ${o.orijinal}\nMarka: ${o.marka || "-"} · Ürün: ${o.urun || "-"}\n\nVİDEO ADAYLARI:\n${a.videolar.map((v, i) => `${i}. "${v.baslik}" · KANAL: ${v.kanal} (${v.kanalUrl}) · ${v.tur} · bulunduğu yer: ${v.nereden}`).join("\n")}\n\nRESMÎ SAYFA ADAYLARI:\n${a.sayfalar.length ? a.sayfalar.map((p, i) => `${i}. ${p.url} — ${p.metin}`).join("\n") : "yok"}`;
+  const { veri } = await yz("gorsel", VIDEO_SISTEM, istem, ["gemini-3.5-flash", ...MODELLER], Math.min(bitis - 10_000, Date.now() + 40_000), { claudeBitis: Math.min(bitis - 15_000, Date.now() + 30_000), maxTokens: 6000 });
+  const v = a.videolar[Number(veri.video)];
+  if (!Number.isInteger(Number(veri.video)) || !v) return null;
+  const sayfa = a.sayfalar[Number(veri.sayfa)];
+  return { url: v.url, baslik: v.baslik.slice(0, 140), kanal: v.kanal.slice(0, 80), resmiSayfa: sayfa?.url ?? "", spotAltinda: veri.en_ustte === true };
+}
+
 /** Modelin JSON yanıtından başlık, spot ve Markdown gövde (ara başlıklar + paragraflar; marka yazımı düzeltilmiş) */
 function metinYap(t: Record<string, any>, ilgili: { link: string }[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const parcalar: string[] = [];
@@ -373,6 +385,9 @@ ${metinler.join("\n\n---\n\n")}`;
 
     const uslup = await uslupAl(sb);
     await nabiz();
+    // Resmî video adayları yazımla aynı anda toplanır (video.ts); seçimi aşağıda yapay zekâ yapar
+    const basinUrl = it.brand ? (((await sb.from("tr_press").select("url").ilike("brand", it.brand).limit(1)).data ?? []) as { url: string }[]).map((x) => x.url) : [];
+    const videoSoz = tur === "taslak" ? videoAdaylari(sb, { linkler: [it.link, ...diger.map((o) => o.link)], marka: it.brand ?? "", urun: it.product ?? "", baslik: it.title, konu: `${it.topic ?? ""} ${it.kind ?? ""} ${it.news_type ?? ""}`, basin: basinUrl }).catch(() => null) : Promise.resolve(null);
     // Kör karşılaştırma (4 Kasım 2026, kullanıcı: "hazırlananların hepsi karşılaştırmalı olsun, ana metin Claude'un"): Claude ile aynı anda
     // Gemini de yazar; Claude'unki taslak olur, Gemini'ninki qc.ab'de durur ve ayrıca denetlenir. Editör Haber Masası'nda A/B olarak görüp seçer.
     const geminiSoz = tur === "taslak" ? gemini(taslakSistem(uslup), istem, MODELLER, bitis - 30_000).catch(() => null) : Promise.resolve(null);
@@ -390,6 +405,8 @@ ${metinler.join("\n\n---\n\n")}`;
     const dikkat = metinListe(t.dikkat_edilmesi_gerekenler);
     if (dikkat.length) notlar.unshift(...dikkat.map((x: string) => "Dikkat: " + x));
     const { baslik, spot, govdeMd } = metinYap(t, ilgili);
+    const video = await videoSec(await videoSoz, { baslik, marka: it.brand ?? "", urun: it.product ?? "", orijinal: it.title }, bitis).catch(() => null);
+    if (video) notlar.push(`Resmî video eklendi: ${video.baslik} (${video.kanal}). İstemezsen panelde "Gömülü video"yu boşalt.`);
     const ab = gAlt ? { gemini: { ...(({ baslik: b, spot: sp, govdeMd: g }) => ({ baslik: b, spot: sp, govde: g }))(metinYap(gAlt.veri, ilgili)), model: gAlt.model }, durum: "bekliyor" } : undefined;
 
     // Kaynaklar (panelde haberin "Kaynaklar" listesine gider; ilk satır birincil): ilk yazan + diğerleri + asıl kaynak
@@ -410,6 +427,7 @@ ${metinler.join("\n\n---\n\n")}`;
       title: baslik, spot, body: govdeMd,
       seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: etiketSuz(metinListe(t.etiketler), [it.source_name, ...diger.map((o) => o.name)]),
         kisa_cevap: String(t.kisa_cevap ?? "").trim(),
+        ...(video ? { video } : {}),
         sizinti: { bilinenler: metinListe(t.sizinti?.bilinenler), bilinmeyenler: metinListe(t.sizinti?.bilinmeyenler), kesinlik: String(t.sizinti?.kesinlik ?? "").replace(/\D/g, "").slice(0, 1) } },
       sources: kaynaklar.join("\n"), image_note: String(g.oneri ?? ""), editor_note: notlar.join("\n"),
       questions: metinListe(t.editor_sorulari), checks: metinListe(t.dogrulama), notes: notlar,

@@ -248,6 +248,12 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel ve panele gönderim). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
       <OnemSatiri t={t} haber={haber} />
       <Karsilastirma t={t} />
+      {d.seo?.video?.url && <div className="panel">
+        <h3 style={{ margin: 0 }}>Resmî video</h3>
+        <div><a href={d.seo.video.url} target="_blank" rel="noreferrer">{d.seo.video.baslik || d.seo.video.url}</a> <span className="muted">· {d.seo.video.kanal}{d.seo.video.resmiSayfa ? " · resmî sayfa var" : ""}</span></div>
+        <div className="muted">Sitede {d.seo.video.spotAltinda ? "metnin en başında" : "ilk paragraftan sonra"} oynar. {t.site_id ? "Panele gitti; değiştirmek için paneldeki \"Gömülü video\" alanı." : "Panele gönderilince habere eklenir."}</div>
+        {!t.site_id && <button className="btn ghost sm" onClick={() => alan("seo", { ...d.seo, video: null })}>Videoyu kaldır</button>}
+      </div>}
       {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
       {t.site_id && <div className="msg good">Panelde taslak haber olarak duruyor{t.site_gonderim ? " (" + zamanOnce(t.site_gonderim) + " önce gönderildi)" : ""}. {t.site_onizleme && <a href={t.site_onizleme} target="_blank" rel="noreferrer">Son taslağı aç ↗</a>}{t.site_admin && <> · <a href={t.site_admin} target="_blank" rel="noreferrer">Panelde aç ↗</a></>}</div>}
       {!t.site_id && t.site_eksik?.kaldirildi && <div className="muted">Panelde {t.site_eksik.gun} gün kimse dokunmadığı için {zamanOnce(t.site_eksik.kaldirildi)} önce panelden kaldırıldı. Yeniden göndermek için "Panele gönder"e bas.</div>}
