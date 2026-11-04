@@ -141,7 +141,7 @@ export default function Baglantilar() {
   const [mesgul, setMesgul] = useState("");
   const [hata, setHata] = useState("");
   const [acik, setAcik] = useState("");
-  const [sonuc, setSonuc] = useState<Record<string, { ok: boolean; metin: string }>>({});
+  const [sonuc, setSonuc] = useState<Record<string, { ok: boolean; uyari?: boolean; metin: string }>>({});
   const [gemini, setGemini] = useState<{ durum: string }[] | null>(null);
 
   const yukle = useCallback(async () => {
@@ -189,8 +189,8 @@ export default function Baglantilar() {
       setSonuc((x) => ({ ...x, brave: b.hata ? { ok: false, metin: b.hata } : { ok: !!b.ok, metin: `Web araması: ${b.web} · Görsel araması: ${b.gorsel} · Bu ay ${b.kullanim}/${b.sinir} arama` } }));
       return;
     }
-    const r = (error ? { ok: false, hata: error.message } : data) as { ok?: boolean; hata?: string; model?: string; sure?: number };
-    setSonuc((x) => ({ ...x, [s.id]: r.ok ? { ok: true, metin: `Çalışıyor: ${r.model} ${s.eylem === "claude" ? "yanıt verdi" : "ile görsel üretildi"} (${Math.round((r.sure ?? 0) / 100) / 10} sn).` } : { ok: false, metin: r.hata ?? "Yanıt yok" } }));
+    const r = (error ? { ok: false, hata: error.message } : data) as { ok?: boolean; pay?: boolean; hata?: string; model?: string; sure?: number };
+    setSonuc((x) => ({ ...x, [s.id]: r.ok ? { ok: true, metin: `Çalışıyor: ${r.model} ${s.eylem === "claude" ? "yanıt verdi" : "ile görsel üretildi"} (${Math.round((r.sure ?? 0) / 100) / 10} sn).` } : { ok: false, uyari: !!r.pay, metin: r.hata ?? "Yanıt yok" } }));
   }
 
   // Durum: bütün anahtarları girilmişse bağlı; biri hata kaydı taşıyorsa sorunlu. Gemini havuzu: en az bir anahtar.
@@ -235,7 +235,7 @@ export default function Baglantilar() {
                     {eylemAd && <button type="button" className={"btn sm" + (dr === "ok" ? " ghost" : "")} disabled={mesgul.startsWith(s.id)} onClick={() => (dr === "ok" ? dene(s) : setAcik(s.id))}>{mesgul.startsWith(s.id) ? "Bekle…" : eylemAd}</button>}
                     <button type="button" className="bg-ok" aria-label={ac ? "Kapat" : "Aç"} onClick={() => setAcik(ac ? "" : s.id)}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button>
                   </div>
-                  {r && <div className={"msg " + (r.ok ? "good" : "err") + " bg-sonuc"}>{r.metin}</div>}
+                  {r && <div className={"msg " + (r.ok ? "good" : r.uyari ? "" : "err") + " bg-sonuc"}>{r.metin}</div>}
                   {ac && (
                     <div className="bg-ic">
                       <div className="bg-sol">

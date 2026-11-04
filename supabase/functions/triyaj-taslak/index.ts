@@ -1080,6 +1080,8 @@ Deno.serve(async (req) => {
     try { const g = await uret(sb, "klein", fluxIstem("a modern camera on a wooden desk"), 60_000); return Response.json({ ok: true, model: g.model, sure: Date.now() - t0, boyut: Math.round(g.b64.length * 0.75 / 1024) }, { headers: CORS }); }
     catch (e) {
       const m = String((e as Error).message ?? e);
+      // Günlük ücretsiz pay bitti (4006): bağlantı sağlam, hata değil (4 Kasım 2026)
+      if (/4006|daily free allocation/i.test(m)) return Response.json({ ok: false, pay: true, hata: "Bağlantı çalışıyor, ama Cloudflare'in bugünkü ücretsiz payı bitti (günde 10.000 birim). Pay her gece 03.00'te yenilenir; o zamana kadar görseller Nano Banana ve GPT Image ile üretilir." }, { headers: CORS });
       const aciklama = /AI bağlaması eksik/.test(m) ? "Kod güncel ama Workers AI bağlaması yok: Settings → Bindings → Workers AI → AI." : /işlenemedi|IMAGES/.test(m) ? "Cloudflare'deki kod eski: yeni kodu yapıştırıp Deploy et." : m;
       return Response.json({ ok: false, hata: aciklama }, { headers: CORS });
     }
