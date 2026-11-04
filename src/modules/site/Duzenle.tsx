@@ -35,6 +35,8 @@ function Sayac({ deger, sinir }: { deger: string; sinir: number }) {
   return <span className={deger.length > sinir ? "site-sayac asti" : "site-sayac"}>{deger.length} / {sinir}</span>;
 }
 
+const idAl = (v: unknown): number | null => (v && typeof v === "object" ? Number((v as { id?: unknown }).id) || null : typeof v === "number" ? v : null);
+
 export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon; id: number; kullanici: PanelKullanici; kapat: () => void; ac: (id: number) => void }) {
   const toast = useToast();
   const [doc, setDoc] = useState<TamIcerik | null>(null);
@@ -103,7 +105,8 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
   // ona kalır (inceleyen yayın yönetmeni yazar olmaz).
   const benimYazar = typeof kullanici.author === "object" ? kullanici.author?.id ?? null : kullanici.author ?? null;
   const sistemYazar = yazarlar.find((x) => /stüdyo|studyo/i.test(x.ad))?.id ?? null;
-  const yazarKaydi = f.author && f.author !== sistemYazar ? f.author : benimYazar ?? f.author;
+  const yonetici = kullanici.role === "admin";
+  const yazarKaydi = yonetici && f.author ? f.author : f.author && f.author !== sistemYazar ? f.author : benimYazar ?? f.author;
   const yazarAdi = yazarlar.find((x) => x.id === yazarKaydi)?.ad ?? (yazarKaydi === benimYazar ? kullanici.name : "");
 
   /** Sunucuya gidecek veri: değişen alanlar + grup alanları bütün hâlde */
@@ -114,7 +117,8 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
     author: yazarKaydi, publishedAt: f.publishedAt || null,
     ...(bilinmeyen.length ? {} : { body: f.body }),
     seo: { ...(ek.seo as object), title: f.seoTitle, description: f.seoDescription },
-    workflow: { ...(ek.workflow as object), checklist: f.checklist, ...(durum ? { state: durum } : {}) },
+    // "Hazırlayan" (panelde Yayın akışı): elle seçilmez, ilk kaydeden hesap; yayın kuralı "kendi haberini onaylayamazsın" buna bakar (4 Kasım 2026)
+    workflow: { ...(ek.workflow as object), ownerUser: idAl((ek.workflow as { ownerUser?: unknown } | undefined)?.ownerUser) ?? kullanici.id, checklist: f.checklist, ...(durum ? { state: durum } : {}) },
   });
   veriRef.current = () => veri();
 
@@ -226,11 +230,16 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
               {sema.labels.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
             </select>
           </label>
-          <div className="site-yazar">
+          {yonetici ? <label>Yazar <span className="muted">(yalnız yönetici değiştirebilir)</span>
+            <select value={yazarKaydi ?? ""} onChange={(e) => set("author", e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Seç…</option>
+              {yazarlar.map((x) => <option key={x.id} value={x.id}>{x.ad}</option>)}
+            </select>
+          </label> : <div className="site-yazar">
             <span>Yazar</span>
             <b>{yazarAdi || "—"}</b>
             <span className="muted">{yazarKaydi === benimYazar ? (yazarKaydi !== f.author ? "Kaydedince senin adınla yayımlanır" : "Sen") : "Haberi yazan; değiştirilemez"}</span>
-          </div>
+          </div>}
           <label>Yayın zamanı <span className="muted">(boşsa yayınlandığı an)</span>
             <input type="datetime-local" value={yerel(f.publishedAt)} onChange={(e) => set("publishedAt", e.target.value ? new Date(e.target.value).toISOString() : "")} />
           </label>
@@ -247,10 +256,8 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
             ))}
           </div>
           {(() => {
-            const grup = (ad: string, cikar: string[]) => { const a = alanYapisi.find((x) => x.name === ad); return a ? [{ ...a, fields: (a.fields ?? []).filter((x) => !cikar.includes(x.name ?? "")) }] : []; };
             const setEk_ = (v: Record<string, unknown>) => { setEk(v); degis(); };
             return <>
-              <Alanlar fs={grup("workflow", ["state", "checklist", "approvedBy"])} deger={ek} set={setEk_} />
               <Alanlar fs={alanYapisi.filter((a) => a.admin?.position === "sidebar")} deger={ek} set={setEk_} haric={OZEL} />
             </>;
           })()}

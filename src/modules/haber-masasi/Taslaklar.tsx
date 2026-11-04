@@ -108,6 +108,7 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
   const kisi = useKisi();
   const { profile } = useAuth();
   const [f, setF] = useState<TaslakSuzgec>(suzgecOku);
+  const [suzgecAcik, setSuzgecAcik] = useState(false);
   const t = acik ? v.taslaklar.find((x) => x.id === acik) : undefined;
   useEffect(() => { try { localStorage.setItem(SUZGEC_ANAHTARI, JSON.stringify(f)); } catch { /* depolama kapalı */ } }, [f]);
   if (t) return <Duzenleyici key={t.id} t={t} kapat={() => setAcik(null)} />;
@@ -131,7 +132,8 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
       : f.sira === "haber" ? haberSaati(b) - haberSaati(a)
       : Date.parse(b.created_at) - Date.parse(a.created_at));
   const sec = <K extends keyof TaslakSuzgec>(k: K, deger: TaslakSuzgec[K]) => setF((x) => ({ ...x, [k]: deger }));
-  const suzgecli = f.durum !== "hepsi" || f.model !== "hepsi" || f.gorsel !== "hepsi" || f.anaSayfa || f.tarih !== "hepsi" || !!kucuk;
+  const suzgecSayisi = [f.durum !== "hepsi", f.model !== "hepsi", f.gorsel !== "hepsi", f.anaSayfa, f.tarih !== "hepsi"].filter(Boolean).length;
+  const suzgecli = suzgecSayisi > 0 || !!kucuk;
   return (
     <>
       <div className="taslak-suzgec">
@@ -142,6 +144,10 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
         <label>Sırala<select value={f.sira} onChange={(e) => sec("sira", e.target.value as TaslakSuzgec["sira"])}>
           <option value="yeni">En yeni hazırlanan</option><option value="guncel">Son güncellenen</option><option value="onem">Önem (şu an)</option><option value="haber">Haberin saati</option>
         </select></label>
+        <button type="button" className={"btn ghost sm" + (suzgecli ? " secili" : "")} aria-expanded={suzgecAcik} onClick={() => setSuzgecAcik((x) => !x)}>Süzgeç{suzgecSayisi ? ` (${suzgecSayisi})` : ""}</button>
+        <span className="muted">{liste.length} taslak{suzgecli && <> · <button className="linkbtn" onClick={() => setF({ ...SUZGEC_VARSAYILAN, kim: f.kim, sira: f.sira })}>süzgeci temizle</button></>}</span>
+      </div>
+      {suzgecAcik && <div className="taslak-suzgec taslak-suzgec-ek">
         <label>Durum<select value={f.durum} onChange={(e) => sec("durum", e.target.value as TaslakSuzgec["durum"])}>
           <option value="hepsi">Hepsi</option><option value="taslak">Taslak</option><option value="hazir">Yayına hazır</option><option value="panelde">Panelde</option><option value="eksik">Eksiği ya da hatası var</option>
         </select></label>
@@ -155,8 +161,7 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
           <option value="hepsi">Hepsi</option><option value="bugun">Bugün</option><option value="hafta">Son 7 gün</option>
         </select></label>
         <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={f.anaSayfa} onChange={(e) => sec("anaSayfa", e.target.checked)} /> Ana sayfa adayı</label>
-        <span className="muted">{liste.length} taslak{suzgecli && <> · <button className="linkbtn" onClick={() => setF({ ...SUZGEC_VARSAYILAN, kim: f.kim, sira: f.sira })}>süzgeci temizle</button></>}</span>
-      </div>
+      </div>}
       {!liste.length && <div className="empty">Taslak yok. Benim aldıklarım bölümünde "Taslak hazırla"ya bas.</div>}
       <div className="liste panel">
         {liste.map((x) => (

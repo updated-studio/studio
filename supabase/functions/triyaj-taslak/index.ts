@@ -10,11 +10,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
 import { CLAUDE_MODEL, claudeJson, SECIM_SEMA } from "./claude.ts";
+import { markaYazimi } from "./html.ts";
 import { kullanilabilir, MODEL_AD, uret, type Uretilen, type UretimModeli } from "./uretim.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
-import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, type Kategori } from "./site.ts";
+import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, yayinEsitle, type Kategori } from "./site.ts";
 import { adayListesi, commons, kaynakGorselleri, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, URETIM_DENETIM, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
@@ -353,7 +354,7 @@ ${metinler.join("\n\n---\n\n")}`;
 
     const uslup = await uslupAl(sb);
     await nabiz();
-    const { veri: t, model, claudeHata } = await yz("taslak", taslakSistem(uslup), istem, MODELLER, bitis, { claudeBitis: bitis - 25_000, maxTokens: 8000 });
+    const { veri: t, model, claudeHata } = await yz("taslak", taslakSistem(uslup), istem, MODELLER, bitis, { claudeBitis: bitis - 20_000, maxTokens: 12_000, caba: "medium" });
     await nabiz();
     const notlar: string[] = metinListe(t.editor_notlari);
     if (claudeHata) notlar.push("Claude taslağı yazamadı (" + claudeHata + "); taslağı Gemini yazdı.");
@@ -370,9 +371,9 @@ ${metinler.join("\n\n---\n\n")}`;
     // "Dikkat edilmesi gerekenler" sitedeki yazılarda yok: editör notlarına gider, metne girmez
     const dikkat = metinListe(t.dikkat_edilmesi_gerekenler);
     if (dikkat.length) notlar.unshift(...dikkat.map((x: string) => "Dikkat: " + x));
-    const baslik = String(t.baslik ?? "");
-    const spot = spotKisalt(String(t.spot ?? ""));
-    const govdeMd = linkTemizle(parcalar.join("\n\n"), ilgili.map((x) => x.link));
+    const baslik = markaYazimi(String(t.baslik ?? ""));
+    const spot = markaYazimi(spotKisalt(String(t.spot ?? "")));
+    const govdeMd = markaYazimi(linkTemizle(parcalar.join("\n\n"), ilgili.map((x) => x.link)));
 
     // Kaynaklar (panelde haberin "Kaynaklar" listesine gider; ilk satır birincil): ilk yazan + diğerleri + asıl kaynak
     const kaynaklar = [`${it.source_name} — ${it.link}`, ...((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link !== it.link).map((o) => `${o.name} — ${o.link}`)];
@@ -514,7 +515,7 @@ async function kontrol(sb: Sb, id: number) {
         const { veri: k, claudeHata } = await yz("kontrol", KONTROL_SISTEM(uslup),
           `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik, spot, govde })}${onceki}`,
           // Denetim daha derin düşünür (3 Kasım 2026: başlıktaki çıkarım kaçmıştı); görsel ayrı çağrıda olduğu için süre buna ayrılır
-          MODELLER, bitis - 8_000, { claudeBitis: bitis - 25_000, maxTokens: 12_000, caba: "medium" });
+          MODELLER, bitis - 8_000, { claudeBitis: bitis - 20_000, maxTokens: 16_000, caba: "high" });
         if (claudeHata) notlar.push("Claude denetimi çalışmadı (" + claudeHata + "); kontrolü Gemini yaptı.");
         sorunlar = metinListe(k.sorunlar);
         guven = String(k.guven ?? "");
@@ -524,7 +525,7 @@ async function kontrol(sb: Sb, id: number) {
         if (araBaslik(yeniGovde) >= 2 && araBaslik(yeniGovde) <= 4 && yeniGovde.length > govde.length * 0.75) {
           degisen = degisenParagraf(govde, yeniGovde);
           duzeltmeler = (Array.isArray(k.duzeltmeler) ? k.duzeltmeler : []).slice(0, 15).map((x: Record<string, unknown>) => ({ kontrol: tur, tur: String(x?.tur ?? ""), once: String(x?.once ?? "").slice(0, 300), sonra: String(x?.sonra ?? "").slice(0, 300), neden: String(x?.neden ?? "").slice(0, 200) })).filter((x: Duzeltme) => x.once || x.sonra);
-          govde = yeniGovde; baslik = String(k.baslik ?? "") || baslik; spot = spotKisalt(String(k.spot ?? "") || spot);
+          govde = markaYazimi(yeniGovde); baslik = markaYazimi(String(k.baslik ?? "") || baslik); spot = markaYazimi(spotKisalt(String(k.spot ?? "") || spot));
           durum = "kontrol edildi";
         } else { notlar.push("Kalite kontrolünün önerdiği metin güvenlik denetiminden geçmedi (yapı bozuldu ya da kısaldı); " + (tur === 2 ? "ilk denetimin metni korundu." : "ilk taslak korundu.")); durum = tur === 2 ? "kontrol edildi" : "kontrol uygulanmadı"; }
         if (guven === "dusuk") notlar.push("Kalite kontrolü: güven DÜŞÜK, kaynakları mutlaka oku.");
@@ -716,6 +717,8 @@ async function otoAyar(sb: Sb): Promise<OtoAyar> {
 }
 
 async function otoCalistir(sb: Sb) {
+  // Yayına giren haberler: Haber Masası'nda kendiliğinden "Yayında" (elle "Yayınladım" gerekmez); otomatik taslak kapalıyken de çalışır
+  await yayinEsitle(sb).catch((e) => console.error("yayinEsitle", e));
   const ayar = await otoAyar(sb);
   if (!ayar.acik) return { atlandi: "Otomatik taslak kapalı" };
   const { data: son } = await sb.from("tr_settings").select("value").eq("key", "oto_son").maybeSingle();
@@ -863,7 +866,7 @@ Deno.serve(async (req) => {
     if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
     const t0 = Date.now();
     try {
-      const c = await claudeJson({ sistem: 'Sadece {"tamam": true} döndür.', kullanici: "Bağlantı denemesi.", model: CLAUDE_MODEL.kucuk, ms: 30_000, maxTokens: 50 });
+      const c = await claudeJson({ sistem: 'Sadece {"tamam": true} döndür.', kullanici: "Bağlantı denemesi.", model: CLAUDE_MODEL.kucuk, ms: 30_000, maxTokens: 400, caba: "low" });
       return Response.json(c ? { ok: true, model: c.model, sure: Date.now() - t0 } : { ok: false, hata: "Claude anahtarı kayıtlı değil." }, { headers: CORS });
     } catch (e) { return Response.json({ ok: false, hata: String((e as Error).message ?? e).slice(0, 200) }, { headers: CORS }); }
   }

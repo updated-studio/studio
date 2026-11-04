@@ -233,3 +233,27 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
     return kaydetHata(String((e as Error).message ?? e));
   }
 }
+
+/** Yayın eşitleme (4 Kasım 2026, kullanıcı: "yayınladım demesine gerek kalmamalı; yayınla'ya basınca yayınlanmış saymalı, organizma gibi"):
+ *  panele gitmiş taslaklardan haberi yayına girenlerin Stüdyo kaydı "Siteye gönderildi", Haber Masası'ndaki haberi "Yayında" olur.
+ *  Otomatik turda çalışır; haber listesi panelin herkese açık okuma ucundan alınır (yalnız yayındakiler döner). */
+export async function yayinEsitle(sb: Sb): Promise<number> {
+  const a = siteAyar();
+  if (!a) return 0;
+  const { data } = await sb.from("tr_drafts").select("id,item_id,site_id").not("site_id", "is", null).neq("status", "gonderildi").order("id", { ascending: false }).limit(80);
+  const liste = (data ?? []) as { id: number; item_id: number | null; site_id: number }[];
+  if (!liste.length) return 0;
+  const p = new URLSearchParams({ depth: "0", limit: "100", "select[id]": "true", "select[publishedAt]": "true" });
+  p.set("where[and][0][id][in]", liste.map((x) => x.site_id).join(","));
+  p.set("where[and][1][_status][equals]", "published");
+  const r = await panel(a, "/news?" + p.toString(), { ms: 20_000 });
+  const yayinda = new Set(((r.veri as { docs?: { id: number }[] } | null)?.docs ?? []).map((d) => d.id));
+  let n = 0;
+  for (const t of liste) {
+    if (!yayinda.has(t.site_id)) continue;
+    await sb.from("tr_drafts").update({ status: "gonderildi" }).eq("id", t.id);
+    if (t.item_id) await sb.from("tr_items").update({ status: "yayinda" }).eq("id", t.item_id).in("status", ["alindi", "aday", "belirsiz"]);
+    n++;
+  }
+  return n;
+}

@@ -1,3 +1,5 @@
+// Düşünme seviyesi (4 Kasım 2026, kullanıcı: "önemli bir iş, düşünme neden düşük, bana sormadan yapma"): varsayılan medium; taslak yazımı
+// medium, denetim high. Düşürmek kullanıcı kararıdır.
 // Claude (Anthropic API) çağrıları (2 Kasım 2026, kullanıcı: "geminiden alıp claude'a devredelim; claude'un kendi modelleri arasında,
 // biri yazar daha akıllısı denetler"). Anahtar Stüdyo → Bağlantı anahtarları "claude" (göç 0061).
 // Kim ne yapar: CLAUDE_MODEL'de. Anahtar yoksa null döner; hata (kredi bitti, kota, ağ, süre) fırlatılır. İkisinde de çağıran Gemini'ye döner,
@@ -56,9 +58,9 @@ export async function claudeJson(o: { sistem: string; kullanici: string; model: 
   try {
     const m = await client.messages.create({
       // Sistem istemi önbelleğe alınır (aynı üslup ve kontrol yönergesi her taslakta tekrar gider; tekrar okunması %90 ucuz)
-      model: o.model, max_tokens: o.maxTokens ?? 2048, system: [{ type: "text", text: o.sistem, cache_control: { type: "ephemeral" } }],
+      model: o.model, max_tokens: o.maxTokens ?? 8000, system: [{ type: "text", text: o.sistem, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: icerik }],
-      output_config: { effort: o.caba ?? "low", ...(o.sema ? { format: { type: "json_schema", schema: o.sema } } : {}) },
+      output_config: { effort: o.caba ?? "medium", ...(o.sema ? { format: { type: "json_schema", schema: o.sema } } : {}) },
     } as Anthropic.MessageCreateParamsNonStreaming);
     if (m.stop_reason === "refusal") throw new Error("Claude yanıt vermeyi reddetti");
     if (m.stop_reason === "max_tokens") throw new Error("Claude yanıtı yarıda kesildi");

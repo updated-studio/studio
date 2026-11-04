@@ -53,3 +53,17 @@ export const yorumYeriSil = (md: string) => md.replace(/\n*\**\[EDİTÖR YORUMU[
 export function yaziHtml(spot: string, body: string): string {
   return (spot ? paragraf(`<strong>${kacis(spot)}</strong>`) + "\n\n" : "") + mdHtml(yorumYeriSil(body));
 }
+
+/** Marka yazımı (4 Kasım 2026: başlık büyük harfle başlarken "iPhone" → "İPhone" olmuştu). Küçük harfle başlayan markalar her yerde
+ *  kendi yazımıyla kalır; Türkçe büyük harf dönüşümünün bozduğu hâller düzeltilir. */
+const MARKALAR = ["iPhone", "iPad", "iPadOS", "iOS", "iMac", "iPod", "iCloud", "iMessage", "macOS", "watchOS", "tvOS", "visionOS", "eSIM", "eBay", "iQOO", "iRobot"];
+export function markaYazimi(s: string): string {
+  let r = s;
+  for (const m of MARKALAR) {
+    const govde = m.slice(1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const bas = m[0] === "i" ? "[İIiı]" : `[${m[0]}${m[0].toUpperCase()}]`;
+    r = r.replace(new RegExp(`(^|[^\\p{L}])${bas}${govde}(?![\\p{L}])`, "gu"), (_x, on) => on + m);
+    r = r.replace(new RegExp(`(^|[^\\p{L}])${m.toLocaleUpperCase("tr")}(?![\\p{L}])`, "gu"), (_x, on) => on + m);
+  }
+  return r;
+}

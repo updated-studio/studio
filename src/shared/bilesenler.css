@@ -236,3 +236,5 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .taslak-suzgec label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .taslak-suzgec select { width: auto; padding: 6px 8px; font-size: 13px; color: var(--ink); }
 .taslak-suzgec input[type=search] { width: min(220px, 100%); padding: 7px 10px; font-size: 13px; }
+.taslak-suzgec-ek { background: var(--sunk); border-radius: 12px; padding: 10px 12px; }
+.taslak-suzgec .btn.secili { border-color: var(--blue); color: var(--blue); }

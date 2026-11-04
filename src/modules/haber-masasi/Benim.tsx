@@ -69,7 +69,10 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
               </>
             }>
               {bende && <>
-                <button className="btn sm" onClick={() => guncelle(h, { status: "yayinda" }, "Yayında olarak işaretlendi.")}>Yayınladım</button>
+                {/* 4 Kasım 2026: taslağı panelde olan haber yayına girince kendiliğinden "Yayında" olur (site.ts yayinEsitle); elle işaret yalnız panel dışı yayın için */}
+                {v.taslaklar.some((t) => t.item_id === h.id && t.site_id)
+                  ? <span className="muted" title="Panelde yayına girince birkaç dakika içinde kendiliğinden Yayında olur">Yayınlanınca kendiliğinden işaretlenir</span>
+                  : <button className="btn sm" onClick={() => guncelle(h, { status: "yayinda" }, "Yayında olarak işaretlendi.")}>Yayınladım</button>}
                 <button className="btn ghost sm" onClick={() => birak(h)}>Bırak</button>
                 <button className="btn ghost sm" onClick={() => setAktarAcik(h)}>↪ Aktar</button>
               </>}
