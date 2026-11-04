@@ -117,15 +117,18 @@
   .ed-menu { display: none; }
   .ed-marka-tel { display: flex; }
   .ed-marka-tel .logo { width: 82px; height: 18px; }
-  .ed-tepe { padding: 12px 16px 0; }
+  .ed-tepe { padding: 12px 16px 0; gap: 8px; }
+  /* Dar telefonlarda (iPhone SE/mini 375, çoğu Android 360) logo yanındaki "STÜDYO" etiketi çubuğa sığmıyor */
+  @media (max-width: 400px) { .ed-marka-tel i, .ed-marka-tel span { display: none; } }
   .ed-ana-alan { padding: 10px 16px calc(100px + env(safe-area-inset-bottom, 0px)); }
   .ed-alt { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 50; padding: 6px; border-radius: 22px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 92%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
   .ed-alt a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 0; border-radius: 15px; color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 600; }
   .ed-alt a svg.i { width: 22px; height: 22px; }
   .ed-alt a.on { background: var(--blue-soft); color: var(--blue); }
   .ed-iki { grid-template-columns: minmax(0, 1fr); }
-  .ed-hizli { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); width: 100%; }
-  .ed-hizli .btn.ed-ana { justify-content: center; padding: 0 12px; }
+  /* Düğme yazısı iki satıra bölünmesin: sığmayan telefonda (≤ 400 px) alt alta */
+  .ed-hizli { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 184px), 1fr)); width: 100%; }
+  .ed-hizli .btn.ed-ana { justify-content: center; padding: 0 12px; white-space: nowrap; }
   .ed-cekim-alt { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
 .ed-uyarilar { display: flex; flex-direction: column; gap: 10px; padding: 10px 32px 0; max-width: 1240px; width: 100%; margin: 0 auto; }

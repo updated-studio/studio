@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-04-h",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Telefonda üst çubuk",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Telefonda şu an Stüdyo'da olanlar yeşil nokta ve sayıyla görünür; basınca liste ekran genişliğinde açılır.",
+          "Dar telefonlarda üst çubuk ve Bugün düğmeleri artık taşmıyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-g",
     "tarih": "4 Kasım 2026",
     "baslik": "Ayarlar yenilendi, model seçimi taslakta",

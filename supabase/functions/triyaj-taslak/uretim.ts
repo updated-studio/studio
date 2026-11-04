@@ -113,11 +113,20 @@ export async function modelListesi(sb: Sb): Promise<{ modeller: ModelBilgi[]; se
   const var_ = new Set<string>(), hata: string[] = [];
   if (m.openai) try {
     const r = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: "Bearer " + m.openai }, signal: AbortSignal.timeout(10_000) });
-    ((await r.json()).data ?? []).forEach((x: { id: string }) => var_.add(x.id));
+    const j = await r.json().catch(() => ({}));
+    // Hata iletisi anahtarın bir parçasını içerebilir: yalnız durum kodu ve hata türü yazılır
+    if (!r.ok) hata.push(`OpenAI listesi alınamadı (HTTP ${r.status}${j?.error?.code ? ", " + j.error.code : ""})`);
+    (j.data ?? []).forEach((x: { id: string }) => var_.add(x.id));
   } catch (e) { hata.push("OpenAI listesi alınamadı: " + String((e as Error).message).slice(0, 60)); }
   if (m.gemini_gorsel) try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=300&key=${m.gemini_gorsel}`, { signal: AbortSignal.timeout(10_000) });
-    ((await r.json()).models ?? []).forEach((x: { name: string }) => var_.add(x.name.replace(/^models\//, "")));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) hata.push(`Google listesi alınamadı (HTTP ${r.status}${j?.error?.status ? ", " + j.error.status : ""})`);
+    (j.models ?? []).forEach((x: { name: string }) => var_.add(x.name.replace(/^models\//, "")));
   } catch (e) { hata.push("Google listesi alınamadı: " + String((e as Error).message).slice(0, 60)); }
-  return { modeller: MODEL_KATALOG.map((k) => ({ ...k, erisim: var_.has(k.id) })), secim: await secim(sb), hata };
+  const modeller = MODEL_KATALOG.map((k) => ({ ...k, erisim: var_.has(k.id) }));
+  // Son bakışın özeti (yalnız model adları; Claude'un ve Sistem sayfasının hangi modelin kapalı olduğunu görebilmesi için)
+  await sb.from("tr_settings").upsert({ key: "gorsel_model_erisim", value: { zaman: new Date().toISOString(), kapali: modeller.filter((x) => !x.erisim).map((x) => x.id), hata,
+    anahtar: { openai: !!m.openai, gemini_gorsel: !!m.gemini_gorsel } } });
+  return { modeller, secim: await secim(sb), hata };
 }

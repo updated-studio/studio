@@ -258,6 +258,15 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .canli-satir > span { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
 .canli-satir .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .canli-rozet { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ok); background: var(--ok-soft); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.canli-kisa { display: none; }
+/* Telefon (4 Kasım 2026, kullanıcı: "mobilde sıkışık"; 360–430 px ölçüldü): üst çubukta yalnız yeşil nokta + sayı, liste ekran genişliğinde */
+@media (max-width: 640px) {
+  .canli-yuz, .canli-uzun { display: none; }
+  .canli-kisa { display: inline; }
+  .canli-dugme, .canli-dugme:not(:has(.canli-yuz)) { padding: 0 11px; }
+  .canli-yuz ~ .canli-sayi { margin-left: 0; }
+  .canli-liste { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 60px); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: auto; }
+}
 /* Görsel modeli seçici (haber-masasi/ModelSecici.tsx, 4 Kasım 2026) */
 .ms { display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--surface); }
 .ms.gomulu { border: 0; padding: 0; background: none; }

@@ -22,7 +22,7 @@ export default function CanliKisiler() {
     <div className="canli" ref={kok}>
       <button type="button" className="canli-dugme" aria-expanded={acik} aria-label={`Şu an Stüdyo'da ${kisiler.length} kişi`} onClick={() => setAcik((x) => !x)}>
         {digerleri.slice(0, 3).map((k) => <span key={k.id} className="canli-yuz"><Avatar kisi={{ name: k.ad, email: k.email, avatar_url: k.foto, emoji: null }} boyut={28} /></span>)}
-        <span className="canli-sayi"><i aria-hidden="true" />{digerleri.length ? `${digerleri.length} kişi` : "Yalnız sen"}</span>
+        <span className="canli-sayi"><i aria-hidden="true" /><span className="canli-uzun">{digerleri.length ? `${digerleri.length} kişi` : "Yalnız sen"}</span><span className="canli-kisa">{digerleri.length ? `+${digerleri.length}` : "Sen"}</span></span>
       </button>
       {acik && (
         <div className="canli-liste" role="dialog" aria-label="Şu an Stüdyo'da">
