@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-04-k",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Updated AI görselleri",
+    "bolumler": [
+      {
+        "ad": "Görseller",
+        "maddeler": [
+          "Denetimden geçen yapay zekâ görselleri sitenin görsel arşivine \"yz-\" adıyla girer.",
+          "Görsel seçicide \"Updated AI\" süzgeciyle bulunur; 120 günde hiç kullanılmayanlar kendiliğinden silinir.",
+          "Wikimedia fotoğraf adaylarının kırık görünen küçük resimleri düzeldi."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-j",
     "tarih": "4 Kasım 2026",
     "baslik": "Boş taslak kalmıyor",

@@ -15,15 +15,16 @@ export default function MedyaSecici({ sec, kapat, altSinir, ilk = "arsiv" }: { s
   const [kunye, setKunye] = useState("");
   const [temsili, setTemsili] = useState(false);
   const [mesgul, setMesgul] = useState(false);
+  const [yz, setYz] = useState(false); // yalnız Updated AI (yapay zekâ ile üretilmiş) görseller
 
   useEffect(() => {
     const t = setTimeout(() => {
-      api.medyaListe(ara, sayfa)
+      api.medyaListe(ara, sayfa, yz)
         .then((r) => { setListe((o) => (sayfa > 1 && o ? [...o, ...r.docs] : r.docs)); setDevam(r.hasNextPage); })
         .catch((e) => setHata((e as Error).message));
     }, ara ? 300 : 0);
     return () => clearTimeout(t);
-  }, [ara, sayfa]);
+  }, [ara, sayfa, yz]);
 
   async function yukle() {
     if (!dosya || !alt.trim() || !kunye.trim()) return;
@@ -46,7 +47,13 @@ export default function MedyaSecici({ sec, kapat, altSinir, ilk = "arsiv" }: { s
         {hata && <div className="msg err">{hata}</div>}
         {sekme === "arsiv" ? (
           <>
-            <div className="filtre"><input type="search" placeholder="Alt metinde ya da dosya adında ara…" value={ara} onChange={(e) => { setAra(e.target.value); setSayfa(1); }} /></div>
+            <div className="filtre row">
+              <input type="search" placeholder="Alt metinde ya da dosya adında ara…" value={ara} onChange={(e) => { setAra(e.target.value); setSayfa(1); }} style={{ flex: 1, minWidth: 0 }} />
+              <div className="segment" role="group" aria-label="Görsel türü">
+                <button aria-pressed={!yz} onClick={() => { setYz(false); setSayfa(1); }}>Hepsi</button>
+                <button aria-pressed={yz} onClick={() => { setYz(true); setSayfa(1); }} title="Yapay zekâ ile üretilmiş görseller; 120 günde kullanılmayanlar silinir">Updated AI</button>
+              </div>
+            </div>
             {!liste ? <div className="muted">Yükleniyor…</div> : !liste.length ? <div className="empty">Görsel bulunamadı.</div> : (
               <div className="site-medya-izgara">
                 {liste.map((m) => (

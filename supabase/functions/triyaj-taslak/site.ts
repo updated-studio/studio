@@ -279,3 +279,23 @@ export function araYerlestir(md: string, ara: { bolum: string }[]): string {
   });
   return satirlar.join("\n").replace(/\n{3,}/g, "\n\n");
 }
+
+/** Updated AI kütüphanesi (4 Kasım 2026): denetimden geçen yapay zekâ görseli panelin Görseller'ine "yz-…" adıyla girer; editör görsel
+ *  seçicide "Updated AI" süzgeciyle bulur. Kapak olursa panel aynı kaydı kullanır (aynı adres yeniden yüklenmez). */
+export async function yzKutuphane(g: { url: string; alt: string; ad: string; model: string; odak?: { x: number; y: number } }): Promise<number | null> {
+  const a = siteAyar();
+  if (!a) return null;
+  const r = await panel(a, "/triyaj/yz-medya", { method: "POST", body: g, ms: 30_000 });
+  return r.ok ? Number((r.veri as { id?: number } | null)?.id) || null : null;
+}
+
+/** 120 günden eski, hiçbir yerde kullanılmayan yapay zekâ görsellerini panel siler (günde bir kez, otomatik tur başında) */
+export async function yzTemizle(sb: Sb, gun = 120) {
+  const a = siteAyar();
+  if (!a) return;
+  const bugun = new Date().toISOString().slice(0, 10);
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "yz_temizle_son").maybeSingle();
+  if ((data?.value as { gun?: string } | null)?.gun === bugun) return;
+  const r = await panel(a, "/triyaj/yz-temizle", { method: "POST", body: { gun }, ms: 60_000 });
+  await sb.from("tr_settings").upsert({ key: "yz_temizle_son", value: { gun: bugun, ...(r.ok ? (r.veri as object) : { hata: hataMetni(r.status, r.veri) }) } });
+}

@@ -147,8 +147,9 @@ const secenekler = (yol: string) => istek<{ docs: { id: number; name?: string; t
 export const kategoriler = () => secenekler("/categories?limit=200&depth=0&sort=name");
 export const yazarlar = () => secenekler("/authors?limit=200&depth=0&sort=name");
 
-export const medyaListe = (ara: string, sayfa = 1) => {
+export const medyaListe = (ara: string, sayfa = 1, yz = false) => {
   const p = new URLSearchParams({ limit: "24", page: String(sayfa), sort: "-createdAt", depth: "0" });
+  if (yz) p.set("where[aiGenerated][equals]", "true"); // Updated AI kütüphanesi (4 Kasım 2026)
   if (ara.trim()) { p.set("where[or][0][alt][like]", ara.trim()); p.set("where[or][1][filename][like]", ara.trim()); }
   return istek<{ docs: Medya[]; hasNextPage: boolean }>(`/media?${p}`);
 };

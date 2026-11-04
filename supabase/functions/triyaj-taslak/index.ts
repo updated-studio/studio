@@ -17,7 +17,7 @@ import { ARA_SISTEM, araAdaylar, bolumler } from "./ara.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
-import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, yayinEsitle, type Kategori } from "./site.ts";
+import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, yayinEsitle, yzKutuphane, yzTemizle, type Kategori } from "./site.ts";
 import { adayListesi, commons, kaynakGorselleri, fluxIstem, kaynakDurumu, kucukResim, kuralSecim, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, URETIM_DENETIM, type GorselAday } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
@@ -745,6 +745,12 @@ async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: stri
       if (a.gecti) break;
     }
   }
+  // Denetimden geçenler Updated AI kütüphanesine (deneme taslağınınkiler girmez); kütüphane hatası üretimi etkilemez
+  const gecenler = adaylar.filter((a) => a.gecti && a.url);
+  if (gecenler.length && bitis - Date.now() > 20_000) {
+    const { data: dt } = await sb.from("tr_drafts").select("deneme").eq("id", id).maybeSingle();
+    if (!dt?.deneme) await Promise.all(gecenler.map((a) => yzKutuphane({ url: a.url!, alt: `${o.baslik} (temsili görsel)`.slice(0, 125), ad: [o.marka, o.urun, o.baslik].filter(Boolean).join(" "), model: a.model, odak: a.odak }).catch(() => null)));
+  }
   const iyi = adaylar.filter((a) => a.gecti && a.url).sort((a, b) => b.puan - a.puan)[0];
   const ozet = adaylar.map((a) => `${MODEL_AD[a.model] ?? a.model}: ${a.hata ? "üretilemedi (" + a.hata + ")" : a.gecti ? a.puan + "/10" : "reddedildi (" + a.neden + ")"}`).join("; ");
   if (!iyi) return { secilen: null, neden: "Yapay zekâ görseli de uygun bulunmadı: " + ozet, adaylar, kiyas };
@@ -871,6 +877,8 @@ async function otoAyar(sb: Sb): Promise<OtoAyar> {
 async function otoCalistir(sb: Sb) {
   // Yayına giren haberler: Haber Masası'nda kendiliğinden "Yayında" (elle "Yayınladım" gerekmez); otomatik taslak kapalıyken de çalışır
   await yayinEsitle(sb).catch((e) => console.error("yayinEsitle", e));
+  // Eski yapay zekâ görselleri (120 gün, kullanılmayan; kullanıcı 4 Kasım 2026): günde bir kez
+  await yzTemizle(sb).catch((e) => console.error("yzTemizle", e));
   const ayar = await otoAyar(sb);
   if (!ayar.acik) return { atlandi: "Otomatik taslak kapalı" };
   const { data: son } = await sb.from("tr_settings").select("value").eq("key", "oto_son").maybeSingle();
