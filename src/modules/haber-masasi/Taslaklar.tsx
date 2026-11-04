@@ -104,7 +104,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
           return (
             <figure key={a.model} className={secili ? "secili" : ""} title={a.katmanlar ? Object.entries(a.katmanlar).map(([k, v]) => `${k}: ${v}`).join("\n") : undefined}>
               {a.url ? <img src={a.url} alt="" loading="lazy" /> : <div className="yz-bos">{a.hata ? "Üretilemedi" : "Denetimden geçmedi"}</div>}
-              <figcaption><b>{MODEL_AD[a.model] ?? a.model}</b> · {a.hata ? a.hata : `${a.puan}/10`}{!a.hata && a.neden && <span className="muted"> · {a.neden}</span>}</figcaption>
+              <figcaption><b>{MODEL_AD[a.model] ?? a.model}</b>{a.surum && <span className="muted"> ({a.surum})</span>} · {a.hata ? a.hata : `${a.puan}/10`}{!a.hata && a.neden && <span className="muted"> · {a.neden}</span>}</figcaption>
               {a.url && !secili && <button className="btn ghost sm" disabled={!!seciliyor} onClick={() => adaySec(a.model)}>{seciliyor === a.model ? "Seçiliyor…" : "Bunu kullan"}</button>}
               {secili && <span className="pill ok">Kapak</span>}
             </figure>
