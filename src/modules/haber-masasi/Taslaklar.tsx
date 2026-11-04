@@ -92,11 +92,14 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     <div className="yz-adaylar">
       {fotolar.map((f, i) => {
         const secili = !!g.secilen && g.secilen.buyuk === f.buyuk;
+        // Kaynak haberdeki görselin üreticiye ait olduğu (künyeden) doğrulanmadıysa öyle yazılır: haber sitesinin kendi fotoğrafı olabilir (telif)
+        const supheli = f.kaynak === "Üretici görseli" && !(f as { dogrulandi?: boolean }).dogrulandi;
+        const site = (() => { try { return new URL(f.sayfa).hostname.replace(/^www\./, ""); } catch { return ""; } })();
         return (
           <figure key={f.buyuk + i} className={secili ? "secili" : ""}>
-            <img src={wikiKucuk(f.thumb || f.buyuk)} alt="" loading="lazy" />
-            <figcaption><b>{f.kaynak}</b> · {f.yazar}</figcaption>
-            {secili ? <span className="pill ok">Kapak</span> : <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("foto" + i, { foto_sec: t.id, sira: i }, () => "Kapak değişti.")}>{is_ === "foto" + i ? "Seçiliyor…" : "Bunu kullan"}</button>}
+            <div className="yz-resim"><img src={wikiKucuk(f.thumb || f.buyuk)} alt="" loading="lazy" />{supheli && <span className="pill off">Üretici doğrulanmadı</span>}</div>
+            <figcaption>{supheli ? <><b>Kaynak haberdeki görsel</b> · {site}<span className="muted"> · haber sitesinin kendi fotoğrafı olabilir</span></> : <><b>{f.kaynak}</b> · {f.yazar}</>}</figcaption>
+            {secili ? <span className="pill ok">Kapak</span> : <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("foto" + i, { foto_sec: t.id, sira: i }, () => "Kapak değişti.")}>{is_ === "foto" + i ? "Seçiliyor…" : supheli ? "Yine de kullan" : "Bunu kullan"}</button>}
           </figure>
         );
       })}
