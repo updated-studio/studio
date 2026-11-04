@@ -34,7 +34,7 @@ function YazRota({ Yaz }: { Yaz: (p: { id: number | "yeni" }) => React.ReactElem
 
 type Oge = { yol: string; ad: string; ikon: string; esles?: string; kisa?: string };
 // Editörden gizlenen modüller (yönetim ekranları); Haber Masası kendi menü öğesiyle açılır
-const YONETIM = new Set(["site", "sistem", "baglantilar", "hareketler", "yonetim", "panel-giris"]);
+const YONETIM = new Set(["site", "sistem", "baglantilar", "deneme-masasi", "hareketler", "yonetim", "panel-giris"]);
 
 export default function EditorKabuk() {
   const { profile } = useAuth();

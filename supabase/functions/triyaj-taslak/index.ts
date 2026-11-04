@@ -448,7 +448,7 @@ ${metinler.join("\n\n---\n\n")}`;
     const aramalar: string[] = [].concat(g.aramalar ?? g.arama ?? []).filter(Boolean).slice(0, 3);
 
     const { data: yeni } = await sb.from("tr_drafts").insert({
-      item_id: itemId, author: kullanici, model, auto: !!sec.oto,
+      item_id: itemId, author: kullanici, model, auto: !!sec.oto, deneme: !!it.deneme,
       title: baslik, spot, body: govdeMd,
       seo: { focus: t.focus_keyword ?? "", title_tag: t.title_tag ?? "", slug: t.slug ?? "", meta: t.meta_description ?? "", kategori: t.kategori ?? "", etiketler: etiketSuz(metinListe(t.etiketler), [it.source_name, ...diger.map((o) => o.name)]),
         kisa_cevap: String(t.kisa_cevap ?? "").trim(),
@@ -662,7 +662,8 @@ async function kontrol(sb: Sb, id: number) {
     //    Bağlantı kuruluysa, ayar açıksa, kaynağın tam metni okunduysa. Sonradan Stüdyo'da düzeltilirse "Paneldeki taslağı güncelle".
     let siteDurum = "Sadece Stüdyo'da";
     const ayar = await otoAyar(sb);
-    if (ayar.site && siteAyar()) {
+    if (t.deneme) siteDurum = "deneme taslağı, panele gitmez";
+    else if (ayar.site && siteAyar()) {
       if (!qc.tam_metin) { await sb.from("tr_drafts").update({ site_hata: "Kaynağın tam metni alınamadığı için panele otomatik gönderilmedi. Kontrol edip elle gönder." }).eq("id", id); siteDurum = "tam metin yok, gönderilmedi"; }
       else if (bitis - Date.now() < 35_000) { await sb.from("tr_drafts").update({ site_bekliyor: true }).eq("id", id); siteDurum = "panele sonraki turda gidecek"; }
       else { const r = await siteGonder(sb, id, { kategoriSec }); siteDurum = r.ok ? "panele taslak olarak gitti" : "Panel hatası: " + r.hata; }
@@ -826,7 +827,7 @@ async function elleUret(sb: Sb, id: number, otomatik = false) {
   const ayar = await kiyasAyar(sb);
   let kiyasla = false;
   if (ayar.acik) {
-    const { count } = await sb.from("tr_drafts").select("id", { count: "exact", head: true }).eq("image->>yz_kiyas_oto", "true").gte("created_at", new Date(Date.now() - 864e5).toISOString());
+    const { count } = await sb.from("tr_drafts").select("id", { count: "exact", head: true }).eq("image->>yz_kiyas_oto", "true").eq("deneme", false).gte("created_at", new Date(Date.now() - 864e5).toISOString());
     kiyasla = (count ?? 0) < ayar.gunluk;
   }
   const u = await yzGorselUret(sb, id, { baslik: t.title || it?.title || "", marka: it?.brand ?? "", urun: it?.product ?? "", istem: String(img.ai_istem || t.title) }, bitis, kiyasla);
@@ -904,13 +905,13 @@ async function otoCalistir(sb: Sb) {
 
   // 2) Günlük sınır (İstanbul günü; Türkiye yıl boyu UTC+3)
   const gunBasi = istanbulGun() + "T00:00:00+03:00";
-  const { count: bugun } = await sb.from("tr_drafts").select("id", { count: "exact", head: true }).eq("auto", true).gte("created_at", gunBasi);
+  const { count: bugun } = await sb.from("tr_drafts").select("id", { count: "exact", head: true }).eq("auto", true).eq("deneme", false).gte("created_at", gunBasi);
   if ((bugun ?? 0) >= ayar.gunluk) { await ozet({ durum: `Günlük sınır doldu (${bugun}/${ayar.gunluk})`, bugun }); return { atlandi: "Günlük sınır" }; }
 
   // 3) Aday: havuzda, kimse almamış, daha önce otomatik denenmemiş, iş sürmüyor, son 24 saatte düşmüş
   const { data: havuz } = await sb.from("tr_items")
     .select("id,brand,topic,product,news_type,kind,source_name,turkey,other_sources,published_at,created_at,title,event,event_key,trend")
-    .eq("status", "aday").is("taken_by", null).is("auto_draft_at", null).eq("work_state", "")
+    .eq("status", "aday").eq("deneme", false).is("taken_by", null).is("auto_draft_at", null).eq("work_state", "")
     .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString()).limit(1000);
   const liste = (havuz ?? []) as Aday[];
   if (!liste.length) { await ozet({ durum: "Uygun haber yok", bugun }); return { bos: true }; }
@@ -918,9 +919,9 @@ async function otoCalistir(sb: Sb) {
   // Aynı olay farklı kartlara bölünmüş olabilir: son 3 günde taslağı yazılmış ya da bir editörün aldığı haberlerle aynı olanlar atlanır
   const ucGun = new Date(Date.now() - 72 * 3_600_000).toISOString();
   const [{ data: sonTaslak }, { data: alinan }] = await Promise.all([
-    sb.from("tr_drafts").select("item_id").gte("created_at", ucGun).not("item_id", "is", null).limit(500),
+    sb.from("tr_drafts").select("item_id").eq("deneme", false).gte("created_at", ucGun).not("item_id", "is", null).limit(500),
     // alınmış/yayında olanlar + şu an otomatik taslağı yazılmakta olanlar (son 30 dk; yarıda kalan aynı olayı 3 gün kilitlemesin)
-    sb.from("tr_items").select("id,brand,product,event_key").or(`status.in.(alindi,yayinda),auto_draft_at.gte.${new Date(Date.now() - 30 * 60_000).toISOString()}`).gte("updated_at", ucGun).limit(1000),
+    sb.from("tr_items").select("id,brand,product,event_key").eq("deneme", false).or(`status.in.(alindi,yayinda),auto_draft_at.gte.${new Date(Date.now() - 30 * 60_000).toISOString()}`).gte("updated_at", ucGun).limit(1000),
   ]);
   const taslakIdleri = ((sonTaslak ?? []) as { item_id: number }[]).map((x) => x.item_id);
   const { data: taslakHaber } = taslakIdleri.length ? await sb.from("tr_items").select("id,brand,product,event_key").in("id", taslakIdleri) : { data: [] };
@@ -935,8 +936,8 @@ async function otoCalistir(sb: Sb) {
   const [{ data: prof }, { data: gun }, { data: isler }, { data: otolar }] = await Promise.all([
     sb.from("profiles").select("id,name,interests"),
     sb.from("availability").select("user_id,status").eq("day", istanbulGun()),
-    sb.from("tr_items").select("taken_by").eq("status", "alindi").gte("taken_at", new Date(Date.now() - 48 * 3_600_000).toISOString()),
-    sb.from("tr_drafts").select("author").eq("auto", true).gte("created_at", gunBasi),
+    sb.from("tr_items").select("taken_by").eq("status", "alindi").eq("deneme", false).gte("taken_at", new Date(Date.now() - 48 * 3_600_000).toISOString()),
+    sb.from("tr_drafts").select("author").eq("auto", true).eq("deneme", false).gte("created_at", gunBasi),
   ]);
   const musait = new Map(((gun ?? []) as { user_id: string; status: string }[]).map((g) => [g.user_id, g.status]));
   const yuk = new Map<string, number>();
@@ -1040,6 +1041,45 @@ Deno.serve(async (req) => {
   // Görsel modelleri listesi (yönetici): seçim ekranı için
   if (govde?.gorsel_modeller) {
     return Response.json(await modelListesi(sb), { headers: CORS });
+  }
+  // Deneme masası (yönetici; 4 Kasım 2026, kullanıcı: "taslak bozulmasın diye yöneticiye özel deneme sayfası; gerçek haberlerle").
+  // Gerçek haberin kopyası (tr_items.deneme) üzerinde taslak akışının tamamı çalışır (yazım, kör karşılaştırma, denetim, video, görseller).
+  // Kopya ve taslağı Haber Masası listelerine, otomatik taslağa, kümelemeye, panele, ölçümlere ve katkı puanına girmez (göç 0063).
+  if (govde?.deneme) {
+    if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
+    const d = govde.deneme as { kopyala?: number; sil?: number; temizle?: boolean };
+    if (d.kopyala) {
+      const { data: asil } = await sb.from("tr_items").select("*").eq("id", Number(d.kopyala)).eq("deneme", false).maybeSingle();
+      if (!asil) return Response.json({ hata: "Haber bulunamadı" }, { status: 404, headers: CORS });
+      const { id: _id, created_at: _c, updated_at: _u, ...alanlar } = asil as Record<string, unknown>;
+      // Bağlantı tekil olmalı: sona #deneme eklenir (sayfa okunurken tarayıcı gibi # sonrası gönderilmez); olay anahtarı boş, kümelemeye girmez
+      const { data: kopya, error } = await sb.from("tr_items").insert({
+        ...alanlar, deneme: true, link: `${asil.link}#deneme-${Date.now()}`, event_key: "", status: "alindi", taken_by: u.user.id, taken_at: new Date().toISOString(),
+        work_state: "taslak", work_error: "", touched: true, auto_draft_at: null, transfer_from: null, transfer_seen: true, translation: "", last_action: `${istanbulZaman()} · ${p.name} · deneme`,
+      }).select("id").single();
+      if (error || !kopya) return Response.json({ hata: error?.message ?? "Kopya oluşturulamadı" }, { status: 500, headers: CORS });
+      const kid = Number(kopya.id);
+      const sure = new Promise<void>((r) => setTimeout(async () => {
+        await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi." }).eq("id", kid).eq("work_state", "taslak");
+        r();
+      }, 135_000));
+      // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+      EdgeRuntime.waitUntil(Promise.race([isle(sb, kid, "taslak", u.user.id, p.name ?? ""), sure]));
+      return Response.json({ ok: true, item_id: kid }, { status: 202, headers: CORS });
+    }
+    if (d.sil) {
+      const { data: t } = await sb.from("tr_drafts").select("item_id").eq("id", Number(d.sil)).eq("deneme", true).maybeSingle();
+      if (!t) return Response.json({ hata: "Deneme taslağı bulunamadı" }, { status: 404, headers: CORS });
+      await sb.from("tr_drafts").delete().eq("id", Number(d.sil)).eq("deneme", true);
+      if (t.item_id) await sb.from("tr_items").delete().eq("id", t.item_id).eq("deneme", true);
+      return Response.json({ ok: true }, { headers: CORS });
+    }
+    if (d.temizle) {
+      const { data: silinen } = await sb.from("tr_drafts").delete().eq("deneme", true).select("id");
+      await sb.from("tr_items").delete().eq("deneme", true);
+      return Response.json({ ok: true, silinen: (silinen ?? []).length }, { headers: CORS });
+    }
+    return Response.json({ hata: "Geçersiz istek" }, { status: 400, headers: CORS });
   }
   // Onaya gönderildi: yöneticilere ve yayın yönetmenine Stüdyo bildirimi (4 Kasım 2026). Yalnız editörün elle gönderdiği; otomatik taslak değil.
   if (govde?.onay_bildir) {

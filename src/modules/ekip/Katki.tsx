@@ -38,8 +38,8 @@ export function useKatki() {
   useEffect(() => {
     (async () => {
       const [h, t, o] = await Promise.all([
-        sb.from("tr_items").select("taken_by,status,taken_at,updated_at,event,title,link").not("taken_by", "is", null),
-        sb.from("tr_drafts").select("author,created_at,title"),
+        sb.from("tr_items").select("taken_by,status,taken_at,updated_at,event,title,link").eq("deneme", false).not("taken_by", "is", null),
+        sb.from("tr_drafts").select("author,created_at,title").eq("deneme", false),
         sb.from("tr_votes").select("user_id,created_at"),
       ]);
       setHam({ haber: (h.data ?? []) as Ham["haber"], taslak: (t.data ?? []) as Ham["taslak"], oy: (o.data ?? []) as Ham["oy"] });

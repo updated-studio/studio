@@ -142,7 +142,7 @@ async function isle(sb: Sb) {
 
   // 1) Haber masası: söylenti, sızıntı ve çıkışla ilgili resmî haberler, ürün ürün
   const { data: haberler } = await sb.from("tr_items").select("id,source_name,brand,product,kind,event,other_sources")
-    .gte("created_at", new Date(Date.now() - GUN * 864e5).toISOString()).neq("product", "").in("kind", ["Söylenti", "Sızıntı", "Resmi"]).limit(5000);
+    .eq("deneme", false).gte("created_at", new Date(Date.now() - GUN * 864e5).toISOString()).neq("product", "").in("kind", ["Söylenti", "Sızıntı", "Resmi"]).limit(5000);
   const gruplar = new Map<string, Grup>();
   for (const h of (haberler ?? []) as Haber[]) {
     if (h.kind === "Resmi" && !CIKIS.test(h.event)) continue;

@@ -173,6 +173,8 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
   if (!a) return { ok: false, kod: "ayar_yok", hata: "Panel bağlantısı henüz kurulmadı (Supabase Secrets: STUDIO_IMPORT_KEY)." };
   const { data: t } = await sb.from("tr_drafts").select("*").eq("id", taslakId).single();
   if (!t) return { ok: false, hata: "Taslak bulunamadı." };
+  // Deneme masasının taslakları (4 Kasım 2026) hiçbir yoldan panele gitmez
+  if (t.deneme) return { ok: false, kod: "deneme", hata: "Deneme taslağı panele gitmez." };
   const kaydetHata = async (hata: string, kod?: string): Promise<Sonuc> => {
     await sb.from("tr_drafts").update({ site_hata: hata.slice(0, 300) }).eq("id", taslakId);
     return { ok: false, hata, kod };

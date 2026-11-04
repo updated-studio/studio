@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-11-04-i",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Deneme masası",
+    "bolumler": [
+      {
+        "ad": "Yöneticiler",
+        "maddeler": [
+          "Profil menüsünde Deneme masası: havuzdan gerçek bir haber seçip taslak akışının tamamını dene.",
+          "Deneme taslakları panele gitmez; Haber Masası'nda ve ölçümlerde görünmez."
+        ]
+      },
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Cloudflare'in ücretsiz payı bitince görsel Nano Banana ve GPT Image ile üretilir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-h",
     "tarih": "4 Kasım 2026",
     "baslik": "Telefonda üst çubuk",

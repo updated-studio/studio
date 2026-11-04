@@ -163,15 +163,17 @@ const suzgecOku = (): TaslakSuzgec => { try { return { ...SUZGEC_VARSAYILAN, ...
 
 const DURUM: Record<Taslak["status"], string> = { taslak: "Taslak", hazir: "Yayına hazır", gonderildi: "Siteye gönderildi" };
 
-export default function Taslaklar({ acik, setAcik }: { acik: number | null; setAcik: (id: number | null) => void }) {
+/** sade: Deneme masasında süzgeç çubuğu gizli, bütün deneme taslakları en yeniden eskiye */
+export default function Taslaklar({ acik, setAcik, sade }: { acik: number | null; setAcik: (id: number | null) => void; sade?: boolean }) {
   const { v } = useMasa();
   const kisi = useKisi();
   const { profile } = useAuth();
-  const [f, setF] = useState<TaslakSuzgec>(suzgecOku);
+  const [f0, setF] = useState<TaslakSuzgec>(suzgecOku);
+  const f = sade ? { ...SUZGEC_VARSAYILAN, kim: "hepsi" as const, sira: "yeni" as const } : f0;
   const [suzgecAcik, setSuzgecAcik] = useState(false);
   const canli = useCanli();
   const t = acik ? v.taslaklar.find((x) => x.id === acik) : undefined;
-  useEffect(() => { try { localStorage.setItem(SUZGEC_ANAHTARI, JSON.stringify(f)); } catch { /* depolama kapalı */ } }, [f]);
+  useEffect(() => { try { localStorage.setItem(SUZGEC_ANAHTARI, JSON.stringify(f0)); } catch { /* depolama kapalı */ } }, [f0]);
   if (t) return <Duzenleyici key={t.id} t={t} kapat={() => setAcik(null)} />;
 
   // Sıralama ve süzgeç (3 Kasım 2026, kullanıcı: "son hazırlattığım en üste gelmiyor; detaylı filtreleme ve sıralama"); seçim tarayıcıda hatırlanır
@@ -197,7 +199,7 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
   const suzgecli = suzgecSayisi > 0 || !!kucuk;
   return (
     <>
-      <div className="taslak-suzgec">
+      {!sade && <div className="taslak-suzgec">
         <div className="segment" role="group" aria-label="Kimin taslakları">
           {([["benim", "Benim"], ["hepsi", "Hepsi"], ["oto", "Otomatik"]] as const).map(([k, ad]) => <button key={k} aria-pressed={f.kim === k} onClick={() => sec("kim", k)}>{ad}</button>)}
         </div>
@@ -207,8 +209,8 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
         </select></label>
         <button type="button" className={"btn ghost sm" + (suzgecli ? " secili" : "")} aria-expanded={suzgecAcik} onClick={() => setSuzgecAcik((x) => !x)}>Süzgeç{suzgecSayisi ? ` (${suzgecSayisi})` : ""}</button>
         <span className="muted">{liste.length} taslak{suzgecli && <> · <button className="linkbtn" onClick={() => setF({ ...SUZGEC_VARSAYILAN, kim: f.kim, sira: f.sira })}>süzgeci temizle</button></>}</span>
-      </div>
-      {suzgecAcik && <div className="taslak-suzgec taslak-suzgec-ek">
+      </div>}
+      {suzgecAcik && !sade && <div className="taslak-suzgec taslak-suzgec-ek">
         <label>Durum<select value={f.durum} onChange={(e) => sec("durum", e.target.value as TaslakSuzgec["durum"])}>
           <option value="hepsi">Hepsi</option><option value="taslak">Taslak</option><option value="hazir">Yayına hazır</option><option value="panelde">Panelde</option><option value="eksik">Eksiği ya da hatası var</option>
         </select></label>
@@ -292,8 +294,14 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
   const [silOnay, setSilOnay] = useState(false);
   async function sil() {
     if (!silOnay) { setSilOnay(true); window.setTimeout(() => setSilOnay(false), 4000); return; }
-    const r = await sb.from("tr_drafts").delete().eq("id", t.id);
-    if (r.error) return toast(r.error.message);
+    // Deneme taslağı haberin kopyasıyla birlikte silinir (Deneme masası, 0063)
+    if (t.deneme) {
+      const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { deneme: { sil: t.id } } });
+      if (error || data?.hata) return toast(data?.hata ?? error!.message);
+    } else {
+      const r = await sb.from("tr_drafts").delete().eq("id", t.id);
+      if (r.error) return toast(r.error.message);
+    }
     toast("Taslak silindi."); kapat();
   }
 
@@ -363,7 +371,8 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
         <span className="muted" style={{ marginRight: "auto" }}>Durum: {DURUM[d.status]}{t.model ? " · " + t.model : ""}</span>
         {d.status !== "hazir" && <button className="btn ok sm" onClick={() => kaydet("hazir")}>Yayına hazır</button>}
         {d.status === "hazir" && <button className="btn ghost sm" onClick={() => kaydet("taslak")}>Taslağa geri al</button>}
-        <button className="btn sm" onClick={() => siteGonder()} disabled={siteSuruyor}>{siteSuruyor ? "Gönderiliyor…" : t.site_id ? "Paneldeki taslağı güncelle" : "Panele gönder"}</button>
+        {t.deneme ? <span className="pill off" title="Deneme masasının taslakları panele gitmez">Deneme · panele gitmez</span>
+          : <button className="btn sm" onClick={() => siteGonder()} disabled={siteSuruyor}>{siteSuruyor ? "Gönderiliyor…" : t.site_id ? "Paneldeki taslağı güncelle" : "Panele gönder"}</button>}
         <button className="btn ghost sm" onClick={sil}>{silOnay ? "Emin misin? Tekrar bas" : "Sil"}</button>
       </div>
     </>

@@ -210,7 +210,7 @@ type Aday = { model: string; url?: string; gecti: boolean; puan: number; hata?: 
 function GorselTablo() {
   const [satirlar, setSatirlar] = useState<{ image: Record<string, unknown> }[] | null>(null);
   useEffect(() => {
-    sb.from("tr_drafts").select("image").not("image->yz_adaylar", "is", null).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(300)
+    sb.from("tr_drafts").select("image").eq("deneme", false).not("image->yz_adaylar", "is", null).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(300)
       .then(({ data }) => setSatirlar((data ?? []) as { image: Record<string, unknown> }[]));
   }, []);
   const tablo = new Map<string, { uretildi: number; denendi: number; gecti: number; puan: number; otomatik: number; editor: number; sure: number }>();
@@ -249,7 +249,7 @@ function GorselTablo() {
 function YaziKiyas() {
   const [satirlar, setSatirlar] = useState<{ qc: Record<string, unknown> | null }[] | null>(null);
   useEffect(() => {
-    sb.from("tr_drafts").select("qc").not("qc->ab", "is", null).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(500)
+    sb.from("tr_drafts").select("qc").eq("deneme", false).not("qc->ab", "is", null).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(500)
       .then(({ data }) => setSatirlar((data ?? []) as { qc: Record<string, unknown> | null }[]));
   }, []);
   const s = { toplam: 0, claude: 0, gemini: 0, bekliyor: 0, cDuz: 0, gDuz: 0, cPar: 0, gPar: 0, n: 0 };

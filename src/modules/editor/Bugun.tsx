@@ -33,7 +33,7 @@ export default function Bugun() {
   const [yeniHaber, setYeniHaber] = useState<number | null>(null);
 
   useEffect(() => {
-    sb.from("tr_items").select("id", { count: "exact", head: true }).eq("status", "aday").gte("created_at", new Date(Date.now() - 864e5).toISOString())
+    sb.from("tr_items").select("id", { count: "exact", head: true }).eq("status", "aday").eq("deneme", false).gte("created_at", new Date(Date.now() - 864e5).toISOString())
       .then(({ count }) => setYeniHaber(count ?? 0));
   }, []);
   useEffect(() => { if (kullanici) taslakGetir().then(setTaslak).catch(() => setTaslak([])); else if (kullanici === null) setTaslak([]); }, [kullanici]);

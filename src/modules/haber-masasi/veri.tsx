@@ -33,6 +33,7 @@ export type Taslak = {
   };
   created_at: string; updated_at: string;
   qc_state?: "" | "bekliyor" | "calisiyor" | "tamam" | "hata"; qc?: { ab?: { gemini: { baslik: string; spot: string; govde: string; model: string; kontrol?: string; duzeltme?: number; degisen?: number }; claude?: { baslik: string; spot: string; govde: string }; durum: string; secim?: "claude" | "gemini"; secen?: string; zaman?: string }; sorunlar?: string[]; duzeltmeler?: { kontrol: number; tur: string; once: string; sonra: string; neden: string }[]; degisen?: Record<string, number>; tur?: number; guven?: string; durum?: string; onem?: number | null; ana_sayfa?: boolean; bitti?: string }; // son kalite kontrolü
+  deneme?: boolean; // Deneme masası taslağı (0063): panele gitmez, listelerde görünmez
   auto: boolean; wp_post_id: number | null; wp_link: string; wp_error: string; wp_sent_at: string | null; wp_pending: boolean; // otomatik mi, eski WordPress karşılığı (23 Ekim 2026'ya kadar; yalnız geçmiş)
   site_id?: number | null; site_admin?: string; site_onizleme?: string; site_hata?: string; site_gonderim?: string | null; site_bekliyor?: boolean; // panel (updated.com.tr) karşılığı (0024)
   site_eksik?: { eksikler?: string[]; duzeltmeler?: string[]; kaldirildi?: string; gun?: number } | null; // panelin bildirdiği eksikler ve kural düzeltmeleri (0028)
@@ -50,7 +51,8 @@ export const useMasa = () => useContext(Ctx);
 
 const OTUZ_GUN = () => new Date(Date.now() - 30 * 86_400_000).toISOString();
 
-export function MasaProvider({ children }: { children: ReactNode }) {
+/** deneme: Deneme masası (4 Kasım 2026) yalnız deneme kopyalarını ve taslaklarını yükler; Haber Masası yalnız gerçekleri (göç 0063). */
+export function MasaProvider({ children, deneme = false }: { children: ReactNode; deneme?: boolean }) {
   const [v, setV] = useState<Veri>(BOS);
   const [yukleniyor, setY] = useState(true);
   const [hata, setHata] = useState("");
@@ -59,10 +61,10 @@ export function MasaProvider({ children }: { children: ReactNode }) {
   const yenile = useCallback(async () => {
     const q = await Promise.all([
       // Havuz, belirsiz ve elenenlerin tamamı (saklama kuralı zaten 3 günde temizliyor) + son 30 günün alınan/pas/yayında haberleri
-      sb.from("tr_items").select("*").in("status", ["aday", "belirsiz", "elendi", "rehber"]).order("published_at", { ascending: false }).limit(2000),
-      sb.from("tr_items").select("*").in("status", ["alindi", "pas", "yayinda"]).gte("updated_at", OTUZ_GUN()).order("updated_at", { ascending: false }).limit(1000),
+      sb.from("tr_items").select("*").eq("deneme", deneme).in("status", ["aday", "belirsiz", "elendi", "rehber"]).order("published_at", { ascending: false }).limit(2000),
+      sb.from("tr_items").select("*").eq("deneme", deneme).in("status", ["alindi", "pas", "yayinda"]).gte("updated_at", OTUZ_GUN()).order("updated_at", { ascending: false }).limit(1000),
       sb.from("tr_votes").select("id,item_id,user_id,value,note,created_at,brand,topic,event,link"),
-      sb.from("tr_drafts").select("*").order("updated_at", { ascending: false }).limit(300),
+      sb.from("tr_drafts").select("*").eq("deneme", deneme).order("updated_at", { ascending: false }).limit(300),
       sb.from("tr_chat").select("*").order("created_at", { ascending: false }).limit(200),
       sb.from("tr_sources").select("*").order("category").order("name"),
       sb.from("tr_brands").select("*").order("name"),
@@ -81,11 +83,11 @@ export function MasaProvider({ children }: { children: ReactNode }) {
       etkinlik: d[9] as Etkinlik[],
     });
     setHata(""); setY(false);
-  }, []);
+  }, [deneme]);
 
   useEffect(() => {
     yenile();
-    const kanal = sb.channel("haber-masasi");
+    const kanal = sb.channel(deneme ? "haber-masasi-deneme" : "haber-masasi");
     for (const t of ["tr_items", "tr_votes", "tr_drafts", "tr_chat", "tr_sources", "tr_settings", "tr_brands", "tr_press", "tr_activity"]) {
       kanal.on("postgres_changes", { event: "*", schema: "public", table: t }, () => {
         window.clearTimeout(zaman.current);

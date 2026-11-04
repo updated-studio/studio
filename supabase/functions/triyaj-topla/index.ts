@@ -79,7 +79,7 @@ async function gundemIsaretle(sb: ReturnType<typeof createClient>, yeni: string[
   await sb.from("tr_settings").upsert({ key: "gundem", value: { zaman: simdi, terimler } });
   const anahtarlar = terimler.map((x) => ({ t: x.t, n: norm(x.t) })).filter((x) => x.n.trim().length >= 4);
   if (!anahtarlar.length) return 0;
-  const { data: kartlar } = await sb.from("tr_items").select("id,title,event,brand,product").in("status", ["aday", "belirsiz", "alindi"]).is("trend", null)
+  const { data: kartlar } = await sb.from("tr_items").select("id,title,event,brand,product").in("status", ["aday", "belirsiz", "alindi"]).eq("deneme", false).is("trend", null)
     .gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString()).limit(800);
   let n = 0;
   for (const k of (kartlar ?? []) as { id: number; title: string; event: string; brand: string; product: string }[]) {
@@ -434,7 +434,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const anahtarlar = [...olaylar.keys()].filter((a) => !a.startsWith("tekil-"));
   if (anahtarlar.length) {
     const { data } = await sb.from("tr_items").select("id,event_key,other_sources,source_name,brand,event,title,product").in("event_key", anahtarlar)
-      .neq("status", "elendi").gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString());
+      .neq("status", "elendi").eq("deneme", false).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString());
     (data ?? []).forEach((r: MevcutKart & { event_key: string }) => { if (!bagAday.has(r.event_key)) bagAday.set(r.event_key, r); });
   }
   // Olay kimliği tutmayanlar için: yapay zekâ yeni haberi son 48 saatteki kartlarla karşılaştırır (aynı olay farklı turda gelmesin)
@@ -442,7 +442,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   if (eslesmeyen.length && !hata) {
     try {
       const { data: son } = await sb.from("tr_items").select("id,brand,event,title,product,other_sources,source_name,event_key")
-        .in("status", ["aday", "alindi", "yayinda", "pas", "belirsiz"]).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
+        .in("status", ["aday", "alindi", "yayinda", "pas", "belirsiz"]).eq("deneme", false).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
         .order("created_at", { ascending: false }).limit(250);
       const liste = (son ?? []) as (MevcutKart & { event_key: string })[];
       if (liste.length) {
@@ -546,7 +546,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
 // Tek seferlik / yönetici: havuzdaki (son 48 saat, kimsenin dokunmadığı) aynı olaya ait kartları birleştirir.
 async function birlestir(sb: ReturnType<typeof createClient>, model: string, sadeceMarka?: string) {
   const { data } = await sb.from("tr_items").select("id,brand,event,title,link,source_name,other_sources,touched,published_at")
-    .eq("status", "aday").gte("created_at", new Date(Date.now() - 72 * 3600_000).toISOString()).order("published_at").limit(600);
+    .eq("status", "aday").eq("deneme", false).gte("created_at", new Date(Date.now() - 72 * 3600_000).toISOString()).order("published_at").limit(600);
   const liste = (data ?? []) as { id: number; brand: string; event: string; title: string; link: string; source_name: string; other_sources: { name: string; link: string }[]; touched: boolean }[];
   const markalar = new Map<string, typeof liste>();
   liste.forEach((x) => { const m = (x.brand || "—").toLowerCase(); markalar.set(m, [...(markalar.get(m) ?? []), x]); });
@@ -600,7 +600,7 @@ function benzer(a: { brand: string; title: string; event: string }, b: { brand: 
 async function kumele(sb: ReturnType<typeof createClient>, model: string) {
   const bas = Date.now();
   const { data } = await sb.from("tr_items").select("id,brand,product,event,title,link,source_name,other_sources,touched,status,auto_draft_at,created_at")
-    .in("status", ["aday", "belirsiz", "alindi"]).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
+    .in("status", ["aday", "belirsiz", "alindi"]).eq("deneme", false).gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
     .order("created_at", { ascending: false }).limit(300);
   type K = { id: number; brand: string; product: string; event: string; title: string; link: string; source_name: string; other_sources: { name: string; link: string }[]; touched: boolean; status: string; auto_draft_at: string | null; created_at: string };
   const liste = (data ?? []) as K[];
