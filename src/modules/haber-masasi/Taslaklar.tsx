@@ -18,6 +18,8 @@ import ModelSecici from "./ModelSecici";
 const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof x === "object" ? Object.values(x as Record<string, unknown>).map((v) => metinYap(v)).filter(Boolean).join(" — ") : String(x ?? "");
 
 /** Eski taslak dokümanının "GÖRSEL" bölümü: öneri, alt text, basın kiti, stok önerileri, yapay zekâ istemi */
+const URETIM_BASLADI = "Üretim başladı: görsel yönetmeni haberi okuyor; görseller 1–4 dakikada burada belirir.";
+
 // Wikimedia 2026'dan beri küçük resmi yalnız sabit boylarda veriyor (250, 330, 500, 960…); eski kayıtlardaki 400 px adresi 400 hatası verir
 const wikiKucuk = (u: string) => (u && /\.wikimedia\.org\//.test(u) ? u.replace(/\/400px-/, "/500px-") : u);
 
@@ -25,13 +27,16 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   const toast = useToast();
   const g = t.image ?? {};
   // Yapay zekâ ile görsel (3 Kasım 2026): sunucu üretir (Cloudflare), Claude denetler (başka marka tasarımı, yazı, bozuk nesne reddedilir)
+  // Üretim arka planda (4 Kasım 2026): görsel yönetmeni haberi okur, modeller üretir, denetim puanlar; 1–4 dakika. Sürdüğü taslakta
+  // image.yz_suruyor durur, bitince yz_son; ekran anlık güncellemeyle kendiliğinden değişir.
+  const suruyor = !!g.yz_suruyor?.zaman && Date.now() - Date.parse(g.yz_suruyor.zaman) < 6 * 60_000;
   const [uretiliyor, setUretiliyor] = useState(false);
   async function uret() {
     setUretiliyor(true);
     const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { gorsel_uret: t.id } });
     setUretiliyor(false);
     const hata = (data as { hata?: string } | null)?.hata;
-    toast(hata ?? (error ? "Görsel üretilemedi: " + error.message : "Görsel üretildi ve denetlendi."));
+    toast(hata ?? (error ? "Görsel üretilemedi: " + error.message : URETIM_BASLADI));
   }
   const [seciliyor, setSeciliyor] = useState("");
   async function adaySec(model: string) {
@@ -79,7 +84,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
       <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("tara", { gorsel_tara: t.id }, (r) => `Tarandı: ${r.aday ?? 0} fotoğraf adayı.`)}>{is_ === "tara" ? "Taranıyor…" : "Fotoğrafları yeniden tara"}</button>
       <button className="btn ghost sm" aria-expanded={seciciAcik} onClick={() => setSeciciAcik((x) => !x)}>{seciciAcik ? "Model seçiciyi kapat" : "Yapay zekâ ile üret: model seç"}</button>
     </div>
-    {seciciAcik && <ModelSecici mod="uret" mesgul={is_ === "uret"} uret={(sec) => cagir("uret", { gorsel_uret: t.id, yeniden: true, secim: sec }, (r) => `Üretildi: ${r.toplam ?? 0} görselden ${r.gecen ?? 0}'i denetimden geçti.`)} />}
+    {seciciAcik && <ModelSecici mod="uret" mesgul={is_ === "uret" || suruyor} uret={(sec) => cagir("uret", { gorsel_uret: t.id, yeniden: true, secim: sec }, () => URETIM_BASLADI)} />}
   </>;
   const fotoSatir = fotolar.length > 0 && <>
     <b>Fotoğraf adayları</b>
@@ -97,7 +102,14 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     </div>
   </>;
   const yzSatir = <>
-    {g.yz_bekliyor && !g.secilen && <div className="muted">Yapay zekâ ile görsel üretiliyor ve denetleniyor…</div>}
+    {(suruyor || (g.yz_bekliyor && !g.secilen)) && <div className="msg">Yapay zekâ görselleri hazırlanıyor{g.yz_suruyor?.kim ? ` (${g.yz_suruyor.kim} başlattı)` : ""}: görsel yönetmeni haberi okuyor, modeller üretiyor, denetim puanlıyor. Bitince burada belirir.</div>}
+    {!suruyor && g.yz_son && <div className={"muted" + (g.yz_son.ok ? "" : " hata-metni")}>Son üretim ({zamanOnce(g.yz_son.zaman)} önce): {g.yz_son.mesaj}</div>}
+    {g.yz_tarif && <details className="yz-tarif"><summary>Görsel yönetmeninin tarifi: {g.yz_tarif.konu}</summary>
+      <div><b>Ana mesaj:</b> {g.yz_tarif.ana_mesaj}</div>
+      <div><b>Sahne:</b> {g.yz_tarif.sahne}</div>
+      {g.yz_tarif.yazilar.length > 0 && <div><b>Görseldeki yazılar:</b> {g.yz_tarif.yazilar.map((y) => `"${y}"`).join(", ")}</div>}
+      {g.yz_tarif.kacin.length > 0 && <div><b>Kaçınılanlar:</b> {g.yz_tarif.kacin.join(" · ")}</div>}
+    </details>}
     {g.yz_uretim && g.secilen && <div className="muted">Bu görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan.</div>}
     {adaylar.length > 0 && <>
       <b>Yapay zekâ adayları (model kıyası)</b>
@@ -115,7 +127,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
         })}
       </div>
     </>}
-    {!g.secilen && !g.yz_bekliyor && <div><button className="btn ghost sm" onClick={uret} disabled={uretiliyor}>{uretiliyor ? "Üretiliyor, denetleniyor…" : "Yapay zekâ ile görsel üret"}</button></div>}
+    {!g.secilen && !g.yz_bekliyor && !suruyor && <div><button className="btn ghost sm" onClick={uret} disabled={uretiliyor}>{uretiliyor ? "Başlatılıyor…" : "Yapay zekâ ile görsel üret"}</button></div>}
     {fotoSatir}
     {araSatir}
     {islemler}

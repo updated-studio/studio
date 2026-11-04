@@ -275,22 +275,48 @@ export function fluxIstem(konu: string): string {
   return `${k}. Photorealistic editorial technology news photo, natural lighting, shallow depth of field, clean composition, subject centered, 16:9. Generic unbranded design: do not imitate any specific manufacturer design signature (no emblems, no signature grilles, no recognizable silhouette of a specific brand product). No real human faces. No text, no letters, no words, no captions, no logos, no watermark, no brand names, no UI overlays.`;
 }
 
+/** Görsel yönetmeni (4 Kasım 2026, kullanıcı: "haberin içeriğinden konuyu anlayıp yapay zekâya ona göre istem yazdıracak bir ara katman;
+ *  kapak fotoğrafı gibi, ürüne odaklı; dikkat çekici ama clickbait değil; ortalanmış ve kırpılabilir; yazı doğruysa olabilir; model başına istem").
+ *  Haberi okur, kapağın neyi anlatacağına karar verir ve her model ailesi için ayrı İngilizce istem yazar. Denetim bu tarife göre puanlar. */
+export type GorselTarif = { konu: string; ana_mesaj: string; sahne: string; yazilar: string[]; marka_ogeleri: string; kacin: string[]; istemler: { flux: string; gpt: string; banana: string } };
+export const GORSEL_YONETMEN = `UPDATED adlı Türkçe teknoloji haber sitesinin görsel yönetmenisin. Haberin kapak görselini yapay zekâya ürettireceğiz: sen haberi okuyup sanat yönetimini yapar, her model için üretim istemini yazarsın.
+ÖNCE HABERİ ANLA: Başlık, spot ve metinden haberin ASIL konusunu ve okurun kapağa bakınca ilk anda anlaması gereken TEK şeyi çıkar. Genel konuyu değil, haberi farklı kılan ayrıntıyı resmet ve haberin dikkat çeken somut öğesini (sürüm adı, yeni özellik, ürünün ayırt edici parçası) görünür kıl.
+Örnek: "macOS 27.3 betası: Canlı Etkinlikler menü çubuğunda; çentikli eski Mac'lerde de" → çentikli bir MacBook'un ekranında, menü çubuğunda yanan küçük bir canlı etkinlik göstergesi (ör. zamanlayıcı), ekranda küçük ama net "macOS 27.3 beta" yazısı; stüdyo ışığında, ekrana odaklı.
+KAPAK İLKELERİ
+- Dikkat çekici ama dürüst: profesyonel editoryal kapak (stüdyo ürün çekimi ya da temiz, sade bir sahne; iyi ışık; konuya odaklı). YouTube küçük resmi değil: abartılı ifade, ok/daire işareti, şok, öfke uyandırma, clickbait yok.
+- Kompozisyon: ana konu kadrajın ORTASINDA, dört kenarda geniş nefes payı (her kenarda ~%15-20). Aynı görsel sitede 16:10, 4:3, 16:9; sosyal medyada 1:1, 4:5 ve 9:16 (Reels, Story, Shorts kapağı) kırpılacak ve yakınlaştırılabilecek. Konunun önemli kısmı alttaki üçte bire düşmesin (manşette başlık biner).
+- Yazı: Yalnız haberin özünü taşıyan, BİREBİR DOĞRU kısa yazılar (en çok 2; her biri en çok 4 kelime; ör. "macOS 27.3 beta"). Gerçek ürünün üzerinde gerçekte bulunan logo ya da yazı doğru haliyle görünebilir (MSI dizüstünün kapağındaki MSI logosu gibi). Klavye gibi ayrıntılı yüzey gerekiyorsa gerçek düzenine sadık iste (ör. Apple Mac klavye düzeni); doğru çıkması zor ayrıntıyı (uzun arayüz metni, menü listesi, küçük paragraflar) isteme: kadrajı oradan uzaklaştır ya da sığ alan derinliğiyle flu bırak.
+- Gerçek kişi yüzü yok. Henüz tanıtılmamış ürünün (söylenti, sızıntı) tasarımını kesin gerçekmiş gibi uydurma: konsepti ya da bilinen mevcut nesli göster, yeni ürünü belirsiz bırak. Haberdeki markadan başka markanın ürünü ya da logosu yok.
+MODEL BAŞINA İSTEM (İngilizce yaz; hepsinde photorealistic, 16:9 landscape, subject centered with generous empty margins on all four sides for cropping):
+- "flux" (FLUX.2 klein/dev, Lucid Origin): tek paragraf, fotoğrafçı diliyle akan doğal anlatım: konu, ortam, ışık, lens ve açı, renk; 60-110 kelime; yazı varsa çift tırnak içinde birebir ve nerede durduğu.
+- "gpt" (GPT Image): satır satır yapılandırılmış talimat: "Scene:", "Subject:", "Composition:", "Lighting:", "Exact text:" (yoksa "none"), "Constraints:" (açık do-not maddeleri).
+- "banana" (Nano Banana / Gemini): amaç cümlesiyle başlayan anlatı ("Create a professional editorial cover photo for a tech news article about …"), sonra sahne, kompozisyon, ışık, birebir yazı ve kaçınılacaklar.
+Sadece şu JSON'u döndür: {"konu":"Türkçe tek cümle","ana_mesaj":"okurun ilk bakışta anlaması gereken şey, Türkçe","sahne":"Türkçe 2-3 cümle","yazilar":["görselde birebir görünecek yazı"],"marka_ogeleri":"görünebilecek gerçek logo ya da öğe; yoksa yok","kacin":["Türkçe kısa madde"],"istemler":{"flux":"...","gpt":"...","banana":"..."}}`;
+
+/** Tarifteki istemi modele göre seçer; tarif yoksa eski genel istem */
+export function modelIstemi(t: GorselTarif | null, model: string, yedek: string): string {
+  if (!t) return yedek;
+  const i = model === "gpt" ? t.istemler.gpt : model === "banana" ? t.istemler.banana : t.istemler.flux;
+  return (i || t.istemler.flux || yedek).slice(0, 2400);
+}
+
 /** Üretilen görselin denetimi: yedi katman + puan (3 Kasım 2026, kullanıcı: "kolaya kaçmışsın, eleme usulümüzde katmanlar vardı").
  *  Fotoğraf seçimindeki kurallar (SECIM_SISTEM) üretim için uyarlandı; ilk beş katman eleyici, puan adaylar arasında sıralar. */
-export const URETIM_DENETIM = `Bir Türkçe teknoloji haberi için yapay zekâyla üretilmiş öne çıkan görseli denetliyorsun. Sana haber başlığı, marka ve ürün verilecek, ekte görsel var.
-Görsel sitede üç yerde kırpılır: manşet 16:10 (masaüstü), manşet 4:3 (telefon), kart 16:9. Manşette alttaki yaklaşık %40'ın üstüne başlık yazısı biner.
+export const URETIM_DENETIM = `Bir Türkçe teknoloji haberi için yapay zekâyla üretilmiş kapak görselini denetliyorsun. Sana haber başlığı, spot, marka, ürün ve görsel yönetmeninin tarifi (konu, okurun ilk anlaması gereken ana mesaj, görselde olması gereken birebir yazılar) verilecek; ekte görsel var.
+Görsel sitede manşet 16:10 ve 4:3, kart 16:9; sosyal medyada 1:1, 4:5 ve 9:16 kırpılır. Manşette alttaki yaklaşık %40'ın üstüne başlık yazısı biner.
 Her katmanı ayrı değerlendir:
-1. marka: Haberdeki markadan BAŞKA bir markayı çağrıştıran logo, amblem ya da belirgin tasarım imzası var mı (ör. haber BMW ise Mercedes yıldızı, Audi halkaları; haber Apple ise başka markanın bilinen telefon tasarımı)? Haberdeki ürün türüyle uyumsuz nesne (telefon haberinde tablet) de sorun.
-2. yazi: Okunur ya da harfe benzeyen bozuk yazı, rakam, logo, filigran, arayüz metni var mı? Uzakta, dikkat çekmeyen, okunmayan doku sorun değil; göze batan her yazı sorundur.
-3. bozukluk: Fazla/eksik parmak, eriyen ya da birbirine geçen nesneler, eğri düz çizgiler, fiziksel olmayan yansıma ve gölge, anlamsız parçalar.
-4. ilgi: Sahne haberin konusunu anlatıyor mu? Genel "teknoloji" süsü ya da konuyla ilgisiz sahne sorun.
-5. etik: Tanınabilir gerçek kişi yüzü; belirli gerçek bir ürünün fotoğrafı sanılacak kadar ayrıntılı taklidi (okuru yanıltır); şiddet, uygunsuz içerik.
-6. kirpma: Konu ortada mı; üç kırpmada da konu kalıyor mu; konunun önemli kısmı alttaki başlık alanında mı kalıyor?
+1. konu: Görsel haberin başlığı ve içeriğiyle uyuşuyor mu? Ana mesaj insan bakınca ilk anda anlaşılıyor mu? Genel "teknoloji" süsü, konuyla ilgisiz ya da anahtar ayrıntıyı (yeni özellik, sürüm, ürün) iletemeyen sahne sorun.
+2. yazi: Görünen her yazı birebir doğru ve tutarlı mı? Tarifteki yazılar varsa doğru yazılmış mı? Bozuk, uydurma, harfe benzeyen anlamsız yazı; harfleri tutarsız klavye; okunmaz arayüz metni sorun. Ürünün üzerindeki gerçek ve doğru logo sorun değil; uzakta, flu, dikkat çekmeyen doku sorun değil.
+3. marka: Haberdeki markadan BAŞKA markayı çağrıştıran logo, amblem ya da belirgin tasarım imzası; haberdeki ürün türüyle uyumsuz nesne (telefon haberinde tablet).
+4. bozukluk: Fazla/eksik parmak, eriyen ya da birbirine geçen nesneler, eğri düz çizgiler, fiziksel olmayan yansıma ve gölge, anlamsız parçalar.
+5. etik: Tanınabilir gerçek kişi yüzü; söylenti/sızıntı haberinde henüz tanıtılmamış ürünü kesin gerçekmiş gibi gösterme; şiddet, uygunsuz içerik.
+6. kirpma: Konu ortada mı, kenarlarda kırpma payı var mı; 16:10, 4:3, 16:9 ve 1:1, 4:5, 9:16 kırpmalarında konu kalıyor mu; önemli kısım alttaki başlık alanında mı?
 7. kalite: Editoryal fotoğraf kalitesi: doğal ışık ve doku; plastik, aşırı parlak, aşırı doygun "yapay zekâ işi" görünüm puanı düşürür.
+8. cekicilik: Kapak olarak göz alıcı ve profesyonel mi (stüdyo çekimi kalitesi, net odak)? Abartı, clickbait, YouTube küçük resmi havası puanı düşürür.
 "gecti": 1-5. katmanların hepsi sorunsuzsa true; biri bile sorunluysa false. Emin değilsen false.
-"puan": 0-10 genel kalite (6. ve 7. katman ağırlıklı; 1-5'ten biri sorunluysa en fazla 3).
+"puan": 0-10 genel (1. katman ve 6-8 ağırlıklı; 1-5'ten biri sorunluysa en fazla 3).
 "odak": konunun merkezi, {"x": soldan yüzde, "y": üstten yüzde}.
-Sadece şu JSON'u döndür: {"katmanlar":{"marka":"tamam ya da kısa sorun","yazi":"","bozukluk":"","ilgi":"","etik":"","kirpma":"","kalite":""},"gecti":true,"puan":0,"odak":{"x":50,"y":50},"neden":"tek cümle özet"}`;
+Sadece şu JSON'u döndür: {"katmanlar":{"konu":"tamam ya da kısa sorun","yazi":"","marka":"","bozukluk":"","etik":"","kirpma":"","kalite":"","cekicilik":""},"gecti":true,"puan":0,"odak":{"x":50,"y":50},"neden":"tek cümle özet"}`;
 
 /** Yapay zekâya gösterilecek aday listesi */
 export function adayListesi(adaylar: GorselAday[]): string {

@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-11-04-l",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Görsel yönetmeni, anlık güncelleme",
+    "bolumler": [
+      {
+        "ad": "Görseller",
+        "maddeler": [
+          "Yapay zekâ görselinden önce bir görsel yönetmeni haberi okuyup kapağı tarif eder ve her modele ayrı istem yazar.",
+          "Denetim görseli bu tarife göre puanlar; üretim arka planda sürer, bitince taslakta kendiliğinden görünür."
+        ]
+      },
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Ekranlar yeniden anlık güncelleniyor; sayfayı yenilemek gerekmiyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-k",
     "tarih": "4 Kasım 2026",
     "baslik": "Updated AI görselleri",

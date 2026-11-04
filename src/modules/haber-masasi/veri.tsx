@@ -28,6 +28,8 @@ export type Taslak = {
     secilen?: GorselAday | null; gorsel_adaylar?: GorselAday[]; gorsel_neden?: string; wp_media_id?: number | null; yukleme_hata?: string; // öne çıkan görsel (gorsel.ts)
     ara?: { bolum: string; gorsel: GorselAday; alt: string }[]; ara_neden?: string; // haber içi resmî görseller (4 Kasım 2026)
     yz_bekliyor?: boolean; yz_model?: string; yz_secen?: "otomatik" | "editor"; yz_kiyas?: boolean;
+    yz_suruyor?: { zaman: string; kim: string } | null; yz_son?: { zaman: string; mesaj: string; ok: boolean }; // arka plan üretimi (4 Kasım 2026)
+    yz_tarif?: { konu: string; ana_mesaj: string; sahne: string; yazilar: string[]; kacin: string[] }; // görsel yönetmeni (gorsel.ts GORSEL_YONETMEN)
     yz_adaylar?: { model: string; surum?: string; url?: string; gecti: boolean; puan: number; katmanlar?: Record<string, string>; neden: string; hata?: string; sure: number }[]; // görsel model kıyası (3 Kasım 2026)
     yz_uretim?: boolean; // öne çıkan görsel yapay zekâ ile üretildi (3 Kasım 2026; eski "flux" kuyruğu kaldırıldı)
   };
