@@ -313,6 +313,16 @@ function metinListe(x: unknown): string[] {
   return (Array.isArray(x) ? x : x ? [x] : []).map(duz).map((s) => s.trim()).filter(Boolean);
 }
 
+/** Modelin JSON yanıtından başlık, spot ve Markdown gövde (ara başlıklar + paragraflar; marka yazımı düzeltilmiş) */
+function metinYap(t: Record<string, any>, ilgili: { link: string }[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const parcalar: string[] = [];
+  for (const b of t.govde ?? []) {
+    if (b?.h2) parcalar.push("## " + b.h2);
+    for (const p of b?.paragraflar ?? []) if (p) parcalar.push(String(p));
+  }
+  return { baslik: markaYazimi(String(t.baslik ?? "")), spot: markaYazimi(spotKisalt(String(t.spot ?? ""))), govdeMd: markaYazimi(linkTemizle(parcalar.join("\n\n"), ilgili.map((x) => x.link))) };
+}
+
 /** Uzun yapay zekâ çağrısı sürerken nabız düzenli gitsin (2 dk nabızsız iş yarıda kalmış sayılıyor) */
 async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici: string | null, ad: string, sec: IsSecenek = {}) {
   const nb = setInterval(() => { sb.from("tr_items").update({ work_state: tur }).eq("id", itemId).eq("work_state", tur).then(() => {}, () => {}); }, 45_000);
@@ -363,7 +373,11 @@ ${metinler.join("\n\n---\n\n")}`;
 
     const uslup = await uslupAl(sb);
     await nabiz();
+    // Kör karşılaştırma (4 Kasım 2026, kullanıcı: "hazırlananların hepsi karşılaştırmalı olsun, ana metin Claude'un"): Claude ile aynı anda
+    // Gemini de yazar; Claude'unki taslak olur, Gemini'ninki qc.ab'de durur ve ayrıca denetlenir. Editör Haber Masası'nda A/B olarak görüp seçer.
+    const geminiSoz = tur === "taslak" ? gemini(taslakSistem(uslup), istem, MODELLER, bitis - 30_000).catch(() => null) : Promise.resolve(null);
     const { veri: t, model, claudeHata } = await yz("taslak", taslakSistem(uslup), istem, MODELLER, bitis, { claudeBitis: bitis - 20_000, maxTokens: 12_000, caba: "medium" });
+    const gAlt = /claude/.test(model) ? await geminiSoz : null;
     await nabiz();
     const notlar: string[] = metinListe(t.editor_notlari);
     if (claudeHata) notlar.push("Claude taslağı yazamadı (" + claudeHata + "); taslağı Gemini yazdı.");
@@ -371,18 +385,12 @@ ${metinler.join("\n\n---\n\n")}`;
     const okunan = 1 + ekler.filter((e) => e.metin.length >= 300).length;
     if (diger.length) notlar.push(`${okunan}/${diger.length + 1} kaynak okunarak yazıldı.`);
 
-    // Gövde: ara başlıklar (editör yorumu yeri 2 Kasım 2026'da kaldırıldı: editör isterse kendisi ekler)
-    const parcalar: string[] = [];
-    for (const b of t.govde ?? []) {
-      if (b?.h2) parcalar.push("## " + b.h2);
-      for (const p of b?.paragraflar ?? []) if (p) parcalar.push(String(p));
-    }
+    // Gövde: ara başlıklar (editör yorumu yeri 2 Kasım 2026'da kaldırıldı: editör isterse kendisi ekler); metinYap
     // "Dikkat edilmesi gerekenler" sitedeki yazılarda yok: editör notlarına gider, metne girmez
     const dikkat = metinListe(t.dikkat_edilmesi_gerekenler);
     if (dikkat.length) notlar.unshift(...dikkat.map((x: string) => "Dikkat: " + x));
-    const baslik = markaYazimi(String(t.baslik ?? ""));
-    const spot = markaYazimi(spotKisalt(String(t.spot ?? "")));
-    const govdeMd = markaYazimi(linkTemizle(parcalar.join("\n\n"), ilgili.map((x) => x.link)));
+    const { baslik, spot, govdeMd } = metinYap(t, ilgili);
+    const ab = gAlt ? { gemini: { ...(({ baslik: b, spot: sp, govdeMd: g }) => ({ baslik: b, spot: sp, govde: g }))(metinYap(gAlt.veri, ilgili)), model: gAlt.model }, durum: "bekliyor" } : undefined;
 
     // Kaynaklar (panelde haberin "Kaynaklar" listesine gider; ilk satır birincil): ilk yazan + diğerleri + asıl kaynak
     const kaynaklar = [`${it.source_name} — ${it.link}`, ...((it.other_sources ?? []) as { name: string; link: string }[]).filter((o) => o.link !== it.link).map((o) => `${o.name} — ${o.link}`)];
@@ -408,7 +416,7 @@ ${metinler.join("\n\n---\n\n")}`;
       image: { oneri: g.oneri ?? "", alt_text: g.alt_text ?? "", aramalar, ai_istem: g.ai_istem ?? "", basin, stok: [] },
       // Son kalite kontrolü ayrı çağrıda (süre sınırı): kaynak metinleri ve iç link adayları onun için saklanır
       qc_state: "bekliyor", qc_at: new Date().toISOString(),
-      qc: { kaynak: metinler.join("\n\n---\n\n").slice(0, 30000), ilgili, tam_metin: ana.metin.length >= 300, ilk_govde: govdeMd },
+      qc: { kaynak: metinler.join("\n\n---\n\n").slice(0, 30000), ilgili, tam_metin: ana.metin.length >= 300, ilk_govde: govdeMd, ...(ab ? { ab } : {}) },
     }).select("id").single();
 
     const zaman = istanbulZaman();
@@ -491,6 +499,8 @@ async function kontrolBaslat(id: number) {
   } catch { /* zamanlanmış tur devralır */ } finally { clearTimeout(t); }
 }
 
+/** Kör karşılaştırma kaydı (qc.ab): Gemini'nin aynı habere yazdığı metin ve editörün seçimi */
+type AbKayit = { gemini: { baslik: string; spot: string; govde: string; model: string; kontrol?: string; duzeltme?: number; degisen?: number }; durum: string; secim?: "claude" | "gemini"; secen?: string; zaman?: string };
 /** Kalite kontrolünün yaptığı düzeltme (Stüdyo'da "hangi kontrolde ne düzeldi" diye gösterilir; kullanıcı 2 Kasım 2026) */
 type Duzeltme = { kontrol: number; tur: string; once: string; sonra: string; neden: string };
 /** Nesnel ölçü: yeni metinde eskisinde birebir bulunmayan paragraf sayısı (modelin kendi beyanına ek) */
@@ -504,12 +514,25 @@ async function kontrol(sb: Sb, id: number) {
     .eq("id", id).or(`qc_state.eq.bekliyor,and(qc_state.eq.calisiyor,qc_at.lt.${asili})`).select("*");
   const t = kilit?.[0];
   if (!t) return { atlandi: "Kontrol beklemiyor" };
-  const qc = (t.qc ?? {}) as { kaynak?: string; ilgili?: { baslik: string; link: string }[]; tam_metin?: boolean; ilk_govde?: string; tur?: number; onceki_sorunlar?: string[]; duzeltmeler?: Duzeltme[]; degisen?: Record<string, number> };
+  const qc = (t.qc ?? {}) as { kaynak?: string; ilgili?: { baslik: string; link: string }[]; tam_metin?: boolean; ilk_govde?: string; tur?: number; onceki_sorunlar?: string[]; duzeltmeler?: Duzeltme[]; degisen?: Record<string, number>; ab?: AbKayit };
   const { data: it } = await sb.from("tr_items").select("*").eq("id", t.item_id ?? 0).maybeSingle();
   const notlar: string[] = [];
   let durum = "", guven = "";
   const tur = qc.tur === 2 ? 2 : 1;
   let duzeltmeler: Duzeltme[] = [], degisen = 0;
+  // Karşılaştırmadaki Gemini metni de (ilk turda bir kez) Gemini ile denetlenir; adil kıyas: her model kendi metnini kendi denetler
+  const abSoz: Promise<AbKayit | undefined> = (async () => {
+    const ab = qc.ab;
+    if (!ab?.gemini || ab.gemini.kontrol || !qc.kaynak) return ab;
+    try {
+      const uslup = await uslupAl(sb);
+      const { veri: k } = await gemini(KONTROL_SISTEM(uslup), `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik: ab.gemini.baslik, spot: ab.gemini.spot, govde: ab.gemini.govde })}`, MODELLER, Math.min(bitis - 60_000, Date.now() + 120_000));
+      const yeni = linkTemizle(String(k.govde ?? ""), (qc.ilgili ?? []).map((x) => x.link));
+      const ara = (x: string) => (x.match(/^## /gm) ?? []).length;
+      const uygun = ara(yeni) >= 2 && ara(yeni) <= 4 && yeni.length > ab.gemini.govde.length * 0.75;
+      return { ...ab, gemini: { ...ab.gemini, ...(uygun ? { baslik: markaYazimi(String(k.baslik ?? "") || ab.gemini.baslik), spot: markaYazimi(spotKisalt(String(k.spot ?? "") || ab.gemini.spot)), govde: markaYazimi(yeni) } : {}), kontrol: uygun ? "kontrol edildi" : "kontrol uygulanmadı", duzeltme: Array.isArray(k.duzeltmeler) ? k.duzeltmeler.length : 0, degisen: uygun ? degisenParagraf(ab.gemini.govde, yeni) : 0 } };
+    } catch { return { ...ab, gemini: { ...ab.gemini, kontrol: "kontrol çalışmadı" } }; }
+  })();
   try {
     // 1) Doğrulama + düzeltme + insanlaştırma
     let { title: baslik, spot, body: govde } = t as { title: string; spot: string; body: string };
@@ -546,7 +569,7 @@ async function kontrol(sb: Sb, id: number) {
       await sb.from("tr_drafts").update({
         ...(sim?.body === t.body ? { title: baslik, spot, body: govde } : {}),
         notes: [...((sim?.notes ?? []) as string[]), ...notlar],
-        qc: { ...qc, tur: 2, onceki_sorunlar: sorunlar, ilk_guven: guven, duzeltmeler, degisen: { "1": degisen } }, qc_state: "bekliyor", qc_at: new Date().toISOString(),
+        qc: { ...qc, ab: await abSoz, tur: 2, onceki_sorunlar: sorunlar, ilk_guven: guven, duzeltmeler, degisen: { "1": degisen } }, qc_state: "bekliyor", qc_at: new Date().toISOString(),
       }).eq("id", id);
       if (sim?.body === t.body) { await kontrolBaslat(id); return { ikinci_tur: true, sorunlar }; }
       await sb.from("tr_drafts").update({ qc_state: "tamam", qc: { ...qc, kaynak: undefined, sorunlar, durum: "kontrol edildi", bitti: new Date().toISOString() } }).eq("id", id);
@@ -566,7 +589,7 @@ async function kontrol(sb: Sb, id: number) {
       ...(degismedi ? { title: baslik, spot, body: govde } : {}),
       editor_note: [String(simdi?.editor_note ?? ""), ...kontrolNot].filter(Boolean).join("\n"),
       notes: [...((simdi?.notes ?? []) as string[]), ...kontrolNot],
-      qc: { ...qc, kaynak: undefined, onceki_sorunlar: undefined, sorunlar, durum, guven, duzeltmeler: [...(tur === 2 ? qc.duzeltmeler ?? [] : []), ...(degismedi ? duzeltmeler : [])], degisen: { ...(tur === 2 ? qc.degisen ?? {} : {}), ...(degismedi && durum === "kontrol edildi" ? { [String(tur)]: degisen } : {}) }, onem: d?.onem ?? null, ana_sayfa: !!d && d.puan >= ANA_SAYFA_ESIK, bitti: new Date().toISOString() },
+      qc: { ...qc, ab: await abSoz, kaynak: undefined, onceki_sorunlar: undefined, sorunlar, durum, guven, duzeltmeler: [...(tur === 2 ? qc.duzeltmeler ?? [] : []), ...(degismedi ? duzeltmeler : [])], degisen: { ...(tur === 2 ? qc.degisen ?? {} : {}), ...(degismedi && durum === "kontrol edildi" ? { [String(tur)]: degisen } : {}) }, onem: d?.onem ?? null, ana_sayfa: !!d && d.puan >= ANA_SAYFA_ESIK, bitti: new Date().toISOString() },
     }).eq("id", id);
 
     // 2) Öne çıkan görsel (yoksa yapay zekâ üretimi)
@@ -864,6 +887,21 @@ Deno.serve(async (req) => {
   if (govde?.gorsel_uret) {
     const r = await elleUret(sb, Number(govde.gorsel_uret));
     return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
+  }
+  // Kör karşılaştırma: editör metni seçer (ekip üyesi). Gemini seçilirse taslağın metni onunkiyle değişir; panele gitmişse güncellenir.
+  if (govde?.ab_sec) {
+    const id = Number(govde.ab_sec), secim = govde.secim === "gemini" ? "gemini" : "claude";
+    const { data: t } = await sb.from("tr_drafts").select("qc,site_id,title,spot,body").eq("id", id).single();
+    const ab = (t?.qc as { ab?: AbKayit } | null)?.ab;
+    if (!ab) return Response.json({ hata: "Bu taslakta karşılaştırma yok" }, { status: 422, headers: CORS });
+    const yeniAb: AbKayit = { ...ab, durum: "secildi", secim, secen: p.name, zaman: new Date().toISOString(), ...(secim === "gemini" && !ab.secim ? { claude: { baslik: t!.title, spot: t!.spot, govde: t!.body } } : {}) } as AbKayit;
+    // Claude'un metni ilk geçişte qc.ab.claude'a saklanır; Claude'a geri dönülürse oradan geri gelir
+    const eskiClaude = (ab as { claude?: { baslik: string; spot: string; govde: string } }).claude;
+    const metin = secim === "gemini" ? { title: ab.gemini.baslik, spot: ab.gemini.spot, body: ab.gemini.govde }
+      : eskiClaude && ab.secim === "gemini" ? { title: eskiClaude.baslik, spot: eskiClaude.spot, body: eskiClaude.govde } : null;
+    await sb.from("tr_drafts").update({ ...(metin ?? {}), qc: { ...(t!.qc as object), ab: yeniAb } }).eq("id", id);
+    const site = metin && t?.site_id ? await siteGonder(sb, id, { zorla: true, kategoriSec }) : null;
+    return Response.json({ ok: true, site }, { headers: CORS });
   }
   // Kıyas adaylarından başkasını kapak yap (ekip üyesi)
   if (govde?.gorsel_sec) {

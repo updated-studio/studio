@@ -31,7 +31,7 @@ export type Taslak = {
     yz_uretim?: boolean; // öne çıkan görsel yapay zekâ ile üretildi (3 Kasım 2026; eski "flux" kuyruğu kaldırıldı)
   };
   created_at: string; updated_at: string;
-  qc_state?: "" | "bekliyor" | "calisiyor" | "tamam" | "hata"; qc?: { sorunlar?: string[]; duzeltmeler?: { kontrol: number; tur: string; once: string; sonra: string; neden: string }[]; degisen?: Record<string, number>; tur?: number; guven?: string; durum?: string; onem?: number | null; ana_sayfa?: boolean; bitti?: string }; // son kalite kontrolü
+  qc_state?: "" | "bekliyor" | "calisiyor" | "tamam" | "hata"; qc?: { ab?: { gemini: { baslik: string; spot: string; govde: string; model: string; kontrol?: string; duzeltme?: number; degisen?: number }; claude?: { baslik: string; spot: string; govde: string }; durum: string; secim?: "claude" | "gemini"; secen?: string; zaman?: string }; sorunlar?: string[]; duzeltmeler?: { kontrol: number; tur: string; once: string; sonra: string; neden: string }[]; degisen?: Record<string, number>; tur?: number; guven?: string; durum?: string; onem?: number | null; ana_sayfa?: boolean; bitti?: string }; // son kalite kontrolü
   auto: boolean; wp_post_id: number | null; wp_link: string; wp_error: string; wp_sent_at: string | null; wp_pending: boolean; // otomatik mi, eski WordPress karşılığı (23 Ekim 2026'ya kadar; yalnız geçmiş)
   site_id?: number | null; site_admin?: string; site_onizleme?: string; site_hata?: string; site_gonderim?: string | null; site_bekliyor?: boolean; // panel (updated.com.tr) karşılığı (0024)
   site_eksik?: { eksikler?: string[]; duzeltmeler?: string[]; kaldirildi?: string; gun?: number } | null; // panelin bildirdiği eksikler ve kural düzeltmeleri (0028)

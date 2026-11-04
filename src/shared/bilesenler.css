@@ -238,3 +238,9 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .taslak-suzgec input[type=search] { width: min(220px, 100%); padding: 7px 10px; font-size: 13px; }
 .taslak-suzgec-ek { background: var(--sunk); border-radius: 12px; padding: 10px 12px; }
 .taslak-suzgec .btn.secili { border-color: var(--blue); color: var(--blue); }
+/* Kör karşılaştırma (Haber Masası → Taslaklar, 4 Kasım 2026) */
+.ab-ikili { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.ab-metin { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.ab-metin.secili { border-color: var(--blue); }
+.ab-metin h4 { margin: 0; font-family: var(--baslik); font-size: 18px; }
+.ab-metin .onizleme { max-height: 420px; overflow: auto; width: 100%; }

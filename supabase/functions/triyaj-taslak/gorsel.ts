@@ -248,7 +248,8 @@ export async function stokFoto(q: string, adet: number, anahtar: { pexels?: stri
  *  ZORUNLU tutar; bu yüzden sadece onlarda altyazı yazılır. CC0, kamu malı, Pexels, Pixabay: altyazı yok. Resmi basın: "Görsel: Marka". */
 export function altyazi(g: GorselAday): string {
   if (g.kaynak === "Resmi basın" || g.kaynak === "Üretici görseli") return `Görsel: ${g.yazar.replace(/[<>&]/g, "")}`;
-  if (g.kaynak === "Yapay zekâ (Flux)") return "Görsel yapay zekâ ile üretilmiştir.";
+  // Marka kiti §8: "Temsili görsel · Yapay zekâ ile üretildi"
+  if (g.kaynak === "Yapay zekâ (Flux)") return "Temsili görsel · Yapay zekâ ile üretildi";
   if (!/^cc[- ]by/i.test(g.lisans)) return "";
   const k = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `Fotoğraf: ${k(g.yazar)} / <a href="${k(g.sayfa)}" target="_blank" rel="noopener">${k(g.kaynak)}</a>${/^(cc|kamu)/i.test(g.lisans) ? ` (${k(g.lisans)})` : ""}`;

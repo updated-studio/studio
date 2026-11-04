@@ -39,6 +39,7 @@ export default function Ayarlar() {
       <OtomatikTaslak ayar={ayar} />
       <YazimUslubu ayar={ayar} />
       <GorselKiyas ayar={ayar} />
+      <YaziKiyas />
       <SitePaneli ayar={ayar} />
       <div className="panel">
         <h3>Saklama</h3>
@@ -233,6 +234,41 @@ function GorselKiyas({ ayar }: { ayar: (k: string, v: unknown, m: string) => Pro
         </table></div>
       )}
       <div className="muted">Cloudflare modelleri günlük ücretsiz payla çalışır; pay biterse o gün "üretilemedi" görünür ve ücret çıkmaz. Maliyet sütunu bu durumda üst sınırdır.</div>
+    </div>
+  );
+}
+
+// Yazı karşılaştırması (4 Kasım 2026): her taslakta Claude ve Gemini aynı haberi yazar; editörün kör seçimi ve denetimin düzeltme sayısı.
+function YaziKiyas() {
+  const [satirlar, setSatirlar] = useState<{ qc: Record<string, unknown> | null }[] | null>(null);
+  useEffect(() => {
+    sb.from("tr_drafts").select("qc").not("qc->ab", "is", null).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(500)
+      .then(({ data }) => setSatirlar((data ?? []) as { qc: Record<string, unknown> | null }[]));
+  }, []);
+  const s = { toplam: 0, claude: 0, gemini: 0, bekliyor: 0, cDuz: 0, gDuz: 0, cPar: 0, gPar: 0, n: 0 };
+  for (const r of satirlar ?? []) {
+    const q = r.qc as { ab?: { secim?: string; gemini?: { duzeltme?: number; degisen?: number } }; duzeltmeler?: { kontrol: number }[]; degisen?: Record<string, number> } | null;
+    if (!q?.ab) continue;
+    s.toplam++;
+    if (q.ab.secim === "claude") s.claude++; else if (q.ab.secim === "gemini") s.gemini++; else s.bekliyor++;
+    if (q.ab.gemini?.duzeltme != null) { s.n++; s.gDuz += q.ab.gemini.duzeltme; s.gPar += q.ab.gemini.degisen ?? 0; s.cDuz += (q.duzeltmeler ?? []).filter((x) => x.kontrol === 1).length; s.cPar += q.degisen?.["1"] ?? 0; }
+  }
+  const ort = (x: number) => (s.n ? (x / s.n).toLocaleString("tr", { maximumFractionDigits: 1 }) : "–");
+  const secilen = s.claude + s.gemini;
+  return (
+    <div className="panel">
+      <h3>Yazı karşılaştırması (Claude · Gemini)</h3>
+      <div className="muted">Her taslakta iki model aynı haberi yazar ve kendi denetiminden geçer. Editör hangisinin kimden geldiğini bilmeden seçer. Ana taslak Claude'unki. Son 30 gün.</div>
+      {!satirlar ? <div className="muted">Yükleniyor…</div> : !s.toplam ? <div className="muted">Henüz karşılaştırma yok; ilk taslakla başlar.</div> : (
+        <div className="tbl"><table>
+          <thead><tr><th>Model</th><th>Editör seçti</th><th>Seçim oranı</th><th>Denetimin düzeltmesi (ort.)</th><th>Değişen paragraf (ort.)</th></tr></thead>
+          <tbody>
+            <tr><td><b>Claude</b></td><td>{s.claude}</td><td>{secilen ? Math.round((s.claude / secilen) * 100) + "%" : "–"}</td><td>{ort(s.cDuz)}</td><td>{ort(s.cPar)}</td></tr>
+            <tr><td><b>Gemini</b></td><td>{s.gemini}</td><td>{secilen ? Math.round((s.gemini / secilen) * 100) + "%" : "–"}</td><td>{ort(s.gDuz)}</td><td>{ort(s.gPar)}</td></tr>
+          </tbody>
+        </table></div>
+      )}
+      {!!s.toplam && <div className="muted">{s.toplam} karşılaştırma · {s.bekliyor} seçim bekliyor. Düzeltme sayısı az olan, denetime daha temiz metin teslim etmiş demektir.</div>}
     </div>
   );
 }

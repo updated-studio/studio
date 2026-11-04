@@ -247,6 +247,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       {t.auto && <div className="muted">🤖 Bu taslağı Stüdyo en güçlü haberlerden otomatik hazırladı{t.author ? " ve ilgi alanına göre sana verdi" : ""}. Yayından önce doğrulama listesine bak.</div>}
       {(t.qc_state === "bekliyor" || t.qc_state === "calisiyor") && <div className="msg">Son kalite kontrolü sürüyor (rakamlar, adlar, tutarlılık kaynaklara karşı; ardından görsel ve panele gönderim). Bitince metin kendiliğinden güncellenir; bu arada değiştirirsen düzeltmeler metne uygulanmaz, notlara yazılır.</div>}
       <OnemSatiri t={t} haber={haber} />
+      <Karsilastirma t={t} />
       {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
       {t.site_id && <div className="msg good">Panelde taslak haber olarak duruyor{t.site_gonderim ? " (" + zamanOnce(t.site_gonderim) + " önce gönderildi)" : ""}. {t.site_onizleme && <a href={t.site_onizleme} target="_blank" rel="noreferrer">Son taslağı aç ↗</a>}{t.site_admin && <> · <a href={t.site_admin} target="_blank" rel="noreferrer">Panelde aç ↗</a></>}</div>}
       {!t.site_id && t.site_eksik?.kaldirildi && <div className="muted">Panelde {t.site_eksik.gun} gün kimse dokunmadığı için {zamanOnce(t.site_eksik.kaldirildi)} önce panelden kaldırıldı. Yeniden göndermek için "Panele gönder"e bas.</div>}
@@ -339,6 +340,47 @@ function OnemSatiri({ t, haber }: { t: Taslak; haber?: Parameters<typeof degerle
         {fark > 0 ? ` Taslak hazırlandığından bu yana önem ${fark.toLocaleString("tr")} düştü; bu yalnız zamandan, haberin kendisinden değil.` : ""}
         {" "}Gerekçe: {simdi.gerekce.join(", ")}.
       </Bilgi>
+    </div>
+  );
+}
+
+// Kör karşılaştırma (4 Kasım 2026, kullanıcı: "hazırlananların hepsi karşılaştırmalı olsun"): aynı haberi Claude ve Gemini yazdı, ikisi de
+// kendi denetiminden geçti. Editör hangisinin kimden geldiğini bilmeden seçer; seçimden sonra açıklanır. Ana taslak Claude'unki.
+function Karsilastirma({ t }: { t: Taslak }) {
+  const toast = useToast();
+  const [acik, setAcik] = useState(false);
+  const [mesgul, setMesgul] = useState(false);
+  const ab = t.qc?.ab;
+  if (!ab) return null;
+  const claude = ab.secim === "gemini" && ab.claude ? ab.claude : { baslik: t.title, spot: t.spot, govde: t.body };
+  const gemini = ab.gemini;
+  const sira: ("claude" | "gemini")[] = t.id % 2 ? ["claude", "gemini"] : ["gemini", "claude"];
+  const metin = (m: "claude" | "gemini") => (m === "claude" ? claude : gemini);
+  async function sec(m: "claude" | "gemini") {
+    setMesgul(true);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { ab_sec: t.id, secim: m } });
+    setMesgul(false);
+    const r = data as { hata?: string; site?: { ok: boolean; hata?: string } | null } | null;
+    toast(r?.hata ?? (error ? error.message : `Seçildi: Metin ${sira.indexOf(m) === 0 ? "A" : "B"} (${m === "claude" ? "Claude" : "Gemini"}).${r?.site && !r.site.ok ? " Panele aktarılamadı: " + r.site.hata : ""}`));
+  }
+  return (
+    <div className="panel">
+      <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <h3 style={{ margin: 0 }}>Karşılaştırma: Metin A · Metin B</h3>
+        {ab.secim ? <span className="pill ok">Seçilen: {ab.secim === "claude" ? "Claude" : "Gemini"}{ab.secen ? ` · ${ab.secen}` : ""}</span> : <span className="pill off">Seçim bekliyor</span>}
+      </div>
+      <div className="muted">Aynı haberi iki yapay zekâ yazdı ve ikisi de denetlendi. Hangisinin hangi modelden geldiği seçene kadar gizli. Beğendiğini seç; seçtiğin metin taslak olur{t.site_id ? ", paneldeki taslak da güncellenir" : ""}.</div>
+      <button type="button" className="btn ghost sm" onClick={() => setAcik((x) => !x)}>{acik ? "Metinleri gizle" : "Metinleri yan yana aç"}</button>
+      {acik && <div className="ab-ikili">
+        {sira.map((m, i) => (
+          <div key={m} className={"ab-metin" + (ab.secim === m ? " secili" : "")}>
+            <b>Metin {i ? "B" : "A"}{ab.secim ? ` · ${m === "claude" ? "Claude" : "Gemini"}` : ""}</b>
+            <h4>{metin(m).baslik}</h4>
+            <div className="onizleme" dangerouslySetInnerHTML={{ __html: yaziHtml(metin(m).spot, metin(m).govde) }} />
+            {ab.secim !== m && <button className="btn sm" disabled={mesgul} onClick={() => sec(m)}>{mesgul ? "Seçiliyor…" : `Metin ${i ? "B" : "A"}'yı kullan`}</button>}
+          </div>
+        ))}
+      </div>}
     </div>
   );
 }

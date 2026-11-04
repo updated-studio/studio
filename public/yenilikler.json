@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-04-b",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Claude ve Gemini kör karşılaştırması",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Her taslağı Claude ve Gemini ayrı ayrı yazar; ana taslak Claude'unki.",
+          "Taslakta \"Metin A · Metin B\" yan yana; hangisinin kimden olduğu seçince görünür.",
+          "Ayarlar'da hangi modelin kaç kez seçildiği tabloda."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-a",
     "tarih": "4 Kasım 2026",
     "baslik": "Yayın kendiliğinden işaretleniyor",
