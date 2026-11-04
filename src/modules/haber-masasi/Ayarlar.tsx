@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { MODEL_AD, MODEL_UCRET } from "./gorselModel";
+import ModelSecici, { useModelKatalog, type Katalog } from "./ModelSecici";
 import { sb } from "../../shared/supabase";
 import { hataMetni, useToast } from "../../shared/toast";
 import { ANA_SAYFA_ESIK, HABER_TURLERI, YAYIN_ESIK } from "./oncelik";
@@ -7,93 +8,123 @@ import { zamanOnce } from "./ortak";
 import { useMasa } from "./veri";
 import { OTO_VARSAYILAN, type OtoAyar } from "../../../supabase/functions/triyaj-taslak/secim.ts";
 import { USLUP_VARSAYILAN } from "../../../supabase/functions/triyaj-taslak/uslup.ts";
+import "../sistem/baglantilar.css";
+import "./ayarlar.css";
 
-// Sadece yöneticiler: otomatik taslak ve site paneli bağlantısı, saklama süresi, gürültü kelimeleri, Türkiye pazarı markaları, basın kiti.
+// Sadece yöneticiler. Düzen (4 Kasım 2026, kullanıcı: "ayarlar kısmı çorba, okumakta zorlandım"): Bağlantı anahtarları sayfasının onaylı
+// düzeni; gruplar solda başlık + açıklama, sağda açılır satırlar. Kapalı satır kayıtlı değeri tek satırda özetler; açılınca alanlar
+// "ad + kısa not | değer" biçiminde sıralanır.
+type AyarYaz = (key: string, value: unknown, mesaj: string) => Promise<void>;
+type Ac = (id: string) => void;
+
 export default function Ayarlar() {
   const { v } = useMasa();
   const toast = useToast();
-  const [gun, setGun] = useState(String(v.ayarlar.saklama_gun ?? 3));
-  const [kelimeler, setKelimeler] = useState(((v.ayarlar.gurultu_kelimeleri as string[]) ?? []).join("\n"));
+  const [acik, setAcik] = useState("");
+  const katalog = useModelKatalog();
 
   async function ayar(key: string, value: unknown, mesaj: string) {
     const r = await sb.from("tr_settings").upsert({ key, value });
     toast(r.error ? hataMetni(r.error) : mesaj);
   }
-  async function markaEkle(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const r = await sb.from("tr_brands").upsert({ name: String(f.get("ad")).trim(), grp: String(f.get("grup")), note: String(f.get("not")).trim() });
-    if (r.error) return toast(hataMetni(r.error));
-    e.currentTarget.reset();
-  }
-  async function basinEkle(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const r = await sb.from("tr_press").insert({ brand: String(f.get("marka")).trim(), url: String(f.get("url")).trim(), note: String(f.get("not")).trim() });
-    if (r.error) return toast(hataMetni(r.error));
-    e.currentTarget.reset();
-  }
+
+  const a = v.ayarlar;
+  const oto = { ...OTO_VARSAYILAN, ...((a.oto_taslak ?? {}) as Partial<OtoAyar>) };
+  const kiyas = { acik: true, gunluk: 3, ...((a.gorsel_kiyas ?? {}) as { acik?: boolean; gunluk?: number }) };
+  const uslupOzel = typeof a.yazim_uslubu === "string" && !!(a.yazim_uslubu as string).trim();
+  const gurultu = ((a.gurultu_kelimeleri as string[]) ?? []).length;
+  const kategoriler = ((a.site_kategoriler ?? {}) as { liste?: { slug: string; name: string }[] }).liste ?? [];
+  const varsKat = kategoriler.find((k) => k.slug === String(a.site_varsayilan_kategori ?? ""));
+  const acikPill = (x: boolean) => <span className={"pill " + (x ? "blue" : "off")}>{x ? "Açık" : "Kapalı"}</span>;
+  const p = { acik, ac: setAcik };
 
   return (
-    <>
-      <OtomatikTaslak ayar={ayar} />
-      <YazimUslubu ayar={ayar} />
-      <GorselKiyas ayar={ayar} />
-      <YaziKiyas />
-      <SitePaneli ayar={ayar} />
-      <div className="panel">
-        <h3>Saklama</h3>
-        <div className="muted">Havuzda kimsenin dokunmadığı (alınmamış, oylanmamış, pas geçilmemiş) haberler bu kadar gün sonra silinir. İşlem görmüş haberler kalır.</div>
-        <div className="row">
-          <input type="text" inputMode="numeric" value={gun} onChange={(e) => setGun(e.target.value.replace(/\D/g, ""))} style={{ width: 90 }} aria-label="Gün" /> gün
-          <button className="btn sm" onClick={() => ayar("saklama_gun", Math.max(1, Math.min(60, Number(gun) || 3)), "Saklama süresi kaydedildi.")}>Kaydet</button>
-        </div>
-      </div>
-      <div className="panel">
-        <h3>Gürültü kelimeleri</h3>
-        <div className="muted">Başlığında bunlardan biri geçen haber yapay zekâya gitmeden elenir. Her satıra bir tane.</div>
-        <textarea className="alan" rows={8} value={kelimeler} onChange={(e) => setKelimeler(e.target.value)} />
-        <div><button className="btn sm" onClick={() => ayar("gurultu_kelimeleri", kelimeler.split("\n").map((s) => s.trim().toLowerCase()).filter(Boolean), "Gürültü kelimeleri kaydedildi.")}>Kaydet</button></div>
-      </div>
-      <div className="panel">
-        <h3>Türkiye pazarı markaları</h3>
-        <div className="muted">Öncelikli markaların haberleri öne çıkar; Hariç olanlar (Türkiye'de satılmayanlar) geride kalır.</div>
-        <div className="row">
-          {v.markalar.map((m) => (
-            <span key={m.name} className="chip" title={m.note}>{m.name} <span className="muted">{m.grp}</span>
-              <button className="linkbtn" aria-label={m.name + " sil"} onClick={async () => { const r = await sb.from("tr_brands").delete().eq("name", m.name); if (r.error) toast(hataMetni(r.error)); }}>×</button>
-            </span>
-          ))}
-        </div>
-        <form className="grid" onSubmit={markaEkle}>
-          <label>Marka<input name="ad" type="text" required maxLength={40} /></label>
-          <label>Grup<select name="grup"><option>Öncelikli</option><option>Normal</option><option>Hariç</option></select></label>
-          <label>Not<input name="not" type="text" maxLength={60} /></label>
-          <button className="btn">Ekle</button>
-        </form>
-      </div>
-      <div className="panel">
-        <h3>Basın kiti</h3>
-        <div className="liste">
-          {v.basin.map((b) => (
-            <div key={b.id} className="satir">
-              <div className="ana"><b>{b.brand}</b> <a href={b.url} target="_blank" rel="noreferrer">{b.url}</a>{b.note && <div className="muted">{b.note}</div>}</div>
-              <button className="btn ghost sm" onClick={async () => { const r = await sb.from("tr_press").delete().eq("id", b.id); if (r.error) toast(hataMetni(r.error)); }}>Sil</button>
-            </div>
-          ))}
-        </div>
-        <form className="grid" onSubmit={basinEkle}>
-          <label>Marka<input name="marka" type="text" required maxLength={40} /></label>
-          <label>Basın sayfası<input name="url" type="text" required placeholder="https://" /></label>
-          <label>Not<input name="not" type="text" maxLength={80} /></label>
-          <button className="btn">Ekle</button>
-        </form>
-      </div>
-    </>
+    <section className="bg ay">
+      <p className="bg-ozet">
+        <b>Otomatik taslak {oto.acik ? "açık" : "kapalı"}{oto.acik ? `, günde en çok ${oto.gunluk}, en az ${oto.esik} puan.` : "."}</b>{" "}
+        Görsel: {modelOzet(katalog, a.gorsel_modeller)}. Satıra tıklayınca ayarları açılır; değişiklik Kaydet'e basınca geçerli olur.
+      </p>
+
+      <Grup id="yazim" ad="Otomatik yazım" ne="Hangi haberin kendiliğinden taslağa döneceği ve taslağın nasıl yazılacağı.">
+        <Satir {...p} id="oto" ad="Otomatik taslak" ne="Güçlü haberlere düğmeye basılmadan taslak yazılır." durum={acikPill(oto.acik)}
+          deger={oto.acik ? `günde ${oto.gunluk} · ${oto.esik}+ puan` : undefined}><OtomatikTaslak ayar={ayar} /></Satir>
+        <Satir {...p} id="uslup" ad="Yazım üslubu" ne="Taslakların uyduğu dil ve biçim kuralları." deger={uslupOzel ? "Özelleştirilmiş" : "Varsayılan"}>
+          <YazimUslubu ayar={ayar} /></Satir>
+      </Grup>
+
+      <Grup id="gorsel" ad="Görseller" ne="Uygun fotoğraf bulunamayınca kapağı yapay zekâ çizer. Sitede “Temsili görsel” etiketiyle çıkar.">
+        <Satir {...p} id="modeller" ad="Üretimde kullanılan modeller" ne="Otomatik üretim bunları kullanır. Taslakta tek seferlik başka model seçilebilir."
+          deger={modelOzet(katalog, a.gorsel_modeller)}>
+          <ModelSecici mod="varsayilan" gomulu katalog={katalog} kaydet={(s) => ayar("gorsel_modeller", s, "Görsel modelleri kaydedildi.")} />
+        </Satir>
+        <Satir {...p} id="kiyas" ad="Model kıyası" ne="Bazı taslaklarda bütün modeller birlikte üretir; en yüksek puanlı kapak olur." durum={acikPill(kiyas.acik)}
+          deger={kiyas.acik ? `günde ${kiyas.gunluk} taslak` : undefined}><KiyasAyari ayar={ayar} /></Satir>
+      </Grup>
+
+      <Grup id="olcum" ad="Ölçümler" ne="Hangi model daha iyi iş çıkarıyor? Son 30 günün sayıları.">
+        <Satir {...p} id="gtablo" ad="Görsel modelleri" ne="Kaç kez üretti, denetimden geçti, kapak oldu; süre ve maliyet."><GorselTablo /></Satir>
+        <Satir {...p} id="ytablo" ad="Yazı: Claude ve Gemini" ne="Editörün kör seçimi ve denetimin yaptığı düzeltme sayısı."><YaziKiyas /></Satir>
+      </Grup>
+
+      <Grup id="kaynak" ad="Haber kaynakları" ne="Havuza ne gireceği, neyin öne çıkacağı ve ne kadar duracağı.">
+        <Satir {...p} id="gurultu" ad="Gürültü kelimeleri" ne="Başlığında bunlardan biri geçen haber baştan elenir." deger={`${gurultu} kelime`}><Gurultu ayar={ayar} /></Satir>
+        <Satir {...p} id="marka" ad="Türkiye pazarı markaları" ne="Öncelikli markalar öne çıkar; Türkiye'de satılmayanlar geride kalır." deger={`${v.markalar.length} marka`}><Markalar /></Satir>
+        <Satir {...p} id="basin" ad="Basın sayfaları" ne="Görsel ve bilgi aranırken markanın resmî basın sayfasına bakılır." deger={`${v.basin.length} sayfa`}><Basin /></Satir>
+        <Satir {...p} id="saklama" ad="Saklama süresi" ne="Kimsenin dokunmadığı haber bu süre sonunda havuzdan silinir." deger={`${a.saklama_gun ?? 3} gün`}><Saklama ayar={ayar} /></Satir>
+      </Grup>
+
+      <Grup id="baglanti" ad="Site" ne="Taslakların gittiği updated.com.tr paneli.">
+        <Satir {...p} id="site" ad="Site paneli" ne="Bağlantıyı dene; yapay zekâ kategori bulamazsa kullanılacak kategori."
+          deger={varsKat ? varsKat.name : "Kategori seçilmedi"}><SitePaneli ayar={ayar} /></Satir>
+      </Grup>
+    </section>
   );
 }
 
-type AyarYaz = (key: string, value: unknown, mesaj: string) => Promise<void>;
+function modelOzet(k: Katalog | null, kayit: unknown) {
+  const s = (kayit ?? {}) as { gpt?: string; banana?: string; gpt_kalite?: string };
+  const ad = (sg: "gpt" | "banana", id?: string) => {
+    const m = k?.modeller.find((x) => (id ? x.id === id : x.saglayici === sg && x.varsayilan));
+    return m?.ad ?? id ?? (sg === "gpt" ? "GPT Image (en yeni)" : "Nano Banana (en yeni)");
+  };
+  return `${ad("gpt", s.gpt)} · ${ad("banana", s.banana)}`;
+}
+
+function Grup({ id, ad, ne, children }: { id: string; ad: string; ne: string; children: ReactNode }) {
+  return (
+    <section className="bg-grup" aria-labelledby={"ay-" + id}>
+      <div className="bg-grup-sol"><h2 id={"ay-" + id}>{ad}</h2><p>{ne}</p></div>
+      <div className="bg-liste">{children}</div>
+    </section>
+  );
+}
+
+function Satir({ id, ad, ne, durum, deger, acik, ac, children }: { id: string; ad: string; ne: string; durum?: ReactNode; deger?: string; acik: string; ac: Ac; children: ReactNode }) {
+  const a = acik === id;
+  return (
+    <div className={"bg-srv" + (a ? " acik" : "")}>
+      <div className="bg-bas">
+        <button type="button" className="bg-ac ay-ac" aria-expanded={a} onClick={() => ac(a ? "" : id)}>
+          <span className="bg-ad"><b>{ad}</b><span>{ne}</span></span>
+          <span className="ay-durum">{durum}{deger && <span className="ay-deger">{deger}</span>}</span>
+        </button>
+        <button type="button" className="bg-ok" aria-label={a ? "Kapat" : "Aç"} onClick={() => ac(a ? "" : id)}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" /></svg></button>
+      </div>
+      {a && <div className="ay-ic">{children}</div>}
+    </div>
+  );
+}
+
+/** Ayar satırı: solda ad + kısa not, sağda değer */
+function Alan({ ad, not, children }: { ad: string; not?: ReactNode; children: ReactNode }) {
+  return <div className="ay-alan"><div className="ay-alan-ad"><b>{ad}</b>{not && <span>{not}</span>}</div><div className="ay-alan-deger">{children}</div></div>;
+}
+function Anahtar({ acik, degis, ad }: { acik: boolean; degis: (x: boolean) => void; ad: string }) {
+  return <input type="checkbox" role="switch" className="ay-anahtar" checked={acik} aria-label={ad} onChange={(e) => degis(e.target.checked)} />;
+}
+function Sayi({ deger, degis, birim, ad }: { deger: number | string; degis: (x: string) => void; birim?: string; ad: string }) {
+  return <span className="ay-sayi"><input type="text" inputMode="numeric" value={String(deger)} aria-label={ad} onChange={(e) => degis(e.target.value.replace(/\D/g, ""))} />{birim && <span>{birim}</span>}</span>;
+}
 
 /** Otomatik taslak (ARCHITECTURE.md, 15 Ekim 2026): en güçlü haberlere taslak + panele taslak haber olarak gönderim. */
 function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
@@ -103,72 +134,40 @@ function OtomatikTaslak({ ayar }: { ayar: AyarYaz }) {
   const [a, setA] = useState<OtoAyar>({ ...OTO_VARSAYILAN, ...kayitli, site: kayitli.site ?? kayitli.wordpress ?? OTO_VARSAYILAN.site });
   const son = (v.ayarlar.oto_son ?? {}) as { zaman?: string; durum?: string; haber?: string; editor?: string; puan?: number; bugun?: number };
   const sinir = { gunluk: [1, 200], esik: [40, 150], bekle_dk: [0, 240], tur_basina: [1, 3], panel_sure_gun: [0, 30] } as const;
-  const sayi = (k: keyof typeof sinir) => (
-    <input type="text" inputMode="numeric" value={String(a[k])} style={{ width: 80 }} aria-label={k}
-      onChange={(e) => setA({ ...a, [k]: Number(e.target.value.replace(/\D/g, "")) || 0 } as OtoAyar)} />
-  );
+  const sayi = (k: keyof typeof sinir, birim: string) => <Sayi ad={k} deger={a[k]} birim={birim} degis={(x) => setA({ ...a, [k]: Number(x) || 0 } as OtoAyar)} />;
   return (
-    <div className="panel">
-      <h3>Otomatik taslak</h3>
-      <div className="muted">Öncelik puanı eşiği geçen haberlere (en yüksek puandan başlayarak) taslak, düğmeye basılmadan hazırlanır ve (atama açıksa) ilgi alanı en uygun editöre verilir; atama kapalıysa ya da eşleşen editör yoksa haber havuzda sahipsiz kalır. Taslak sitenin paneline de <b>incelemede</b> bir haber olarak gider; yayına panelde yayın yönetmeni basar.</div>
-      <label className="row"><input type="checkbox" checked={a.acik} onChange={(e) => setA({ ...a, acik: e.target.checked })} /> Otomatik taslak açık</label>
-      <label className="row"><input type="checkbox" checked={a.ata} onChange={(e) => setA({ ...a, ata: e.target.checked })} /> Taslağı ilgi alanı en uygun editöre ata <span className="muted">(kapalıyken taslak havuzda sahipsiz kalır, kimseye bildirim gitmez)</span></label>
-      <label className="row"><input type="checkbox" checked={a.site} onChange={(e) => setA({ ...a, site: e.target.checked })} /> Hazırlanan taslakları (otomatik ve elle) panele (updated.com.tr) taslak olarak gönder</label>
-      <div className="row">Günde en fazla {sayi("gunluk")} taslak</div>
-      <div className="row">En az {sayi("esik")} puan <span className="muted">(= önem {(a.esik / 10).toLocaleString("tr")}/10 · {YAYIN_ESIK} = Öncelik 2 "yayına değer", {ANA_SAYFA_ESIK} = Öncelik 1 "ana sayfa adayı")</span></div>
-      <div className="row">Haber düştükten {sayi("bekle_dk")} dk sonra <span className="muted">(diğer kaynaklar aynı karta birleşsin diye)</span></div>
-      <div className="row">Her turda (10 dk) en fazla {sayi("tur_basina")} farklı haber <span className="muted">(aynı haberin diğer kartları yazılmaz)</span></div>
-      <div className="row">Panelde {sayi("panel_sure_gun")} gün kimsenin dokunmadığı otomatik taslak panelden kaldırılır <span className="muted">(0 = kapalı; Stüdyo'daki taslak kalır, yeniden gönderilebilir)</span></div>
-      <div className="muted">Bu türler otomatik yazılmaz:</div>
-      <div className="row">
-        {HABER_TURLERI.map((t) => (
-          <label key={t.ad} className="chip"><input type="checkbox" checked={a.haric_turler.includes(t.ad)}
-            onChange={(e) => setA({ ...a, haric_turler: e.target.checked ? [...a.haric_turler, t.ad] : a.haric_turler.filter((x) => x !== t.ad) })} /> {t.ad}</label>
-        ))}
+    <>
+      <div className="ay-alanlar">
+        <Alan ad="Çalışsın" not="Kapalıyken taslak yalnız düğmeyle hazırlanır."><Anahtar ad="Otomatik taslak çalışsın" acik={a.acik} degis={(x) => setA({ ...a, acik: x })} /></Alan>
+        <Alan ad="Editöre ata" not="İlgi alanı en uygun editöre verilir. Kapalıyken taslak sahipsiz kalır, bildirim gitmez."><Anahtar ad="Editöre ata" acik={a.ata} degis={(x) => setA({ ...a, ata: x })} /></Alan>
+        <Alan ad="Panele gönder" not="Hazırlanan her taslak panelde incelemede bir haber olur. Yayına panelde basılır."><Anahtar ad="Panele gönder" acik={a.site} degis={(x) => setA({ ...a, site: x })} /></Alan>
+        <Alan ad="En az puan" not={<>Önem {(a.esik / 10).toLocaleString("tr")}/10. {YAYIN_ESIK} = yayına değer, {ANA_SAYFA_ESIK} = ana sayfa adayı.</>}>{sayi("esik", "puan")}</Alan>
+        <Alan ad="Günlük sınır" not="Bir günde yazılacak en çok taslak.">{sayi("gunluk", "taslak")}</Alan>
+        <Alan ad="Bekleme" not="Haber düştükten sonra beklenir; diğer kaynaklar aynı habere eklensin diye.">{sayi("bekle_dk", "dk")}</Alan>
+        <Alan ad="Tur başına" not="10 dakikada bir tur; aynı haberin diğer kartları yazılmaz.">{sayi("tur_basina", "haber")}</Alan>
+        <Alan ad="Panelden kaldır" not="Kimsenin dokunmadığı otomatik taslak bu süre sonunda panelden çıkar. 0 = kapalı.">{sayi("panel_sure_gun", "gün")}</Alan>
       </div>
-      <div><button className="btn sm" onClick={() => {
-        const temiz = { ...a } as OtoAyar;
-        for (const k of Object.keys(sinir) as (keyof typeof sinir)[]) temiz[k] = Math.max(sinir[k][0], Math.min(sinir[k][1], a[k]));
-        const { wordpress: _eski, ...kayit } = temiz as OtoAyar & { wordpress?: boolean };
-        setA(temiz); ayar("oto_taslak", kayit, "Otomatik taslak ayarları kaydedildi.");
-      }}>Kaydet</button></div>
-      {son.zaman && (
-        <div className="muted">Son çalışma: {zamanOnce(son.zaman)} önce · {son.durum}{son.haber ? ` · "${son.haber}"${son.puan ? ` (${son.puan} puan)` : ""} → ${son.editor || "sahipsiz"}` : ""}{son.bugun !== undefined ? ` · bugün ${son.bugun}/${a.gunluk}` : ""}</div>
-      )}
-    </div>
-  );
-}
-
-/** Site paneli (Payload, panel.updated.com.tr) bağlantısı: anahtar Supabase Secrets'ta (STUDIO_IMPORT_KEY); burada sadece denenir.
- *  WordPress bağlantısı 23 Ekim 2026'da kaldırıldı (ARCHITECTURE.md karar günlüğü). */
-function SitePaneli({ ayar }: { ayar: AyarYaz }) {
-  const { v } = useMasa();
-  const [sonuc, setSonuc] = useState<{ ok: boolean; hata?: string; panel?: string; kategori?: number; yazar?: number; uyari?: string } | null>(null);
-  const [suruyor, setSuruyor] = useState(false);
-  const kategoriler = ((v.ayarlar.site_kategoriler ?? {}) as { liste?: { id: number | string; name: string; slug: string }[] }).liste ?? [];
-  async function dene() {
-    setSuruyor(true);
-    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { site_dene: true } });
-    setSuruyor(false);
-    setSonuc(error ? { ok: false, hata: error.message } : data);
-  }
-  return (
-    <div className="panel">
-      <h3>Site paneli bağlantısı</h3>
-      <div className="muted">Taslaklar updated.com.tr'nin paneline (panel.updated.com.tr) gider. Bağlantı anahtarı burada değil, Supabase'in gizli bilgiler bölümünde durur.</div>
-      <div><button className="btn sm" onClick={dene} disabled={suruyor}>{suruyor ? "Deneniyor…" : "Bağlantıyı dene"}</button></div>
-      {sonuc && (sonuc.ok
-        ? <div className="msg good">Bağlandı: {sonuc.panel} · {sonuc.kategori} kategori okundu · {sonuc.yazar} yazar.{sonuc.uyari ? " " + sonuc.uyari : ""}</div>
-        : <div className="msg err">{sonuc.hata}</div>)}
-      {kategoriler.length > 0 && (
-        <label>Yapay zekâ uygun kategori bulamazsa
-          <select value={String(v.ayarlar.site_varsayilan_kategori ?? "")} onChange={(e) => ayar("site_varsayilan_kategori", e.target.value, "Varsayılan kategori kaydedildi.")}>
-            <option value="">Seçilmedi (taslak gönderilmez, uyarı verir)</option>
-            {kategoriler.map((k) => <option key={k.slug} value={k.slug}>{k.name}</option>)}
-          </select>
-        </label>
-      )}
-    </div>
+      <div className="ay-blok">
+        <b>Otomatik yazılmayan türler</b>
+        <div className="row">
+          {HABER_TURLERI.map((t) => (
+            <label key={t.ad} className={"ay-cip" + (a.haric_turler.includes(t.ad) ? " secili" : "")}><input type="checkbox" checked={a.haric_turler.includes(t.ad)}
+              onChange={(e) => setA({ ...a, haric_turler: e.target.checked ? [...a.haric_turler, t.ad] : a.haric_turler.filter((x) => x !== t.ad) })} />{t.ad}</label>
+          ))}
+        </div>
+      </div>
+      <div className="ay-kaydet">
+        <button className="btn sm" onClick={() => {
+          const temiz = { ...a } as OtoAyar;
+          for (const k of Object.keys(sinir) as (keyof typeof sinir)[]) temiz[k] = Math.max(sinir[k][0], Math.min(sinir[k][1], a[k]));
+          const { wordpress: _eski, ...kayit } = temiz as OtoAyar & { wordpress?: boolean };
+          setA(temiz); ayar("oto_taslak", kayit, "Otomatik taslak ayarları kaydedildi.");
+        }}>Kaydet</button>
+        {son.zaman && (
+          <span className="muted">Son çalışma {zamanOnce(son.zaman)} önce: {son.durum}{son.haber ? ` · "${son.haber}"${son.puan ? ` (${son.puan} puan)` : ""} → ${son.editor || "sahipsiz"}` : ""}{son.bugun !== undefined ? ` · bugün ${son.bugun}/${a.gunluk}` : ""}</span>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -178,26 +177,37 @@ function YazimUslubu({ ayar }: { ayar: AyarYaz }) {
   const kayitli = typeof v.ayarlar.yazim_uslubu === "string" && (v.ayarlar.yazim_uslubu as string).trim() ? (v.ayarlar.yazim_uslubu as string) : "";
   const [metin, setMetin] = useState(kayitli || USLUP_VARSAYILAN);
   return (
-    <div className="panel">
-      <h3>Yazım üslubu</h3>
-      <div className="muted">Taslaklar bu kurallara göre yazılır; ardından metinde yapay zekâ kokan ifade kalırsa bir kez daha "insanlaştırılır". Sitedeki yazılar, Nerdesin Fatih YouTube kanalı ve Instagram gönderilerinden çıkarıldı. Değiştirip kaydedebilirsin; yeni taslaklarda geçerli olur.</div>
+    <>
+      <p className="ay-not">Sitedeki yazılardan, Nerdesin Fatih YouTube kanalından ve Instagram gönderilerinden çıkarıldı. Değişiklik yeni taslaklarda geçerli olur.</p>
       <textarea className="alan" rows={16} value={metin} onChange={(e) => setMetin(e.target.value)} aria-label="Yazım üslubu" />
-      <div className="row">
+      <div className="ay-kaydet">
         <button className="btn sm" onClick={() => ayar("yazim_uslubu", metin.trim() === USLUP_VARSAYILAN.trim() ? "" : metin, "Yazım üslubu kaydedildi.")}>Kaydet</button>
-        <button className="btn ghost sm" onClick={() => { setMetin(USLUP_VARSAYILAN); ayar("yazim_uslubu", "", "Varsayılan üsluba dönüldü."); }}>Varsayılana dön</button>
-        <span className="muted">{kayitli ? "Özelleştirilmiş üslup kullanılıyor." : "Varsayılan üslup kullanılıyor."}</span>
+        {kayitli && <button className="btn ghost sm" onClick={() => { setMetin(USLUP_VARSAYILAN); ayar("yazim_uslubu", "", "Varsayılan üsluba dönüldü."); }}>Varsayılana dön</button>}
       </div>
-    </div>
+    </>
   );
 }
 
 // Görsel model kıyası (3 Kasım 2026, kullanıcı: "birkaç gün birden çok modele ürettirsin, hangisi daha iyi sonuç veriyor bakalım").
 // Fotoğraf bulunamayan taslaklarda (günlük sınır kadarında) bütün bağlı modeller aynı anda üretir; tablo son 30 günü sayar.
-type Aday = { model: string; url?: string; gecti: boolean; puan: number; hata?: string; sure: number };
-function GorselKiyas({ ayar }: { ayar: (k: string, v: unknown, m: string) => Promise<void> }) {
+function KiyasAyari({ ayar }: { ayar: AyarYaz }) {
   const { v } = useMasa();
   const k = { acik: true, gunluk: 3, ...((v.ayarlar.gorsel_kiyas ?? {}) as { acik?: boolean; gunluk?: number }) };
+  const [acik, setAcik] = useState(k.acik);
   const [gunluk, setGunluk] = useState(String(k.gunluk));
+  return (
+    <>
+      <div className="ay-alanlar">
+        <Alan ad="Kıyas" not="Ücretsiz modellerin yanında anahtarı girilmiş GPT Image ve Nano Banana da üretir (ücretli)."><Anahtar ad="Kıyas" acik={acik} degis={setAcik} /></Alan>
+        <Alan ad="Günlük sınır" not="Bu sayının dışındaki taslaklarda yalnız seçili model üretir."><Sayi ad="Günlük sınır" deger={gunluk} degis={setGunluk} birim="taslak" /></Alan>
+      </div>
+      <div className="ay-kaydet"><button className="btn sm" onClick={() => ayar("gorsel_kiyas", { acik, gunluk: Math.max(1, Math.min(50, Number(gunluk) || 3)) }, "Kıyas ayarı kaydedildi.")}>Kaydet</button></div>
+    </>
+  );
+}
+
+type Aday = { model: string; url?: string; gecti: boolean; puan: number; hata?: string; sure: number };
+function GorselTablo() {
   const [satirlar, setSatirlar] = useState<{ image: Record<string, unknown> }[] | null>(null);
   useEffect(() => {
     sb.from("tr_drafts").select("image").eq("image->>yz_kiyas", "true").gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(300)
@@ -214,28 +224,21 @@ function GorselKiyas({ ayar }: { ayar: (k: string, v: unknown, m: string) => Pro
     }
   }
   const sirali = [...tablo.entries()].sort((a, b) => (b[1].editor + b[1].otomatik) - (a[1].editor + a[1].otomatik) || b[1].puan / Math.max(1, b[1].uretildi) - a[1].puan / Math.max(1, a[1].uretildi));
+  if (!satirlar) return <p className="ay-not">Yükleniyor…</p>;
+  if (!sirali.length) return <p className="ay-not">Henüz kıyas yok; fotoğrafı bulunamayan ilk taslakta başlar.</p>;
   return (
-    <div className="panel">
-      <h3>Görsel model kıyası</h3>
-      <div className="muted">Uygun fotoğraf bulunamayan taslaklarda bağlı bütün modeller (Cloudflare FLUX.2 klein ve dev, Lucid Origin; anahtar girilmişse GPT Image ve Nano Banana) aynı anda görsel üretir. Her görsel yedi katmanlı denetimden geçer; en yüksek puanlı kapak olur, editör taslakta başkasını seçebilir. Günlük sınırın dışındaki taslaklarda tek model çalışır.</div>
-      <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <label className="row" style={{ gap: 6 }}><input type="checkbox" checked={k.acik} onChange={(e) => ayar("gorsel_kiyas", { ...k, acik: e.target.checked }, e.target.checked ? "Kıyas açıldı." : "Kıyas kapatıldı.")} /> Kıyas açık</label>
-        <label className="row" style={{ gap: 6 }}>Günde en çok <input type="number" min={1} max={50} value={gunluk} onChange={(e) => setGunluk(e.target.value)} style={{ width: 70 }} /> taslak</label>
-        <button className="btn sm" onClick={() => ayar("gorsel_kiyas", { ...k, gunluk: Math.max(1, Math.min(50, Number(gunluk) || 3)) }, "Günlük sınır kaydedildi.")}>Kaydet</button>
-      </div>
-      <ModelSecimi ayar={ayar} />
-      {!satirlar ? <div className="muted">Yükleniyor…</div> : !sirali.length ? <div className="muted">Henüz kıyas yok; ilk görselsiz taslakta başlar.</div> : (
-        <div className="tbl"><table>
-          <thead><tr><th>Model</th><th>Denendi</th><th>Üretti</th><th>Denetimden geçti</th><th>Ort. puan</th><th>Kapak oldu</th><th>Editör seçti</th><th>Ort. süre</th><th>Tahmini maliyet</th></tr></thead>
-          <tbody>{sirali.map(([m, t]) => (
-            <tr key={m}><td><b>{MODEL_AD[m] ?? m}</b></td><td>{t.denendi}</td><td>{t.uretildi}</td><td>{t.gecti}</td>
-              <td>{t.uretildi ? (t.puan / t.uretildi).toLocaleString("tr", { maximumFractionDigits: 1 }) : "–"}</td><td>{t.otomatik + t.editor}</td><td>{t.editor}</td>
-              <td>{t.uretildi ? Math.round(t.sure / t.uretildi / 1000) + " sn" : "–"}</td><td>{(t.uretildi * (MODEL_UCRET[m] ?? 0)).toLocaleString("tr", { style: "currency", currency: "USD" })}</td></tr>
-          ))}</tbody>
-        </table></div>
-      )}
-      <div className="muted">Cloudflare modelleri günlük ücretsiz payla çalışır; pay biterse o gün "üretilemedi" görünür ve ücret çıkmaz. Maliyet sütunu bu durumda üst sınırdır.</div>
-    </div>
+    <>
+      <div className="tbl"><table>
+        <thead><tr><th>Model</th><th>Üretti</th><th>Denetimden geçti</th><th>Ort. puan</th><th>Kapak oldu</th><th>Ort. süre</th><th>Maliyet</th></tr></thead>
+        <tbody>{sirali.map(([m, t]) => (
+          <tr key={m}><td><b>{MODEL_AD[m] ?? m}</b></td><td>{t.uretildi}/{t.denendi}</td><td>{t.gecti}</td>
+            <td>{t.uretildi ? (t.puan / t.uretildi).toLocaleString("tr", { maximumFractionDigits: 1 }) : "–"}</td>
+            <td>{t.otomatik + t.editor}{t.editor ? <span className="muted"> ({t.editor} editör)</span> : null}</td>
+            <td>{t.uretildi ? Math.round(t.sure / t.uretildi / 1000) + " sn" : "–"}</td><td>{(t.uretildi * (MODEL_UCRET[m] ?? 0)).toLocaleString("tr", { style: "currency", currency: "USD" })}</td></tr>
+        ))}</tbody>
+      </table></div>
+      <p className="ay-not">Puan 10 üzerinden, yedi katmanlı denetimin verdiği. Cloudflare modelleri ücretsiz günlük payla çalışır; maliyet üst sınırdır.</p>
+    </>
   );
 }
 
@@ -256,63 +259,144 @@ function YaziKiyas() {
   }
   const ort = (x: number) => (s.n ? (x / s.n).toLocaleString("tr", { maximumFractionDigits: 1 }) : "–");
   const secilen = s.claude + s.gemini;
+  if (!satirlar) return <p className="ay-not">Yükleniyor…</p>;
+  if (!s.toplam) return <p className="ay-not">Henüz karşılaştırma yok; ilk taslakla başlar.</p>;
   return (
-    <div className="panel">
-      <h3>Yazı karşılaştırması (Claude · Gemini)</h3>
-      <div className="muted">Her taslakta iki model aynı haberi yazar ve kendi denetiminden geçer. Editör hangisinin kimden geldiğini bilmeden seçer. Ana taslak Claude'unki. Son 30 gün.</div>
-      {!satirlar ? <div className="muted">Yükleniyor…</div> : !s.toplam ? <div className="muted">Henüz karşılaştırma yok; ilk taslakla başlar.</div> : (
-        <div className="tbl"><table>
-          <thead><tr><th>Model</th><th>Editör seçti</th><th>Seçim oranı</th><th>Denetimin düzeltmesi (ort.)</th><th>Değişen paragraf (ort.)</th></tr></thead>
-          <tbody>
-            <tr><td><b>Claude</b></td><td>{s.claude}</td><td>{secilen ? Math.round((s.claude / secilen) * 100) + "%" : "–"}</td><td>{ort(s.cDuz)}</td><td>{ort(s.cPar)}</td></tr>
-            <tr><td><b>Gemini</b></td><td>{s.gemini}</td><td>{secilen ? Math.round((s.gemini / secilen) * 100) + "%" : "–"}</td><td>{ort(s.gDuz)}</td><td>{ort(s.gPar)}</td></tr>
-          </tbody>
-        </table></div>
-      )}
-      {!!s.toplam && <div className="muted">{s.toplam} karşılaştırma · {s.bekliyor} seçim bekliyor. Düzeltme sayısı az olan, denetime daha temiz metin teslim etmiş demektir.</div>}
-    </div>
+    <>
+      <div className="tbl"><table>
+        <thead><tr><th>Model</th><th>Editör seçti</th><th>Seçim oranı</th><th>Düzeltme (ort.)</th><th>Değişen paragraf (ort.)</th></tr></thead>
+        <tbody>
+          <tr><td><b>Claude</b></td><td>{s.claude}</td><td>{secilen ? Math.round((s.claude / secilen) * 100) + "%" : "–"}</td><td>{ort(s.cDuz)}</td><td>{ort(s.cPar)}</td></tr>
+          <tr><td><b>Gemini</b></td><td>{s.gemini}</td><td>{secilen ? Math.round((s.gemini / secilen) * 100) + "%" : "–"}</td><td>{ort(s.gDuz)}</td><td>{ort(s.gPar)}</td></tr>
+        </tbody>
+      </table></div>
+      <p className="ay-not">{s.toplam} karşılaştırma, {s.bekliyor} tanesi seçim bekliyor. Editör hangisinin kimden geldiğini bilmeden seçer; ana taslak Claude'unki. Düzeltmesi az olan, denetime daha temiz metin teslim etmiştir.</p>
+    </>
   );
 }
 
-// Görsel modeli seçimi (4 Kasım 2026, kullanıcı: "model seçilebilir olsun; gücü, yeniliği ve tahmini ücreti belirtsin"). Liste sağlayıcıdan
-// gelir (hesabın erişebildiği modeller); seçim yoksa sistem en yeni standart modeli kullanır. Ücretler yaklaşık, görsel başına.
-type ModelBilgi = { saglayici: "gpt" | "banana"; id: string; guc: string; ucret: string; tarih?: string; enYeni?: boolean };
-function ModelSecimi({ ayar }: { ayar: (k: string, v: unknown, m: string) => Promise<void> }) {
+function Gurultu({ ayar }: { ayar: AyarYaz }) {
   const { v } = useMasa();
-  const kayit = (v.ayarlar.gorsel_modeller ?? {}) as { gpt?: string; gpt_kalite?: string; banana?: string };
-  const [liste, setListe] = useState<ModelBilgi[] | null>(null);
-  const [hata, setHata] = useState("");
-  const [mesgul, setMesgul] = useState(false);
-  const [sec, setSec] = useState(kayit);
-  async function getir() {
-    setMesgul(true); setHata("");
-    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { gorsel_modeller: true } });
-    setMesgul(false);
-    const r = data as { modeller?: ModelBilgi[]; hata?: string[] | string } | null;
-    if (error || !r?.modeller) { setHata(error?.message ?? String(r?.hata ?? "Liste alınamadı")); return; }
-    setListe(r.modeller); if (Array.isArray(r.hata) && r.hata.length) setHata(r.hata.join(" · "));
-  }
-  const etiket = (m: ModelBilgi) => `${m.id} · ${m.guc}${m.enYeni ? " · en yeni" : ""}${m.tarih ? ` · ${m.tarih}` : ""} · ${m.ucret}`;
-  const grup = (sg: "gpt" | "banana") => (liste ?? []).filter((m) => m.saglayici === sg);
+  const [kelimeler, setKelimeler] = useState(((v.ayarlar.gurultu_kelimeleri as string[]) ?? []).join("\n"));
   return (
-    <div className="panel" style={{ background: "var(--sunk)", gap: 10 }}>
-      <b>Model seçimi</b>
-      <div className="muted">Şu an: GPT Image {kayit.gpt ?? "en yeni standart (kendiliğinden)"} · kalite {kayit.gpt_kalite === "high" ? "yüksek" : kayit.gpt_kalite === "low" ? "düşük" : "orta"} · Nano Banana {kayit.banana ?? "en yeni standart (kendiliğinden)"}. Ücretler görsel başına, yaklaşık.</div>
-      {!liste ? <button className="btn ghost sm" disabled={mesgul} onClick={getir} style={{ alignSelf: "flex-start" }}>{mesgul ? "Modeller alınıyor…" : "Modelleri listele"}</button> : <>
-        <label>GPT Image modeli<select value={sec.gpt ?? ""} onChange={(e) => setSec({ ...sec, gpt: e.target.value || undefined })}>
-          <option value="">Kendiliğinden: en yeni standart</option>
-          {grup("gpt").map((m) => <option key={m.id} value={m.id}>{etiket(m)}</option>)}
-        </select></label>
-        <label>GPT Image kalitesi<select value={sec.gpt_kalite ?? "medium"} onChange={(e) => setSec({ ...sec, gpt_kalite: e.target.value })}>
-          <option value="low">Düşük · en ucuz</option><option value="medium">Orta · önerilen</option><option value="high">Yüksek · yaklaşık 3 kat pahalı</option>
-        </select></label>
-        <label>Nano Banana modeli<select value={sec.banana ?? ""} onChange={(e) => setSec({ ...sec, banana: e.target.value || undefined })}>
-          <option value="">Kendiliğinden: en yeni standart</option>
-          {grup("banana").map((m) => <option key={m.id} value={m.id}>{etiket(m)}</option>)}
-        </select></label>
-        <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => ayar("gorsel_modeller", Object.fromEntries(Object.entries(sec).filter(([, x]) => x)), "Görsel modeli seçimi kaydedildi.")}>Kaydet</button>
-      </>}
-      {hata && <div className="msg err">{hata}</div>}
-    </div>
+    <>
+      <p className="ay-not">Her satıra bir kelime. Bu haberler yapay zekâya hiç gitmez.</p>
+      <textarea className="alan" rows={8} value={kelimeler} onChange={(e) => setKelimeler(e.target.value)} aria-label="Gürültü kelimeleri" />
+      <div className="ay-kaydet"><button className="btn sm" onClick={() => ayar("gurultu_kelimeleri", kelimeler.split("\n").map((s) => s.trim().toLowerCase()).filter(Boolean), "Gürültü kelimeleri kaydedildi.")}>Kaydet</button></div>
+    </>
+  );
+}
+
+const MARKA_GRUP: [string, string][] = [["Öncelikli", "Öne çıkar"], ["Normal", "Etkisiz"], ["Hariç", "Türkiye'de satılmıyor, geride kalır"]];
+function Markalar() {
+  const { v } = useMasa();
+  const toast = useToast();
+  async function ekle(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const r = await sb.from("tr_brands").upsert({ name: String(f.get("ad")).trim(), grp: String(f.get("grup")), note: String(f.get("not")).trim() });
+    if (r.error) return toast(hataMetni(r.error));
+    e.currentTarget.reset();
+  }
+  return (
+    <>
+      <div className="ay-alanlar">
+        {MARKA_GRUP.map(([g, not]) => {
+          const l = v.markalar.filter((m) => m.grp === g);
+          return (
+            <Alan key={g} ad={g} not={not}>
+              <span className="ay-markalar">{l.length ? l.map((m) => (
+                <span key={m.name} className="ay-cip" title={m.note || undefined}>{m.name}
+                  <button className="ay-sil" aria-label={m.name + " sil"} onClick={async () => { const r = await sb.from("tr_brands").delete().eq("name", m.name); if (r.error) toast(hataMetni(r.error)); }}>×</button>
+                </span>
+              )) : <span className="muted">Yok</span>}</span>
+            </Alan>
+          );
+        })}
+      </div>
+      <form className="ay-form" onSubmit={ekle}>
+        <label>Marka<input name="ad" type="text" required maxLength={40} /></label>
+        <label>Grup<select name="grup">{MARKA_GRUP.map(([g]) => <option key={g}>{g}</option>)}</select></label>
+        <label>Not<input name="not" type="text" maxLength={60} /></label>
+        <button className="btn">Ekle</button>
+      </form>
+    </>
+  );
+}
+
+function Basin() {
+  const { v } = useMasa();
+  const toast = useToast();
+  async function ekle(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const r = await sb.from("tr_press").insert({ brand: String(f.get("marka")).trim(), url: String(f.get("url")).trim(), note: String(f.get("not")).trim() });
+    if (r.error) return toast(hataMetni(r.error));
+    e.currentTarget.reset();
+  }
+  return (
+    <>
+      {v.basin.length ? (
+        <div className="ay-alanlar">
+          {v.basin.map((b) => (
+            <Alan key={b.id} ad={b.brand} not={<><a href={b.url} target="_blank" rel="noreferrer">{b.url.replace(/^https?:\/\/(www\.)?/, "")}</a>{b.note ? ` · ${b.note}` : ""}</>}>
+              <button className="btn ghost sm" onClick={async () => { const r = await sb.from("tr_press").delete().eq("id", b.id); if (r.error) toast(hataMetni(r.error)); }}>Sil</button>
+            </Alan>
+          ))}
+        </div>
+      ) : <p className="ay-not">Henüz basın sayfası yok.</p>}
+      <form className="ay-form" onSubmit={ekle}>
+        <label>Marka<input name="marka" type="text" required maxLength={40} /></label>
+        <label>Basın sayfası<input name="url" type="text" required placeholder="https://" /></label>
+        <label>Not<input name="not" type="text" maxLength={80} /></label>
+        <button className="btn">Ekle</button>
+      </form>
+    </>
+  );
+}
+
+function Saklama({ ayar }: { ayar: AyarYaz }) {
+  const { v } = useMasa();
+  const [gun, setGun] = useState(String(v.ayarlar.saklama_gun ?? 3));
+  return (
+    <>
+      <div className="ay-alanlar">
+        <Alan ad="Saklama süresi" not="Alınmamış, oylanmamış, pas geçilmemiş haberler silinir. İşlem görenler kalır. 1–60 gün."><Sayi ad="Gün" deger={gun} degis={setGun} birim="gün" /></Alan>
+      </div>
+      <div className="ay-kaydet"><button className="btn sm" onClick={() => ayar("saklama_gun", Math.max(1, Math.min(60, Number(gun) || 3)), "Saklama süresi kaydedildi.")}>Kaydet</button></div>
+    </>
+  );
+}
+
+/** Site paneli (Payload, panel.updated.com.tr) bağlantısı: anahtar Supabase Secrets'ta (STUDIO_IMPORT_KEY); burada sadece denenir.
+ *  WordPress bağlantısı 23 Ekim 2026'da kaldırıldı (ARCHITECTURE.md karar günlüğü). */
+function SitePaneli({ ayar }: { ayar: AyarYaz }) {
+  const { v } = useMasa();
+  const [sonuc, setSonuc] = useState<{ ok: boolean; hata?: string; panel?: string; kategori?: number; yazar?: number; uyari?: string } | null>(null);
+  const [suruyor, setSuruyor] = useState(false);
+  const kategoriler = ((v.ayarlar.site_kategoriler ?? {}) as { liste?: { id: number | string; name: string; slug: string }[] }).liste ?? [];
+  async function dene() {
+    setSuruyor(true);
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { site_dene: true } });
+    setSuruyor(false);
+    setSonuc(error ? { ok: false, hata: error.message } : data);
+  }
+  return (
+    <>
+      <div className="ay-alanlar">
+        <Alan ad="Bağlantı" not="Anahtar sunucuda durur; burada yalnız denenir."><button className="btn ghost sm" onClick={dene} disabled={suruyor}>{suruyor ? "Deneniyor…" : "Dene"}</button></Alan>
+        {kategoriler.length > 0 && (
+          <Alan ad="Yedek kategori" not="Yapay zekâ uygun kategori bulamazsa. Seçilmezse taslak gönderilmez, uyarı verir.">
+            <select value={String(v.ayarlar.site_varsayilan_kategori ?? "")} aria-label="Yedek kategori" onChange={(e) => ayar("site_varsayilan_kategori", e.target.value, "Yedek kategori kaydedildi.")}>
+              <option value="">Seçilmedi</option>
+              {kategoriler.map((k) => <option key={k.slug} value={k.slug}>{k.name}</option>)}
+            </select>
+          </Alan>
+        )}
+      </div>
+      {sonuc && (sonuc.ok
+        ? <div className="msg good">Bağlandı: {sonuc.panel} · {sonuc.kategori} kategori · {sonuc.yazar} yazar.{sonuc.uyari ? " " + sonuc.uyari : ""}</div>
+        : <div className="msg err">{sonuc.hata}</div>)}
+    </>
   );
 }

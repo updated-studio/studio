@@ -12,6 +12,7 @@ import { useMasa, type Taslak } from "./veri";
 // Markdown → HTML ortak dosyada: ekrandaki önizleme ve "HTML kopyala" aynı çıktıyı kullanır (panele Markdown gider).
 import { yaziHtml } from "../../../supabase/functions/triyaj-taslak/html.ts";
 import { MODEL_AD } from "./gorselModel";
+import ModelSecici from "./ModelSecici";
 
 /** Yapay zekâ bazen liste öğesini metin yerine nesne döndürür ({iddia, kaynak} gibi): ekran çökmesin diye metne çevrilir */
 const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof x === "object" ? Object.values(x as Record<string, unknown>).map((v) => metinYap(v)).filter(Boolean).join(" — ") : String(x ?? "");
@@ -39,13 +40,11 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   }
   // Görseli beğenmeyen editör için (4 Kasım 2026): fotoğrafları yeniden tara, ücretsiz modellerle yeniden üret; ücretli modeller (GPT Image,
   // Nano Banana) yalnız yöneticide ve onaylı. Adaylar aşağıda yan yana, "Bunu kullan" ile kapak olur.
-  const { profile } = useAuth();
   const [is_, setIs] = useState("");
-  const [ucretliOnay, setUcretliOnay] = useState(false);
   async function cagir(ad: string, govde: Record<string, unknown>, basari: (r: Record<string, unknown>) => string) {
     setIs(ad);
     const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: govde });
-    setIs(""); setUcretliOnay(false);
+    setIs("");
     const r = (data ?? {}) as Record<string, unknown>;
     toast((r.hata as string) ?? (error ? error.message : basari(r)));
   }
@@ -71,13 +70,14 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   </> : null;
   const fotolar = g.gorsel_adaylar ?? [];
   const adaylar = g.yz_adaylar ?? [];
-  const islemler = <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-    <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("tara", { gorsel_tara: t.id }, (r) => `Tarandı: ${r.aday ?? 0} fotoğraf adayı.`)}>{is_ === "tara" ? "Taranıyor…" : "Fotoğrafları yeniden tara"}</button>
-    <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("uret", { gorsel_uret: t.id, yeniden: true }, (r) => `Üretildi: ${r.toplam ?? 0} görselden ${r.gecen ?? 0}'i denetimden geçti.`)}>{is_ === "uret" ? "Üretiliyor…" : "Yapay zekâ ile yeniden üret (ücretsiz)"}</button>
-    {profile?.is_admin && (ucretliOnay
-      ? <><span className="muted">GPT Image ve Nano Banana da çalışır; görsel başına yaklaşık 4 sent.</span><button className="btn sm" disabled={!!is_} onClick={() => cagir("ucretli", { gorsel_uret: t.id, yeniden: true, ucretli: true }, (r) => `Üretildi: ${r.toplam ?? 0} görselden ${r.gecen ?? 0}'i denetimden geçti.`)}>{is_ === "ucretli" ? "Üretiliyor…" : "Onayla, üret"}</button><button className="btn ghost sm" onClick={() => setUcretliOnay(false)}>Vazgeç</button></>
-      : <button className="btn ghost sm" disabled={!!is_} onClick={() => setUcretliOnay(true)}>Tüm modellerle üret (ücretli)</button>)}
-  </div>;
+  const [seciciAcik, setSeciciAcik] = useState(false);
+  const islemler = <>
+    <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+      <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("tara", { gorsel_tara: t.id }, (r) => `Tarandı: ${r.aday ?? 0} fotoğraf adayı.`)}>{is_ === "tara" ? "Taranıyor…" : "Fotoğrafları yeniden tara"}</button>
+      <button className="btn ghost sm" aria-expanded={seciciAcik} onClick={() => setSeciciAcik((x) => !x)}>{seciciAcik ? "Model seçiciyi kapat" : "Yapay zekâ ile üret: model seç"}</button>
+    </div>
+    {seciciAcik && <ModelSecici mod="uret" mesgul={is_ === "uret"} uret={(sec) => cagir("uret", { gorsel_uret: t.id, yeniden: true, secim: sec }, (r) => `Üretildi: ${r.toplam ?? 0} görselden ${r.gecen ?? 0}'i denetimden geçti.`)} />}
+  </>;
   const fotoSatir = fotolar.length > 0 && <>
     <b>Fotoğraf adayları</b>
     <div className="yz-adaylar">

@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-04-g",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Ayarlar yenilendi, model seçimi taslakta",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Ayarlar gruplara ayrıldı; her satır kapalıyken kayıtlı değeri gösterir, tıklayınca açılır.",
+          "Görsel modeli taslağın Görsel bölümünden seçilir; Ayarlar'da yalnız otomatik üretimin modeli durur.",
+          "Model adları, açıklamaları ve fiyatları OpenAI ile Google'ın kendi sayfalarından."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-f",
     "tarih": "4 Kasım 2026",
     "baslik": "Görsel modeli seçimi",

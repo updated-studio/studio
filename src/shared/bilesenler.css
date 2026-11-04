@@ -258,3 +258,21 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .canli-satir > span { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
 .canli-satir .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .canli-rozet { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ok); background: var(--ok-soft); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+/* Görsel modeli seçici (haber-masasi/ModelSecici.tsx, 4 Kasım 2026) */
+.ms { display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--surface); }
+.ms.gomulu { border: 0; padding: 0; background: none; }
+.ms section { display: flex; flex-direction: column; gap: 4px; }
+.ms h4 { margin: 0 0 4px; font-size: 14px; }
+.ms h4 .muted { font-weight: 400; font-size: 12px; }
+.ms-satir { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-weight: 400; }
+.ms-satir:hover { background: var(--sunk); }
+.ms-satir.secili { background: var(--blue-soft); }
+.ms-satir.kapali { opacity: .55; cursor: default; }
+.ms-ad { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font-size: 14px; }
+.ms-ad .muted { flex-basis: 100%; font-size: 12px; }
+.ms-ad .pill { font-size: 11px; padding: 1px 7px; }
+.ms-fiyat { font-size: 12px; color: var(--muted); text-align: right; max-width: 220px; }
+.ms-kalite { display: flex; flex-direction: row; justify-content: flex-start; align-self: flex-start; align-items: center; gap: 8px; font-size: 13px; padding: 4px 10px; }
+.ms-kalite select { width: auto; padding: 5px 8px; font-size: 13px; }
+.ms-kaynak { font-size: 12px; }
+@media (max-width: 560px) { .ms-satir { grid-template-columns: 20px minmax(0, 1fr); } .ms-fiyat { grid-column: 2; text-align: left; max-width: none; } }

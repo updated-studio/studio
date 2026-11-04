@@ -43,52 +43,52 @@ async function cloudflare(sb: Sb, model: string, istem: string, ms: number): Pro
 }
 
 // Hesaptaki en yeni model adı (bir kez bakılır): sürüm adlarını tahmin etmek yerine sağlayıcının listesinden seçilir
-const surumOnbellek: Record<string, string> = {};
-const surumSirala = (a: string, b: string) => b.localeCompare(a, "en", { numeric: true });
+/** Model kataloğu: firmaların KENDİ adları, açıklamaları ve resmî fiyatları (4 Kasım 2026, kullanıcı: "verileri doğrudan firmalardan çek").
+ *  Kaynak: OpenAI görsel üretim rehberi fiyat tablosu (developers.openai.com/api/docs/guides/image-generation) ve Google AI Studio fiyat
+ *  sayfası (aistudio.google.com/docs/pricing). Fiyatlar görsel başına, bizim boyutumuzda (OpenAI 1536×1024; Google 16:9, 1K). API model listesi
+ *  fiyat vermiyor; firma fiyat değiştirirse bu tablo güncellenir. "Jeton fiyatından" yazanlar için OpenAI görsel başı fiyat yayımlamıyor; çıktı jetonu fiyatı ($30/1M) GPT Image 2 ile aynı, o yüzden onun orta kalitesi yazıldı. */
+export type KatalogModel = { saglayici: "gpt" | "banana"; id: string; ad: string; aciklama: string; fiyat: string; varsayilan?: boolean; kapaniyor?: string };
+export const MODEL_KATALOG: KatalogModel[] = [
+  { saglayici: "gpt", id: "gpt-image-2.5-flare", ad: "GPT Image 2.5 Flare", aciklama: "OpenAI: \"hızlı, yüksek kaliteli günlük görsel üretimi\"", fiyat: "≈ $0,041 (orta) · jeton fiyatından", varsayilan: true },
+  { saglayici: "gpt", id: "gpt-image-2.5-sunburst", ad: "GPT Image 2.5 Sunburst", aciklama: "OpenAI: \"düzenleme hassasiyetinin en önemli olduğu işler\"", fiyat: "≈ $0,041 (orta) · jeton fiyatından" },
+  { saglayici: "gpt", id: "gpt-image-2", ad: "GPT Image 2", aciklama: "OpenAI'ın önceki nesil görsel modeli", fiyat: "düşük $0,005 · orta $0,041 · yüksek $0,165" },
+  { saglayici: "gpt", id: "gpt-image-1.5", ad: "GPT Image 1.5", aciklama: "OpenAI'ın eski görsel modeli", fiyat: "düşük $0,013 · orta $0,05 · yüksek $0,20" },
+  { saglayici: "gpt", id: "gpt-image-1-mini", ad: "GPT Image 1 Mini", aciklama: "OpenAI'ın küçük, ucuz görsel modeli", fiyat: "düşük $0,006 · orta $0,015 · yüksek $0,052" },
+  { saglayici: "banana", id: "gemini-nano-banana-2.1", ad: "Nano Banana 2.1", aciklama: "Google'ın en yeni görsel modeli", fiyat: "$0,0336 (1K) · $0,0504 (2K)", varsayilan: true },
+  { saglayici: "banana", id: "gemini-3.1-flash-image", ad: "Nano Banana 2 (Gemini 3.1 Flash Image)", aciklama: "Google'ın önceki nesil hızlı görsel modeli", fiyat: "$0,067 (1K) · $0,101 (2K)" },
+  { saglayici: "banana", id: "gemini-3.1-flash-lite-image", ad: "Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)", aciklama: "Google'ın hafif, ucuz görsel modeli; eski Nano Banana'nın önerilen yerine geçeni", fiyat: "$0,0336 (1K)" },
+  { saglayici: "banana", id: "gemini-3-pro-image", ad: "Nano Banana Pro (Gemini 3 Pro Image)", aciklama: "Google'ın en güçlü görsel modeli", fiyat: "$0,134 (1K/2K) · $0,24 (4K)" },
+  { saglayici: "banana", id: "gemini-2.5-flash-image", ad: "Nano Banana (Gemini 2.5 Flash Image)", aciklama: "Google'ın ilk Nano Banana'sı", fiyat: "$0,039", kapaniyor: "15 Mart 2027'de kapanıyor" },
+];
 
-/** Yöneticinin seçtiği model ve kalite (Haber Masası → Ayarlar → Görsel model kıyası; tr_settings.gorsel_modeller). Boşsa en yeni standart. */
-async function secim(sb: Sb): Promise<{ gpt?: string; gpt_kalite?: "medium" | "high" | "low"; banana?: string }> {
+/** Yöneticinin seçtiği varsayılan model ve kalite (Haber Masası → Ayarlar; tr_settings.gorsel_modeller). Boşsa katalogdaki varsayılan. */
+type Secim = { gpt?: string; gpt_kalite?: "medium" | "high" | "low"; banana?: string };
+async function secim(sb: Sb): Promise<Secim> {
   const { data } = await sb.from("tr_settings").select("value").eq("key", "gorsel_modeller").maybeSingle();
-  return (data?.value ?? {}) as { gpt?: string; gpt_kalite?: "medium" | "high" | "low"; banana?: string };
+  return (data?.value ?? {}) as Secim;
 }
+const varsayilan = (sg: "gpt" | "banana") => MODEL_KATALOG.find((m) => m.saglayici === sg && m.varsayilan)!.id;
 
-async function openai(sb: Sb, istem: string, ms: number): Promise<Uretilen> {
+async function openai(sb: Sb, istem: string, ms: number, surum?: string, kalite?: string): Promise<Uretilen> {
   const { openai: key } = await anahtarlar(sb, ["openai"]);
-  const h = { Authorization: "Bearer " + key, "Content-Type": "application/json" };
   const sc = await secim(sb);
-  if (sc.gpt) surumOnbellek.gpt = sc.gpt;
-  else if (!surumOnbellek.gpt) {
-    const l = await fetch("https://api.openai.com/v1/models", { headers: h, signal: AbortSignal.timeout(10_000) });
-    if (!l.ok) throw new Error("OpenAI: " + (await l.text()).slice(0, 120));
-    const ids = ((await l.json()).data as { id: string }[]).map((x) => x.id).filter((x) => /^gpt-image/.test(x) && !/mini/.test(x)).sort(surumSirala);
-    if (!ids.length) throw new Error("OpenAI hesabında gpt-image modeli yok");
-    surumOnbellek.gpt = ids[0];
-  }
+  const model = surum || sc.gpt || varsayilan("gpt");
   const r = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST", headers: h, signal: AbortSignal.timeout(ms),
-    body: JSON.stringify({ model: surumOnbellek.gpt, prompt: istem, size: "1536x1024", quality: sc.gpt_kalite ?? "medium", n: 1 }),
+    method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" }, signal: AbortSignal.timeout(ms),
+    body: JSON.stringify({ model, prompt: istem, size: "1536x1024", quality: kalite || sc.gpt_kalite || "medium", n: 1 }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error("OpenAI: " + String(j?.error?.message ?? r.status).slice(0, 140));
   const d = j?.data?.[0]?.b64_json;
   if (!d) throw new Error("OpenAI görsel döndürmedi");
-  return { b64: d, mime: "image/png", model: "gpt", surum: surumOnbellek.gpt };
+  return { b64: d, mime: "image/png", model: "gpt", surum: model };
 }
 
-async function nanoBanana(sb: Sb, istem: string, ms: number): Promise<Uretilen> {
+async function nanoBanana(sb: Sb, istem: string, ms: number, surum?: string): Promise<Uretilen> {
   const { gemini_gorsel: key } = await anahtarlar(sb, ["gemini_gorsel"]);
-  const kok = "https://generativelanguage.googleapis.com/v1beta";
   const sc = await secim(sb);
-  if (sc.banana) surumOnbellek.banana = sc.banana;
-  else if (!surumOnbellek.banana) {
-    const l = await fetch(`${kok}/models?pageSize=200&key=${key}`, { signal: AbortSignal.timeout(10_000) });
-    if (!l.ok) throw new Error("Google: " + (await l.text()).slice(0, 120));
-    const ad = ((await l.json()).models as { name: string; supportedGenerationMethods?: string[] }[])
-      .filter((x) => /flash-image/.test(x.name) && (x.supportedGenerationMethods ?? []).includes("generateContent")).map((x) => x.name.replace(/^models\//, "")).sort(surumSirala);
-    if (!ad.length) throw new Error("Google hesabında flash-image modeli yok");
-    surumOnbellek.banana = ad[0];
-  }
-  const r = await fetch(`${kok}/models/${surumOnbellek.banana}:generateContent?key=${key}`, {
+  const model = surum || sc.banana || varsayilan("banana");
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(ms),
     body: JSON.stringify({ contents: [{ parts: [{ text: istem }] }], generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "16:9" } } }),
   });
@@ -96,40 +96,28 @@ async function nanoBanana(sb: Sb, istem: string, ms: number): Promise<Uretilen> 
   if (!r.ok) throw new Error("Google: " + String(j?.error?.message ?? r.status).slice(0, 140));
   const p = (j?.candidates?.[0]?.content?.parts ?? []).find((x: { inlineData?: { data?: string } }) => x.inlineData?.data);
   if (!p) throw new Error("Nano Banana görsel döndürmedi");
-  return { b64: p.inlineData.data, mime: p.inlineData.mimeType || "image/png", model: "banana", surum: surumOnbellek.banana };
+  return { b64: p.inlineData.data, mime: p.inlineData.mimeType || "image/png", model: "banana", surum: model };
 }
 
-export function uret(sb: Sb, model: UretimModeli, istem: string, ms: number): Promise<Uretilen> {
-  if (model === "gpt") return openai(sb, istem, ms);
-  if (model === "banana") return nanoBanana(sb, istem, ms);
+/** surum: belirli bir model (taslaktaki seçiciden); kalite: GPT için düşük/orta/yüksek */
+export function uret(sb: Sb, model: UretimModeli, istem: string, ms: number, surum?: string, kalite?: string): Promise<Uretilen> {
+  if (model === "gpt") return openai(sb, istem, ms, surum, kalite);
+  if (model === "banana") return nanoBanana(sb, istem, ms, surum);
   return cloudflare(sb, model, istem, ms);
 }
 
-/** Seçilebilir modeller (yönetici ekranı): sağlayıcının listesinden, gücü, yeniliği ve görsel başına tahmini ücretiyle.
- *  Ücretler yaklaşık (Kasım 2026 fiyat sayfaları); sağlayıcı fiyat değiştirirse burası güncellenir. */
-export type ModelBilgi = { saglayici: "gpt" | "banana"; id: string; guc: string; ucret: string; tarih?: string; enYeni?: boolean };
-export async function modelListesi(sb: Sb): Promise<{ modeller: ModelBilgi[]; hata: string[] }> {
+/** Seçici için: katalogdaki modellerden hesabımızın gerçekten erişebildikleri (firmanın model listesinden doğrulanır) */
+export type ModelBilgi = KatalogModel & { erisim: boolean };
+export async function modelListesi(sb: Sb): Promise<{ modeller: ModelBilgi[]; secim: Secim; hata: string[] }> {
   const m = await anahtarlar(sb, ["openai", "gemini_gorsel"]);
-  const out: ModelBilgi[] = [], hata: string[] = [];
-  if (m.openai) {
-    try {
-      const r = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: "Bearer " + m.openai }, signal: AbortSignal.timeout(10_000) });
-      const l = ((await r.json()).data ?? []) as { id: string; created: number }[];
-      const gi = l.filter((x) => /^gpt-image/.test(x.id)).sort((a, b) => surumSirala(a.id, b.id));
-      gi.forEach((x, i) => out.push({ saglayici: "gpt", id: x.id, enYeni: i === 0 && !/mini/.test(x.id),
-        guc: /mini/.test(x.id) ? "Ekonomik (daha düşük kalite)" : "Standart", ucret: /mini/.test(x.id) ? "~1 sent (orta), ~4 sent (yüksek)" : "~4 sent (orta), ~13 sent (yüksek)",
-        tarih: x.created ? new Date(x.created * 1000).toISOString().slice(0, 10) : undefined }));
-    } catch (e) { hata.push("OpenAI: " + String((e as Error).message).slice(0, 80)); }
-  }
-  if (m.gemini_gorsel) {
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${m.gemini_gorsel}`, { signal: AbortSignal.timeout(10_000) });
-      const l = ((await r.json()).models ?? []) as { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
-      const gi = l.filter((x) => /image/.test(x.name) && !/imagen/.test(x.name) && (x.supportedGenerationMethods ?? []).includes("generateContent")).map((x) => x.name.replace(/^models\//, "")).sort(surumSirala);
-      const ilkFlash = gi.find((x) => /flash-image/.test(x));
-      gi.forEach((id) => out.push({ saglayici: "banana", id, enYeni: id === ilkFlash || id === gi.find((x) => /pro-image/.test(x)),
-        guc: /pro-image/.test(id) ? "En güçlü (Pro)" : /flash-image/.test(id) ? "Standart (hızlı)" : "Diğer", ucret: /pro-image/.test(id) ? "~13 sent (2K), ~24 sent (4K)" : "~4 sent" }));
-    } catch (e) { hata.push("Google: " + String((e as Error).message).slice(0, 80)); }
-  }
-  return { modeller: out, hata };
+  const var_ = new Set<string>(), hata: string[] = [];
+  if (m.openai) try {
+    const r = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: "Bearer " + m.openai }, signal: AbortSignal.timeout(10_000) });
+    ((await r.json()).data ?? []).forEach((x: { id: string }) => var_.add(x.id));
+  } catch (e) { hata.push("OpenAI listesi alınamadı: " + String((e as Error).message).slice(0, 60)); }
+  if (m.gemini_gorsel) try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=300&key=${m.gemini_gorsel}`, { signal: AbortSignal.timeout(10_000) });
+    ((await r.json()).models ?? []).forEach((x: { name: string }) => var_.add(x.name.replace(/^models\//, "")));
+  } catch (e) { hata.push("Google listesi alınamadı: " + String((e as Error).message).slice(0, 60)); }
+  return { modeller: MODEL_KATALOG.map((k) => ({ ...k, erisim: var_.has(k.id) })), secim: await secim(sb), hata };
 }

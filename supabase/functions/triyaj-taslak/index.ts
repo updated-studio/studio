@@ -714,14 +714,15 @@ async function yukle(sb: Sb, id: number, g: Uretilen): Promise<string> {
 
 const adayGorsel = (a: YzAday, istem: string): GorselAday => ({ kaynak: "Yapay zekâ (Flux)", sayfa: a.url!, buyuk: a.url!, thumb: a.url!, yazar: `Updated (yapay zekâ, ${MODEL_AD[a.model] ?? a.model})`, lisans: "Yapay zekâ üretimi", aciklama: istem, w: 1600, h: 900, ...(a.odak ? { odak: a.odak } : {}) });
 
-async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: string; urun: string; istem: string }, bitis: number, kiyasla: boolean, izinli?: string[]): Promise<{ secilen: GorselAday | null; neden: string; adaylar: YzAday[]; model?: string }> {
+async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: string; urun: string; istem: string }, bitis: number, kiyasla: boolean, izinli?: string[], surumler?: { gpt?: string; banana?: string; kalite?: string }): Promise<{ secilen: GorselAday | null; neden: string; adaylar: YzAday[]; model?: string }> {
   const modeller = (await kullanilabilir(sb)).filter((m) => !izinli || izinli.includes(m));
   if (!modeller.length) return { secilen: null, neden: "Görsel üretecek servis bağlı değil (Bağlantı anahtarları → Cloudflare).", adaylar: [] };
   const istem = fluxIstem(o.istem);
   const tek = async (model: UretimModeli | "", ist: string): Promise<YzAday> => {
     const t0 = Date.now();
     try {
-      const g = await uret(sb, (model || "klein") as UretimModeli, ist, Math.max(10_000, Math.min(60_000, bitis - Date.now() - 40_000)));
+      const m = (model || "klein") as UretimModeli;
+      const g = await uret(sb, m, ist, Math.max(10_000, Math.min(60_000, bitis - Date.now() - 40_000)), m === "gpt" ? surumler?.gpt : m === "banana" ? surumler?.banana : undefined, surumler?.kalite);
       const d = await denetle(o, g, bitis);
       return { model: g.model, surum: g.surum, ...d, url: d.gecti ? await yukle(sb, id, g) : undefined, sure: Date.now() - t0 };
     } catch (e) { return { model: model || "klein", gecti: false, puan: 0, neden: "", hata: String((e as Error).message ?? e).slice(0, 160), sure: Date.now() - t0 }; }
@@ -755,14 +756,17 @@ const UCRETLI_MODEL = ["gpt", "banana"];
 const UCRETSIZ_MODEL = ["klein", "dev", "lucid"];
 
 /** Editör görseli beğenmedi: yeniden üret (görseli olan taslakta da). Adaylar eklenir/yenilenir; seçili görsel değişmez, editör seçer. */
-async function yenidenUret(sb: Sb, id: number, ucretli: boolean) {
+async function yenidenUret(sb: Sb, id: number, ucretli: boolean, istenen?: { modeller?: string[]; gpt?: string; banana?: string; kalite?: string }) {
   const bitis = Date.now() + BUTCE_MS;
   const { data: t } = await sb.from("tr_drafts").select("id,title,item_id,image").eq("id", id).single();
   if (!t) return { hata: "Taslak bulunamadı" };
   const img = (t.image ?? {}) as Record<string, unknown> & { ai_istem?: string; secilen?: GorselAday | null; yz_adaylar?: YzAday[] };
   const { data: it } = await sb.from("tr_items").select("brand,product,title").eq("id", t.item_id ?? 0).maybeSingle();
-  const izinli = ucretli ? [...UCRETSIZ_MODEL, ...UCRETLI_MODEL] : UCRETSIZ_MODEL;
-  const u = await yzGorselUret(sb, id, { baslik: t.title || it?.title || "", marka: it?.brand ?? "", urun: it?.product ?? "", istem: String(img.ai_istem || t.title) }, bitis, true, izinli);
+  // Taslaktaki seçiciden gelen modeller (4 Kasım 2026); ücretliler yalnız yöneticide (çağıran yer denetler)
+  const sinir = ucretli ? [...UCRETSIZ_MODEL, ...UCRETLI_MODEL] : UCRETSIZ_MODEL;
+  const izinli = istenen?.modeller?.length ? istenen.modeller.filter((m) => sinir.includes(m)) : sinir;
+  if (!izinli.length) return { hata: "Model seçilmedi" };
+  const u = await yzGorselUret(sb, id, { baslik: t.title || it?.title || "", marka: it?.brand ?? "", urun: it?.product ?? "", istem: String(img.ai_istem || t.title) }, bitis, izinli.length > 1, izinli, { gpt: istenen?.gpt, banana: istenen?.banana, kalite: istenen?.kalite });
   if (!u.adaylar.length) return { hata: u.neden };
   const { data: son } = await sb.from("tr_drafts").select("image").eq("id", id).single();
   const simdi = (son?.image ?? {}) as Record<string, unknown> & { secilen?: GorselAday | null; yz_adaylar?: YzAday[] };
@@ -990,8 +994,10 @@ Deno.serve(async (req) => {
   // Görselsiz taslağa yapay zekâ ile görsel (ekip üyesi)
   if (govde?.gorsel_uret) {
     if (govde.yeniden) {
-      if (govde.ucretli && !p.is_admin) return Response.json({ hata: "Ücretli modellerle yeniden üretimi yalnız yöneticiler başlatabilir." }, { status: 403, headers: CORS });
-      const r = await yenidenUret(sb, Number(govde.gorsel_uret), !!govde.ucretli);
+      const ist = (govde.secim ?? undefined) as { modeller?: string[]; gpt?: string; banana?: string; kalite?: string } | undefined;
+      const ucretliVar = !!govde.ucretli || !!ist?.modeller?.some((m) => UCRETLI_MODEL.includes(m));
+      if (ucretliVar && !p.is_admin) return Response.json({ hata: "Ücretli modellerle üretimi yalnız yöneticiler başlatabilir." }, { status: 403, headers: CORS });
+      const r = await yenidenUret(sb, Number(govde.gorsel_uret), ucretliVar, ist);
       return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
     }
     const r = await elleUret(sb, Number(govde.gorsel_uret));
@@ -1022,7 +1028,6 @@ Deno.serve(async (req) => {
   }
   // Görsel modelleri listesi (yönetici): seçim ekranı için
   if (govde?.gorsel_modeller) {
-    if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
     return Response.json(await modelListesi(sb), { headers: CORS });
   }
   // Onaya gönderildi: yöneticilere ve yayın yönetmenine Stüdyo bildirimi (4 Kasım 2026). Yalnız editörün elle gönderdiği; otomatik taslak değil.

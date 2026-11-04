@@ -1,0 +1,50 @@
+/* Haber Masası → Ayarlar (4 Kasım 2026): Bağlantı anahtarları düzeni (../sistem/baglantilar.css) + ayar alanları.
+   Satır kapalıyken sağda kayıtlı değer; açıkken "ad + kısa not | değer" sıraları. */
+.ay { padding-top: 8px; }
+.ay .bg-ozet { margin: 0; max-width: 72ch; }
+.bg-ac.ay-ac { grid-template-columns: minmax(0, 1fr) auto; }
+.ay-durum { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.ay-deger { font-size: 13px; color: var(--muted); text-align: right; }
+.ay-ic { display: flex; flex-direction: column; gap: 14px; padding: 2px 16px 18px; min-width: 0; }
+.ay-alanlar { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.ay-alan { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 24px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.ay-alan-ad { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ay-alan-ad b { font-weight: 600; font-size: 14px; }
+.ay-alan-ad span { font-size: 13px; color: var(--muted); }
+.ay-alan-ad a { color: var(--blue); text-decoration: none; }
+.ay-alan-deger { display: flex; justify-content: flex-end; min-width: 0; }
+.ay-alan-deger select { width: auto; max-width: 260px; }
+.ay-sayi { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.ay-sayi input { width: 72px; text-align: right; }
+.ay-sayi span { min-width: 3.2em; }
+.ay-not { margin: 0; font-size: 13px; color: var(--muted); max-width: 72ch; }
+.ay-blok { display: flex; flex-direction: column; gap: 8px; }
+.ay-blok > b { font-size: 14px; font-weight: 600; }
+.ay-kaydet { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.ay-kaydet .muted { font-size: 13px; }
+
+/* Aç/kapa anahtarı: gerçek onay kutusu, görünüşü değişir (klavye ve ekran okuyucu aynen çalışır) */
+.ay-anahtar { appearance: none; -webkit-appearance: none; margin: 0; width: 40px; height: 24px; border-radius: 99px; background: var(--line); position: relative; cursor: pointer; transition: background .15s; flex: none; }
+.ay-anahtar::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: transform .15s; }
+.ay-anahtar:checked { background: var(--blue); }
+.ay-anahtar:checked::after { transform: translateX(16px); }
+
+/* Seçilebilir ve silinebilir etiketler */
+.ay-cip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 99px; font-size: 13px; color: var(--ink); background: var(--surface); cursor: pointer; flex-direction: row; }
+.ay-cip input { position: absolute; opacity: 0; pointer-events: none; }
+.ay-cip.secili { background: var(--blue-soft); border-color: transparent; color: var(--blue); }
+.ay-cip:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ay-markalar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.ay-markalar .ay-cip { cursor: default; padding-right: 4px; }
+.ay-sil { background: none; border: 0; color: var(--muted); font-size: 15px; line-height: 1; padding: 0 4px; cursor: pointer; border-radius: 99px; }
+.ay-sil:hover { color: var(--ink); }
+.ay-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.ay-form label { flex: 1 1 160px; min-width: 0; }
+.ay-form select { width: 100%; }
+
+@media (max-width: 640px) {
+  .bg-ac.ay-ac { grid-template-columns: minmax(0, 1fr); }
+  .ay-durum { justify-content: flex-start; }
+  .ay-alan { grid-template-columns: minmax(0, 1fr); }
+  .ay-alan-deger, .ay-markalar { justify-content: flex-start; }
+}
