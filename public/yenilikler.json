@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-04-j",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Boş taslak kalmıyor",
+    "bolumler": [
+      {
+        "ad": "Haber yaz",
+        "maddeler": [
+          "Hiçbir şey yazmadan çıktığın haber taslaklara düşmez, kendiliğinden silinir.",
+          "Eskiden kalan boş taslaklar Taslaklar açılınca temizlenir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-i",
     "tarih": "4 Kasım 2026",
     "baslik": "Deneme masası",
