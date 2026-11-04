@@ -11,7 +11,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
 import { CLAUDE_MODEL, claudeJson, SECIM_SEMA } from "./claude.ts";
 import { markaYazimi } from "./html.ts";
-import { kullanilabilir, MODEL_AD, uret, type Uretilen, type UretimModeli } from "./uretim.ts";
+import { kullanilabilir, MODEL_AD, modelListesi, uret, type Uretilen, type UretimModeli } from "./uretim.ts";
 import { VIDEO_SISTEM, videoAdaylari } from "./video.ts";
 import { ARA_SISTEM, araAdaylar, bolumler } from "./ara.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
@@ -1019,6 +1019,11 @@ Deno.serve(async (req) => {
   if (govde?.gorsel_sec) {
     const r = await adaySec(sb, Number(govde.gorsel_sec), String(govde.model ?? ""), p.name ?? "");
     return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
+  }
+  // Görsel modelleri listesi (yönetici): seçim ekranı için
+  if (govde?.gorsel_modeller) {
+    if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
+    return Response.json(await modelListesi(sb), { headers: CORS });
   }
   // Onaya gönderildi: yöneticilere ve yayın yönetmenine Stüdyo bildirimi (4 Kasım 2026). Yalnız editörün elle gönderdiği; otomatik taslak değil.
   if (govde?.onay_bildir) {

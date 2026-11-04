@@ -223,6 +223,7 @@ function GorselKiyas({ ayar }: { ayar: (k: string, v: unknown, m: string) => Pro
         <label className="row" style={{ gap: 6 }}>Günde en çok <input type="number" min={1} max={50} value={gunluk} onChange={(e) => setGunluk(e.target.value)} style={{ width: 70 }} /> taslak</label>
         <button className="btn sm" onClick={() => ayar("gorsel_kiyas", { ...k, gunluk: Math.max(1, Math.min(50, Number(gunluk) || 3)) }, "Günlük sınır kaydedildi.")}>Kaydet</button>
       </div>
+      <ModelSecimi ayar={ayar} />
       {!satirlar ? <div className="muted">Yükleniyor…</div> : !sirali.length ? <div className="muted">Henüz kıyas yok; ilk görselsiz taslakta başlar.</div> : (
         <div className="tbl"><table>
           <thead><tr><th>Model</th><th>Denendi</th><th>Üretti</th><th>Denetimden geçti</th><th>Ort. puan</th><th>Kapak oldu</th><th>Editör seçti</th><th>Ort. süre</th><th>Tahmini maliyet</th></tr></thead>
@@ -269,6 +270,49 @@ function YaziKiyas() {
         </table></div>
       )}
       {!!s.toplam && <div className="muted">{s.toplam} karşılaştırma · {s.bekliyor} seçim bekliyor. Düzeltme sayısı az olan, denetime daha temiz metin teslim etmiş demektir.</div>}
+    </div>
+  );
+}
+
+// Görsel modeli seçimi (4 Kasım 2026, kullanıcı: "model seçilebilir olsun; gücü, yeniliği ve tahmini ücreti belirtsin"). Liste sağlayıcıdan
+// gelir (hesabın erişebildiği modeller); seçim yoksa sistem en yeni standart modeli kullanır. Ücretler yaklaşık, görsel başına.
+type ModelBilgi = { saglayici: "gpt" | "banana"; id: string; guc: string; ucret: string; tarih?: string; enYeni?: boolean };
+function ModelSecimi({ ayar }: { ayar: (k: string, v: unknown, m: string) => Promise<void> }) {
+  const { v } = useMasa();
+  const kayit = (v.ayarlar.gorsel_modeller ?? {}) as { gpt?: string; gpt_kalite?: string; banana?: string };
+  const [liste, setListe] = useState<ModelBilgi[] | null>(null);
+  const [hata, setHata] = useState("");
+  const [mesgul, setMesgul] = useState(false);
+  const [sec, setSec] = useState(kayit);
+  async function getir() {
+    setMesgul(true); setHata("");
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: { gorsel_modeller: true } });
+    setMesgul(false);
+    const r = data as { modeller?: ModelBilgi[]; hata?: string[] | string } | null;
+    if (error || !r?.modeller) { setHata(error?.message ?? String(r?.hata ?? "Liste alınamadı")); return; }
+    setListe(r.modeller); if (Array.isArray(r.hata) && r.hata.length) setHata(r.hata.join(" · "));
+  }
+  const etiket = (m: ModelBilgi) => `${m.id} · ${m.guc}${m.enYeni ? " · en yeni" : ""}${m.tarih ? ` · ${m.tarih}` : ""} · ${m.ucret}`;
+  const grup = (sg: "gpt" | "banana") => (liste ?? []).filter((m) => m.saglayici === sg);
+  return (
+    <div className="panel" style={{ background: "var(--sunk)", gap: 10 }}>
+      <b>Model seçimi</b>
+      <div className="muted">Şu an: GPT Image {kayit.gpt ?? "en yeni standart (kendiliğinden)"} · kalite {kayit.gpt_kalite === "high" ? "yüksek" : kayit.gpt_kalite === "low" ? "düşük" : "orta"} · Nano Banana {kayit.banana ?? "en yeni standart (kendiliğinden)"}. Ücretler görsel başına, yaklaşık.</div>
+      {!liste ? <button className="btn ghost sm" disabled={mesgul} onClick={getir} style={{ alignSelf: "flex-start" }}>{mesgul ? "Modeller alınıyor…" : "Modelleri listele"}</button> : <>
+        <label>GPT Image modeli<select value={sec.gpt ?? ""} onChange={(e) => setSec({ ...sec, gpt: e.target.value || undefined })}>
+          <option value="">Kendiliğinden: en yeni standart</option>
+          {grup("gpt").map((m) => <option key={m.id} value={m.id}>{etiket(m)}</option>)}
+        </select></label>
+        <label>GPT Image kalitesi<select value={sec.gpt_kalite ?? "medium"} onChange={(e) => setSec({ ...sec, gpt_kalite: e.target.value })}>
+          <option value="low">Düşük · en ucuz</option><option value="medium">Orta · önerilen</option><option value="high">Yüksek · yaklaşık 3 kat pahalı</option>
+        </select></label>
+        <label>Nano Banana modeli<select value={sec.banana ?? ""} onChange={(e) => setSec({ ...sec, banana: e.target.value || undefined })}>
+          <option value="">Kendiliğinden: en yeni standart</option>
+          {grup("banana").map((m) => <option key={m.id} value={m.id}>{etiket(m)}</option>)}
+        </select></label>
+        <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => ayar("gorsel_modeller", Object.fromEntries(Object.entries(sec).filter(([, x]) => x)), "Görsel modeli seçimi kaydedildi.")}>Kaydet</button>
+      </>}
+      {hata && <div className="msg err">{hata}</div>}
     </div>
   );
 }

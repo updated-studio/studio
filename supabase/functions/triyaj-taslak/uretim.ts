@@ -46,10 +46,18 @@ async function cloudflare(sb: Sb, model: string, istem: string, ms: number): Pro
 const surumOnbellek: Record<string, string> = {};
 const surumSirala = (a: string, b: string) => b.localeCompare(a, "en", { numeric: true });
 
+/** Yöneticinin seçtiği model ve kalite (Haber Masası → Ayarlar → Görsel model kıyası; tr_settings.gorsel_modeller). Boşsa en yeni standart. */
+async function secim(sb: Sb): Promise<{ gpt?: string; gpt_kalite?: "medium" | "high" | "low"; banana?: string }> {
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "gorsel_modeller").maybeSingle();
+  return (data?.value ?? {}) as { gpt?: string; gpt_kalite?: "medium" | "high" | "low"; banana?: string };
+}
+
 async function openai(sb: Sb, istem: string, ms: number): Promise<Uretilen> {
   const { openai: key } = await anahtarlar(sb, ["openai"]);
   const h = { Authorization: "Bearer " + key, "Content-Type": "application/json" };
-  if (!surumOnbellek.gpt) {
+  const sc = await secim(sb);
+  if (sc.gpt) surumOnbellek.gpt = sc.gpt;
+  else if (!surumOnbellek.gpt) {
     const l = await fetch("https://api.openai.com/v1/models", { headers: h, signal: AbortSignal.timeout(10_000) });
     if (!l.ok) throw new Error("OpenAI: " + (await l.text()).slice(0, 120));
     const ids = ((await l.json()).data as { id: string }[]).map((x) => x.id).filter((x) => /^gpt-image/.test(x) && !/mini/.test(x)).sort(surumSirala);
@@ -58,7 +66,7 @@ async function openai(sb: Sb, istem: string, ms: number): Promise<Uretilen> {
   }
   const r = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST", headers: h, signal: AbortSignal.timeout(ms),
-    body: JSON.stringify({ model: surumOnbellek.gpt, prompt: istem, size: "1536x1024", quality: "medium", n: 1 }),
+    body: JSON.stringify({ model: surumOnbellek.gpt, prompt: istem, size: "1536x1024", quality: sc.gpt_kalite ?? "medium", n: 1 }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error("OpenAI: " + String(j?.error?.message ?? r.status).slice(0, 140));
@@ -70,7 +78,9 @@ async function openai(sb: Sb, istem: string, ms: number): Promise<Uretilen> {
 async function nanoBanana(sb: Sb, istem: string, ms: number): Promise<Uretilen> {
   const { gemini_gorsel: key } = await anahtarlar(sb, ["gemini_gorsel"]);
   const kok = "https://generativelanguage.googleapis.com/v1beta";
-  if (!surumOnbellek.banana) {
+  const sc = await secim(sb);
+  if (sc.banana) surumOnbellek.banana = sc.banana;
+  else if (!surumOnbellek.banana) {
     const l = await fetch(`${kok}/models?pageSize=200&key=${key}`, { signal: AbortSignal.timeout(10_000) });
     if (!l.ok) throw new Error("Google: " + (await l.text()).slice(0, 120));
     const ad = ((await l.json()).models as { name: string; supportedGenerationMethods?: string[] }[])
@@ -93,4 +103,33 @@ export function uret(sb: Sb, model: UretimModeli, istem: string, ms: number): Pr
   if (model === "gpt") return openai(sb, istem, ms);
   if (model === "banana") return nanoBanana(sb, istem, ms);
   return cloudflare(sb, model, istem, ms);
+}
+
+/** Seçilebilir modeller (yönetici ekranı): sağlayıcının listesinden, gücü, yeniliği ve görsel başına tahmini ücretiyle.
+ *  Ücretler yaklaşık (Kasım 2026 fiyat sayfaları); sağlayıcı fiyat değiştirirse burası güncellenir. */
+export type ModelBilgi = { saglayici: "gpt" | "banana"; id: string; guc: string; ucret: string; tarih?: string; enYeni?: boolean };
+export async function modelListesi(sb: Sb): Promise<{ modeller: ModelBilgi[]; hata: string[] }> {
+  const m = await anahtarlar(sb, ["openai", "gemini_gorsel"]);
+  const out: ModelBilgi[] = [], hata: string[] = [];
+  if (m.openai) {
+    try {
+      const r = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: "Bearer " + m.openai }, signal: AbortSignal.timeout(10_000) });
+      const l = ((await r.json()).data ?? []) as { id: string; created: number }[];
+      const gi = l.filter((x) => /^gpt-image/.test(x.id)).sort((a, b) => surumSirala(a.id, b.id));
+      gi.forEach((x, i) => out.push({ saglayici: "gpt", id: x.id, enYeni: i === 0 && !/mini/.test(x.id),
+        guc: /mini/.test(x.id) ? "Ekonomik (daha düşük kalite)" : "Standart", ucret: /mini/.test(x.id) ? "~1 sent (orta), ~4 sent (yüksek)" : "~4 sent (orta), ~13 sent (yüksek)",
+        tarih: x.created ? new Date(x.created * 1000).toISOString().slice(0, 10) : undefined }));
+    } catch (e) { hata.push("OpenAI: " + String((e as Error).message).slice(0, 80)); }
+  }
+  if (m.gemini_gorsel) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${m.gemini_gorsel}`, { signal: AbortSignal.timeout(10_000) });
+      const l = ((await r.json()).models ?? []) as { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
+      const gi = l.filter((x) => /image/.test(x.name) && !/imagen/.test(x.name) && (x.supportedGenerationMethods ?? []).includes("generateContent")).map((x) => x.name.replace(/^models\//, "")).sort(surumSirala);
+      const ilkFlash = gi.find((x) => /flash-image/.test(x));
+      gi.forEach((id) => out.push({ saglayici: "banana", id, enYeni: id === ilkFlash || id === gi.find((x) => /pro-image/.test(x)),
+        guc: /pro-image/.test(id) ? "En güçlü (Pro)" : /flash-image/.test(id) ? "Standart (hızlı)" : "Diğer", ucret: /pro-image/.test(id) ? "~13 sent (2K), ~24 sent (4K)" : "~4 sent" }));
+    } catch (e) { hata.push("Google: " + String((e as Error).message).slice(0, 80)); }
+  }
+  return { modeller: out, hata };
 }
