@@ -71,7 +71,7 @@ final class AppleKaynagi: KonusmaKaynagi {
         giris.removeTap(onBus: 0)
         giris.installTap(onBus: 0, bufferSize: 1024, format: bicim) { [weak self] tampon, _ in
             guard let self else { return }
-            let duzey = SesTakipci.seviye(tampon)
+            let duzey = AppleKaynagi.seviye(tampon)
             self.kilit.lock()
             let r = self.istek
             // Konuşma eşiği ortam gürültüsüne göre: sessiz anlarda zemin yavaşça ölçülür.
