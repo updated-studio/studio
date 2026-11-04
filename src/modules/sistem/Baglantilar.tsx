@@ -108,7 +108,7 @@ function bicimHatasi(ad: string, v: string): string {
 // solda adımlar ve anahtar kutusu, sağda ne için / ücret / olmazsa.
 type Servis = {
   id: string; grup: "yazi" | "gorsel" | "site"; logo: string; ad: string; ne: string; anahtarlar: string[];
-  neIcin: string; ucret: string; olmazsa: string; eylem?: "claude" | "cloudflare" | "instagram" | "gemini";
+  neIcin: string; ucret: string; olmazsa: string; eylem?: "claude" | "cloudflare" | "instagram" | "gemini" | "brave";
 };
 const GRUPLAR: { id: Servis["grup"]; ad: string; ne: string }[] = [
   { id: "yazi", ad: "Yazı ve denetim", ne: "Taslağı yazar, kaynaklara karşı denetler. Biri yoksa diğeri devralır." },
@@ -128,8 +128,8 @@ const SERVISLER: Servis[] = [
     neIcin: "Görsel model kıyası: Nano Banana da görsel üretir.", ucret: "Görsel başına yaklaşık 4 sent, Google faturasından. Yazı işlerindeki ücretsiz anahtarlardan ayrı proje.", olmazsa: "Kıyas diğer modellerle sürer." },
   { id: "instagram", grup: "site", logo: "instagram", ad: "Instagram", ne: "Sitedeki Reels sütunu için son videoları çeker", anahtarlar: ["instagram"], eylem: "instagram",
     neIcin: "Sitedeki Reels sütunu. Anahtar yalnız okuma izni taşır, paylaşım yapamaz.", ucret: "Ücretsiz. Süresi 60 gün; sistem dolmadan kendisi yeniler.", olmazsa: "Reels sütunu YouTube kısa videolarını gösterir." },
-  { id: "brave", grup: "site", logo: "brave", ad: "Brave arama", ne: "Künye için ürünün resmî sayfasını bulur", anahtarlar: ["brave_arama"],
-    neIcin: "Künye otomasyonu ürünün resmî özellik sayfasını bulur; sayfayı sistem okur.", ucret: "Ücretsiz planla; ürün başına bir arama.", olmazsa: "Künye otomasyonu özellikleri bulamaz." },
+  { id: "brave", grup: "site", logo: "brave", ad: "Brave arama", ne: "Künye, resmî video ve haber içi resmî görsel araması", anahtarlar: ["brave_arama"], eylem: "brave",
+    neIcin: "Künye otomasyonu ürünün resmî sayfasını bulur; taslakta resmî fragman ve yazı içi resmî görsel aranır.", ucret: "Ücretsiz planla; sistem ayda en çok 700 arama yapar (künye, video, görsel ortak).", olmazsa: "Künye otomasyonu özellikleri bulamaz." },
 ];
 const ADLAR: Record<string, string> = { cloudflare_adres: "Programın adresi", cloudflare_anahtar: "Ortak şifre (ANAHTAR)" };
 const kisaTarih = (s?: string) => (s ? new Date(s).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) : "");
@@ -182,8 +182,13 @@ export default function Baglantilar() {
     if (s.eylem === "instagram") return instagramCek();
     if (s.eylem === "gemini") { setAcik(acik === s.id ? "" : s.id); return; }
     setMesgul(s.id + "-dene");
-    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: s.eylem === "claude" ? { claude_dene: true } : { uret_dene: true } });
+    const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: s.eylem === "claude" ? { claude_dene: true } : s.eylem === "brave" ? { brave_dene: true } : { uret_dene: true } });
     setMesgul("");
+    if (s.eylem === "brave") {
+      const b = (error ? { hata: error.message } : data) as { ok?: boolean; hata?: string; web?: string; gorsel?: string; kullanim?: number; sinir?: number };
+      setSonuc((x) => ({ ...x, brave: b.hata ? { ok: false, metin: b.hata } : { ok: !!b.ok, metin: `Web araması: ${b.web} · Görsel araması: ${b.gorsel} · Bu ay ${b.kullanim}/${b.sinir} arama` } }));
+      return;
+    }
     const r = (error ? { ok: false, hata: error.message } : data) as { ok?: boolean; hata?: string; model?: string; sure?: number };
     setSonuc((x) => ({ ...x, [s.id]: r.ok ? { ok: true, metin: `Çalışıyor: ${r.model} ${s.eylem === "claude" ? "yanıt verdi" : "ile görsel üretildi"} (${Math.round((r.sure ?? 0) / 100) / 10} sn).` } : { ok: false, metin: r.hata ?? "Yanıt yok" } }));
   }

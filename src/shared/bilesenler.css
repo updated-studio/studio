@@ -246,9 +246,11 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .ab-metin .onizleme { max-height: 420px; overflow: auto; width: 100%; }
 /* Canlı durum (shared/canli.tsx, CanliKisiler.tsx; 4 Kasım 2026) */
 .canli { position: relative; }
-.canli-dugme { display: inline-flex; align-items: center; gap: 0; background: none; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px 3px 4px; color: var(--ink); cursor: pointer; }
+.canli-dugme { display: inline-flex; align-items: center; gap: 0; height: 36px; background: none; border: 1px solid var(--line); border-radius: 99px; padding: 0 14px 0 4px; color: var(--ink); cursor: pointer; }
+.canli-dugme:not(:has(.canli-yuz)) { padding: 0 14px; }
 .canli-yuz { margin-right: -8px; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); display: inline-flex; }
-.canli-sayi { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; font-size: 13px; font-weight: 500; }
+.canli-sayi { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
+.canli-yuz + .canli-sayi, .canli-yuz ~ .canli-sayi { margin-left: 16px; }
 .canli-sayi i, .canli-rozet i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
 .canli-liste { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: min(320px, 90vw); display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 10px 30px rgb(0 0 0 / .2); }
 .canli-satir { display: flex; gap: 10px; align-items: center; text-align: left; background: none; border: 0; padding: 6px; border-radius: 10px; color: var(--ink); cursor: pointer; }

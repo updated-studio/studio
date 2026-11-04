@@ -133,3 +133,6 @@
 .ed-tamam { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--ok-soft); color: var(--ok); font-weight: 600; }
 @media (max-width: 900px) { .ed-uyarilar { padding: 8px 16px 0; } }
 .ed-cekim .ed-cekim-alt { position: static; background: none; } /* liste maddelerinin üstüne binmesin */
+
+/* Logo düğme (4 Kasım 2026): tıklanınca Bugün; düğme görünümü yok */
+button.ed-marka { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }

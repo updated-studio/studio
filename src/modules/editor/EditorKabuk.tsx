@@ -59,13 +59,15 @@ export default function EditorKabuk() {
   // Profil menüsü: profil ve yönetim sayfaları + telefonda alt çubuğa sığmayan bölümler
   const profilde = izinli.filter((m) => m.yer === "profil" || ((m.yer ?? "dock") === "dock" && m.id !== "takvim"));
   const onizleme = yonetirMi(profile) && editorGibi(profile);
+  // Logoya basınca ana ekran (Bugün); zaten oradaysa sayfa yenilenir (4 Kasım 2026, kullanıcı isteği)
+  const anaSayfa = () => { if (konum.pathname.startsWith("/bugun")) location.reload(); else git("/bugun"); };
 
   return (
     <CanliSaglayici>
     <div className="ed">
       <SimgeTanimlari />
       <nav className="ed-menu simge" aria-label="Stüdyo menüsü">
-        <div className="ed-marka"><span className="logo" role="img" aria-label="Updated" /><i /><span>STÜDYO</span></div>
+        <button type="button" className="ed-marka" aria-label="Updated Stüdyo, Bugün" onClick={anaSayfa}><span className="logo" aria-hidden="true" /><i /><span>STÜDYO</span></button>
         {ogeler.map((o) => <NavLink key={o.yol} to={o.yol} className={etkin(o) ? "on" : ""} aria-current={etkin(o) ? "page" : undefined}><Ikon ad={o.ikon} />{o.ad}</NavLink>)}
         <div className="ed-menu-alt">
           <button onClick={rehber}><Ikon ad="yardim" />Rehberi yeniden göster</button>
@@ -75,7 +77,7 @@ export default function EditorKabuk() {
 
       <div className="ed-govde">
         <header className="ed-tepe">
-          <div className="ed-marka ed-marka-tel"><span className="logo" role="img" aria-label="Updated" /><i /><span>STÜDYO</span></div>
+          <button type="button" className="ed-marka ed-marka-tel" aria-label="Updated Stüdyo, Bugün" onClick={anaSayfa}><span className="logo" aria-hidden="true" /><i /><span>STÜDYO</span></button>
           <span style={{ flex: 1 }} />
           <CanliKisiler />
           <SohbetDugme />

@@ -1020,6 +1020,20 @@ Deno.serve(async (req) => {
     const r = await adaySec(sb, Number(govde.gorsel_sec), String(govde.model ?? ""), p.name ?? "");
     return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
   }
+  // Brave'i dene (yönetici): web ve görsel araması açık mı, bu ayki kullanım (4 Kasım 2026)
+  if (govde?.brave_dene) {
+    if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
+    const { data: k } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "brave_arama").maybeSingle();
+    const anahtar = (k as { deger?: string } | null)?.deger;
+    if (!anahtar) return Response.json({ ok: false, hata: "Brave anahtarı kayıtlı değil." }, { headers: CORS });
+    const dene = async (uc: string) => { try { const r = await fetch(`https://api.search.brave.com/res/v1/${uc}/search?count=3&q=sony%20camera`, { headers: { Accept: "application/json", "X-Subscription-Token": anahtar }, signal: AbortSignal.timeout(12_000) }); const t = await r.text(); return r.ok ? "açık" : r.status === 401 || r.status === 403 || r.status === 422 ? "planda kapalı (" + r.status + ")" : "hata " + r.status + ": " + t.slice(0, 80); } catch (e) { return "ulaşılamadı: " + String((e as Error).message).slice(0, 60); } };
+    const [web, gorsel] = await Promise.all([dene("web"), dene("images")]);
+    const ay = new Date().toISOString().slice(0, 7);
+    const { data: sy } = await sb.from("tr_settings").select("value").eq("key", "brave_sayac").maybeSingle();
+    const sayac = (sy?.value as { ay?: string; adet?: number } | null)?.ay === ay ? Number((sy!.value as { adet?: number }).adet ?? 0) : 0;
+    await sb.from("tr_settings").upsert({ key: "brave_sayac", value: { ay, adet: sayac + 2 } });
+    return Response.json({ ok: web === "açık", web, gorsel, kullanim: sayac + 2, sinir: 700 }, { headers: CORS });
+  }
   // Claude anahtarını dene (yönetici): en küçük modelle tek kısa istek
   if (govde?.claude_dene) {
     if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
