@@ -30,7 +30,7 @@ final class SesTakipci {
     private var sonSesZamani: CFAbsoluteTime = 0      // ses dinleme iş parçacığında yazılır (kilit ile)
     private var sonSonucZamani: CFAbsoluteTime = 0
     private var gorevBaslangici: CFAbsoluteTime = 0
-    private static let sesEsigi: Float = 0.012         // RMS; bunun üstü konuşma sayılır
+    private var gurultuZemini: Float = 0.003           // ortam gürültüsü (ses iş parçacığında güncellenir)
 
     func tokenlariAyarla(_ t: [String]) {
         tokenlar = t
@@ -90,10 +90,14 @@ final class SesTakipci {
         giris.removeTap(onBus: 0)
         giris.installTap(onBus: 0, bufferSize: 1024, format: bicim) { [weak self] tampon, _ in
             guard let self else { return }
-            let konusma = SesTakipci.seviye(tampon) > SesTakipci.sesEsigi
+            let duzey = SesTakipci.seviye(tampon)
             self.kilit.lock()
             let r = self.istek
-            if konusma { self.sonSesZamani = CFAbsoluteTimeGetCurrent() }
+            // Konuşma eşiği ortam gürültüsüne göre: sessiz anlarda zemin yavaşça ölçülür.
+            if duzey < self.gurultuZemini * 2 || self.gurultuZemini <= 0 {
+                self.gurultuZemini = max(0.0005, self.gurultuZemini * 0.97 + duzey * 0.03)
+            }
+            if duzey > max(0.004, self.gurultuZemini * 3) { self.sonSesZamani = CFAbsoluteTimeGetCurrent() }
             self.kilit.unlock()
             r?.append(tampon)
         }
@@ -124,11 +128,17 @@ final class SesTakipci {
         kilit.unlock()
         let gorevYasi = simdi - gorevBaslangici
         let sonuctanBeri = simdi - max(sonSonucZamani, gorevBaslangici)
-        // Konuşuluyor ama 1,5 sn'dir sonuç yok: tanıma takılmış.
-        let takildi = simdi - ses < 0.6 && sonuctanBeri > 1.5 && gorevYasi > 2.5
+        let sessizlik = simdi - ses
+        let sonucVar = sonSonucZamani > gorevBaslangici
+        let sesGoruldu = ses > gorevBaslangici
+        // Konuşmacı durdu (0,8 sn sessizlik): tanımayı şimdiden tazele ki tekrar
+        // konuşmaya başlayınca ilk kelimeyi taze bir görev duysun.
+        let durdu = sonucVar && sesGoruldu && sessizlik > 0.8 && gorevYasi > 1.0
+        // Konuşuluyor ama 1,2 sn'dir sonuç yok: tanıma takılmış.
+        let takildi = sessizlik < 0.5 && sonuctanBeri > 1.2 && gorevYasi > 2.0
         // Hiç sonuç gelmeden 6 sn geçti: sessizlikte de tazele.
         let bayat = sonuctanBeri > 6 && gorevYasi > 6
-        if takildi || bayat { yeniGorev() }
+        if durdu || takildi || bayat { yeniGorev() }
     }
 
     private static func seviye(_ tampon: AVAudioPCMBuffer) -> Float {

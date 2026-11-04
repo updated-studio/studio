@@ -177,7 +177,9 @@ final class PrompterMetinView: NSView {
             if p != o.ptr { o.ptr = p }
         }
 
-        offset += (hedef - offset) * min(1, dt * 7)
+        // Uzak bir yere atlarken daha hızlı, küçük adımlarda yumuşak kay.
+        let hiz: CGFloat = abs(hedef - offset) > satir * 1.5 ? 14 : 9
+        offset += (hedef - offset) * min(1, dt * hiz)
         if abs(hedef - offset) < 0.3 { offset = hedef }
         if metin.frame.origin.y != -offset { metin.frame.origin.y = -offset }
         if boyananPtr != o.ptr { boya(o.ptr) }
