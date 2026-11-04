@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "../../shared/toast";
+import { sb } from "../../shared/supabase";
 import * as api from "./api";
 import type { Koleksiyon, Medya, PanelKullanici, Secenek, Sema, TamIcerik } from "./api";
 import { bilinmeyenTurler } from "./editor/dugumler";
@@ -136,6 +137,8 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
     finally { setMesgul(false); }
   }
   const kaydet = (durum?: string, mesaj = "Kaydedildi (taslak).") => calistir(() => api.kaydet(k, id, veri(durum)), mesaj);
+  // Onaya gönderilince yöneticilere ve yayın yönetmenine bildirim (4 Kasım 2026, kullanıcı: "editörlerin gönderdiklerinde gitsin, otomatik taslakta gerek yok")
+  const onayBildir = () => { sb.functions.invoke("triyaj-taslak", { body: { onay_bildir: { koleksiyon: k, id, baslik: f?.title ?? "" } } }).catch(() => {}); };
   const yayinla = () => { if (confirm(yayinda ? "Değişiklikler sitede yayınlansın mı?" : "Haber yayınlansın mı?")) calistir(() => api.kaydetVeYayinla(k, id, veri()), "Yayınlandı; site birkaç dakikada güncellenir.", true); };
   async function onizle() {
     if (degisti) await kaydet(undefined, "Kaydedildi, önizleme açılıyor.");
@@ -178,7 +181,7 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
         {!canli && <button className="btn ghost sm" disabled={mesgul} onClick={onizle}>Önizle ↗</button>}
         {kullanici.role === "admin" && <a className="btn ghost sm" href={api.panelAdresi(k, id)} target="_blank" rel="noreferrer">Panelde aç ↗</a>}
         <button className="btn ghost sm" disabled={mesgul || kilitli || !degisti} onClick={() => kaydet()}>{degisti ? "Kaydet" : "Kaydedildi"}</button>
-        {!yayinda && !yayinci && doc.workflow?.state !== "incelemede" && <button className="btn sm" data-rehber="gonder" disabled={mesgul || kilitli} onClick={() => kaydet("incelemede", "İncelemeye gönderildi.")}>İncelemeye gönder</button>}
+        {!yayinda && !yayinci && doc.workflow?.state !== "incelemede" && <button className="btn sm" data-rehber="gonder" disabled={mesgul || kilitli} onClick={async () => { await kaydet("incelemede", "İncelemeye gönderildi; yöneticilere bildirim gitti."); onayBildir(); }}>İncelemeye gönder</button>}
         {yayinci && <button className="btn sm" disabled={mesgul || kilitli} onClick={yayinla}>{yayinda ? "Değişiklikleri yayınla" : "Yayınla"}</button>}
       </div>
       {kilit.durum.tur === "baskasi" && (

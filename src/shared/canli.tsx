@@ -11,7 +11,7 @@ export type CanliNesne = { tur: "haber" | "taslak"; id: number; baslik: string; 
 export type CanliKisi = { id: string; ad: string; foto: string | null; email: string; yol: string; nesne: CanliNesne | null; zaman: string };
 
 const BOLUM: [RegExp, string][] = [
-  [/^\/bugun/, "Bugün"], [/^\/yaz\//, "Haber yaz"], [/^\/taslaklar/, "Taslaklar"], [/^\/yayinda/, "Yayındakiler"], [/^\/haber-masasi/, "Haber Masası"],
+  [/^\/bugun/, "Bugün"], [/^\/yaz\//, "Haber yaz"], [/^\/taslaklar/, "Taslaklar"], [/^\/yayinda/, "Yayındakiler"], [/^\/onay/, "Onay bekleyenler"], [/^\/haber-masasi/, "Haber Masası"],
   [/^\/cekim/, "Çekim listesi"], [/^\/takvim/, "Takvim"], [/^\/icerik/, "İçerik"], [/^\/site/, "Site"], [/^\/ekip/, "Ekip"], [/^\/marka/, "Marka Kiti"],
   [/^\/baglantilar/, "Bağlantı anahtarları"], [/^\/sistem/, "Sistem"], [/^\/profil/, "Profil"],
 ];

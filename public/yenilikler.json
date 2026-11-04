@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-11-04-e",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Onay bekleyenler",
+    "bolumler": [
+      {
+        "ad": "Menü",
+        "maddeler": [
+          "Yeni bölüm: Onay bekleyenler. Editörlerden ve Haber Masası'ndan gelenler ayrı başlıkta, öneme göre sıralı.",
+          "Taslaklar'da artık yalnız onaya gönderilmemiş taslaklar var."
+        ]
+      },
+      {
+        "ad": "Bildirim",
+        "maddeler": [
+          "Bir editör haberi onaya gönderince yöneticilere ve yayın yönetmenine bildirim gider; otomatik taslaklarda gitmez."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-d",
     "tarih": "4 Kasım 2026",
     "baslik": "Canlı durum",

@@ -59,14 +59,15 @@ export default function Taslaklarim() {
   // Sıralama ve süzgeç (3 Kasım 2026, kullanıcı: "son hazırlattığım en üste gelmiyor; detaylı filtreleme ve sıralama")
   const [sira, setSira] = useState<"yeni" | "guncel" | "kontrol">("yeni");
   const [kim, setKim] = useState<"hepsi" | "benim">("hepsi");
-  const [durum, setDurum] = useState<"hepsi" | "taslak" | "incelemede">("hepsi");
+  const durum: "hepsi" | "taslak" = "hepsi";
   const [ara, setAra] = useState("");
   const yukle = useCallback(() => { if (kullanici) taslaklar().then(setListe).catch(() => setListe([])); }, [kullanici]);
   useEffect(yukle, [yukle]);
   const benimYazar = kullanici ? (typeof kullanici.author === "object" ? kullanici.author?.id : kullanici.author) ?? null : null;
   const yazarId = (x: Icerik) => { const a = (x as { author?: number | { id: number } | null }).author; return typeof a === "object" ? a?.id ?? null : a ?? null; };
   const suz = (l: Icerik[]) => l
-    .filter((x) => (kim === "hepsi" || yazarId(x) === benimYazar) && (durum === "hepsi" || (x.workflow?.state ?? "taslak") === durum)
+    // Onaya gönderilenler kendi bölümünde (Onay bekleyenler, 4 Kasım 2026); burada yalnız taslaklar
+    .filter((x) => (kim === "hepsi" || yazarId(x) === benimYazar) && (x.workflow?.state ?? "taslak") !== "incelemede" && (durum === "hepsi" || (x.workflow?.state ?? "taslak") === durum)
       && (!ara.trim() || (x.title ?? "").toLocaleLowerCase("tr").includes(ara.trim().toLocaleLowerCase("tr"))))
     .sort((a, b) => sira === "kontrol" ? kontrolSayisi(b) - kontrolSayisi(a)
       : sira === "guncel" ? +new Date(b.updatedAt) - +new Date(a.updatedAt)
@@ -76,7 +77,7 @@ export default function Taslaklarim() {
   return (
     <div className="ed-sayfa">
       <div className="ed-bas">
-        <div><span className="ed-ust">TASLAK VE İNCELEMEDE</span><h1>Taslaklar</h1></div>
+        <div><span className="ed-ust">ONAYA GÖNDERİLMEMİŞ</span><h1>Taslaklar</h1></div>
         <button className="btn ed-ana" onClick={() => git("/yaz/yeni")}><Ikon ad="plus" />Yeni haber yaz</button>
       </div>
       {!liste ? <div className="muted">Yükleniyor…</div> : !liste.length ? (
@@ -89,7 +90,7 @@ export default function Taslaklarim() {
           </div>
           <input type="search" placeholder="Başlıkta ara" aria-label="Başlıkta ara" value={ara} onChange={(e) => setAra(e.target.value)} />
           <label>Sırala<select value={sira} onChange={(e) => setSira(e.target.value as typeof sira)}><option value="yeni">En yeni hazırlanan</option><option value="guncel">Son güncellenen</option><option value="kontrol">Kontrolü en çok biten</option></select></label>
-          <label>Durum<select value={durum} onChange={(e) => setDurum(e.target.value as typeof durum)}><option value="hepsi">Hepsi</option><option value="taslak">Taslak</option><option value="incelemede">Yayın onayında</option></select></label>
+
         </div>
         <div className="ed-liste">
           {suz(liste).map((x) => (
@@ -145,6 +146,54 @@ export function Yayindakiler() {
         </div>
       )}
       {sonraki && <button className="btn ghost sm" onClick={() => setSayfa((x) => x + 1)}>Daha fazla</button>}
+    </div>
+  );
+}
+
+/** Onay bekleyenler (4 Kasım 2026, kullanıcı: "onay bekleyenler taslaklardan ayrı görünmeli, öncelikli ve başlıkları olmalı"): incelemedeki
+ *  haberler iki başlıkta (editörlerden, Haber Masası'ndan), her biri önem ve bekleme süresine göre sıralı. */
+export function OnayBekleyenler() {
+  const { kullanici, hata } = usePanelKullanici();
+  const canli = useCanli();
+  const [liste, setListe] = useState<Icerik[] | null>(null);
+  const git = useNavigate();
+  useEffect(() => {
+    if (!kullanici) return;
+    Promise.all([1, 2, 3, 4].map((sf) => api.liste("news", "incelemede", "", sf, { sirala: "updatedAt" }).catch(() => ({ docs: [] as Icerik[] }))))
+      .then((r) => { const tek = new Map(r.flatMap((x) => x.docs).map((x) => [x.id, x])); setListe([...tek.values()]); });
+  }, [kullanici]);
+  if (hata) return <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
+  if (kullanici === null) return <SiteYetkisiYok />;
+  const onem = (x: Icerik) => Number((x as { triyaj?: { priority?: number } }).triyaj?.priority ?? 0);
+  const otomatik = (x: Icerik) => !!(x as { triyaj?: { importedAt?: string } }).triyaj?.importedAt;
+  const hazirlayan = (x: Icerik) => { const o = (x.workflow as { ownerUser?: { name?: string } | number } | undefined)?.ownerUser; return o && typeof o === "object" ? o.name ?? "" : ""; };
+  const sirala = (l: Icerik[]) => [...l].sort((a, b) => onem(b) - onem(a) || +new Date(a.updatedAt) - +new Date(b.updatedAt));
+  const gruplar: [string, string, Icerik[]][] = liste ? [
+    ["Editörlerden", "Editörün yazıp onaya gönderdiği haberler.", sirala(liste.filter((x) => !otomatik(x)))],
+    ["Haber Masası'ndan", "Otomatik hazırlanan taslaklar; bildirim gitmez, burada bekler.", sirala(liste.filter(otomatik))],
+  ] : [];
+  return (
+    <div className="ed-sayfa">
+      <div className="ed-bas"><div><span className="ed-ust">YAYIN ONAYI</span><h1>Onay bekleyenler</h1></div></div>
+      <div className="muted">Haberi yalnız yayın yönetmeni ya da yönetici yayınlar; kimse kendi haberini onaylayamaz. Önemi yüksek olan ve en uzun bekleyen üstte.</div>
+      {!liste ? <div className="muted">Yükleniyor…</div> : gruplar.map(([ad, aciklama, l]) => (
+        <section key={ad} aria-label={ad} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <h2 className="ed-baslik">{ad.toLocaleUpperCase("tr-TR")} · {l.length}</h2>
+          <div className="muted" style={{ fontSize: 13 }}>{aciklama}</div>
+          {!l.length ? <div className="muted ed-ic">Bekleyen yok.</div> : (
+            <div className="ed-liste">
+              {l.map((x) => (
+                <button key={x.id} className="ed-satir" onClick={() => git(`/yaz/${x.id}`)}>
+                  <span className="ed-satir-m"><b>{x.title || "Başlıksız"}</b><span className="muted">{[hazirlayan(x), api.ad(x.category as never), `${zaman(x.updatedAt)} gönderildi`].filter(Boolean).join(" · ")}</span></span>
+                  <AcikTutan kisiler={canli.kisiler.filter((k) => k.id !== canli.ben && k.nesne?.tur === "haber" && k.nesne.id === x.id)} />
+                  {onem(x) > 0 && <span className={onem(x) >= 8 ? "ed-sayi tamam" : "ed-sayi"} title="Haber Masası önemi (10 üzerinden)">{onem(x).toLocaleString("tr", { maximumFractionDigits: 1 })}</span>}
+                  <Ikon ad="ileri" />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      ))}
     </div>
   );
 }

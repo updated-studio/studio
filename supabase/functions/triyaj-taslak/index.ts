@@ -1020,6 +1020,15 @@ Deno.serve(async (req) => {
     const r = await adaySec(sb, Number(govde.gorsel_sec), String(govde.model ?? ""), p.name ?? "");
     return Response.json(r, { status: "hata" in r ? 422 : 200, headers: CORS });
   }
+  // Onaya gönderildi: yöneticilere ve yayın yönetmenine Stüdyo bildirimi (4 Kasım 2026). Yalnız editörün elle gönderdiği; otomatik taslak değil.
+  if (govde?.onay_bildir) {
+    const o = govde.onay_bildir as { koleksiyon?: string; id?: number; baslik?: string };
+    const { data: yon } = await sb.from("profiles").select("id").in("site_rol", ["admin", "yayin-yonetmeni"]).neq("id", u.user.id);
+    const tur = o.koleksiyon === "reviews" ? "İnceleme" : o.koleksiyon === "comparisons" ? "Kıyas" : "Haber";
+    const satirlar = ((yon ?? []) as { id: string }[]).map((x) => ({ user_id: x.id, body: `Onay bekliyor · ${tur}: ${String(o.baslik || "başlıksız").slice(0, 120)} — ${p.name} gönderdi (Stüdyo → Onay bekleyenler)` }));
+    if (satirlar.length) await sb.from("notifications").insert(satirlar);
+    return Response.json({ ok: true, bildirilen: satirlar.length }, { headers: CORS });
+  }
   // Brave'i dene (yönetici): web ve görsel araması açık mı, bu ayki kullanım (4 Kasım 2026)
   if (govde?.brave_dene) {
     if (!p.is_admin) return Response.json({ hata: "Sadece yönetici" }, { status: 403, headers: CORS });
