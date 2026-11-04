@@ -10,13 +10,15 @@ export type KatalogModel = { saglayici: "gpt" | "banana"; id: string; ad: string
 type Secim = { gpt?: string; gpt_kalite?: string; banana?: string };
 
 // Cloudflare Workers AI modelleri (ücretsiz günlük pay içinde); açıklamalar Cloudflare model kataloğundan
-export const CF_MODELLER: { id: string; ad: string; aciklama: string }[] = [
-  { id: "klein", ad: "FLUX.2 [klein] 9B", aciklama: "Black Forest Labs; hızlı, damıtılmış model" },
-  { id: "dev", ad: "FLUX.2 [dev]", aciklama: "Black Forest Labs; en gerçekçi ve ayrıntılı FLUX" },
-  { id: "lucid", ad: "Lucid Origin", aciklama: "Leonardo AI; canlı renk, güçlü istem uyumu" },
+// noron: görsel başına yaklaşık Cloudflare birimi (sunucu: uretim.ts CF_NORON); pay dolunca aşan her 1.000 birim 0,011 $
+export const CF_MODELLER: { id: string; ad: string; aciklama: string; noron: number }[] = [
+  { id: "klein", ad: "FLUX.2 [klein] 9B", aciklama: "Black Forest Labs; hızlı, damıtılmış model", noron: 1450 },
+  { id: "dev", ad: "FLUX.2 [dev]", aciklama: "Black Forest Labs; en gerçekçi ve ayrıntılı FLUX", noron: 6000 },
+  { id: "lucid", ad: "Lucid Origin", aciklama: "Leonardo AI; canlı renk, güçlü istem uyumu", noron: 3500 },
 ];
+const cfUcret = (noron: number) => "≈ $" + (noron * 0.011 / 1000).toLocaleString("tr", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
-export type Katalog = { modeller: KatalogModel[]; secim: Secim; hata: string[] };
+export type Katalog = { modeller: KatalogModel[]; secim: Secim; hata: string[]; cf?: { kullanilan: number; sinir: number; bitti: boolean } };
 export function useModelKatalog(atla = false) {
   const [veri, setVeri] = useState<Katalog | null>(null);
   useEffect(() => {
@@ -63,13 +65,22 @@ export default function ModelSecici({ mod, uret, kaydet, mesgul, katalog, gomulu
   return (
     <div className={"ms" + (gomulu ? " gomulu" : "")}>
       {mod === "uret" && <section>
-        <h4>Ücretsiz · Cloudflare <span className="muted">(günlük ücretsiz pay; dolarsa o gün üretmez, ücret çıkmaz)</span></h4>
-        {CF_MODELLER.map((m) => (
-          <label key={m.id} className={"ms-satir" + (cf.includes(m.id) ? " secili" : "")}>
-            <input type="checkbox" checked={cf.includes(m.id)} onChange={(e) => setCf((x) => e.target.checked ? [...x, m.id] : x.filter((y) => y !== m.id))} />
-            <span className="ms-ad"><b>{m.ad}</b><span className="muted">{m.aciklama}</span></span><span className="ms-fiyat">ücretsiz</span>
-          </label>
-        ))}
+        <h4>Cloudflare <span className="muted">(günde 10.000 birim ücretsiz; dolunca görsel başı ücretli, her gece 03.00'te yenilenir)</span></h4>
+        {veri.cf && <div className="ms-pay">
+          <span className="ms-pay-cubuk"><i style={{ width: Math.min(100, Math.round((veri.cf.kullanilan / veri.cf.sinir) * 100)) + "%" }} /></span>
+          <span className="muted">{veri.cf.bitti ? "Bugünkü ücretsiz pay bitti; Cloudflare görselleri şu an ücretli." : `Bugün ücretsiz payın ~%${Math.round((veri.cf.kullanilan / veri.cf.sinir) * 100)}'i kullanıldı (tahmini, kalan ~${(veri.cf.sinir - veri.cf.kullanilan).toLocaleString("tr")} birim).`}</span>
+        </div>}
+        {CF_MODELLER.map((m) => {
+          const kalan = veri.cf ? veri.cf.sinir - veri.cf.kullanilan : 10_000;
+          const bedava = !veri.cf?.bitti && kalan >= m.noron;
+          return (
+            <label key={m.id} className={"ms-satir" + (cf.includes(m.id) ? " secili" : "")}>
+              <input type="checkbox" checked={cf.includes(m.id)} onChange={(e) => setCf((x) => e.target.checked ? [...x, m.id] : x.filter((y) => y !== m.id))} />
+              <span className="ms-ad"><b>{m.ad}</b><span className="muted">{m.aciklama} · görsel başı ~{m.noron.toLocaleString("tr")} birim</span></span>
+              <span className="ms-fiyat">{bedava ? "ücretsiz (pay içinde)" : cfUcret(m.noron)}</span>
+            </label>
+          );
+        })}
       </section>}
       <section>
         <h4>OpenAI · GPT Image <span className="muted">(fiyat: görsel başına, 1536×1024)</span></h4>

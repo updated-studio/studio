@@ -48,3 +48,18 @@
   .ay-alan { grid-template-columns: minmax(0, 1fr); }
   .ay-alan-deger, .ay-markalar { justify-content: flex-start; }
 }
+
+/* Yapay zekâ kıyası sayfası (4 Kasım 2026) */
+.ay-git { color: inherit; text-decoration: none; }
+.ay-git:hover { background: var(--sunk); }
+.kiyas-ozet { padding: 6px 16px 14px; }
+.kiyas-ozet td:first-child { white-space: nowrap; }
+.kiyas-ayrinti summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; }
+.kiyas-ayrinti[open] summary { margin-bottom: 8px; }
+.kiyas-ayrinti .tbl td { vertical-align: top; font-size: 13px; }
+.kiyas-ayrinti a { color: var(--ink); text-decoration: none; }
+.kiyas-ayrinti a:hover { color: var(--blue); }
+.kiyas-fark { margin: 4px 0 0; padding-left: 16px; font-size: 12px; color: var(--muted); }
+.kiyas-dis { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 16px; font-size: 14px; }
+.kiyas-dis p { margin: 0; }
+.kiyas-ozet th, .kiyas-ozet td { text-align: left; }

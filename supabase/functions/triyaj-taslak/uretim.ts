@@ -11,7 +11,10 @@ type Sb = ReturnType<typeof createClient>;
 export type UretimModeli = "klein" | "dev" | "lucid" | "gpt" | "banana";
 export const MODEL_AD: Record<string, string> = { klein: "FLUX.2 klein", dev: "FLUX.2 dev", lucid: "Lucid Origin", schnell: "FLUX.1 schnell", gpt: "GPT Image", banana: "Nano Banana" };
 /** Görsel başına yaklaşık maliyet (dolar; Cloudflare günlük ücretsiz pay içindeyse 0). Kıyas tablosunda tahmini toplam için. */
-export const MODEL_UCRET: Record<string, number> = { klein: 0.016, dev: 0.04, lucid: 0.045, schnell: 0.002, gpt: 0.04, banana: 0.04 };
+export const MODEL_UCRET: Record<string, number> = { klein: 0.016, dev: 0.066, lucid: 0.039, schnell: 0.002, gpt: 0.041, banana: 0.034 };
+/** Cloudflare Workers AI: bizim boyutumuzda görsel başına yaklaşık "neuron" (fiyat sayfası, 4 Kasım 2026); günlük ücretsiz pay 10.000,
+ *  her gün 00.00 UTC'de (03.00 TR) yenilenir; ücretli planda aşan her 1.000 neuron 0,011 $. */
+export const CF_NORON: Record<string, number> = { klein: 1450, dev: 6000, lucid: 3500 };
 
 export type Uretilen = { b64: string; mime: string; model: string; surum?: string };
 
@@ -108,7 +111,20 @@ export function uret(sb: Sb, model: UretimModeli, istem: string, ms: number, sur
 
 /** Seçici için: katalogdaki modellerden hesabımızın gerçekten erişebildikleri (firmanın model listesinden doğrulanır) */
 export type ModelBilgi = KatalogModel & { erisim: boolean };
-export async function modelListesi(sb: Sb): Promise<{ modeller: ModelBilgi[]; secim: Secim; hata: string[] }> {
+/** Bugünkü Cloudflare payının tahmini kullanımı: bugün güncellenen taslaklardaki başarılı Cloudflare üretimlerinin toplamı (künye arka
+ *  plan silme neuron harcamaz). Tahmini: Cloudflare'in kendi sayacına erişimimiz yok. */
+async function cfPay(sb: Sb) {
+  const gun = new Date(); gun.setUTCHours(0, 0, 0, 0);
+  const { data } = await sb.from("tr_drafts").select("image").gte("updated_at", gun.toISOString()).not("image->yz_adaylar", "is", null).limit(400);
+  let kullanilan = 0, bitti = false;
+  for (const r of (data ?? []) as { image: { yz_adaylar?: { model: string; hata?: string }[] } }[]) for (const a of r.image?.yz_adaylar ?? []) {
+    if (a.hata && /4006|daily free allocation/i.test(a.hata)) bitti = true;
+    else if (!a.hata && CF_NORON[a.model]) kullanilan += CF_NORON[a.model];
+  }
+  return { kullanilan, sinir: 10_000, bitti: bitti || kullanilan >= 10_000 };
+}
+
+export async function modelListesi(sb: Sb): Promise<{ modeller: ModelBilgi[]; secim: Secim; hata: string[]; cf: { kullanilan: number; sinir: number; bitti: boolean } }> {
   const m = await anahtarlar(sb, ["openai", "gemini_gorsel"]);
   const var_ = new Set<string>(), hata: string[] = [];
   if (m.openai) try {
@@ -128,5 +144,5 @@ export async function modelListesi(sb: Sb): Promise<{ modeller: ModelBilgi[]; se
   // Son bakışın özeti (yalnız model adları; Claude'un ve Sistem sayfasının hangi modelin kapalı olduğunu görebilmesi için)
   await sb.from("tr_settings").upsert({ key: "gorsel_model_erisim", value: { zaman: new Date().toISOString(), kapali: modeller.filter((x) => !x.erisim).map((x) => x.id), hata,
     anahtar: { openai: !!m.openai, gemini_gorsel: !!m.gemini_gorsel } } });
-  return { modeller, secim: await secim(sb), hata };
+  return { modeller, secim: await secim(sb), hata, cf: await cfPay(sb).catch(() => ({ kullanilan: 0, sinir: 10_000, bitti: false })) };
 }

@@ -13,7 +13,7 @@ export type CanliKisi = { id: string; ad: string; foto: string | null; email: st
 const BOLUM: [RegExp, string][] = [
   [/^\/bugun/, "Bugün"], [/^\/yaz\//, "Haber yaz"], [/^\/taslaklar/, "Taslaklar"], [/^\/yayinda/, "Yayındakiler"], [/^\/onay/, "Onay bekleyenler"], [/^\/haber-masasi/, "Haber Masası"],
   [/^\/cekim/, "Çekim listesi"], [/^\/takvim/, "Takvim"], [/^\/icerik/, "İçerik"], [/^\/site/, "Site"], [/^\/ekip/, "Ekip"], [/^\/marka/, "Marka Kiti"],
-  [/^\/baglantilar/, "Bağlantı anahtarları"], [/^\/deneme-masasi/, "Deneme masası"], [/^\/sistem/, "Sistem"], [/^\/profil/, "Profil"],
+  [/^\/baglantilar/, "Bağlantı anahtarları"], [/^\/deneme-masasi/, "Deneme masası"], [/^\/yz-kiyas/, "Yapay zekâ kıyası"], [/^\/sistem/, "Sistem"], [/^\/profil/, "Profil"],
 ];
 export const bolumAdi = (yol: string) => BOLUM.find(([r]) => r.test(yol))?.[1] ?? "Stüdyo";
 

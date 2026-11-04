@@ -288,7 +288,8 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
   }
   const kalan = Math.max(0, urunler.length - adet);
   const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "yz_kiyas").maybeSingle();
-  const kiyasOran = Math.max(0, Math.min(100, Number((ky?.value as { kunye_oran?: number } | null)?.kunye_oran ?? 20)));
+  const kyA = (ky?.value ?? {}) as { kunye_oran?: number; bitis?: string };
+  const kiyasOran = Date.now() > Date.parse(kyA.bitis ?? "2026-11-18T23:59:00+03:00") ? 0 : Math.max(0, Math.min(100, Number(kyA.kunye_oran ?? 20)));
   const sonuc: { urun: string; durum: string; sayi?: number; hata?: string }[] = [];
   // Son tur Stüdyo'da görünsün (31 Ekim 2026: zamanlayıcı turları 4 gün hiç öneri yazmadı, neden görünmüyordu): her üründen sonra yazılır,
   // işçi süre dolduğu için yarıda kesilse de o ana kadarki sonuç kalır

@@ -289,4 +289,8 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .ms-kalite { display: flex; flex-direction: row; justify-content: flex-start; align-self: flex-start; align-items: center; gap: 8px; font-size: 13px; padding: 4px 10px; }
 .ms-kalite select { width: auto; padding: 5px 8px; font-size: 13px; }
 .ms-kaynak { font-size: 12px; }
+/* Cloudflare günlük ücretsiz payı (tahmini): ince çubuk, mavi */
+.ms-pay { display: flex; flex-direction: column; gap: 4px; padding: 2px 10px 6px; font-size: 12px; }
+.ms-pay-cubuk { display: block; height: 4px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.ms-pay-cubuk i { display: block; height: 100%; background: var(--blue); }
 @media (max-width: 560px) { .ms-satir { grid-template-columns: 20px minmax(0, 1fr); } .ms-fiyat { grid-column: 2; text-align: left; max-width: none; } }

@@ -323,7 +323,9 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const ayarlar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
   const gurultu: string[] = (ayarlar.gurultu_kelimeleri ?? []).map((s: string) => String(s).toLowerCase()).filter(Boolean);
   const model = String(ayarlar.model_eleme ?? "gemini-3.5-flash-lite");
-  const kiyasOran = Math.max(0, Math.min(100, Number((ayarlar.yz_kiyas as { eleme_oran?: number } | undefined)?.eleme_oran ?? 10)));
+  // Kıyas bitiş tarihinden sonra kendiliğinden kapanır (kullanıcı: "iki hafta açık tutalım")
+  const kiyasA = (ayarlar.yz_kiyas ?? {}) as { eleme_oran?: number; bitis?: string };
+  const kiyasOran = Date.now() > Date.parse(kiyasA.bitis ?? "2026-11-18T23:59:00+03:00") ? 0 : Math.max(0, Math.min(100, Number(kiyasA.eleme_oran ?? 10)));
   // Kıyas kayıtları 90 gün tutulur
   sb.from("yz_kiyas").delete().lt("created_at", new Date(Date.now() - 90 * 864e5).toISOString()).then(() => {}, () => {});
   if (ayarlar.model_yedek) YEDEK_MODEL = String(ayarlar.model_yedek);
