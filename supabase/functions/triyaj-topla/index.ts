@@ -6,6 +6,7 @@
 // Not: "Verify JWT" kapalı; girdi almaz. 5 dakikada bir defadan sık çalışmaz.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { aktif, aktifDeger, anahtarHatasi, anahtarYukle, isaretle, sonrakine } from "./anahtar.ts";
+import { claudeJson } from "../triyaj-taslak/claude.ts";
 
 // Eski TR_AYAR
 const SAAT = 24;          // bundan eski haberler alınmaz
@@ -39,6 +40,45 @@ Sadece şu biçimde geçerli JSON döndür: {"eslesme":[{"yeni":0,"mevcut":123}]
 type Kaynak = { id: number; name: string; url: string };
 type Ham = { source: Kaynak; title: string; link: string; date: Date | null; ozet: string };
 type Etiket = { id: number; marka?: string; urun?: string; tur?: string; tip?: string; konu?: string; turkiye?: string; asil_kaynak?: string; olay?: string; neden?: string };
+type Pazar = { orj: string; ad: string; grup: string };
+
+// ---------- Eleme kıyası (4 Kasım 2026, kullanıcı: "Claude iki modelle eleme denesin, yöneticiler 3 sonucu kıyaslasın"; göç 0065) ----------
+// Örneklenen partilerde aynı liste ve aynı istemle Claude Haiku ve Sonnet de etiketler; sonuçları kullanılmaz, yalnız public.yz_kiyas'a
+// yazılır (Gemini'ninkiyle birlikte). Karar, aşağıdaki kurallarla (topla içindeki forEach ile AYNI; biri değişirse öteki de) hesaplanır.
+// Editörün sonraki kararı (aldı, yanlış eleme işareti) Stüdyo'da doğruluk ölçüsü olur. Oran: tr_settings.yz_kiyas.eleme_oran (yüzde).
+const KIYAS_CLAUDE = ["claude-haiku-5-5", "claude-sonnet-5-5"];
+function kararVer(e: Etiket | undefined, pazar: Pazar[]): string {
+  if (!e) return "elendi";
+  const markaK = String(e.marka ?? "").toLowerCase(), urunK = String(e.urun ?? "").toLowerCase();
+  const haric = pazar.find((p) => p.grup === "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
+  const kayit = pazar.find((p) => p.grup !== "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
+  if (haric) return "elendi";
+  if (e.tur === "rehber") return "rehber";
+  if (e.tur === "kampanya") return "elendi";
+  if (e.turkiye === "belirsiz") return "belirsiz";
+  if (e.turkiye === "yok" && (kayit?.grup ?? "") !== "Öncelikli") return "elendi";
+  return "aday";
+}
+async function elemeKiyas(sb: ReturnType<typeof createClient>, p: Ham[], ilk: number, liste: string, gemModel: string, gem: Etiket[], pazar: Pazar[]) {
+  const satirlar: Record<string, unknown>[] = [];
+  const ekle = (model: string, haberler: Etiket[] | null, sure: number, hata?: string) => {
+    const m = new Map((haberler ?? []).map((e) => [Number(e.id), e]));
+    p.forEach((h, i) => {
+      const e = m.get(ilk + i + 1);
+      satirlar.push({ is_turu: "eleme", nesne: h.link, model, sonuc: e ? { marka: e.marka ?? "", urun: e.urun ?? "", tur: e.tur ?? "", tip: e.tip ?? "", konu: e.konu ?? "", turkiye: e.turkiye ?? "", neden: e.neden ?? "" } : {},
+        karar: hata ? null : kararVer(e, pazar), sure_ms: sure, hata: hata ?? null });
+    });
+  };
+  ekle("gemini:" + gemModel, gem, 0);
+  await Promise.all(KIYAS_CLAUDE.map(async (m) => {
+    const t0 = Date.now();
+    try {
+      const c = await claudeJson({ sistem: SISTEM, kullanici: liste, model: m, ms: 150_000, maxTokens: 20_000, fonk: "triyaj-topla" });
+      ekle(m, c ? ((c.veri.haberler ?? []) as Etiket[]) : null, Date.now() - t0, c ? undefined : "Claude anahtarı yok");
+    } catch (e) { ekle(m, null, Date.now() - t0, String((e as Error).message ?? e).slice(0, 200)); }
+  }));
+  for (let i = 0; i < satirlar.length; i += 200) await sb.from("yz_kiyas").insert(satirlar.slice(i, i + 200));
+}
 
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -283,6 +323,9 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const ayarlar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
   const gurultu: string[] = (ayarlar.gurultu_kelimeleri ?? []).map((s: string) => String(s).toLowerCase()).filter(Boolean);
   const model = String(ayarlar.model_eleme ?? "gemini-3.5-flash-lite");
+  const kiyasOran = Math.max(0, Math.min(100, Number((ayarlar.yz_kiyas as { eleme_oran?: number } | undefined)?.eleme_oran ?? 15)));
+  // Kıyas kayıtları 90 gün tutulur
+  sb.from("yz_kiyas").delete().lt("created_at", new Date(Date.now() - 90 * 864e5).toISOString()).then(() => {}, () => {});
   if (ayarlar.model_yedek) YEDEK_MODEL = String(ayarlar.model_yedek);
   YEDEK_KULLANILDI = false;
   GEMINI_TIKALI = "";
@@ -291,7 +334,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
     sb.from("tr_sources").select("id,name,url").eq("active", true).order("id"),
     sb.from("tr_brands").select("name,grp"),
   ]);
-  const pazar = (markalar ?? []).map((m: { name: string; grp: string }) => ({ orj: m.name.trim(), ad: m.name.trim().toLowerCase(), grup: m.grp.trim() }));
+  const pazar: Pazar[] = (markalar ?? []).map((m: { name: string; grp: string }) => ({ orj: m.name.trim(), ad: m.name.trim().toLowerCase(), grup: m.grp.trim() }));
   const sinir = Date.now() - SAAT * 3600_000;
 
   // --- RSS'leri çek (kaynak sırası korunur; kaynak başına sınır sırayla uygulanır) ---
@@ -393,11 +436,16 @@ async function topla(sb: ReturnType<typeof createClient>) {
         const v = await gemini(model, liste);
         ((v.haberler ?? []) as Etiket[]).forEach((e) => etiketler.set(Number(e.id), e));
         p.forEach((_, i) => islenen.add(ilk + i + 1));
+        // Eleme kıyası: arka planda, toplamayı bekletmez
+        if (Math.random() * 100 < kiyasOran) {
+          // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+          EdgeRuntime.waitUntil(elemeKiyas(sb, p, ilk, liste, model, (v.haberler ?? []) as Etiket[], pazar).catch((e) => console.error("eleme kıyası", e)));
+        }
       } catch (e) { hata = String((e as Error).message ?? e).slice(0, 300); }
     }));
   }
 
-  // --- Kurallar (eski triyajIs_) ---
+  // --- Kurallar (eski triyajIs_) --- (karar kısmı kararVer ile aynı; biri değişirse öteki de, eleme kıyası onu kullanır)
   const MODEL = model + " · Stüdyo";
   const elenen: Record<string, unknown>[] = [...onElenen];
   const belirsiz: Record<string, unknown>[] = [];

@@ -35,6 +35,7 @@ export default function Ayarlar() {
   const gurultu = ((a.gurultu_kelimeleri as string[]) ?? []).length;
   const kategoriler = ((a.site_kategoriler ?? {}) as { liste?: { slug: string; name: string }[] }).liste ?? [];
   const varsKat = kategoriler.find((k) => k.slug === String(a.site_varsayilan_kategori ?? ""));
+  const kiyasA = { eleme_oran: 15, kunye_oran: 30, ...((a.yz_kiyas ?? {}) as { eleme_oran?: number; kunye_oran?: number }) };
   const acikPill = (x: boolean) => <span className={"pill " + (x ? "blue" : "off")}>{x ? "Açık" : "Kapalı"}</span>;
   const p = { acik, ac: setAcik };
 
@@ -64,6 +65,9 @@ export default function Ayarlar() {
       <Grup id="olcum" ad="Ölçümler" ne="Hangi model daha iyi iş çıkarıyor? Son 30 günün sayıları.">
         <Satir {...p} id="gtablo" ad="Görsel modelleri" ne="Her deneme: kaç kez üretti, denetimden geçti, kapak oldu; süre ve maliyet."><GorselTablo /></Satir>
         <Satir {...p} id="ytablo" ad="Yazı: Claude ve Gemini" ne="Editörün kör seçimi ve denetimin yaptığı düzeltme sayısı."><YaziKiyas /></Satir>
+        <Satir {...p} id="etablo" ad="Haber eleme: Gemini, Claude Haiku, Claude Sonnet" ne="Aynı haberleri üçü de etiketler; kararları birbiriyle ve editörün kararıyla karşılaştırılır."><ElemeKiyas /></Satir>
+        <Satir {...p} id="ktablo" ad="Künye: Gemini, Claude Haiku, Claude Sonnet" ne="Aynı sayfalardan ürün özelliği çıkarırlar; alıntının sayfada gerçekten geçip geçmediği ölçülür."><KunyeKiyas /></Satir>
+        <Satir {...p} id="kiyasayar" ad="Kıyas oranı" ne="Kıyasa giren haber ve ürün payı; Claude'un ek maliyeti buna göre." deger={`eleme %${kiyasA.eleme_oran} · künye %${kiyasA.kunye_oran}`}><KiyasOrani ayar={ayar} /></Satir>
       </Grup>
 
       <Grup id="kaynak" ad="Haber kaynakları" ne="Havuza ne gireceği, neyin öne çıkacağı ve ne kadar duracağı.">
@@ -400,6 +404,137 @@ function SitePaneli({ ayar }: { ayar: AyarYaz }) {
       {sonuc && (sonuc.ok
         ? <div className="msg good">Bağlandı: {sonuc.panel} · {sonuc.kategori} kategori · {sonuc.yazar} yazar.{sonuc.uyari ? " " + sonuc.uyari : ""}</div>
         : <div className="msg err">{sonuc.hata}</div>)}
+    </>
+  );
+}
+
+// ---------- Yapay zekâ iş kıyasları (4 Kasım 2026, kullanıcı: "her yapay zekâyı en iyi olduğu işte kullanalım; yöneticiler 3 sonucu
+// kıyaslasın"; göç 0065, public.yz_kiyas). Asıl işi Gemini yapar; Claude Haiku ve Sonnet aynı girdiyle gölgede çalışır. ----------
+type KiyasSatir = { nesne: string; model: string; sonuc: Record<string, unknown>; karar: string | null; sure_ms: number | null; hata: string | null };
+const MODEL_ADI = (m: string) => (m.startsWith("gemini:") ? `Gemini (${m.slice(7)})` : m === "claude-haiku-5-5" ? "Claude Haiku 5.5" : m === "claude-sonnet-5-5" ? "Claude Sonnet 5.5" : m);
+const yuzde = (a: number, b: number) => (b ? Math.round((a / b) * 100) + "%" : "–");
+function useKiyas(is: "eleme" | "kunye") {
+  const [satirlar, setSatirlar] = useState<KiyasSatir[] | null>(null);
+  useEffect(() => {
+    sb.from("yz_kiyas").select("nesne,model,sonuc,karar,sure_ms,hata").eq("is_turu", is).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).order("id", { ascending: false }).limit(6000)
+      .then(({ data }) => setSatirlar((data ?? []) as KiyasSatir[]));
+  }, [is]);
+  return satirlar;
+}
+const gruplaNesne = (l: KiyasSatir[]) => { const m = new Map<string, KiyasSatir[]>(); for (const s of l) m.set(s.nesne, [...(m.get(s.nesne) ?? []), s]); return m; };
+const modeller = (l: KiyasSatir[]) => [...new Set(l.map((s) => s.model))].sort((a, b) => (a.startsWith("gemini") ? -1 : b.startsWith("gemini") ? 1 : a.localeCompare(b)));
+
+function ElemeKiyas() {
+  const satirlar = useKiyas("eleme");
+  const [dogru, setDogru] = useState<Map<string, string> | null>(null);
+  // Editörün kararı (doğruluk ölçüsü): haberi aldıysa ya da yanlış eleme işaretiyle havuza aldıysa "havuza girmeliydi"; yanlış işaretiyle
+  // havuzdan elediyse "elenmeliydi". Pas geçilen ve dokunulmayanlar ölçüye girmez.
+  useEffect(() => {
+    if (!satirlar) return;
+    const linkler = [...new Set(satirlar.map((s) => s.nesne))];
+    (async () => {
+      const m = new Map<string, string>();
+      for (let i = 0; i < linkler.length; i += 150) {
+        const { data } = await sb.from("tr_items").select("link,status,wrong_by,taken_by").eq("deneme", false).in("link", linkler.slice(i, i + 150));
+        for (const h of (data ?? []) as { link: string; status: string; wrong_by: string | null; taken_by: string | null }[]) {
+          if (h.wrong_by) m.set(h.link, h.status === "elendi" ? "elendi" : "aday");
+          else if (h.taken_by && ["alindi", "yayinda"].includes(h.status)) m.set(h.link, "aday");
+        }
+      }
+      setDogru(m);
+    })();
+  }, [satirlar]);
+  if (!satirlar) return <p className="ay-not">Yükleniyor…</p>;
+  if (!satirlar.length) return <p className="ay-not">Henüz kıyas yok; örneklenen ilk toplamada (15 dakikada bir) başlar.</p>;
+  const nesneler = gruplaNesne(satirlar);
+  const havuz = (k: string | null) => k === "aday" || k === "belirsiz";
+  const ms = modeller(satirlar);
+  const gemAd = ms.find((m) => m.startsWith("gemini")) ?? "";
+  const ozet = ms.map((m) => {
+    let n = 0, hata = 0, aday = 0, uyum = 0, uyumN = 0, alan = 0, alanN = 0, dN = 0, dOk = 0, sure = 0, sureN = 0;
+    for (const [link, l] of nesneler) {
+      const s = l.find((x) => x.model === m); if (!s) continue;
+      n++; if (s.hata) { hata++; continue; }
+      if (havuz(s.karar)) aday++;
+      if (s.sure_ms) { sure += s.sure_ms; sureN++; }
+      const g = l.find((x) => x.model === gemAd);
+      if (g && !g.hata && m !== gemAd) {
+        uyumN++; if (havuz(g.karar) === havuz(s.karar)) uyum++;
+        for (const k of ["marka", "tur", "turkiye", "konu"]) { alanN++; if (String(g.sonuc[k] ?? "").toLocaleLowerCase("tr") === String(s.sonuc[k] ?? "").toLocaleLowerCase("tr")) alan++; }
+      }
+      const d = dogru?.get(link);
+      if (d) { dN++; if ((d === "aday") === havuz(s.karar)) dOk++; }
+    }
+    return { m, n, hata, aday, uyum, uyumN, alan, alanN, dN, dOk, sure: sureN ? Math.round(sure / sureN / 1000) : 0 };
+  });
+  return (
+    <>
+      <div className="tbl"><table>
+        <thead><tr><th>Model</th><th>Haber</th><th>Havuza aldı</th><th>Gemini ile aynı karar</th><th>Etiket uyumu</th><th>Editörle uyum</th><th>Ort. süre</th></tr></thead>
+        <tbody>{ozet.map((o) => (
+          <tr key={o.m}><td><b>{MODEL_ADI(o.m)}</b>{o.hata ? <span className="muted"> ({o.hata} hata)</span> : null}</td><td>{o.n}</td><td>{yuzde(o.aday, o.n - o.hata)}</td>
+            <td>{o.m === gemAd ? "–" : yuzde(o.uyum, o.uyumN)}</td><td>{o.m === gemAd ? "–" : yuzde(o.alan, o.alanN)}</td>
+            <td>{dogru ? <>{yuzde(o.dOk, o.dN)} <span className="muted">({o.dN})</span></> : "…"}</td><td>{o.sure ? o.sure + " sn" : "–"}</td></tr>
+        ))}</tbody>
+      </table></div>
+      <p className="ay-not">Son 30 gün. "Editörle uyum": editörün aldığı ya da "yanlış eleme" diye düzelttiği haberlerde modelin kararı editörünkiyle aynı mı (parantezde ölçülen haber sayısı). Asıl kararı Gemini veriyor; Claude'un sonuçları yalnız burada.</p>
+    </>
+  );
+}
+
+function KunyeKiyas() {
+  const satirlar = useKiyas("kunye");
+  if (!satirlar) return <p className="ay-not">Yükleniyor…</p>;
+  if (!satirlar.length) return <p className="ay-not">Henüz kıyas yok; künye otomasyonunun örneklenen ilk ürününde başlar.</p>;
+  const nesneler = gruplaNesne(satirlar);
+  const ms = modeller(satirlar);
+  const gemAd = ms.find((m) => m.startsWith("gemini")) ?? "";
+  type Oz = { key: string; value: string; dogru?: boolean };
+  const deger = (v: string) => v.toLocaleLowerCase("tr").replace(/\s+/g, "").replace(",", ".");
+  const ozet = ms.map((m) => {
+    let n = 0, hata = 0, bulunan = 0, dogrulanan = 0, ayni = 0, ortak = 0, sure = 0, sureN = 0;
+    for (const [, l] of nesneler) {
+      const s = l.find((x) => x.model === m); if (!s) continue;
+      n++; if (s.hata) { hata++; continue; }
+      const oz = (s.sonuc.ozellikler ?? []) as Oz[];
+      bulunan += oz.length; dogrulanan += oz.filter((x) => x.dogru).length;
+      if (s.sure_ms) { sure += s.sure_ms; sureN++; }
+      const g = l.find((x) => x.model === gemAd);
+      if (g && !g.hata && m !== gemAd) {
+        const gm = new Map(((g.sonuc.ozellikler ?? []) as Oz[]).map((x) => [x.key, deger(x.value)]));
+        for (const x of oz) if (gm.has(x.key)) { ortak++; if (gm.get(x.key) === deger(x.value)) ayni++; }
+      }
+    }
+    const basarili = n - hata;
+    return { m, n, hata, ort: basarili ? (bulunan / basarili).toLocaleString("tr", { maximumFractionDigits: 1 }) : "–", dogrulanan, bulunan, ayni, ortak, sure: sureN ? Math.round(sure / sureN / 1000) : 0 };
+  });
+  return (
+    <>
+      <div className="tbl"><table>
+        <thead><tr><th>Model</th><th>Ürün</th><th>Ürün başına özellik</th><th>Alıntısı sayfada geçen</th><th>Gemini ile aynı değer</th><th>Ort. süre</th></tr></thead>
+        <tbody>{ozet.map((o) => (
+          <tr key={o.m}><td><b>{MODEL_ADI(o.m)}</b>{o.hata ? <span className="muted"> ({o.hata} hata)</span> : null}</td><td>{o.n}</td><td>{o.ort}</td>
+            <td>{yuzde(o.dogrulanan, o.bulunan)}</td><td>{o.m === gemAd ? "–" : yuzde(o.ayni, o.ortak)}</td><td>{o.sure ? o.sure + " sn" : "–"}</td></tr>
+        ))}</tbody>
+      </table></div>
+      <p className="ay-not">Son 30 gün. "Alıntısı sayfada geçen": modelin kanıt diye gösterdiği cümle kaynak sayfada birebir var mı (uydurma ölçüsü). Asıl öneriyi Gemini veriyor; Claude'un sonuçları yalnız burada.</p>
+    </>
+  );
+}
+
+function KiyasOrani({ ayar }: { ayar: AyarYaz }) {
+  const { v } = useMasa();
+  const k = { eleme_oran: 15, kunye_oran: 30, ...((v.ayarlar.yz_kiyas ?? {}) as { eleme_oran?: number; kunye_oran?: number }) };
+  const [eleme, setEleme] = useState(String(k.eleme_oran));
+  const [kunye, setKunye] = useState(String(k.kunye_oran));
+  const sinirla = (x: string, y: number) => Math.max(0, Math.min(100, Number(x) || 0)) || (x.trim() === "0" ? 0 : y);
+  return (
+    <>
+      <div className="ay-alanlar">
+        <Alan ad="Haber eleme" not="Her 15 dakikalık toplamada partilerin bu kadarı kıyasa girer. %15 ≈ ayda 15 $ Claude (çoğu Sonnet). 0 = kapalı."><Sayi ad="Eleme oranı" deger={eleme} degis={setEleme} birim="%" /></Alan>
+        <Alan ad="Künye" not="Künye otomasyonunun ürünlerinden bu kadarı kıyasa girer. %30 ≈ ayda 10–15 $ Claude. 0 = kapalı."><Sayi ad="Künye oranı" deger={kunye} degis={setKunye} birim="%" /></Alan>
+      </div>
+      <div className="ay-kaydet"><button className="btn sm" onClick={() => ayar("yz_kiyas", { eleme_oran: sinirla(eleme, 15), kunye_oran: sinirla(kunye, 30) }, "Kıyas oranları kaydedildi.")}>Kaydet</button></div>
     </>
   );
 }

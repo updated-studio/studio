@@ -23,7 +23,7 @@ function istemci() {
   return sb;
 }
 const FONK = (() => { try { return new URL(import.meta.url).pathname.split("/").slice(-2, -1)[0] || "?"; } catch { return "?"; } })();
-const say = (model: string, sonuc: string) => { istemci().rpc("gemini_say", { p_fonk: FONK, p_model: model, p_sonuc: sonuc }).then(() => {}, () => {}); };
+const say = (model: string, sonuc: string, fonk?: string) => { istemci().rpc("gemini_say", { p_fonk: fonk || FONK, p_model: model, p_sonuc: sonuc }).then(() => {}, () => {}); };
 
 let onbellek: { anahtar: string | null; zaman: number } | null = null;
 let krediYok = 0; // kredi bitti yanıtı alındıysa 30 dk boyunca Claude denenmez (her çağrıda boşuna beklenmesin)
@@ -43,7 +43,8 @@ function jsonAl(metin: string): Record<string, unknown> {
 }
 
 /** JSON döndüren tek çağrı. sema verilirse yanıt şemaya bağlanır; resimler "Aday N:" etiketiyle sırayla eklenir. */
-export async function claudeJson(o: { sistem: string; kullanici: string; model: string; ms: number; sema?: Record<string, unknown>; resimler?: { mime: string; b64: string; etiket?: string }[]; maxTokens?: number; caba?: "low" | "medium" | "high" }): Promise<{ veri: Record<string, any>; model: string } | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
+// fonk: başka fonksiyondan çağrılınca kullanım sayacındaki ad (kıyaslar, 4 Kasım 2026)
+export async function claudeJson(o: { sistem: string; kullanici: string; model: string; ms: number; sema?: Record<string, unknown>; resimler?: { mime: string; b64: string; etiket?: string }[]; maxTokens?: number; caba?: "low" | "medium" | "high"; fonk?: string }): Promise<{ veri: Record<string, any>; model: string } | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
   if (Date.now() < krediYok) return null;
   const apiKey = await claudeAnahtari();
   if (!apiKey) return null;
@@ -78,14 +79,14 @@ async function tekCagri(apiKey: string, o: Parameters<typeof claudeJson>[0], ice
     if (m.stop_reason === "refusal") throw new Error("Claude yanıt vermeyi reddetti");
     if (m.stop_reason === "max_tokens") throw new Error("Claude yanıtı yarıda kesildi");
     const veri = jsonAl(m.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join(""));
-    say(o.model, "basarili");
+    say(o.model, "basarili", o.fonk);
     return { veri, model: o.model };
   } catch (e) {
     const msg = String((e as Error).message ?? e);
     const kredi = /credit balance|billing|insufficient/i.test(msg);
     if (kredi) krediYok = Date.now() + 30 * 60_000;
     if ((e as { status?: number }).status === 401) onbellek = null;
-    say(o.model, kredi || (e as { status?: number }).status === 429 ? "kota" : "hata");
+    say(o.model, kredi || (e as { status?: number }).status === 429 ? "kota" : "hata", o.fonk);
     throw Object.assign(new Error(kredi ? "Claude kredisi bitti" : msg.slice(0, 120)), { status: kredi ? 0 : (e as { status?: number }).status });
   }
 }

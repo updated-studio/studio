@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-04-m",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Eleme ve künye kıyası",
+    "bolumler": [
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Haber eleme ve künye çıkarma Gemini'nin yanında Claude Haiku ve Sonnet ile de gölgede yapılıyor.",
+          "Ayarlar → Ölçümler'de üçü yan yana: editörle uyum, uydurma ölçüsü, süre."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-l",
     "tarih": "4 Kasım 2026",
     "baslik": "Görsel yönetmeni, anlık güncelleme",

@@ -6,6 +6,7 @@
 // sunucu içinden (X-Forwarded-For'suz) kabul edilir, arka planda çalışır. Kota dolunca durur, ürünü "hata" diye işaretlemez (ertesi tur yeniden dener).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
+import { claudeJson } from "../triyaj-taslak/claude.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -81,6 +82,34 @@ async function gorselBul(marka: string, ad: string, gemini: string | null | unde
 }
 
 type Sayfa = { url: string; baslik: string; metin: string; resmi: boolean };
+
+// ---------- Künye kıyası (4 Kasım 2026, kullanıcı: "künyeye de bir karşılaştırma ekleyelim"; göç 0065) ----------
+// Örneklenen ürünlerde aynı sayfa metinleri ve aynı istemle Claude Haiku ve Sonnet de özellik çıkarır; sonuçları kullanılmaz, yalnız
+// public.yz_kiyas'a yazılır (Gemini'ninkiyle birlikte). Nesnel ölçü: modelin verdiği alıntı ("kanit") kaynak sayfanın metninde gerçekten
+// geçiyor mu (uydurma kontrolü). Oran: tr_settings.yz_kiyas.kunye_oran (yüzde).
+type KunyeGirdi = { kullanici: string; sayfalar: Sayfa[]; model: string };
+const KIYAS_CLAUDE = ["claude-haiku-5-5", "claude-sonnet-5-5"];
+const duz = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+function kunyeSuz(v: Record<string, any> | null | undefined, adlar: Set<string>, sayfalar: Sayfa[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const metin = new Map(sayfalar.map((x) => [x.url, duz(x.metin)]));
+  const oz = (Array.isArray(v?.ozellikler) ? v!.ozellikler : []).filter((o: { key?: string; value?: string; kaynak?: string }) => o?.key && adlar.has(o.key) && o.value && metin.has(String(o.kaynak ?? "")))
+    .map((o: { key: string; value: string; kaynak: string; kanit?: string }) => {
+      const k = duz(String(o.kanit ?? ""));
+      return { key: o.key, value: String(o.value).slice(0, 120), kaynak: o.kaynak, kanit: String(o.kanit ?? "").slice(0, 160), dogru: k.length >= 3 && metin.get(o.kaynak)!.includes(k) };
+    });
+  return { ozellikler: oz, resmiAd: typeof v?.resmiAd === "string" ? v.resmiAd : null, bulunan: oz.length, dogrulanan: oz.filter((x: { dogru: boolean }) => x.dogru).length };
+}
+async function kunyeKiyas(sb: ReturnType<typeof createClient>, oneriId: string, g: KunyeGirdi, adlar: Set<string>, gemV: Record<string, any>) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const satirlar: Record<string, unknown>[] = [{ is_turu: "kunye", nesne: oneriId, model: "gemini:" + g.model, sonuc: kunyeSuz(gemV, adlar, g.sayfalar), sure_ms: 0 }];
+  await Promise.all(KIYAS_CLAUDE.map(async (m) => {
+    const t0 = Date.now();
+    try {
+      const c = await claudeJson({ sistem: OKU_SISTEM, kullanici: g.kullanici, model: m, ms: 150_000, maxTokens: 16_000, fonk: "kunye-otomatik" });
+      satirlar.push({ is_turu: "kunye", nesne: oneriId, model: m, sonuc: c ? kunyeSuz(c.veri, adlar, g.sayfalar) : {}, sure_ms: Date.now() - t0, hata: c ? null : "Claude anahtarı yok" });
+    } catch (e) { satirlar.push({ is_turu: "kunye", nesne: oneriId, model: m, sonuc: {}, sure_ms: Date.now() - t0, hata: String((e as Error).message ?? e).slice(0, 200) }); }
+  }));
+  await sb.from("yz_kiyas").insert(satirlar);
+}
 let SAYFA_TESHIS = "";
 /** Ürünün özellik sayfaları: yalnız künyede kayıtlı bağlantılar (üretici sayfası, önceki önerilerin kaynakları) okunur; arama motoru
  *  kazınmaz (31 Ekim 2026: robot doğrulaması olan aramalar kullanılmaz). Sayfa kendi adımızla (UA) istenir; engelleyen site atlanır.
@@ -163,7 +192,7 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun) {
         if (Array.isArray(v.ozellikler)) v.ozellikler = v.ozellikler.filter((o: { kaynak?: string }) => izinli.has(String(o?.kaynak ?? "")));
         if (v.urunSayfasi && !izinli.has(v.urunSayfasi)) v.urunSayfasi = sayfalar.find((x) => x.resmi)?.url ?? null;
         SAYFA_TESHIS += ` → ${model}`;
-        return { v, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })) };
+        return { v, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })), girdi: { kullanici: `${istem}\n\nSAYFALAR:\n${metin}`, sayfalar, model } };
       } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
     }
     if (hepsiKota) await isaretle(a, "kota_dolu", son); }
@@ -259,6 +288,8 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
     urunler = tum.filter((u) => !atla.has(u.id) && (u.specs?.length ?? 0) > 0 && (u.specs ?? []).filter((s) => s.value).length < (u.specs ?? []).length / 2);
   }
   const kalan = Math.max(0, urunler.length - adet);
+  const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "yz_kiyas").maybeSingle();
+  const kiyasOran = Math.max(0, Math.min(100, Number((ky?.value as { kunye_oran?: number } | null)?.kunye_oran ?? 30)));
   const sonuc: { urun: string; durum: string; sayi?: number; hata?: string }[] = [];
   // Son tur Stüdyo'da görünsün (31 Ekim 2026: zamanlayıcı turları 4 gün hiç öneri yazmadı, neden görünmüyordu): her üründen sonra yazılır,
   // işçi süre dolduğu için yarıda kesilse de o ana kadarki sonuç kalır
@@ -267,7 +298,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
   await kaydet(false);
   for (const u of urunler.slice(0, adet)) {
     try {
-      const { v, kaynaklar } = await ara(sb, u);
+      const { v, kaynaklar, girdi } = await ara(sb, u) as { v: Record<string, any>; kaynaklar: unknown; girdi?: KunyeGirdi }; // eslint-disable-line @typescript-eslint/no-explicit-any
       const adlar = new Set([...(u.specs ?? []).map((s) => s.key), "Boyutlar"]);
       const oz = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).filter((o: { key?: string; value?: string }) => o?.key && adlar.has(o.key) && o.value)
         .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string }) => ({ key: o.key, value: String(o.value).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160) }));
@@ -280,6 +311,11 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       // Görsel sütunları göç 0043 ile geldi; uygulanmamışsa kayıt görselsiz yazılır
       const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, ...(resmiAd ? { resmi_ad: resmiAd } : {}), gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok" }).select("id").single();
       if (error) await sb.from("kunye_oneriler").insert(kayit);
+      // Künye kıyası (göç 0065): arka planda, öneriyi bekletmez
+      if (yeni && girdi && Math.random() * 100 < kiyasOran) {
+        // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
+        EdgeRuntime.waitUntil(kunyeKiyas(sb, String(yeni.id), girdi, adlar, v).catch((e) => console.error("künye kıyası", e)));
+      }
       else if (gorsel && cf && yeni) await gorselIsle(sb, cf, { id: yeni.id as number, urun_id: u.id, gorsel_aday: gorsel });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length, hata: SAYFA_TESHIS }); await kaydet(false);
     } catch (e) {
