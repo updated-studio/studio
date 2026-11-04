@@ -6,7 +6,7 @@
 // Not: "Verify JWT" kapalı; girdi almaz. 5 dakikada bir defadan sık çalışmaz.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { aktif, aktifDeger, anahtarHatasi, anahtarYukle, isaretle, sonrakine } from "./anahtar.ts";
-import { claudeJson } from "../triyaj-taslak/claude.ts";
+import { KIYAS_MODELLERI, kiyasCagir } from "../triyaj-taslak/kiyas.ts";
 
 // Eski TR_AYAR
 const SAAT = 24;          // bundan eski haberler alınmaz
@@ -42,11 +42,11 @@ type Ham = { source: Kaynak; title: string; link: string; date: Date | null; oze
 type Etiket = { id: number; marka?: string; urun?: string; tur?: string; tip?: string; konu?: string; turkiye?: string; asil_kaynak?: string; olay?: string; neden?: string };
 type Pazar = { orj: string; ad: string; grup: string };
 
-// ---------- Eleme kıyası (4 Kasım 2026, kullanıcı: "Claude iki modelle eleme denesin, yöneticiler 3 sonucu kıyaslasın"; göç 0065) ----------
-// Örneklenen partilerde aynı liste ve aynı istemle Claude Haiku ve Sonnet de etiketler; sonuçları kullanılmaz, yalnız public.yz_kiyas'a
+// ---------- Eleme kıyası (4 Kasım 2026, kullanıcı: "Claude iki modelle eleme denesin, yöneticiler sonuçları kıyaslasın; GPT ve Gemini'nin
+// yeni nesli de girsin"; göç 0065) ----------
+// Örneklenen partilerde aynı liste ve aynı istemle kıyas modelleri (triyaj-taslak/kiyas.ts: Claude, GPT, Gemini 4) de etiketler; sonuçları kullanılmaz, yalnız public.yz_kiyas'a
 // yazılır (Gemini'ninkiyle birlikte). Karar, aşağıdaki kurallarla (topla içindeki forEach ile AYNI; biri değişirse öteki de) hesaplanır.
 // Editörün sonraki kararı (aldı, yanlış eleme işareti) Stüdyo'da doğruluk ölçüsü olur. Oran: tr_settings.yz_kiyas.eleme_oran (yüzde).
-const KIYAS_CLAUDE = ["claude-haiku-5-5", "claude-sonnet-5-5"];
 function kararVer(e: Etiket | undefined, pazar: Pazar[]): string {
   if (!e) return "elendi";
   const markaK = String(e.marka ?? "").toLowerCase(), urunK = String(e.urun ?? "").toLowerCase();
@@ -70,12 +70,12 @@ async function elemeKiyas(sb: ReturnType<typeof createClient>, p: Ham[], ilk: nu
     });
   };
   ekle("gemini:" + gemModel, gem, 0);
-  await Promise.all(KIYAS_CLAUDE.map(async (m) => {
+  await Promise.all(KIYAS_MODELLERI.map(async (m) => {
     const t0 = Date.now();
     try {
-      const c = await claudeJson({ sistem: SISTEM, kullanici: liste, model: m, ms: 150_000, maxTokens: 20_000, fonk: "triyaj-topla" });
-      ekle(m, c ? ((c.veri.haberler ?? []) as Etiket[]) : null, Date.now() - t0, c ? undefined : "Claude anahtarı yok");
-    } catch (e) { ekle(m, null, Date.now() - t0, String((e as Error).message ?? e).slice(0, 200)); }
+      const v = await kiyasCagir(sb, m, SISTEM, liste, 150_000, "triyaj-topla");
+      ekle(m.id, v ? ((v.haberler ?? []) as Etiket[]) : null, Date.now() - t0, v ? undefined : "Anahtar yok");
+    } catch (e) { ekle(m.id, null, Date.now() - t0, String((e as Error).message ?? e).slice(0, 200)); }
   }));
   for (let i = 0; i < satirlar.length; i += 200) await sb.from("yz_kiyas").insert(satirlar.slice(i, i + 200));
 }
@@ -323,7 +323,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const ayarlar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
   const gurultu: string[] = (ayarlar.gurultu_kelimeleri ?? []).map((s: string) => String(s).toLowerCase()).filter(Boolean);
   const model = String(ayarlar.model_eleme ?? "gemini-3.5-flash-lite");
-  const kiyasOran = Math.max(0, Math.min(100, Number((ayarlar.yz_kiyas as { eleme_oran?: number } | undefined)?.eleme_oran ?? 15)));
+  const kiyasOran = Math.max(0, Math.min(100, Number((ayarlar.yz_kiyas as { eleme_oran?: number } | undefined)?.eleme_oran ?? 10)));
   // Kıyas kayıtları 90 gün tutulur
   sb.from("yz_kiyas").delete().lt("created_at", new Date(Date.now() - 90 * 864e5).toISOString()).then(() => {}, () => {});
   if (ayarlar.model_yedek) YEDEK_MODEL = String(ayarlar.model_yedek);

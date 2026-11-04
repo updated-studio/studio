@@ -2,13 +2,14 @@
   {
     "id": "2026-11-04-m",
     "tarih": "4 Kasım 2026",
-    "baslik": "Eleme ve künye kıyası",
+    "baslik": "Yapay zekâ kıyası",
     "bolumler": [
       {
         "ad": "Haber Masası",
         "maddeler": [
-          "Haber eleme ve künye çıkarma Gemini'nin yanında Claude Haiku ve Sonnet ile de gölgede yapılıyor.",
-          "Ayarlar → Ölçümler'de üçü yan yana: editörle uyum, uydurma ölçüsü, süre."
+          "Haber eleme ve künyede asıl işi ücretsiz Gemini yapar; Claude, GPT ve Gemini 4 aynı işi gölgede yapar.",
+          "Ayarlar → Ölçümler'de modeller yan yana; anlaşamadıkları haberlerde yönetici hakem olur.",
+          "Yeni bir yapay zekâ modeli çıkınca yöneticilere bildirim gelir."
         ]
       }
     ]

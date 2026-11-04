@@ -17,6 +17,7 @@ import { ARA_SISTEM, araAdaylar, bolumler } from "./ara.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
+import { modelTakip } from "./kiyas.ts";
 import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, yayinEsitle, yzKutuphane, yzTemizle, type Kategori } from "./site.ts";
 import { adayListesi, commons, kaynakGorselleri, fluxIstem, GORSEL_YONETMEN, kaynakDurumu, kucukResim, kuralSecim, modelIstemi, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, URETIM_DENETIM, type GorselAday, type GorselTarif } from "./gorsel.ts";
 
@@ -919,6 +920,8 @@ async function otoCalistir(sb: Sb) {
   await yayinEsitle(sb).catch((e) => console.error("yayinEsitle", e));
   // Eski yapay zekâ görselleri (120 gün, kullanılmayan; kullanıcı 4 Kasım 2026): günde bir kez
   await yzTemizle(sb).catch((e) => console.error("yzTemizle", e));
+  // Yeni yapay zekâ modelleri (günde bir; çıkınca yöneticilere bildirim)
+  await modelTakip(sb).catch((e) => console.error("modelTakip", e));
   const ayar = await otoAyar(sb);
   if (!ayar.acik) return { atlandi: "Otomatik taslak kapalı" };
   const { data: son } = await sb.from("tr_settings").select("value").eq("key", "oto_son").maybeSingle();

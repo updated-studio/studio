@@ -35,7 +35,7 @@ export default function Ayarlar() {
   const gurultu = ((a.gurultu_kelimeleri as string[]) ?? []).length;
   const kategoriler = ((a.site_kategoriler ?? {}) as { liste?: { slug: string; name: string }[] }).liste ?? [];
   const varsKat = kategoriler.find((k) => k.slug === String(a.site_varsayilan_kategori ?? ""));
-  const kiyasA = { eleme_oran: 15, kunye_oran: 30, ...((a.yz_kiyas ?? {}) as { eleme_oran?: number; kunye_oran?: number }) };
+  const kiyasA = { eleme_oran: 10, kunye_oran: 20, ...((a.yz_kiyas ?? {}) as { eleme_oran?: number; kunye_oran?: number }) };
   const acikPill = (x: boolean) => <span className={"pill " + (x ? "blue" : "off")}>{x ? "Açık" : "Kapalı"}</span>;
   const p = { acik, ac: setAcik };
 
@@ -65,8 +65,8 @@ export default function Ayarlar() {
       <Grup id="olcum" ad="Ölçümler" ne="Hangi model daha iyi iş çıkarıyor? Son 30 günün sayıları.">
         <Satir {...p} id="gtablo" ad="Görsel modelleri" ne="Her deneme: kaç kez üretti, denetimden geçti, kapak oldu; süre ve maliyet."><GorselTablo /></Satir>
         <Satir {...p} id="ytablo" ad="Yazı: Claude ve Gemini" ne="Editörün kör seçimi ve denetimin yaptığı düzeltme sayısı."><YaziKiyas /></Satir>
-        <Satir {...p} id="etablo" ad="Haber eleme: Gemini, Claude Haiku, Claude Sonnet" ne="Aynı haberleri üçü de etiketler; kararları birbiriyle ve editörün kararıyla karşılaştırılır."><ElemeKiyas /></Satir>
-        <Satir {...p} id="ktablo" ad="Künye: Gemini, Claude Haiku, Claude Sonnet" ne="Aynı sayfalardan ürün özelliği çıkarırlar; alıntının sayfada gerçekten geçip geçmediği ölçülür."><KunyeKiyas /></Satir>
+        <Satir {...p} id="etablo" ad="Haber eleme: 6 model" ne="Aynı haberleri hepsi etiketler; kararlar birbiriyle, editörle ve senin hakem kararınla karşılaştırılır."><ElemeKiyas /></Satir>
+        <Satir {...p} id="ktablo" ad="Künye: 6 model" ne="Aynı sayfalardan ürün özelliği çıkarırlar; alıntının sayfada gerçekten geçip geçmediği ölçülür."><KunyeKiyas /></Satir>
         <Satir {...p} id="kiyasayar" ad="Kıyas oranı" ne="Kıyasa giren haber ve ürün payı; Claude'un ek maliyeti buna göre." deger={`eleme %${kiyasA.eleme_oran} · künye %${kiyasA.kunye_oran}`}><KiyasOrani ayar={ayar} /></Satir>
       </Grup>
 
@@ -411,7 +411,9 @@ function SitePaneli({ ayar }: { ayar: AyarYaz }) {
 // ---------- Yapay zekâ iş kıyasları (4 Kasım 2026, kullanıcı: "her yapay zekâyı en iyi olduğu işte kullanalım; yöneticiler 3 sonucu
 // kıyaslasın"; göç 0065, public.yz_kiyas). Asıl işi Gemini yapar; Claude Haiku ve Sonnet aynı girdiyle gölgede çalışır. ----------
 type KiyasSatir = { nesne: string; model: string; sonuc: Record<string, unknown>; karar: string | null; sure_ms: number | null; hata: string | null };
-const MODEL_ADI = (m: string) => (m.startsWith("gemini:") ? `Gemini (${m.slice(7)})` : m === "claude-haiku-5-5" ? "Claude Haiku 5.5" : m === "claude-sonnet-5-5" ? "Claude Sonnet 5.5" : m);
+// Kıyas modelleri sunucuda triyaj-taslak/kiyas.ts KIYAS_MODELLERI; "gemini:…" asıl işi yapan ücretsiz Gemini
+const KIYAS_AD: Record<string, string> = { "claude-haiku-5-5": "Claude Haiku 5.5", "claude-sonnet-5-5": "Claude Sonnet 5.5", "gpt-6-luna": "GPT-6 Luna", "gpt-6.1-sol": "GPT-6.1 Sol", "gemini-4-argon": "Gemini 4 Argon" };
+const MODEL_ADI = (m: string) => (m.startsWith("gemini:") ? `Gemini ${m.slice(7).replace(/^gemini-/, "")} (asıl, ücretsiz)` : KIYAS_AD[m] ?? m);
 const yuzde = (a: number, b: number) => (b ? Math.round((a / b) * 100) + "%" : "–");
 function useKiyas(is: "eleme" | "kunye") {
   const [satirlar, setSatirlar] = useState<KiyasSatir[] | null>(null);
@@ -422,11 +424,14 @@ function useKiyas(is: "eleme" | "kunye") {
   return satirlar;
 }
 const gruplaNesne = (l: KiyasSatir[]) => { const m = new Map<string, KiyasSatir[]>(); for (const s of l) m.set(s.nesne, [...(m.get(s.nesne) ?? []), s]); return m; };
-const modeller = (l: KiyasSatir[]) => [...new Set(l.map((s) => s.model))].sort((a, b) => (a.startsWith("gemini") ? -1 : b.startsWith("gemini") ? 1 : a.localeCompare(b)));
+const modeller = (l: KiyasSatir[]) => [...new Set(l.map((s) => s.model).filter((m) => m !== "editor"))].sort((a, b) => (a.startsWith("gemini") ? -1 : b.startsWith("gemini") ? 1 : a.localeCompare(b)));
 
 function ElemeKiyas() {
   const satirlar = useKiyas("eleme");
   const [dogru, setDogru] = useState<Map<string, string> | null>(null);
+  const [basliklar, setBasliklar] = useState<Map<string, string>>(new Map());
+  const [hakemler, setHakemler] = useState<Map<string, string>>(new Map());
+  const toast = useToast();
   // Editörün kararı (doğruluk ölçüsü): haberi aldıysa ya da yanlış eleme işaretiyle havuza aldıysa "havuza girmeliydi"; yanlış işaretiyle
   // havuzdan elediyse "elenmeliydi". Pas geçilen ve dokunulmayanlar ölçüye girmez.
   useEffect(() => {
@@ -435,15 +440,24 @@ function ElemeKiyas() {
     (async () => {
       const m = new Map<string, string>();
       for (let i = 0; i < linkler.length; i += 150) {
-        const { data } = await sb.from("tr_items").select("link,status,wrong_by,taken_by").eq("deneme", false).in("link", linkler.slice(i, i + 150));
-        for (const h of (data ?? []) as { link: string; status: string; wrong_by: string | null; taken_by: string | null }[]) {
+        const { data } = await sb.from("tr_items").select("link,title,event,status,wrong_by,taken_by").eq("deneme", false).in("link", linkler.slice(i, i + 150));
+        for (const h of (data ?? []) as { link: string; title: string; event: string; status: string; wrong_by: string | null; taken_by: string | null }[]) {
+          basliklar.set(h.link, h.event || h.title);
           if (h.wrong_by) m.set(h.link, h.status === "elendi" ? "elendi" : "aday");
           else if (h.taken_by && ["alindi", "yayinda"].includes(h.status)) m.set(h.link, "aday");
         }
       }
-      setDogru(m);
+      // Yöneticinin hakem kararı editör kararının önüne geçer
+      for (const s of satirlar) if (s.model === "editor" && s.karar) m.set(s.nesne, s.karar);
+      setBasliklar(new Map(basliklar)); setDogru(m);
     })();
-  }, [satirlar]);
+  }, [satirlar]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function hakem(link: string, karar: "aday" | "elendi") {
+    const r = await sb.from("yz_kiyas").insert({ is_turu: "eleme", nesne: link, model: "editor", karar });
+    if (r.error) return toast(hataMetni(r.error));
+    setHakemler((x) => new Map(x).set(link, karar));
+    setDogru((x) => new Map(x ?? []).set(link, karar));
+  }
   if (!satirlar) return <p className="ay-not">Yükleniyor…</p>;
   if (!satirlar.length) return <p className="ay-not">Henüz kıyas yok; örneklenen ilk toplamada (15 dakikada bir) başlar.</p>;
   const nesneler = gruplaNesne(satirlar);
@@ -467,6 +481,12 @@ function ElemeKiyas() {
     }
     return { m, n, hata, aday, uyum, uyumN, alan, alanN, dN, dOk, sure: sureN ? Math.round(sure / sureN / 1000) : 0 };
   });
+  // Modellerin anlaşamadığı, henüz doğrusu bilinmeyen haberler: yönetici hakem olur (birkaç dakikada en değerli ölçü)
+  const anlasmazlik = [...nesneler].filter(([link, l]) => {
+    if (dogru?.has(link) || hakemler.has(link)) return false;
+    const k = l.filter((x) => x.model !== "editor" && !x.hata).map((x) => havuz(x.karar));
+    return k.length >= 3 && k.some(Boolean) && k.some((x) => !x);
+  }).slice(0, 15);
   return (
     <>
       <div className="tbl"><table>
@@ -477,7 +497,21 @@ function ElemeKiyas() {
             <td>{dogru ? <>{yuzde(o.dOk, o.dN)} <span className="muted">({o.dN})</span></> : "…"}</td><td>{o.sure ? o.sure + " sn" : "–"}</td></tr>
         ))}</tbody>
       </table></div>
-      <p className="ay-not">Son 30 gün. "Editörle uyum": editörün aldığı ya da "yanlış eleme" diye düzelttiği haberlerde modelin kararı editörünkiyle aynı mı (parantezde ölçülen haber sayısı). Asıl kararı Gemini veriyor; Claude'un sonuçları yalnız burada.</p>
+      <p className="ay-not">Son 30 gün. "Editörle uyum": editörün aldığı, "yanlış eleme" diye düzelttiği ya da aşağıda hakem olarak işaretlediğin haberlerde modelin kararı doğruyla aynı mı (parantezde ölçülen haber). Asıl kararı ücretsiz Gemini veriyor; diğerlerinin sonuçları yalnız burada.</p>
+      {anlasmazlik.length > 0 && <div className="ay-blok">
+        <b>Hakem ol: modellerin anlaşamadığı haberler</b>
+        <p className="ay-not">Her biri için doğrusunu seç; editörler henüz denetlemediği için en değerli ölçü bu. Kimin ne dediğini görmeden karar ver.</p>
+        <div className="ay-alanlar">
+          {anlasmazlik.map(([link]) => (
+            <Alan key={link} ad={basliklar.get(link) || link.replace(/^https?:\/\/(www\.)?/, "").slice(0, 80)} not={<a href={link} target="_blank" rel="noreferrer">Haberi aç ↗</a>}>
+              <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                <button className="btn ghost sm" onClick={() => hakem(link, "aday")}>Havuza girmeli</button>
+                <button className="btn ghost sm" onClick={() => hakem(link, "elendi")}>Elenmeli</button>
+              </span>
+            </Alan>
+          ))}
+        </div>
+      </div>}
     </>
   );
 }
@@ -524,17 +558,18 @@ function KunyeKiyas() {
 
 function KiyasOrani({ ayar }: { ayar: AyarYaz }) {
   const { v } = useMasa();
-  const k = { eleme_oran: 15, kunye_oran: 30, ...((v.ayarlar.yz_kiyas ?? {}) as { eleme_oran?: number; kunye_oran?: number }) };
+  const k = { eleme_oran: 10, kunye_oran: 20, ...((v.ayarlar.yz_kiyas ?? {}) as { eleme_oran?: number; kunye_oran?: number }) };
   const [eleme, setEleme] = useState(String(k.eleme_oran));
   const [kunye, setKunye] = useState(String(k.kunye_oran));
   const sinirla = (x: string, y: number) => Math.max(0, Math.min(100, Number(x) || 0)) || (x.trim() === "0" ? 0 : y);
   return (
     <>
       <div className="ay-alanlar">
-        <Alan ad="Haber eleme" not="Her 15 dakikalık toplamada partilerin bu kadarı kıyasa girer. %15 ≈ ayda 15 $ Claude (çoğu Sonnet). 0 = kapalı."><Sayi ad="Eleme oranı" deger={eleme} degis={setEleme} birim="%" /></Alan>
-        <Alan ad="Künye" not="Künye otomasyonunun ürünlerinden bu kadarı kıyasa girer. %30 ≈ ayda 10–15 $ Claude. 0 = kapalı."><Sayi ad="Künye oranı" deger={kunye} degis={setKunye} birim="%" /></Alan>
+        <Alan ad="Haber eleme" not="Toplanan haber partilerinin bu kadarı kıyasa girer; giren her haberi 6 model de etiketler. %10 ≈ ayda 30 $ (çoğu üç güçlü model). 0 = kapalı."><Sayi ad="Eleme oranı" deger={eleme} degis={setEleme} birim="%" /></Alan>
+        <Alan ad="Künye" not="Künye otomasyonunun ürünlerinden bu kadarı kıyasa girer. %20 ≈ ayda 25 $. 0 = kapalı."><Sayi ad="Künye oranı" deger={kunye} degis={setKunye} birim="%" /></Alan>
+        <Alan ad="Öneri" not="İki hafta açık tut, Ölçümler'de kazananı seç, sonra 0 yap. Kıyas kalıcı bir masraf değil, karar vermek için."><span className="muted">–</span></Alan>
       </div>
-      <div className="ay-kaydet"><button className="btn sm" onClick={() => ayar("yz_kiyas", { eleme_oran: sinirla(eleme, 15), kunye_oran: sinirla(kunye, 30) }, "Kıyas oranları kaydedildi.")}>Kaydet</button></div>
+      <div className="ay-kaydet"><button className="btn sm" onClick={() => ayar("yz_kiyas", { eleme_oran: sinirla(eleme, 10), kunye_oran: sinirla(kunye, 20) }, "Kıyas oranları kaydedildi.")}>Kaydet</button></div>
     </>
   );
 }

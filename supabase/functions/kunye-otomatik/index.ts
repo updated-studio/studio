@@ -6,7 +6,7 @@
 // sunucu içinden (X-Forwarded-For'suz) kabul edilir, arka planda çalışır. Kota dolunca durur, ürünü "hata" diye işaretlemez (ertesi tur yeniden dener).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
-import { claudeJson } from "../triyaj-taslak/claude.ts";
+import { KIYAS_MODELLERI, kiyasCagir } from "../triyaj-taslak/kiyas.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -84,11 +84,10 @@ async function gorselBul(marka: string, ad: string, gemini: string | null | unde
 type Sayfa = { url: string; baslik: string; metin: string; resmi: boolean };
 
 // ---------- Künye kıyası (4 Kasım 2026, kullanıcı: "künyeye de bir karşılaştırma ekleyelim"; göç 0065) ----------
-// Örneklenen ürünlerde aynı sayfa metinleri ve aynı istemle Claude Haiku ve Sonnet de özellik çıkarır; sonuçları kullanılmaz, yalnız
+// Örneklenen ürünlerde aynı sayfa metinleri ve aynı istemle kıyas modelleri (triyaj-taslak/kiyas.ts: Claude, GPT, Gemini 4) de özellik çıkarır; sonuçları kullanılmaz, yalnız
 // public.yz_kiyas'a yazılır (Gemini'ninkiyle birlikte). Nesnel ölçü: modelin verdiği alıntı ("kanit") kaynak sayfanın metninde gerçekten
 // geçiyor mu (uydurma kontrolü). Oran: tr_settings.yz_kiyas.kunye_oran (yüzde).
 type KunyeGirdi = { kullanici: string; sayfalar: Sayfa[]; model: string };
-const KIYAS_CLAUDE = ["claude-haiku-5-5", "claude-sonnet-5-5"];
 const duz = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
 function kunyeSuz(v: Record<string, any> | null | undefined, adlar: Set<string>, sayfalar: Sayfa[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const metin = new Map(sayfalar.map((x) => [x.url, duz(x.metin)]));
@@ -101,12 +100,12 @@ function kunyeSuz(v: Record<string, any> | null | undefined, adlar: Set<string>,
 }
 async function kunyeKiyas(sb: ReturnType<typeof createClient>, oneriId: string, g: KunyeGirdi, adlar: Set<string>, gemV: Record<string, any>) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const satirlar: Record<string, unknown>[] = [{ is_turu: "kunye", nesne: oneriId, model: "gemini:" + g.model, sonuc: kunyeSuz(gemV, adlar, g.sayfalar), sure_ms: 0 }];
-  await Promise.all(KIYAS_CLAUDE.map(async (m) => {
+  await Promise.all(KIYAS_MODELLERI.map(async (m) => {
     const t0 = Date.now();
     try {
-      const c = await claudeJson({ sistem: OKU_SISTEM, kullanici: g.kullanici, model: m, ms: 150_000, maxTokens: 16_000, fonk: "kunye-otomatik" });
-      satirlar.push({ is_turu: "kunye", nesne: oneriId, model: m, sonuc: c ? kunyeSuz(c.veri, adlar, g.sayfalar) : {}, sure_ms: Date.now() - t0, hata: c ? null : "Claude anahtarı yok" });
-    } catch (e) { satirlar.push({ is_turu: "kunye", nesne: oneriId, model: m, sonuc: {}, sure_ms: Date.now() - t0, hata: String((e as Error).message ?? e).slice(0, 200) }); }
+      const v = await kiyasCagir(sb, m, OKU_SISTEM, g.kullanici, 150_000, "kunye-otomatik");
+      satirlar.push({ is_turu: "kunye", nesne: oneriId, model: m.id, sonuc: v ? kunyeSuz(v, adlar, g.sayfalar) : {}, sure_ms: Date.now() - t0, hata: v ? null : "Anahtar yok" });
+    } catch (e) { satirlar.push({ is_turu: "kunye", nesne: oneriId, model: m.id, sonuc: {}, sure_ms: Date.now() - t0, hata: String((e as Error).message ?? e).slice(0, 200) }); }
   }));
   await sb.from("yz_kiyas").insert(satirlar);
 }
@@ -289,7 +288,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
   }
   const kalan = Math.max(0, urunler.length - adet);
   const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "yz_kiyas").maybeSingle();
-  const kiyasOran = Math.max(0, Math.min(100, Number((ky?.value as { kunye_oran?: number } | null)?.kunye_oran ?? 30)));
+  const kiyasOran = Math.max(0, Math.min(100, Number((ky?.value as { kunye_oran?: number } | null)?.kunye_oran ?? 20)));
   const sonuc: { urun: string; durum: string; sayi?: number; hata?: string }[] = [];
   // Son tur Stüdyo'da görünsün (31 Ekim 2026: zamanlayıcı turları 4 gün hiç öneri yazmadı, neden görünmüyordu): her üründen sonra yazılır,
   // işçi süre dolduğu için yarıda kesilse de o ana kadarki sonuç kalır
