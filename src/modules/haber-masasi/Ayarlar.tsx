@@ -53,7 +53,7 @@ export default function Ayarlar() {
       </Grup>
 
       <Grup id="gorsel" ad="Görseller" ne="Uygun fotoğraf bulunamayınca kapağı yapay zekâ çizer. Sitede “Temsili görsel” etiketiyle çıkar.">
-        <Satir {...p} id="modeller" ad="Üretimde kullanılan modeller" ne="Otomatik üretim bunları kullanır. Taslakta tek seferlik başka model seçilebilir."
+        <Satir {...p} id="modeller" ad="Üretimde kullanılan modeller" ne="Önce ücretsiz Cloudflare dener; payı biterse ya da görsel reddedilirse sırayla Nano Banana, GPT Image."
           deger={modelOzet(katalog, a.gorsel_modeller)}>
           <ModelSecici mod="varsayilan" gomulu katalog={katalog} kaydet={(s) => ayar("gorsel_modeller", s, "Görsel modelleri kaydedildi.")} />
         </Satir>
@@ -62,7 +62,7 @@ export default function Ayarlar() {
       </Grup>
 
       <Grup id="olcum" ad="Ölçümler" ne="Hangi model daha iyi iş çıkarıyor? Son 30 günün sayıları.">
-        <Satir {...p} id="gtablo" ad="Görsel modelleri" ne="Kaç kez üretti, denetimden geçti, kapak oldu; süre ve maliyet."><GorselTablo /></Satir>
+        <Satir {...p} id="gtablo" ad="Görsel modelleri" ne="Her deneme: kaç kez üretti, denetimden geçti, kapak oldu; süre ve maliyet."><GorselTablo /></Satir>
         <Satir {...p} id="ytablo" ad="Yazı: Claude ve Gemini" ne="Editörün kör seçimi ve denetimin yaptığı düzeltme sayısı."><YaziKiyas /></Satir>
       </Grup>
 
@@ -210,14 +210,16 @@ type Aday = { model: string; url?: string; gecti: boolean; puan: number; hata?: 
 function GorselTablo() {
   const [satirlar, setSatirlar] = useState<{ image: Record<string, unknown> }[] | null>(null);
   useEffect(() => {
-    sb.from("tr_drafts").select("image").eq("image->>yz_kiyas", "true").gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(300)
+    sb.from("tr_drafts").select("image").not("image->yz_adaylar", "is", null).gte("created_at", new Date(Date.now() - 30 * 864e5).toISOString()).limit(300)
       .then(({ data }) => setSatirlar((data ?? []) as { image: Record<string, unknown> }[]));
   }, []);
   const tablo = new Map<string, { uretildi: number; denendi: number; gecti: number; puan: number; otomatik: number; editor: number; sure: number }>();
+  let payBitti = 0;
   for (const r of satirlar ?? []) {
     const img = r.image as { yz_adaylar?: Aday[]; yz_model?: string; yz_secen?: string };
     for (const a of img.yz_adaylar ?? []) {
       const t = tablo.get(a.model) ?? { uretildi: 0, denendi: 0, gecti: 0, puan: 0, otomatik: 0, editor: 0, sure: 0 };
+      if (a.hata && /4006|daily free allocation/i.test(a.hata)) payBitti++;
       t.denendi++; if (!a.hata) { t.uretildi++; t.puan += a.puan; t.sure += a.sure; } if (a.gecti) t.gecti++;
       if (img.yz_model === a.model) img.yz_secen === "editor" ? t.editor++ : t.otomatik++;
       tablo.set(a.model, t);
@@ -225,7 +227,7 @@ function GorselTablo() {
   }
   const sirali = [...tablo.entries()].sort((a, b) => (b[1].editor + b[1].otomatik) - (a[1].editor + a[1].otomatik) || b[1].puan / Math.max(1, b[1].uretildi) - a[1].puan / Math.max(1, a[1].uretildi));
   if (!satirlar) return <p className="ay-not">Yükleniyor…</p>;
-  if (!sirali.length) return <p className="ay-not">Henüz kıyas yok; fotoğrafı bulunamayan ilk taslakta başlar.</p>;
+  if (!sirali.length) return <p className="ay-not">Henüz deneme yok; fotoğrafı bulunamayan ilk taslakta başlar.</p>;
   return (
     <>
       <div className="tbl"><table>
@@ -237,6 +239,7 @@ function GorselTablo() {
             <td>{t.uretildi ? Math.round(t.sure / t.uretildi / 1000) + " sn" : "–"}</td><td>{(t.uretildi * (MODEL_UCRET[m] ?? 0)).toLocaleString("tr", { style: "currency", currency: "USD" })}</td></tr>
         ))}</tbody>
       </table></div>
+      {payBitti > 0 && <p className="ay-not"><b>Cloudflare'in günlük ücretsiz payı {payBitti} denemede bitmişti</b>; bu denemeler "üretti" sayısına girmez. Pay her gün 03.00'te (Türkiye) yenilenir.</p>}
       <p className="ay-not">Puan 10 üzerinden, yedi katmanlı denetimin verdiği. Cloudflare modelleri ücretsiz günlük payla çalışır; maliyet üst sınırdır.</p>
     </>
   );

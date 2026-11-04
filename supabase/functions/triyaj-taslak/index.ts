@@ -714,7 +714,7 @@ async function yukle(sb: Sb, id: number, g: Uretilen): Promise<string> {
 
 const adayGorsel = (a: YzAday, istem: string): GorselAday => ({ kaynak: "Yapay zekâ (Flux)", sayfa: a.url!, buyuk: a.url!, thumb: a.url!, yazar: `Updated (yapay zekâ, ${MODEL_AD[a.model] ?? a.model})`, lisans: "Yapay zekâ üretimi", aciklama: istem, w: 1600, h: 900, ...(a.odak ? { odak: a.odak } : {}) });
 
-async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: string; urun: string; istem: string }, bitis: number, kiyasla: boolean, izinli?: string[], surumler?: { gpt?: string; banana?: string; kalite?: string }): Promise<{ secilen: GorselAday | null; neden: string; adaylar: YzAday[]; model?: string }> {
+async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: string; urun: string; istem: string }, bitis: number, kiyasla: boolean, izinli?: string[], surumler?: { gpt?: string; banana?: string; kalite?: string }): Promise<{ secilen: GorselAday | null; neden: string; adaylar: YzAday[]; model?: string; kiyas?: boolean }> {
   const modeller = (await kullanilabilir(sb)).filter((m) => !izinli || izinli.includes(m));
   if (!modeller.length) return { secilen: null, neden: "Görsel üretecek servis bağlı değil (Bağlantı anahtarları → Cloudflare).", adaylar: [] };
   const istem = fluxIstem(o.istem);
@@ -728,17 +728,28 @@ async function yzGorselUret(sb: Sb, id: number, o: { baslik: string; marka: stri
     } catch (e) { return { model: model || "klein", gecti: false, puan: 0, neden: "", hata: String((e as Error).message ?? e).slice(0, 160), sure: Date.now() - t0 }; }
   };
   let adaylar: YzAday[];
-  if (kiyasla && modeller.length > 1) adaylar = await Promise.all(modeller.map((m) => tek(m, istem)));
+  const kiyas = kiyasla && modeller.length > 1;
+  if (kiyas) adaylar = await Promise.all(modeller.map((m) => tek(m, istem)));
   else {
-    adaylar = [await tek("", istem)];
-    if (!adaylar[0].gecti && bitis - Date.now() > 50_000) adaylar.push(await tek("", istem + " Show the subject as a neutral concept or a close-up detail, not a full branded product."));
+    // Tek model sırası (4 Kasım 2026): önce ücretsiz Cloudflare; günlük payı biterse ya da reddedilirse sırayla Nano Banana (ucuz), GPT Image.
+    // Eskiden yalnız klein iki kez deneniyordu: Cloudflare payı bittiği günlerde hiç görsel çıkmıyordu, ücretli modeller hiç denenmiyordu.
+    const sira = (["klein", "banana", "gpt"] as UretimModeli[]).filter((m) => modeller.includes(m));
+    const notr = " Show the subject as a neutral concept or a close-up detail, not a full branded product.";
+    adaylar = [];
+    for (const m of sira.length ? sira : [modeller[0] as UretimModeli]) {
+      if (adaylar.length && bitis - Date.now() < 50_000) break;
+      // Bir önceki model görseli üretip denetimden geçemediyse sonraki model daha nötr istemle dener
+      const a = await tek(m, adaylar.some((x) => !x.hata) ? istem + notr : istem);
+      adaylar.push(a);
+      if (a.gecti) break;
+    }
   }
   const iyi = adaylar.filter((a) => a.gecti && a.url).sort((a, b) => b.puan - a.puan)[0];
   const ozet = adaylar.map((a) => `${MODEL_AD[a.model] ?? a.model}: ${a.hata ? "üretilemedi (" + a.hata + ")" : a.gecti ? a.puan + "/10" : "reddedildi (" + a.neden + ")"}`).join("; ");
-  if (!iyi) return { secilen: null, neden: "Yapay zekâ görseli de uygun bulunmadı: " + ozet, adaylar };
+  if (!iyi) return { secilen: null, neden: "Yapay zekâ görseli de uygun bulunmadı: " + ozet, adaylar, kiyas };
   return {
-    secilen: adayGorsel(iyi, istem), adaylar, model: iyi.model,
-    neden: `Uygun fotoğraf bulunamadı; görsel yapay zekâ destekli üretildi (${MODEL_AD[iyi.model] ?? iyi.model}, denetim ${iyi.puan}/10: ${iyi.neden}). Daha iyi bir görsel bulursan değiştir.${adaylar.length > 1 ? " Kıyas: " + ozet : ""}`,
+    secilen: adayGorsel(iyi, istem), adaylar, model: iyi.model, kiyas,
+    neden: `Uygun fotoğraf bulunamadı; görsel yapay zekâ destekli üretildi (${MODEL_AD[iyi.model] ?? iyi.model}, denetim ${iyi.puan}/10: ${iyi.neden}). Daha iyi bir görsel bulursan değiştir.${adaylar.length > 1 ? (kiyas ? " Kıyas: " : " Denenenler: ") + ozet : ""}`,
   };
 }
 
@@ -815,7 +826,7 @@ async function elleUret(sb: Sb, id: number, otomatik = false) {
   const ayar = await kiyasAyar(sb);
   let kiyasla = false;
   if (ayar.acik) {
-    const { count } = await sb.from("tr_drafts").select("id", { count: "exact", head: true }).eq("image->>yz_kiyas", "true").gte("created_at", new Date(Date.now() - 864e5).toISOString());
+    const { count } = await sb.from("tr_drafts").select("id", { count: "exact", head: true }).eq("image->>yz_kiyas_oto", "true").gte("created_at", new Date(Date.now() - 864e5).toISOString());
     kiyasla = (count ?? 0) < ayar.gunluk;
   }
   const u = await yzGorselUret(sb, id, { baslik: t.title || it?.title || "", marka: it?.brand ?? "", urun: it?.product ?? "", istem: String(img.ai_istem || t.title) }, bitis, kiyasla);
@@ -823,7 +834,7 @@ async function elleUret(sb: Sb, id: number, otomatik = false) {
   const simdi = (son?.image ?? {}) as Record<string, unknown> & { secilen?: GorselAday | null };
   if (simdi.secilen) return { hata: "Bu arada elle görsel seçildi; üretilen adaylar kaydedildi.", adaylar: u.adaylar.length };
   await sb.from("tr_drafts").update({
-    image: { ...simdi, secilen: u.secilen, gorsel_neden: u.neden, yz_adaylar: u.adaylar, ...(u.adaylar.length > 1 ? { yz_kiyas: true } : {}), ...(u.secilen ? { yz_uretim: true, yz_secen: "otomatik", yz_model: u.model } : {}) },
+    image: { ...simdi, secilen: u.secilen, gorsel_neden: u.neden, yz_adaylar: u.adaylar, ...(u.kiyas ? { yz_kiyas: true, yz_kiyas_oto: true } : {}), ...(u.secilen ? { yz_uretim: true, yz_secen: "otomatik", yz_model: u.model } : {}) },
     ...(u.secilen ? { notes: [...((son?.notes ?? []) as string[]), "Görsel: uygun fotoğraf bulunamadı, öne çıkan görsel yapay zekâ destekli üretildi. Bulabilirsen daha iyi bir görsel kullan."] } : {}),
   }).eq("id", id);
   if (u.secilen && t.site_id) return { ok: true, neden: u.neden, site: await siteKapakEkle(sb, id) };
