@@ -56,14 +56,18 @@ export default function Taslaklarim() {
   // Sıralama ve süzgeç (3 Kasım 2026, kullanıcı: "son hazırlattığım en üste gelmiyor; detaylı filtreleme ve sıralama")
   const [sira, setSira] = useState<"yeni" | "guncel" | "kontrol">("yeni");
   const [kim, setKim] = useState<"hepsi" | "benim">("hepsi");
-  const [durum, setDurum] = useState<"hepsi" | "taslak" | "incelemede">("hepsi");
+  const [durum, setDurum] = useState<"hepsi" | "taslak" | "incelemede" | "yayinda">("hepsi");
+  // Yayındaki haberi düzeltmek (4 Kasım 2026, kullanıcı: "yazılan haberi girip düzeltebilmeliyiz, Stüdyo'da bulamadım"): "Yayında" seçilince
+  // son yayımlanan 50 haber gelir; açıp düzeltince sitedeki hâli yeniden yayımlanana kadar değişmez.
+  const [yayinda, setYayinda] = useState<Icerik[] | null>(null);
+  useEffect(() => { if (durum === "yayinda" && !yayinda && kullanici) api.liste("news", "yayinda", "", 1, { sirala: "-publishedAt" }).then((r) => setYayinda(r.docs)).catch(() => setYayinda([])); }, [durum, yayinda, kullanici]);
   const [ara, setAra] = useState("");
   const yukle = useCallback(() => { if (kullanici) taslaklar().then(setListe).catch(() => setListe([])); }, [kullanici]);
   useEffect(yukle, [yukle]);
   const benimYazar = kullanici ? (typeof kullanici.author === "object" ? kullanici.author?.id : kullanici.author) ?? null : null;
   const yazarId = (x: Icerik) => { const a = (x as { author?: number | { id: number } | null }).author; return typeof a === "object" ? a?.id ?? null : a ?? null; };
   const suz = (l: Icerik[]) => l
-    .filter((x) => (kim === "hepsi" || yazarId(x) === benimYazar) && (durum === "hepsi" || (x.workflow?.state ?? "taslak") === durum)
+    .filter((x) => (kim === "hepsi" || yazarId(x) === benimYazar) && (durum === "hepsi" || durum === "yayinda" || (x.workflow?.state ?? "taslak") === durum)
       && (!ara.trim() || (x.title ?? "").toLocaleLowerCase("tr").includes(ara.trim().toLocaleLowerCase("tr"))))
     .sort((a, b) => sira === "kontrol" ? kontrolSayisi(b) - kontrolSayisi(a)
       : sira === "guncel" ? +new Date(b.updatedAt) - +new Date(a.updatedAt)
@@ -86,10 +90,10 @@ export default function Taslaklarim() {
           </div>
           <input type="search" placeholder="Başlıkta ara" aria-label="Başlıkta ara" value={ara} onChange={(e) => setAra(e.target.value)} />
           <label>Sırala<select value={sira} onChange={(e) => setSira(e.target.value as typeof sira)}><option value="yeni">En yeni hazırlanan</option><option value="guncel">Son güncellenen</option><option value="kontrol">Kontrolü en çok biten</option></select></label>
-          <label>Durum<select value={durum} onChange={(e) => setDurum(e.target.value as typeof durum)}><option value="hepsi">Hepsi</option><option value="taslak">Taslak</option><option value="incelemede">Yayın onayında</option></select></label>
+          <label>Durum<select value={durum} onChange={(e) => setDurum(e.target.value as typeof durum)}><option value="hepsi">Hepsi</option><option value="taslak">Taslak</option><option value="incelemede">Yayın onayında</option><option value="yayinda">Yayında (düzeltmek için)</option></select></label>
         </div>
         <div className="ed-liste">
-          {suz(liste).map((x) => (
+          {(durum === "yayinda" ? yayinda === null ? [] : suz(yayinda) : suz(liste)).map((x) => (
             <button key={x.id} className="ed-satir" onClick={() => git(`/yaz/${x.id}`)}>
               <span className="ed-satir-m"><b>{x.title || "Başlıksız taslak"}</b><span className="muted">{api.ad(x.category as never) || "Kategori yok"} · {zaman(x.updatedAt)}</span></span>
               <span className={`site-durum site-durum--${x.workflow?.state ?? "taslak"}`}>{api.DURUMLAR[x.workflow?.state ?? "taslak"]}</span>

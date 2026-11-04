@@ -92,6 +92,9 @@ function jsonOku(ham: string): Record<string, any> | null { // eslint-disable-li
 // Eski gemini_: modeller sırayla; geçersiz JSON'da aynı modeli 2 kez daha dener; 429/500/503'te sonraki modele geçer
 // Toplam süre bütçesi: sunucu ~150 sn'de işi öldürür, ondan önce bitirip hata yazmalıyız
 const BUTCE_MS = 115_000;
+// Arka plan işleri (EdgeRuntime.waitUntil) istek süresine (150 sn) değil işçi süresine (400 sn, functions/main) bağlı; Claude'a yetecek süre
+// verilsin, süre yetmediği için Gemini'ye düşülmesin (4 Kasım 2026, kullanıcı: "optimum ücretlerde işi Gemini'ye bırakmamak").
+const ISLE_BUTCE_MS = 240_000, KONTROL_BUTCE_MS = 270_000;
 
 // Anahtar havuzu (30 Ekim 2026, göç 0052): anahtarlar sırayla; bir anahtarda bütün modeller kota (429) verirse o anahtar "kota dolu"
 // işaretlenir ve aynı iş sıradaki anahtarla denenir. Hepsi biterse Groq yedeği. Anahtar seçimi anahtar.ts'te (bütün Gemini fonksiyonlarında aynı).
@@ -310,8 +313,14 @@ function metinListe(x: unknown): string[] {
   return (Array.isArray(x) ? x : x ? [x] : []).map(duz).map((s) => s.trim()).filter(Boolean);
 }
 
+/** Uzun yapay zekâ çağrısı sürerken nabız düzenli gitsin (2 dk nabızsız iş yarıda kalmış sayılıyor) */
 async function isle(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici: string | null, ad: string, sec: IsSecenek = {}) {
-  const bitis = Date.now() + BUTCE_MS;
+  const nb = setInterval(() => { sb.from("tr_items").update({ work_state: tur }).eq("id", itemId).eq("work_state", tur).then(() => {}, () => {}); }, 45_000);
+  try { return await isleIc(sb, itemId, tur, kullanici, ad, sec); } finally { clearInterval(nb); }
+}
+
+async function isleIc(sb: Sb, itemId: number, tur: "ceviri" | "taslak", kullanici: string | null, ad: string, sec: IsSecenek = {}) {
+  const bitis = Date.now() + ISLE_BUTCE_MS;
   // Nabız: iş sürdükçe updated_at tazelenir; 2 dk nabız gelmezse zamanlanmış görev işi "hata"ya çeker (0013)
   const nabiz = () => sb.from("tr_items").update({ work_state: tur }).eq("id", itemId).eq("work_state", tur);
   const { data: it } = await sb.from("tr_items").select("*").eq("id", itemId).single();
@@ -488,9 +497,9 @@ type Duzeltme = { kontrol: number; tur: string; once: string; sonra: string; ned
 const degisenParagraf = (eski: string, yeni: string) => { const e = new Set(eski.split(/\n{2,}/).map((x) => x.trim())); return yeni.split(/\n{2,}/).map((x) => x.trim()).filter((x) => x && !e.has(x)).length; };
 
 async function kontrol(sb: Sb, id: number) {
-  const bitis = Date.now() + BUTCE_MS;
+  const bitis = Date.now() + KONTROL_BUTCE_MS;
   // Kilit: sadece bekleyen ya da 4 dakikadır asılı kalmış kontrol alınır
-  const asili = new Date(Date.now() - 4 * 60_000).toISOString();
+  const asili = new Date(Date.now() - 6 * 60_000).toISOString();
   const { data: kilit } = await sb.from("tr_drafts").update({ qc_state: "calisiyor", qc_at: new Date().toISOString() })
     .eq("id", id).or(`qc_state.eq.bekliyor,and(qc_state.eq.calisiyor,qc_at.lt.${asili})`).select("*");
   const t = kilit?.[0];
@@ -514,8 +523,8 @@ async function kontrol(sb: Sb, id: number) {
         const onceki = tur === 2 && qc.onceki_sorunlar?.length ? `\n\n===\n\nÖNCEKİ DENETİMİN BULDUĞU SORUNLAR (hepsini metinde çöz; çözülemeyen bilgiyi metinden çıkar):\n- ${qc.onceki_sorunlar.join("\n- ")}` : "";
         const { veri: k, claudeHata } = await yz("kontrol", KONTROL_SISTEM(uslup),
           `KAYNAK METİNLER:\n${qc.kaynak}\n\n===\n\nTASLAK:\n${JSON.stringify({ baslik, spot, govde })}${onceki}`,
-          // Denetim daha derin düşünür (3 Kasım 2026: başlıktaki çıkarım kaçmıştı); görsel ayrı çağrıda olduğu için süre buna ayrılır
-          MODELLER, bitis - 8_000, { claudeBitis: bitis - 20_000, maxTokens: 16_000, caba: "high" });
+          // Denetim orta seviyede düşünür (4 Kasım 2026, kullanıcı: "yüksek harcamasın, orta"); görsel ayrı çağrıda, süre buna ayrılır
+          MODELLER, bitis - 8_000, { claudeBitis: bitis - 30_000, maxTokens: 16_000, caba: "medium" });
         if (claudeHata) notlar.push("Claude denetimi çalışmadı (" + claudeHata + "); kontrolü Gemini yaptı.");
         sorunlar = metinListe(k.sorunlar);
         guven = String(k.guven ?? "");
@@ -730,7 +739,7 @@ async function otoCalistir(sb: Sb) {
 
   // 0) Kalite kontrolü başlatılamamış ya da yarıda kalmış taslaklar (en fazla 2, arka planda)
   const { data: kontrolBekleyen } = await sb.from("tr_drafts").select("id")
-    .or(`and(qc_state.eq.bekliyor,qc_at.lt.${new Date(Date.now() - 3 * 60_000).toISOString()}),and(qc_state.eq.calisiyor,qc_at.lt.${new Date(Date.now() - 5 * 60_000).toISOString()})`).limit(2);
+    .or(`and(qc_state.eq.bekliyor,qc_at.lt.${new Date(Date.now() - 3 * 60_000).toISOString()}),and(qc_state.eq.calisiyor,qc_at.lt.${new Date(Date.now() - 7 * 60_000).toISOString()})`).limit(2);
   const arkaPlan: Promise<unknown>[] = ((kontrolBekleyen ?? []) as { id: number }[]).map((k) => kontrol(sb, k.id).catch(() => null));
 
   // 1) Önceki turda süre yetmediği için panele gidemeyen otomatik taslaklar (kontrolü bitmiş olanlar)
@@ -805,7 +814,7 @@ async function otoCalistir(sb: Sb) {
       await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi. Tekrar dene." })
         .eq("id", secim.h.id).eq("work_state", "taslak");
       r();
-    }, 135_000));
+    }, 255_000));
     isler2.push(Promise.race([isle(sb, secim.h.id, "taslak", editor?.id ?? null, editor?.name ?? "", { oto: true }), sure]));
   }
   if (!baslayan.length) return { atlandi: "Haberler bu arada alındı" };
@@ -906,7 +915,7 @@ Deno.serve(async (req) => {
     .eq("id", item_id).or(`work_state.not.in.(ceviri,taslak),updated_at.lt.${eski}`).select("id");
   if (!kilit?.length) return Response.json({ hata: "Bu haber için zaten bir iş sürüyor" }, { status: 409, headers: CORS });
 
-  // Sunucu süre sınırına (yaklaşık 150 sn) takılmadan önce işi kesip hatayı yaz; "yazılıyor"da asılı kalmasın
+  // İşçi süre sınırına (400 sn) takılmadan önce işi kesip hatayı yaz; "yazılıyor"da asılı kalmasın
   const sure = new Promise<void>((r) => setTimeout(async () => {
     await sb.from("tr_items").update({ work_state: "hata", work_error: "Zaman aşımı: kaynak site ya da yapay zekâ çok yavaş yanıt verdi. Tekrar dene." })
       .eq("id", Number(item_id)).eq("work_state", tur);

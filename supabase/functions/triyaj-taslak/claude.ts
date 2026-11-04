@@ -1,5 +1,5 @@
 // Düşünme seviyesi (4 Kasım 2026, kullanıcı: "önemli bir iş, düşünme neden düşük, bana sormadan yapma"): varsayılan medium; taslak yazımı
-// medium, denetim high. Düşürmek kullanıcı kararıdır.
+// ve denetim medium (4 Kasım: kullanıcı "yüksek harcamasın"). Düşürmek kullanıcı kararıdır.
 // Claude (Anthropic API) çağrıları (2 Kasım 2026, kullanıcı: "geminiden alıp claude'a devredelim; claude'un kendi modelleri arasında,
 // biri yazar daha akıllısı denetler"). Anahtar Stüdyo → Bağlantı anahtarları "claude" (göç 0061).
 // Kim ne yapar: CLAUDE_MODEL'de. Anahtar yoksa null döner; hata (kredi bitti, kota, ağ, süre) fırlatılır. İkisinde de çağıran Gemini'ye döner,
@@ -48,13 +48,26 @@ export async function claudeJson(o: { sistem: string; kullanici: string; model: 
   const apiKey = await claudeAnahtari();
   if (!apiKey) return null;
   if (o.ms < 8_000) throw new Error("Claude için süre yetmedi");
-  const client = new Anthropic({ apiKey, timeout: o.ms, maxRetries: 0 });
+  const bitis = Date.now() + o.ms;
   const icerik: Anthropic.ContentBlockParam[] = [];
   for (const r of o.resimler ?? []) {
     if (r.etiket) icerik.push({ type: "text", text: r.etiket + ":" });
     icerik.push({ type: "image", source: { type: "base64", media_type: r.mime as "image/jpeg" | "image/png" | "image/webp", data: r.b64 } });
   }
   icerik.push({ type: "text", text: o.kullanici });
+  // Geçici hatada (aşırı yük 529, 5xx, 429) ve süre yetiyorsa bir kez yeniden dener; Gemini'ye ancak sonra düşülür (4 Kasım 2026)
+  for (let deneme = 0; ; deneme++) {
+    try { return await tekCagri(apiKey, o, icerik, bitis - Date.now()); }
+    catch (e) {
+      const st = (e as { status?: number }).status ?? 0;
+      if (deneme === 0 && (st === 429 || st >= 500) && bitis - Date.now() > 45_000) { await new Promise((r) => setTimeout(r, 4_000)); continue; }
+      throw e;
+    }
+  }
+}
+
+async function tekCagri(apiKey: string, o: Parameters<typeof claudeJson>[0], icerik: Anthropic.ContentBlockParam[], ms: number): Promise<{ veri: Record<string, any>; model: string }> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const client = new Anthropic({ apiKey, timeout: Math.max(8_000, ms), maxRetries: 0 });
   try {
     const m = await client.messages.create({
       // Sistem istemi önbelleğe alınır (aynı üslup ve kontrol yönergesi her taslakta tekrar gider; tekrar okunması %90 ucuz)
@@ -73,7 +86,7 @@ export async function claudeJson(o: { sistem: string; kullanici: string; model: 
     if (kredi) krediYok = Date.now() + 30 * 60_000;
     if ((e as { status?: number }).status === 401) onbellek = null;
     say(o.model, kredi || (e as { status?: number }).status === 429 ? "kota" : "hata");
-    throw new Error(kredi ? "Claude kredisi bitti" : msg.slice(0, 120));
+    throw Object.assign(new Error(kredi ? "Claude kredisi bitti" : msg.slice(0, 120)), { status: kredi ? 0 : (e as { status?: number }).status });
   }
 }
 

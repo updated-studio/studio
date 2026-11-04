@@ -66,6 +66,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 4 Kasım 2026
+- (Natro Claude): Kullanıcı: Opus "orta" düşünsün (yüksek değil, maliyet); amaç süre yüzünden Gemini'ye düşmemek. Arka plan işleri istek süresine değil işçi süresine (400 sn) bağlı: `ISLE_BUTCE_MS` 240 sn, `KONTROL_BUTCE_MS` 270 sn, taslak sırasında 45 sn'de bir nabız, geçici hatada (429/5xx) bir yeniden deneme. Elle "Yayınladım" tamamen kalktı ("panel dışından haber yayınlanamamalı"). Taslaklar → Durum "Yayında": yayındaki haberi açıp düzeltme.
 - (Natro Claude): Kullanıcı düşük düşünme seviyesine kızdı ("önemli iş, bana sormadan neden"): taslak yazımı medium, denetim high, varsayılan medium; max_tokens 8000+ (düşünme payı). Düşürmek kullanıcı kararı. "İPhone" hatası Gemini taslağıydı (#857): `html.ts` `markaYazimi` (iPhone, iPad, iOS, macOS, eSIM...) taslak ve denetim sonrası uygulanır; başlık merak uyandırsın, clickbait/ragebait yok kuralı. Yayın eşitleme `site.ts` `yayinEsitle` (oto turu başında; panelde yayındaki haber → taslak gonderildi, haber yayinda); Benim'de elle "Yayınladım" yalnız panelde taslağı olmayan haberde. Yazar: Stüdyo'da yalnız admin seçer; panelde `hooks/imza.ts` `yazarKilidi` (News/Reviews/Comparisons). "Yayın akışı" (Hazırlayan/İkinci editör) formdan kalktı; ownerUser kaydeden hesap. Süzgeçler "Süzgeç" düğmesinde. Onay bekleyen: Claude/Gemini kör karşılaştırma; fragman gömme (yerleşim kararı).
 
 ### 3 Kasım 2026

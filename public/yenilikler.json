@@ -16,6 +16,13 @@
         "maddeler": [
           "Yazarı yalnız yöneticiler değiştirebilir; \"Hazırlayan\" kaydeden hesap olur."
         ]
+      },
+      {
+        "ad": "Taslaklar",
+        "maddeler": [
+          "Durum → \"Yayında\" ile yayındaki haberleri açıp düzeltebilirsin.",
+          "Elle \"Yayınladım\" kalktı; yayın kendiliğinden işaretlenir."
+        ]
       }
     ]
   },
