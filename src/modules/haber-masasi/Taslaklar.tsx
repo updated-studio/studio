@@ -119,7 +119,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
           const secili = g.yz_model === a.model && !!g.secilen && g.secilen.buyuk === a.url;
           return (
             <figure key={a.model} className={secili ? "secili" : ""} title={a.katmanlar ? Object.entries(a.katmanlar).map(([k, v]) => `${k}: ${v}`).join("\n") : undefined}>
-              {a.url ? <div className="yz-resim"><img src={wikiKucuk(a.url)} alt="" loading="lazy" />{!a.gecti && <span className="pill off">Denetimden geçmedi</span>}</div> : <div className="yz-bos">{a.hata ? "Üretilemedi" : "Denetimden geçmedi"}</div>}
+              {a.url ? <div className="yz-resim"><img src={wikiKucuk(a.url)} alt="" loading="lazy" />{!a.gecti && <span className="pill off">Denetimden geçmedi</span>}</div> : <div className="yz-bos">{a.hata ? "Üretilemedi" : <>Denetimden geçmedi<small>Görsel saklanmamış (5 Kasım öncesi üretim); görmek için yeniden üret</small></>}</div>}
               <figcaption><b>{MODEL_AD[a.model] ?? a.model}</b>{a.surum && <span className="muted"> ({a.surum})</span>} · {a.hata ? a.hata : `${a.puan}/10`}{!a.hata && a.neden && <span className="muted"> · {a.neden}</span>}</figcaption>
               {a.url && !secili && <button className="btn ghost sm" disabled={!!seciliyor} onClick={() => adaySec(a.model)}>{seciliyor === a.model ? "Seçiliyor…" : a.gecti ? "Bunu kullan" : "Yine de kullan"}</button>}
               {secili && <span className="pill ok">Kapak</span>}
