@@ -717,7 +717,7 @@ async function gorselYonet(o: YzKonu, bitis: number): Promise<GorselTarif | null
 }
 
 async function denetle(o: YzKonu, g: Uretilen, bitis: number, tarif?: GorselTarif | null): Promise<Pick<YzAday, "gecti" | "puan" | "katmanlar" | "neden" | "odak">> {
-  const tarifMetni = tarif ? `\nGörsel yönetmeninin tarifi — konu: ${tarif.konu}\nAna mesaj: ${tarif.ana_mesaj}\nGörselde olması gereken birebir yazılar: ${tarif.yazilar.length ? tarif.yazilar.map((y) => `"${y}"`).join(", ") : "yok"}\nGörünebilecek gerçek marka öğeleri: ${tarif.marka_ogeleri || "yok"}` : "";
+  const tarifMetni = tarif ? `\nGörsel yönetmeninin tarifi — konu: ${tarif.konu}\nAna mesaj: ${tarif.ana_mesaj}\nGörselde olması gereken birebir yazılar: ${tarif.yazilar.length ? tarif.yazilar.map((y) => `"${y}"`).join(", ") : "yok"}\nİstenen logo / marka öğesi (varsa gerçeğiyle birebir doğru olmalı): ${tarif.marka_ogeleri || "yok"}` : "";
   const { veri } = await yz("gorsel", URETIM_DENETIM, `Haber başlığı: ${o.baslik}\nSpot: ${o.spot || "-"}\nMarka: ${o.marka || "-"}\nÜrün: ${o.urun || "-"}${tarifMetni}`, ["gemini-3.5-flash", ...MODELLER],
     Math.min(bitis - 5_000, Date.now() + 35_000), { claudeBitis: Math.min(bitis - 15_000, Date.now() + 25_000), resimler: [{ mime: g.mime, b64: g.b64, etiket: "Üretilen görsel" }] });
   const puan = Math.max(0, Math.min(10, Number(veri.puan) || 0));

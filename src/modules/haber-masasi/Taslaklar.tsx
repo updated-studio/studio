@@ -111,6 +111,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     {g.yz_tarif && <details className="yz-tarif"><summary>Görsel yönetmeninin tarifi: {g.yz_tarif.konu}</summary>
       <div><b>Ana mesaj:</b> {g.yz_tarif.ana_mesaj}</div>
       <div><b>Sahne:</b> {g.yz_tarif.sahne}</div>
+      {g.yz_tarif.marka_ogeleri && !/^yok$/i.test(g.yz_tarif.marka_ogeleri.trim()) && <div><b>Logo:</b> {g.yz_tarif.marka_ogeleri}</div>}
       {g.yz_tarif.yazilar.length > 0 && <div><b>Görseldeki yazılar:</b> {g.yz_tarif.yazilar.map((y) => `"${y}"`).join(", ")}</div>}
       {g.yz_tarif.kacin.length > 0 && <div><b>Kaçınılanlar:</b> {g.yz_tarif.kacin.join(" · ")}</div>}
     </details>}
