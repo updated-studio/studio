@@ -48,6 +48,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 - Sohbetler uzayınca yeni sohbete geçmekten tedirgin; bu günlük o yüzden var. Obsidian gibi ayrı bir sistem yerine bu depoda tutmayı seçti; Supabase'i de sordu, GitHub seçildi (iki Claude da doğrudan okuyabiliyor, sürümlü, bedava) (19 Ekim). "Her detay girsin, bu bir iş akışı olsun, yeni sohbet buna devam etsin" dedi.
 
 ## Teknik notlar (Claude için; tekrar aynı duvara çarpmamak için)
+- Sözdizimi denetimi (scratchpad sozdizim.cjs) aynı adla iki kez tanımlanan değişkeni yakalamıyor (4 Kasım: kunye-otomatik `duz` → BOOT_ERROR). Fonksiyon değişikliğinden sonra yayına girince `curl -X OPTIONS …/functions/v1/<ad>` 200 mü bak.
 
 - **Supabase bağlantısı (connector):** 19 Ekim'de kuruldu ve çalışıyor (Enes onay verdi; fonksiyon listesi ve SQL denendi). Kuruluysa veritabanı sorguları ve fonksiyon yayını **bağlantıyla** yapılır, Chrome sekmesiyle değil (aşağıdaki Chrome yöntemleri sadece yedek). Fatih'in Claude'unda bağlantı büyük ihtimalle kurulu. Ders: oturum başında hangi bağlantıların var olduğuna bak; 12-19 Ekim arası bu yapılmadığı için Chrome üzerinden zahmetle çalışıldı.
 

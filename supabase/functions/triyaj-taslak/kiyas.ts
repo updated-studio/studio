@@ -4,16 +4,19 @@
 // Gemini 4 Argon'un ücretsiz katmanı yok: görsel için açılan ücretli projenin anahtarıyla (gemini_gorsel) çağrılır; asıl metin işleri
 // ücretsiz Gemini anahtar havuzunda kalır (kullanıcı: "ikisi birbirine girmesin").
 import { claudeJson } from "./claude.ts";
+import { anahtarlar as havuzAnahtarlari } from "./anahtar.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Sb = ReturnType<typeof createClient>;
-export type KiyasModel = { id: string; ad: string; saglayici: "claude" | "openai" | "gemini"; sinif: "ucuz" | "guclu"; fiyat: [number, number] };
+// ucretsiz: Gemini'nin ücretsiz katmanı olan modeli, metin işlerinin ücretsiz anahtar havuzuyla çağrılır (kazanırsa bedava yükseltme)
+export type KiyasModel = { id: string; ad: string; saglayici: "claude" | "openai" | "gemini"; sinif: "ucuz" | "guclu"; fiyat: [number, number]; ucretsiz?: boolean };
 export const KIYAS_MODELLERI: KiyasModel[] = [
   { id: "claude-haiku-5-5", ad: "Claude Haiku 5.5", saglayici: "claude", sinif: "ucuz", fiyat: [0.1, 0.5] },
   { id: "claude-sonnet-5-5", ad: "Claude Sonnet 5.5", saglayici: "claude", sinif: "guclu", fiyat: [2, 10] },
   { id: "gpt-6-luna", ad: "GPT-6 Luna", saglayici: "openai", sinif: "ucuz", fiyat: [0.1, 0.5] },
   { id: "gpt-6.1-sol", ad: "GPT-6.1 Sol", saglayici: "openai", sinif: "guclu", fiyat: [2, 10] },
   { id: "gemini-4-argon", ad: "Gemini 4 Argon", saglayici: "gemini", sinif: "guclu", fiyat: [2, 10] },
+  { id: "gemini-3.8-flash", ad: "Gemini 3.8 Flash (ücretsiz)", saglayici: "gemini", sinif: "ucuz", fiyat: [0, 0], ucretsiz: true },
 ];
 
 const say = (sb: Sb, fonk: string, model: string, sonuc: string) => { sb.rpc("gemini_say", { p_fonk: fonk, p_model: model, p_sonuc: sonuc }).then(() => {}, () => {}); };
@@ -45,7 +48,8 @@ export async function kiyasCagir(sb: Sb, m: KiyasModel, sistem: string, kullanic
     say(sb, fonk, m.id, "basarili");
     return jsonAl(metin);
   }
-  const key = await anahtar(sb, "gemini_gorsel");
+  // Ücretli Gemini yalnız ücretli projenin anahtarıyla; ücretsiz model ücretsiz havuzun ilk uygun anahtarıyla (ikisi karışmaz)
+  const key = m.ucretsiz ? (await havuzAnahtarlari())[0]?.deger ?? null : await anahtar(sb, "gemini_gorsel");
   if (!key) return null;
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m.id}:generateContent`, {
     method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(ms),

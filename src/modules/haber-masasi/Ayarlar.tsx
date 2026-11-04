@@ -65,8 +65,8 @@ export default function Ayarlar() {
       <Grup id="olcum" ad="Ölçümler" ne="Hangi model daha iyi iş çıkarıyor? Son 30 günün sayıları.">
         <Satir {...p} id="gtablo" ad="Görsel modelleri" ne="Her deneme: kaç kez üretti, denetimden geçti, kapak oldu; süre ve maliyet."><GorselTablo /></Satir>
         <Satir {...p} id="ytablo" ad="Yazı: Claude ve Gemini" ne="Editörün kör seçimi ve denetimin yaptığı düzeltme sayısı."><YaziKiyas /></Satir>
-        <Satir {...p} id="etablo" ad="Haber eleme: 6 model" ne="Aynı haberleri hepsi etiketler; kararlar birbiriyle, editörle ve senin hakem kararınla karşılaştırılır."><ElemeKiyas /></Satir>
-        <Satir {...p} id="ktablo" ad="Künye: 6 model" ne="Aynı sayfalardan ürün özelliği çıkarırlar; alıntının sayfada gerçekten geçip geçmediği ölçülür."><KunyeKiyas /></Satir>
+        <Satir {...p} id="etablo" ad="Haber eleme: 7 model" ne="Aynı haberleri hepsi etiketler; kararlar birbiriyle, editörle ve senin hakem kararınla karşılaştırılır."><ElemeKiyas /></Satir>
+        <Satir {...p} id="ktablo" ad="Künye: 7 model" ne="Aynı sayfalardan ürün özelliği çıkarırlar; alıntının sayfada gerçekten geçip geçmediği ölçülür."><KunyeKiyas /></Satir>
         <Satir {...p} id="kiyasayar" ad="Kıyas oranı" ne="Kıyasa giren haber ve ürün payı; Claude'un ek maliyeti buna göre." deger={`eleme %${kiyasA.eleme_oran} · künye %${kiyasA.kunye_oran}`}><KiyasOrani ayar={ayar} /></Satir>
       </Grup>
 
@@ -412,7 +412,7 @@ function SitePaneli({ ayar }: { ayar: AyarYaz }) {
 // kıyaslasın"; göç 0065, public.yz_kiyas). Asıl işi Gemini yapar; Claude Haiku ve Sonnet aynı girdiyle gölgede çalışır. ----------
 type KiyasSatir = { nesne: string; model: string; sonuc: Record<string, unknown>; karar: string | null; sure_ms: number | null; hata: string | null };
 // Kıyas modelleri sunucuda triyaj-taslak/kiyas.ts KIYAS_MODELLERI; "gemini:…" asıl işi yapan ücretsiz Gemini
-const KIYAS_AD: Record<string, string> = { "claude-haiku-5-5": "Claude Haiku 5.5", "claude-sonnet-5-5": "Claude Sonnet 5.5", "gpt-6-luna": "GPT-6 Luna", "gpt-6.1-sol": "GPT-6.1 Sol", "gemini-4-argon": "Gemini 4 Argon" };
+const KIYAS_AD: Record<string, string> = { "claude-haiku-5-5": "Claude Haiku 5.5", "claude-sonnet-5-5": "Claude Sonnet 5.5", "gpt-6-luna": "GPT-6 Luna", "gpt-6.1-sol": "GPT-6.1 Sol", "gemini-4-argon": "Gemini 4 Argon", "gemini-3.8-flash": "Gemini 3.8 Flash (ücretsiz)" };
 const MODEL_ADI = (m: string) => (m.startsWith("gemini:") ? `Gemini ${m.slice(7).replace(/^gemini-/, "")} (asıl, ücretsiz)` : KIYAS_AD[m] ?? m);
 const yuzde = (a: number, b: number) => (b ? Math.round((a / b) * 100) + "%" : "–");
 function useKiyas(is: "eleme" | "kunye") {
@@ -565,7 +565,7 @@ function KiyasOrani({ ayar }: { ayar: AyarYaz }) {
   return (
     <>
       <div className="ay-alanlar">
-        <Alan ad="Haber eleme" not="Toplanan haber partilerinin bu kadarı kıyasa girer; giren her haberi 6 model de etiketler. %10 ≈ ayda 30 $ (çoğu üç güçlü model). 0 = kapalı."><Sayi ad="Eleme oranı" deger={eleme} degis={setEleme} birim="%" /></Alan>
+        <Alan ad="Haber eleme" not="Toplanan haber partilerinin bu kadarı kıyasa girer; giren her haberi 7 model de etiketler. %10 ≈ ayda 30 $ (çoğu üç güçlü model). 0 = kapalı."><Sayi ad="Eleme oranı" deger={eleme} degis={setEleme} birim="%" /></Alan>
         <Alan ad="Künye" not="Künye otomasyonunun ürünlerinden bu kadarı kıyasa girer. %20 ≈ ayda 25 $. 0 = kapalı."><Sayi ad="Künye oranı" deger={kunye} degis={setKunye} birim="%" /></Alan>
         <Alan ad="Öneri" not="İki hafta açık tut, Ölçümler'de kazananı seç, sonra 0 yap. Kıyas kalıcı bir masraf değil, karar vermek için."><span className="muted">–</span></Alan>
       </div>
