@@ -88,12 +88,12 @@ type Sayfa = { url: string; baslik: string; metin: string; resmi: boolean };
 // public.yz_kiyas'a yazılır (Gemini'ninkiyle birlikte). Nesnel ölçü: modelin verdiği alıntı ("kanit") kaynak sayfanın metninde gerçekten
 // geçiyor mu (uydurma kontrolü). Oran: tr_settings.yz_kiyas.kunye_oran (yüzde).
 type KunyeGirdi = { kullanici: string; sayfalar: Sayfa[]; model: string };
-const duz = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+const kucukHarf = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
 function kunyeSuz(v: Record<string, any> | null | undefined, adlar: Set<string>, sayfalar: Sayfa[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
-  const metin = new Map(sayfalar.map((x) => [x.url, duz(x.metin)]));
+  const metin = new Map(sayfalar.map((x) => [x.url, kucukHarf(x.metin)]));
   const oz = (Array.isArray(v?.ozellikler) ? v!.ozellikler : []).filter((o: { key?: string; value?: string; kaynak?: string }) => o?.key && adlar.has(o.key) && o.value && metin.has(String(o.kaynak ?? "")))
     .map((o: { key: string; value: string; kaynak: string; kanit?: string }) => {
-      const k = duz(String(o.kanit ?? ""));
+      const k = kucukHarf(String(o.kanit ?? ""));
       return { key: o.key, value: String(o.value).slice(0, 120), kaynak: o.kaynak, kanit: String(o.kanit ?? "").slice(0, 160), dogru: k.length >= 3 && metin.get(o.kaynak)!.includes(k) };
     });
   return { ozellikler: oz, resmiAd: typeof v?.resmiAd === "string" ? v.resmiAd : null, bulunan: oz.length, dogrulanan: oz.filter((x: { dogru: boolean }) => x.dogru).length };
