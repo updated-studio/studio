@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-04-d",
+    "tarih": "4 Kasım 2026",
+    "baslik": "Canlı durum",
+    "bolumler": [
+      {
+        "ad": "Genel",
+        "maddeler": [
+          "Üst çubukta şu an Stüdyo'da kimin olduğu görünür; basınca kim nerede, hangi haberi açık tutuyor.",
+          "Listelerde bir haberi şu an açık tutan kişi yeşil etiketle görünür.",
+          "\"Yayın onayında\" kartı artık gerçeği yazar: şu an bakan varsa adı, yoksa ne zamandır beklediği."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-c",
     "tarih": "4 Kasım 2026",
     "baslik": "Yayındakiler ve görsel seçenekleri",

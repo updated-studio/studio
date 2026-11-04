@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Ikon } from "../../shared/Ikon";
+import { useCanli } from "../../shared/canli";
+import { AcikTutan } from "../../shared/CanliKisiler";
 import { useToast } from "../../shared/toast";
 import * as api from "../site/api";
 import type { Icerik, PanelKullanici } from "../site/api";
@@ -51,6 +53,7 @@ export const SiteYetkisiYok = () => <div className="empty">Haber yazmak için si
 
 export default function Taslaklarim() {
   const { kullanici, hata } = usePanelKullanici();
+  const canli = useCanli();
   const [liste, setListe] = useState<Icerik[] | null>(null);
   const git = useNavigate();
   // Sıralama ve süzgeç (3 Kasım 2026, kullanıcı: "son hazırlattığım en üste gelmiyor; detaylı filtreleme ve sıralama")
@@ -92,6 +95,7 @@ export default function Taslaklarim() {
           {suz(liste).map((x) => (
             <button key={x.id} className="ed-satir" onClick={() => git(`/yaz/${x.id}`)}>
               <span className="ed-satir-m"><b>{x.title || "Başlıksız taslak"}</b><span className="muted">{api.ad(x.category as never) || "Kategori yok"} · {zaman(x.updatedAt)}</span></span>
+              <AcikTutan kisiler={canli.kisiler.filter((k) => k.id !== canli.ben && k.nesne?.tur === "haber" && k.nesne.id === x.id)} />
               <span className={`site-durum site-durum--${x.workflow?.state ?? "taslak"}`}>{api.DURUMLAR[x.workflow?.state ?? "taslak"]}</span>
               <span className={kontrolSayisi(x) >= 10 ? "ed-sayi tamam" : "ed-sayi"} title="Yayın öncesi kontrol">{kontrolSayisi(x)}/10</span>
               <Ikon ad="ileri" />
@@ -108,6 +112,7 @@ export default function Taslaklarim() {
  *  açıp düzeltince değişiklik taslak olarak kaydedilir, sitedeki hâli yayın yönetmeni yeniden yayınlayana kadar aynı kalır. */
 export function Yayindakiler() {
   const { kullanici, hata } = usePanelKullanici();
+  const canli = useCanli();
   const [liste, setListe] = useState<Icerik[] | null>(null);
   const [ara, setAra] = useState("");
   const [sayfa, setSayfa] = useState(1);
@@ -132,6 +137,7 @@ export function Yayindakiler() {
           {liste.map((x) => (
             <button key={x.id} className="ed-satir" onClick={() => git(`/yaz/${x.id}`)}>
               <span className="ed-satir-m"><b>{x.title || "Başlıksız"}</b><span className="muted">{api.ad(x.category as never) || "Kategori yok"} · {zaman((x as { publishedAt?: string }).publishedAt ?? x.updatedAt)}</span></span>
+              <AcikTutan kisiler={canli.kisiler.filter((k) => k.id !== canli.ben && k.nesne?.tur === "haber" && k.nesne.id === x.id)} />
               <span className="site-durum site-durum--yayinda">{api.DURUMLAR.yayinda}</span>
               <Ikon ad="ileri" />
             </button>

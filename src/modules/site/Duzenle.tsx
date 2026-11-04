@@ -7,6 +7,7 @@ import MetinEditoru from "./editor/MetinEditoru";
 import MedyaSecici from "./MedyaSecici";
 import KapakOnizleme from "./KapakOnizleme";
 import { Alanlar } from "./Form";
+import { useCanliNesne } from "../../shared/canli";
 import { alanlar, veriAlanlari, type Alan, type SurumOzellik } from "./sema";
 import { kilitHatasi, otoMetni, useKilit, useOtoKayit } from "./kayit";
 import Surumler from "./Surumler";
@@ -40,6 +41,8 @@ const idAl = (v: unknown): number | null => (v && typeof v === "object" ? Number
 export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon; id: number; kullanici: PanelKullanici; kapat: () => void; ac: (id: number) => void }) {
   const toast = useToast();
   const [doc, setDoc] = useState<TamIcerik | null>(null);
+  // Canlı durum: bu haberi açık tuttuğun herkese görünür (4 Kasım 2026)
+  useCanliNesne(doc ? { tur: "haber", id, baslik: String((doc as { title?: string }).title ?? ""), eylem: "düzenliyor" } : null);
   const [sema, setSema] = useState<Sema | null>(null);
   const [kategoriler, setKategoriler] = useState<Secenek[]>([]);
   const [yazarlar, setYazarlar] = useState<Secenek[]>([]);

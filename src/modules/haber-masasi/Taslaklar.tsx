@@ -5,6 +5,8 @@ import { useToast } from "../../shared/toast";
 import { Seviye, useKisi, zamanOnce } from "./ortak";
 import { degerlendir } from "./oncelik";
 import Bilgi from "../../shared/Bilgi";
+import { useCanli, useCanliNesne } from "../../shared/canli";
+import { AcikTutan } from "../../shared/CanliKisiler";
 import { useMasa, type Taslak } from "./veri";
 
 // Markdown → HTML ortak dosyada: ekrandaki önizleme ve "HTML kopyala" aynı çıktıyı kullanır (panele Markdown gider).
@@ -146,6 +148,7 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
   const { profile } = useAuth();
   const [f, setF] = useState<TaslakSuzgec>(suzgecOku);
   const [suzgecAcik, setSuzgecAcik] = useState(false);
+  const canli = useCanli();
   const t = acik ? v.taslaklar.find((x) => x.id === acik) : undefined;
   useEffect(() => { try { localStorage.setItem(SUZGEC_ANAHTARI, JSON.stringify(f)); } catch { /* depolama kapalı */ } }, [f]);
   if (t) return <Duzenleyici key={t.id} t={t} kapat={() => setAcik(null)} />;
@@ -204,6 +207,7 @@ export default function Taslaklar({ acik, setAcik }: { acik: number | null; setA
         {liste.map((x) => (
           <button key={x.id} className="satir linkbtn" style={{ color: "inherit", width: "100%" }} onClick={() => setAcik(x.id)}>
             <div className="ana"><b>{x.title || "(başlıksız)"}</b><div className="muted">{kisi(x.author)?.name ?? "?"} · {zamanOnce(x.updated_at)} önce</div></div>
+            <AcikTutan kisiler={canli.kisiler.filter((k) => k.id !== canli.ben && k.nesne?.tur === "taslak" && k.nesne.id === x.id)} />
             {x.auto && <span className="pill purple" title="Stüdyo kendisi hazırladı">🤖</span>}
             {x.qc?.ana_sayfa && <span className="pill rose" title={`Önem ${x.qc.onem ?? ""}/10`}>Ana sayfa adayı</span>}
             {(x.qc_state === "bekliyor" || x.qc_state === "calisiyor") && <span className="pill off" title="Kaynaklara karşı son kontrol, görsel ve panele gönderim">Kontrol ediliyor</span>}
@@ -227,6 +231,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
   const [gorunum, setGorunum] = useState<"duzen" | "onizle">("duzen");
   const haber = v.haberler.find((h) => h.id === t.item_id);
   useEffect(() => { if (!degisti) setD(t); }, [t, degisti]);
+  useCanliNesne({ tur: "taslak", id: t.id, baslik: t.title, eylem: "düzenliyor" });
 
   const alan = <K extends keyof Taslak>(k: K, deger: Taslak[K]) => { setD({ ...d, [k]: deger }); setDegisti(true); };
   const seo = (k: keyof Taslak["seo"], deger: string) => alan("seo", { ...d.seo, [k]: k === "etiketler" ? deger.split(",").map((s) => s.trim()).filter(Boolean) : deger });
@@ -289,7 +294,7 @@ function Duzenleyici({ t, kapat }: { t: Taslak; kapat: () => void }) {
       {d.seo?.video?.url && <div className="panel">
         <h3 style={{ margin: 0 }}>Resmî video</h3>
         <div><a href={d.seo.video.url} target="_blank" rel="noreferrer">{d.seo.video.baslik || d.seo.video.url}</a> <span className="muted">· {d.seo.video.kanal}{d.seo.video.resmiSayfa ? " · resmî sayfa var" : ""}</span></div>
-        <div className="muted">Sitede {d.seo.video.spotAltinda ? "metnin en başında" : "ilk paragraftan sonra"} oynar. {t.site_id ? "Panele gitti; değiştirmek için paneldeki \"Gömülü video\" alanı." : "Panele gönderilince habere eklenir."}</div>
+        <div className="muted">Sitede {d.seo.video.spotAltinda ? "metnin en başında (haber videonun kendisiyle ilgili)" : "ilk paragraftan sonra (önerilen yer)"} oynar. {t.site_id ? "Panele gitti; değiştirmek için paneldeki \"Gömülü video\" alanı." : "Panele gönderilince habere eklenir."}</div>
         {!t.site_id && <button className="btn ghost sm" onClick={() => alan("seo", { ...d.seo, video: null })}>Videoyu kaldır</button>}
       </div>}
       {t.qc?.ana_sayfa && <div className="msg good">Ana sayfa adayı: önem {t.qc.onem?.toLocaleString("tr")}/10.</div>}
@@ -448,7 +453,7 @@ function VideoAdaylari({ t, d }: { t: Taslak; d: Taslak }) {
   return (
     <div className="panel">
       <h3 style={{ margin: 0 }}>Video adayları</h3>
-      <div className="muted">Resmî kanaldan olduğu kesinleşmeyen videolar. İzle; habere uygunsa ekle.</div>
+      <div className="msg err">Dikkat: bu videoların resmî kanaldan olduğu doğrulanamadı. Haber sitesi, hayran ya da yeniden yükleme kanalı olabilir. Kanalı kontrol etmeden ekleme.</div>
       <div className="yz-adaylar">
         {liste.map((v) => (
           <figure key={v.url}>

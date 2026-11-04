@@ -6,6 +6,8 @@ import Bildirimler from "../../shared/Bildirimler";
 import { Ikon, SimgeTanimlari } from "../../shared/Ikon";
 import IkonUyarisi from "../../shared/IkonUyarisi";
 import ProfilMenu from "../../shared/ProfilMenu";
+import CanliKisiler from "../../shared/CanliKisiler";
+import { CanliSaglayici } from "../../shared/canli";
 import SohbetDugme from "../../shared/SohbetDugme";
 import SurumUyarisi from "../../shared/SurumUyarisi";
 import YayinKuyrugu from "../../shared/YayinKuyrugu";
@@ -59,6 +61,7 @@ export default function EditorKabuk() {
   const onizleme = yonetirMi(profile) && editorGibi(profile);
 
   return (
+    <CanliSaglayici>
     <div className="ed">
       <SimgeTanimlari />
       <nav className="ed-menu simge" aria-label="Stüdyo menüsü">
@@ -74,6 +77,7 @@ export default function EditorKabuk() {
         <header className="ed-tepe">
           <div className="ed-marka ed-marka-tel"><span className="logo" role="img" aria-label="Updated" /><i /><span>STÜDYO</span></div>
           <span style={{ flex: 1 }} />
+          <CanliKisiler />
           <SohbetDugme />
           <Bildirimler />
           <ProfilMenu moduller={profilde} />
@@ -104,5 +108,6 @@ export default function EditorKabuk() {
         {alt.map((o) => <NavLink key={o.yol} to={o.yol} className={etkin(o) ? "on" : ""} aria-current={etkin(o) ? "page" : undefined}><Ikon ad={o.ikon} /><span>{o.kisa ?? o.ad}</span></NavLink>)}
       </nav>
     </div>
+    </CanliSaglayici>
   );
 }

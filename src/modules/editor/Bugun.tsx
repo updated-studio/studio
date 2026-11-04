@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
 import { Ikon } from "../../shared/Ikon";
 import { sb } from "../../shared/supabase";
+import { useCanli } from "../../shared/canli";
 import type { Icerik } from "../site/api";
 import { kontrolSayisi, taslaklar as taslakGetir, usePanelKullanici } from "./Taslaklarim";
 
@@ -24,6 +25,10 @@ export default function Bugun() {
   const { profile } = useAuth();
   const { kullanici } = usePanelKullanici();
   const git = useNavigate();
+  const canli = useCanli();
+  // "Yayın onayında" kartı gerçeği söyler (4 Kasım 2026, kullanıcı: "gerçekten o an bakıyor mu"): haberi şu an açık tutan varsa adı, yoksa ne zamandır beklediği
+  const bakan = (id: number) => canli.kisiler.filter((k) => k.id !== canli.ben && k.nesne?.tur === "haber" && k.nesne.id === id).map((k) => k.ad.split(" ")[0]);
+  const bekleme = (s?: string) => { if (!s) return ""; const dk = (Date.now() - Date.parse(s)) / 6e4; return dk < 60 ? `${Math.max(1, Math.round(dk))} dk` : dk < 1440 ? `${Math.round(dk / 60)} saattir` : `${Math.round(dk / 1440)} gündür`; };
   const [taslak, setTaslak] = useState<Icerik[] | null>(null);
   const [yeniHaber, setYeniHaber] = useState<number | null>(null);
 
@@ -36,7 +41,7 @@ export default function Bugun() {
   const kartlar: Kart[] = [
     ...(yeniHaber ? [{ ton: "turuncu" as const, ikon: "masa", ust: "HABER MASASI · SON 24 SAAT", baslik: `${yeniHaber} yeni haber bekliyor`, alt: "Önemlileri seçip taslağa çevir", eylem: "Haber Masası'nı aç", git: "/haber-masasi" }] : []),
     ...(taslak ?? []).filter((x) => x.workflow?.state === "taslak" && kontrolSayisi(x) > 0 && kontrolSayisi(x) < 10).slice(0, 3).map((x): Kart => ({ ton: "sari", ikon: "uyari", ust: `YARIM · ${kontrolSayisi(x)}/10 KONTROL`, baslik: x.title || "Başlıksız taslak", alt: "Eksik kontrol maddelerini tamamla", eylem: "Devam et", git: `/yaz/${x.id}` })),
-    ...(taslak ?? []).filter((x) => x.workflow?.state === "incelemede").slice(0, 3).map((x): Kart => ({ ton: "mavi", ikon: "check", ust: "YAYIN ONAYINDA", baslik: x.title || "Başlıksız", alt: "Yayın yönetmeni bakıyor", eylem: "Aç", git: `/yaz/${x.id}` })),
+    ...(taslak ?? []).filter((x) => x.workflow?.state === "incelemede").slice(0, 3).map((x): Kart => ({ ton: "mavi", ikon: "check", ust: "YAYIN ONAYINDA", baslik: x.title || "Başlıksız", alt: bakan(x.id).length ? `${bakan(x.id).join(", ")} şu an bakıyor` : `Yayın onayı bekliyor · ${bekleme(x.updatedAt)}`, eylem: "Aç", git: `/yaz/${x.id}` })),
   ];
   const yuklendi = taslak !== null && yeniHaber !== null;
 
