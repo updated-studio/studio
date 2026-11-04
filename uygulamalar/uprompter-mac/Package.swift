@@ -3,8 +3,16 @@ import PackageDescription
 
 let package = Package(
     name: "UPrompter",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
+    dependencies: [
+        // Mac'in üzerinde çalışan Whisper (konuşma tanıma); internet yalnız ilk model indirmede.
+        .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "1.1.1"),
+    ],
     targets: [
-        .executableTarget(name: "UPrompter", path: "Sources/UPrompter")
+        .executableTarget(
+            name: "UPrompter",
+            dependencies: [.product(name: "WhisperKit", package: "WhisperKit")],
+            path: "Sources/UPrompter"
+        )
     ]
 )

@@ -122,8 +122,11 @@ struct AyarPaneli: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                if ayarlar.kip == .ses, oturum.mikrofon.sorunlu {
-                    MikrofonSorunu(durum: oturum.mikrofon)
+                if ayarlar.kip == .ses {
+                    MotorSecimi()
+                    if oturum.mikrofon.sorunlu {
+                        MikrofonSorunu(durum: oturum.mikrofon)
+                    }
                 }
                 Kaydirici(ad: "Sabit hız", deger: $ayarlar.hiz, aralik: 10...160, adim: 2, birim: "pt/sn")
 
@@ -168,6 +171,45 @@ struct AyarPaneli: View {
     }
 }
 
+/// Konuşma tanıma motoru seçimi ve motora özel ayarlar.
+struct MotorSecimi: View {
+    @EnvironmentObject var ayarlar: Ayarlar
+    @EnvironmentObject var oturum: Oturum
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Konuşma tanıma", selection: $ayarlar.motor) {
+                ForEach(Motor.allCases) { Text($0.ad).tag($0) }
+            }
+            .font(.system(size: 13))
+            Text(ayarlar.motor.aciklama)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let model = ayarlar.motor.whisperModeli {
+                switch oturum.mikrofon {
+                case .modelIndiriliyor(let p):
+                    ProgressView(value: p) { Text("Model indiriliyor").font(.system(size: 12)) }
+                case .modelHazirlaniyor:
+                    ProgressView { Text(oturum.mikrofon.yazi).font(.system(size: 12)) }
+                        .controlSize(.small)
+                default:
+                    Text(WhisperKaynagi.indirildiMi(model) ? "Model bu Mac'te hazır." : "Model ilk Başlat'ta indirilecek.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if ayarlar.motor == .deepgram {
+                SecureField("Deepgram API anahtarı", text: $ayarlar.deepgramAnahtari)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+                Link("Deepgram'da ücretsiz deneme anahtarı al", destination: URL(string: "https://console.deepgram.com/signup")!)
+                    .font(.system(size: 12))
+            }
+        }
+    }
+}
+
 /// Sese göre kaydırma çalışmadığında ne yapılacağını söyler ve ilgili ayarı açar.
 struct MikrofonSorunu: View {
     let durum: MikrofonDurumu
@@ -178,6 +220,8 @@ struct MikrofonSorunu: View {
             return "Türkçe konuşma tanıma için Mac'te Dikte açık olmalı. Sistem Ayarları › Klavye › Dikte'yi açın, dil olarak Türkçe'yi ekleyin, sonra Başlat'a yeniden basın."
         case .izinYok:
             return "Sistem Ayarları › Gizlilik ve Güvenlik'te Mikrofon ve Konuşma Tanıma altında UPrompter'ı açın."
+        case .anahtarYok:
+            return "Deepgram'ı kullanmak için yukarıdaki alana API anahtarınızı yapıştırın."
         case .desteklenmiyor:
             return "Bu Mac'te Türkçe konuşma tanıma şu an kullanılamıyor. Dikte'nin açık olduğunu ve internete bağlı olduğunuzu kontrol edin."
         default:

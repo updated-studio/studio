@@ -2,7 +2,8 @@ import Foundation
 import AppKit
 
 enum MikrofonDurumu: Equatable {
-    case kapali, acik, dinliyor, izinYok, desteklenmiyor, dikteKapali
+    case kapali, acik, dinliyor, izinYok, desteklenmiyor, dikteKapali, anahtarYok, modelHazirlaniyor
+    case modelIndiriliyor(Double)
     case hata(String)
 
     var yazi: String {
@@ -13,13 +14,16 @@ enum MikrofonDurumu: Equatable {
         case .izinYok: return "Mikrofon ya da konuşma tanıma izni yok"
         case .desteklenmiyor: return "Türkçe konuşma tanıma kullanılamıyor"
         case .dikteKapali: return "Mac'te Dikte kapalı"
+        case .anahtarYok: return "Deepgram anahtarı girilmemiş"
+        case .modelHazirlaniyor: return "Model hazırlanıyor (ilk seferde 1-2 dk sürebilir)"
+        case .modelIndiriliyor(let p): return "Model indiriliyor %\(Int(p * 100))"
         case .hata(let m): return "Hata: \(m)"
         }
     }
 
     var sorunlu: Bool {
         switch self {
-        case .izinYok, .desteklenmiyor, .dikteKapali, .hata: return true
+        case .izinYok, .desteklenmiyor, .dikteKapali, .anahtarYok, .hata: return true
         default: return false
         }
     }
@@ -146,6 +150,12 @@ final class Oturum: ObservableObject {
     func kipDegisti() {
         guard calisiyor else { return }
         if Ayarlar.ortak.kip == .ses { takipci.baslat(konum: ptr) } else { takipci.durdur() }
+    }
+
+    /// Konuşma tanıma motoru değişti: çalışıyorsa yeni motorla yeniden başlar.
+    func motorDegisti() {
+        takipci.durdur()
+        if calisiyor && Ayarlar.ortak.kip == .ses { takipci.baslat(konum: ptr) }
     }
 
     func hizDegistir(_ fark: Double) {

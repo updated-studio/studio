@@ -10,7 +10,7 @@ NOT=${NOT:-}
 KOK=${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}
 
 rm -rf build && mkdir -p build
-ARGS=(-c release --arch arm64 --arch x86_64)
+ARGS=(-c release --arch arm64)
 
 # Derleme hatalarını GitHub'da satır satır işaretle (dışarıdan okunabilsin diye)
 if ! swift build "${ARGS[@]}" 2>&1 | tee build/derleme.log; then
@@ -55,7 +55,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>${YAPI}</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleDevelopmentRegion</key><string>tr</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.video</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>

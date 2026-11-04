@@ -124,6 +124,7 @@ struct PanelGorunumu: View {
         case .dinliyor: return Renk.mavi
         case .acik: return Renk.mavi.opacity(0.5)
         case .kapali: return Color(white: 0.35)
+        case .modelIndiriliyor, .modelHazirlaniyor: return Color(white: 0.6)
         default: return Color(red: 0.94, green: 0.27, blue: 0.37)
         }
     }
