@@ -306,7 +306,7 @@ export const URETIM_DENETIM = `Bir Türkçe teknoloji haberi için yapay zekâyl
 Görsel sitede manşet 16:10 ve 4:3, kart 16:9; sosyal medyada 1:1, 4:5 ve 9:16 kırpılır. Manşette alttaki yaklaşık %40'ın üstüne başlık yazısı biner.
 Her katmanı ayrı değerlendir:
 1. konu: Görsel haberin başlığı ve içeriğiyle uyuşuyor mu? Ana mesaj insan bakınca ilk anda anlaşılıyor mu? Genel "teknoloji" süsü, konuyla ilgisiz ya da anahtar ayrıntıyı (yeni özellik, sürüm, ürün) iletemeyen sahne sorun.
-2. yazi: Görünen her yazı birebir doğru ve tutarlı mı? Tarifteki yazılar varsa doğru yazılmış mı? Bozuk, uydurma, harfe benzeyen anlamsız yazı; harfleri tutarsız klavye; okunmaz arayüz metni sorun. Ürünün üzerindeki gerçek ve doğru logo sorun değil; uzakta, flu, dikkat çekmeyen doku sorun değil.
+2. yazi: Görünen her yazı birebir doğru ve tutarlı mı? Tarifteki yazı görselde harf harf aynı okunuyorsa sorun DEĞİL; şüpheye dayanarak reddetme, açık hata ara. Bozuk, uydurma, harfe benzeyen anlamsız yazı; harfleri tutarsız klavye; okunmaz arayüz metni sorun. Ürünün üzerindeki gerçek ve doğru logo sorun değil; uzakta, flu, dikkat çekmeyen doku sorun değil.
 3. marka: Haberdeki markadan BAŞKA markayı çağrıştıran logo, amblem ya da belirgin tasarım imzası; haberdeki ürün türüyle uyumsuz nesne (telefon haberinde tablet).
 4. bozukluk: Fazla/eksik parmak, eriyen ya da birbirine geçen nesneler, eğri düz çizgiler, fiziksel olmayan yansıma ve gölge, anlamsız parçalar.
 5. etik: Tanınabilir gerçek kişi yüzü; söylenti/sızıntı haberinde henüz tanıtılmamış ürünü kesin gerçekmiş gibi gösterme; şiddet, uygunsuz içerik.
