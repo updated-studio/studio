@@ -61,7 +61,8 @@ export default function Taslaklarim() {
   const [kim, setKim] = useState<"hepsi" | "benim">("hepsi");
   const durum: "hepsi" | "taslak" = "hepsi";
   const [ara, setAra] = useState("");
-  const yukle = useCallback(() => { if (kullanici) taslaklar().then(setListe).catch(() => setListe([])); }, [kullanici]);
+  // Açılışta 1 saatten eski boş taslaklar (sekme kapanınca kalanlar) panelde temizlenir, sonra liste gelir (4 Kasım 2026)
+  const yukle = useCallback(() => { if (kullanici) api.bosTaslakSil().catch(() => null).then(() => taslaklar()).then(setListe).catch(() => setListe([])); }, [kullanici]);
   useEffect(yukle, [yukle]);
   const benimYazar = kullanici ? (typeof kullanici.author === "object" ? kullanici.author?.id : kullanici.author) ?? null : null;
   const yazarId = (x: Icerik) => { const a = (x as { author?: number | { id: number } | null }).author; return typeof a === "object" ? a?.id ?? null : a ?? null; };

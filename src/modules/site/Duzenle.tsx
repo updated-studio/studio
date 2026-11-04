@@ -58,6 +58,19 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
   const [alanYapisi, setAlanYapisi] = useState<Alan[]>([]);
   const [ozellik, setOzellik] = useState<SurumOzellik>({ taslak: true });
   const [yayinda, setYayinda] = useState(false); // sitede yayında mı (taslak kaydı bunu değiştirmez)
+  // Boş bırakılan haber (4 Kasım 2026, kullanıcı: "yeni haber yaz deyip hiçbir şey eklenmeyen şey taslağa boş düşmesin"): "Haber yaz" taslağı
+  // hemen oluşturur; başlık, spot ve kapak boşken çıkılırsa (sekme kapansa da) panel boşluğu kendisi de doğrulayıp siler.
+  const fRef = useRef(f); fRef.current = f;
+  useEffect(() => {
+    if (k !== "news") return;
+    const temizle = () => {
+      const x = fRef.current as { title?: string; spot?: string; cover?: unknown } | null;
+      if (!x || String(x.title ?? "").trim() || String(x.spot ?? "").trim() || x.cover) return;
+      api.bosTaslakSil(id).catch(() => {});
+    };
+    window.addEventListener("pagehide", temizle);
+    return () => { window.removeEventListener("pagehide", temizle); temizle(); };
+  }, [k, id]);
   const [no, setNo] = useState(0); // her değişiklikte artar: otomatik kayıt bunu bekler
   const noRef = useRef(0);
   const veriRef = useRef<() => Record<string, unknown>>(() => ({}));

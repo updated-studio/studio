@@ -166,6 +166,10 @@ export const medyaAdres = (yol: string) => (yol.startsWith("http") ? yol : PANEL
 export const kopyala = (slug: string, id: number) =>
   istek<{ doc: { id: number } }>(`/${slug}/${id}/duplicate?draft=true&depth=0`, { method: "POST" }).then((x) => x.doc.id);
 /** Yeni boş taslak (taslakta zorunlu alanlar aranmaz; yayınlarken panel denetler) */
+/** Boş haber taslağını sil (4 Kasım 2026; panel: /api/studyo/bos-taslak-sil, yalnız gerçekten boş ve hiç yayınlanmamışsa siler).
+ *  id yoksa 1 saatten eski bütün boş taslaklar. keepalive: sayfa kapanırken de gitsin. */
+export const bosTaslakSil = (id?: number) => istek<{ silinen: number }>("/studyo/bos-taslak-sil", { method: "POST", body: JSON.stringify(id ? { id } : {}), keepalive: true });
+
 export const yeniTaslak = (k: Koleksiyon) =>
   istek<{ doc: TamIcerik }>(`/${k}?draft=true&depth=0`, { method: "POST", body: JSON.stringify({ title: "", _status: "draft" }) }).then((x) => x.doc);
 
