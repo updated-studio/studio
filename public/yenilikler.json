@@ -1,5 +1,31 @@
 [
   {
+    "id": "2026-11-05-a",
+    "tarih": "5 Kasım 2026",
+    "baslik": "Düzeltmeler",
+    "bolumler": [
+      {
+        "ad": "Görseller",
+        "maddeler": [
+          "Kırık görünen yapay zekâ görselleri düzeldi; bu görseller artık kapak olarak panele de gidebiliyor.",
+          "Denetimden geçemeyen görsel de gösteriliyor; üzerinde \"Denetimden geçmedi\" yazıyor."
+        ]
+      },
+      {
+        "ad": "Ekip",
+        "maddeler": [
+          "Katkı puanında yayınlar artık sitede yayınlanan ve yazarı sen olan içerikten sayılıyor."
+        ]
+      },
+      {
+        "ad": "Haber Masası",
+        "maddeler": [
+          "Elle istenen taslak hazır olunca bildirim gelir; taslağı varken yeni taslak için ikinci onay istenir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-04-n",
     "tarih": "4 Kasım 2026",
     "baslik": "Yapay zekâ kıyası sayfası",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../shared/auth";
-import { sb } from "../../shared/supabase";
+import { sb, SUPABASE_URL } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
 import { Seviye, useKisi, zamanOnce } from "./ortak";
 import { degerlendir } from "./oncelik";
@@ -20,8 +20,9 @@ const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof
 /** Eski taslak dokümanının "GÖRSEL" bölümü: öneri, alt text, basın kiti, stok önerileri, yapay zekâ istemi */
 const URETIM_BASLADI = "Üretim başladı: görsel yönetmeni haberi okuyor; görseller 1–4 dakikada burada belirir.";
 
-// Wikimedia 2026'dan beri küçük resmi yalnız sabit boylarda veriyor (250, 330, 500, 960…); eski kayıtlardaki 400 px adresi 400 hatası verir
-const wikiKucuk = (u: string) => (u && /\.wikimedia\.org\//.test(u) ? u.replace(/\/400px-/, "/500px-") : u);
+// Wikimedia 2026'dan beri küçük resmi yalnız sabit boylarda veriyor (250, 330, 500, 960…); eski kayıtlardaki 400 px adresi 400 hatası verir.
+// Üretilen görsellerin eski kayıtlarında sunucunun iç ağ adresi (http://api-gw:8000) duruyor; tarayıcı açamaz (4 Kasım 2026).
+const wikiKucuk = (u: string) => (!u ? u : /\.wikimedia\.org\//.test(u) ? u.replace(/\/400px-/, "/500px-") : u.replace(/^https?:\/\/api-gw:8000/, SUPABASE_URL));
 
 function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   const toast = useToast();
@@ -118,9 +119,9 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
           const secili = g.yz_model === a.model && !!g.secilen && g.secilen.buyuk === a.url;
           return (
             <figure key={a.model} className={secili ? "secili" : ""} title={a.katmanlar ? Object.entries(a.katmanlar).map(([k, v]) => `${k}: ${v}`).join("\n") : undefined}>
-              {a.url ? <img src={a.url} alt="" loading="lazy" /> : <div className="yz-bos">{a.hata ? "Üretilemedi" : "Denetimden geçmedi"}</div>}
+              {a.url ? <div className="yz-resim"><img src={wikiKucuk(a.url)} alt="" loading="lazy" />{!a.gecti && <span className="pill off">Denetimden geçmedi</span>}</div> : <div className="yz-bos">{a.hata ? "Üretilemedi" : "Denetimden geçmedi"}</div>}
               <figcaption><b>{MODEL_AD[a.model] ?? a.model}</b>{a.surum && <span className="muted"> ({a.surum})</span>} · {a.hata ? a.hata : `${a.puan}/10`}{!a.hata && a.neden && <span className="muted"> · {a.neden}</span>}</figcaption>
-              {a.url && !secili && <button className="btn ghost sm" disabled={!!seciliyor} onClick={() => adaySec(a.model)}>{seciliyor === a.model ? "Seçiliyor…" : "Bunu kullan"}</button>}
+              {a.url && !secili && <button className="btn ghost sm" disabled={!!seciliyor} onClick={() => adaySec(a.model)}>{seciliyor === a.model ? "Seçiliyor…" : a.gecti ? "Bunu kullan" : "Yine de kullan"}</button>}
               {secili && <span className="pill ok">Kapak</span>}
             </figure>
           );

@@ -128,8 +128,18 @@ function etiketTuru(tur: string): string {
   return k === "sizinti" || k === "soylenti" ? "sizinti" : "yok";
 }
 
+/** Depolama adresi dışarıdan açılır olsun (4 Kasım 2026): işlevin içinde SUPABASE_URL iç ağ adı (http://api-gw:8000); tarayıcı ve panel
+ *  o adresi açamıyordu, üretilen görseller kırık görünüyor ve kapak panele gidemiyordu. Eski kayıtlar da gönderilirken düzeltilir. */
+export const disAdres = (u: string) => {
+  if (!u) return u;
+  const dis = (Deno.env.get("SUPABASE_PUBLIC_URL") ?? "https://panel.updated.com.tr").replace(/\/+$/, "");
+  const ic = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  if (ic && ic !== dis && u.startsWith(ic)) return dis + u.slice(ic.length);
+  return u.replace(/^https?:\/\/api-gw:8000/, dis);
+};
+
 const gorselGovde = (g: GorselAday, alt: string) => ({
-  url: g.buyuk, alt, ai: /flux|yapay/i.test(g.kaynak ?? ""), ...(g.odak ? { odak: g.odak } : {}),
+  url: disAdres(g.buyuk), alt, ai: /flux|yapay/i.test(g.kaynak ?? ""), ...(g.odak ? { odak: g.odak } : {}),
   credit: altyazi(g) || (g.kaynak ? `Görsel: ${g.kaynak}` : "Görsel: kaynak"),
 });
 
@@ -246,8 +256,13 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
 export async function yayinEsitle(sb: Sb): Promise<number> {
   const a = siteAyar();
   if (!a) return 0;
-  const { data } = await sb.from("tr_drafts").select("id,item_id,site_id").not("site_id", "is", null).neq("status", "gonderildi").order("id", { ascending: false }).limit(80);
-  const liste = (data ?? []) as { id: number; item_id: number | null; site_id: number }[];
+  // Panele giden taslak "gonderildi" durumunda; yayın, haberin Haber Masası kaydından anlaşılır (4 Kasım 2026: eskiden "gonderildi" olanlar
+  // atlanıyordu, hiçbir haber "yayında" işaretlenmiyordu)
+  const { data } = await sb.from("tr_drafts").select("id,item_id,site_id").not("site_id", "is", null).not("item_id", "is", null).eq("deneme", false).order("id", { ascending: false }).limit(150);
+  const tum = (data ?? []) as { id: number; item_id: number | null; site_id: number }[];
+  const { data: hs } = tum.length ? await sb.from("tr_items").select("id,status").in("id", tum.map((x) => x.item_id!)) : { data: [] };
+  const bekleyen = new Set(((hs ?? []) as { id: number; status: string }[]).filter((h) => ["alindi", "aday", "belirsiz", "pas"].includes(h.status)).map((h) => h.id));
+  const liste = tum.filter((t) => bekleyen.has(t.item_id!));
   if (!liste.length) return 0;
   const p = new URLSearchParams({ depth: "0", limit: "100", "select[id]": "true", "select[publishedAt]": "true" });
   p.set("where[and][0][id][in]", liste.map((x) => x.site_id).join(","));
@@ -258,7 +273,7 @@ export async function yayinEsitle(sb: Sb): Promise<number> {
   for (const t of liste) {
     if (!yayinda.has(t.site_id)) continue;
     await sb.from("tr_drafts").update({ status: "gonderildi" }).eq("id", t.id);
-    if (t.item_id) await sb.from("tr_items").update({ status: "yayinda" }).eq("id", t.item_id).in("status", ["alindi", "aday", "belirsiz"]);
+    if (t.item_id) await sb.from("tr_items").update({ status: "yayinda" }).eq("id", t.item_id).in("status", ["alindi", "aday", "belirsiz", "pas"]);
     n++;
   }
   return n;

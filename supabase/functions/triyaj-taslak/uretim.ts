@@ -8,10 +8,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Sb = ReturnType<typeof createClient>;
-export type UretimModeli = "klein" | "dev" | "lucid" | "gpt" | "banana";
-export const MODEL_AD: Record<string, string> = { klein: "FLUX.2 klein", dev: "FLUX.2 dev", lucid: "Lucid Origin", schnell: "FLUX.1 schnell", gpt: "GPT Image", banana: "Nano Banana" };
+// gptmax ve bananapro (4 Kasım 2026, kullanıcı: "en yüksek kaliteyi de kıyasa dahil et"): firmaların en kaliteli görsel ayarı; yalnız kıyasta
+export type UretimModeli = "klein" | "dev" | "lucid" | "gpt" | "banana" | "gptmax" | "bananapro";
+export const MODEL_AD: Record<string, string> = { klein: "FLUX.2 klein", dev: "FLUX.2 dev", lucid: "Lucid Origin", schnell: "FLUX.1 schnell", gpt: "GPT Image", banana: "Nano Banana", gptmax: "GPT Image 2.5 Sunburst (yüksek)", bananapro: "Nano Banana Pro" };
+export const KIYAS_YUKSEK: UretimModeli[] = ["gptmax", "bananapro"];
 /** Görsel başına yaklaşık maliyet (dolar; Cloudflare günlük ücretsiz pay içindeyse 0). Kıyas tablosunda tahmini toplam için. */
-export const MODEL_UCRET: Record<string, number> = { klein: 0.016, dev: 0.066, lucid: 0.039, schnell: 0.002, gpt: 0.041, banana: 0.034 };
+export const MODEL_UCRET: Record<string, number> = { klein: 0.016, dev: 0.066, lucid: 0.039, schnell: 0.002, gpt: 0.041, banana: 0.034, gptmax: 0.21, bananapro: 0.134 };
 /** Cloudflare Workers AI: bizim boyutumuzda görsel başına yaklaşık "neuron" (fiyat sayfası, 4 Kasım 2026); günlük ücretsiz pay 10.000,
  *  her gün 00.00 UTC'de (03.00 TR) yenilenir; ücretli planda aşan her 1.000 neuron 0,011 $. */
 export const CF_NORON: Record<string, number> = { klein: 1450, dev: 6000, lucid: 3500 };
@@ -28,8 +30,8 @@ export async function kullanilabilir(sb: Sb): Promise<UretimModeli[]> {
   const m = await anahtarlar(sb, ["cloudflare_adres", "cloudflare_anahtar", "openai", "gemini_gorsel"]);
   return [
     ...(m.cloudflare_adres && m.cloudflare_anahtar ? (["klein", "dev", "lucid"] as const) : []),
-    ...(m.openai ? (["gpt"] as const) : []),
-    ...(m.gemini_gorsel ? (["banana"] as const) : []),
+    ...(m.openai ? (["gpt", "gptmax"] as const) : []),
+    ...(m.gemini_gorsel ? (["banana", "bananapro"] as const) : []),
   ];
 }
 
@@ -103,7 +105,9 @@ async function nanoBanana(sb: Sb, istem: string, ms: number, surum?: string): Pr
 }
 
 /** surum: belirli bir model (taslaktaki seçiciden); kalite: GPT için düşük/orta/yüksek */
-export function uret(sb: Sb, model: UretimModeli, istem: string, ms: number, surum?: string, kalite?: string): Promise<Uretilen> {
+export async function uret(sb: Sb, model: UretimModeli, istem: string, ms: number, surum?: string, kalite?: string): Promise<Uretilen> {
+  if (model === "gptmax") return { ...(await openai(sb, istem, ms, "gpt-image-2.5-sunburst", "high")), model: "gptmax" };
+  if (model === "bananapro") return { ...(await nanoBanana(sb, istem, ms, "gemini-3-pro-image")), model: "bananapro" };
   if (model === "gpt") return openai(sb, istem, ms, surum, kalite);
   if (model === "banana") return nanoBanana(sb, istem, ms, surum);
   return cloudflare(sb, model, istem, ms);

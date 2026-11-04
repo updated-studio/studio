@@ -190,6 +190,7 @@ Not: Supabase ücretsiz projeleri uzun süre kullanılmazsa duraklatabiliyor; g�
 
 ## 12. Karar günlüğü
 
+- **5 Kasım 2026:** Ekip katkı puanında "yayına giden" artık sitede yayınlanan ve yazarı kişi olan haber, inceleme ve kıyas (panel yazar ↔ hesap e-postası eşleşmesi); Haber Masası kaydına bağlı değil (PUAN_SURUMU 4 Kasım 2026).
 - **4 Kasım 2026:** Model seçimi görüşle değil ölçümle: haber eleme ve künye çıkarmada asıl işi Gemini yaparken Claude Haiku ve Sonnet aynı girdiyle gölgede çalışır (örnekleme oranı Ayarlar'da), sonuçlar `yz_kiyas`'ta (90 gün); yöneticiler Ölçümler'de editörle uyum ve uydurma ölçüsüyle karşılaştırır, sonra işi en iyi yapana verir.
 - **4 Kasım 2026:** Yapay zekâ kapak görseli: üretimden önce görsel yönetmeni (Claude) haberi okur, kapağı tarif eder ve model ailesi başına (FLUX/Lucid, GPT Image, Nano Banana) istem yazar; doğru kısa yazı ve haberin markasının gerçek logosu serbest, gerçek kişi yüzü ve tanıtılmamış ürünü kesin gösterme yasak; konu ortada, her kenarda kırpma payı (sosyal medya 9:16/1:1/4:5). Denetim tarife göre 8 katman. Elle üretim arka planda (sonuç Realtime ile gelir).
 - **4 Kasım 2026:** Deneme masası (yönetici): gerçek haberin kopyası (`tr_items.deneme`) ve taslağı (`tr_drafts.deneme`) taslak akışının tamamından geçer ama hiçbir ortak listeye, otomatik taslağa, kümelemeye, panele, ölçüme ve katkı puanına girmez (göç 0063). Yeni bir `tr_items`/`tr_drafts` sorgusu yazılırken `deneme=false` süzgeci unutulmaz. Görsel üretimi tek modelde sırayla: Cloudflare (ücretsiz) → Nano Banana → GPT Image.

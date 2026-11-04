@@ -11,14 +11,14 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar, isaretle } from "./anahtar.ts";
 import { CLAUDE_MODEL, claudeJson, SECIM_SEMA } from "./claude.ts";
 import { markaYazimi } from "./html.ts";
-import { kullanilabilir, MODEL_AD, modelListesi, uret, type Uretilen, type UretimModeli } from "./uretim.ts";
+import { KIYAS_YUKSEK, kullanilabilir, MODEL_AD, modelListesi, uret, type Uretilen, type UretimModeli } from "./uretim.ts";
 import { VIDEO_SISTEM, videoAdaylari } from "./video.ts";
 import { ARA_SISTEM, araAdaylar, bolumler } from "./ara.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
 import { modelTakip } from "./kiyas.ts";
-import { siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, yayinEsitle, yzKutuphane, yzTemizle, type Kategori } from "./site.ts";
+import { disAdres, siteAyar, siteDene, siteGonder, siteIlgili, siteKapakEkle, siteTemizle, yayinEsitle, yzKutuphane, yzTemizle, type Kategori } from "./site.ts";
 import { adayListesi, commons, kaynakGorselleri, fluxIstem, GORSEL_YONETMEN, kaynakDurumu, kucukResim, kuralSecim, modelIstemi, openverse, resmiGorsel, SECIM_SISTEM, stokFoto, URETIM_DENETIM, type GorselAday, type GorselTarif } from "./gorsel.ts";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36";
@@ -678,6 +678,8 @@ async function kontrol(sb: Sb, id: number) {
       await otoOzet(sb, { durum: `Taslak hazır · ${durum || "kontrolsüz"} · ${siteDurum} · ${gDurum}`, haber: baslik });
     }
     await sb.from("tr_drafts").update({ qc_state: "tamam" }).eq("id", id);
+    // Elle istenen taslak hazır (4 Kasım 2026, kullanıcı: "hazırlandı, git demiyor"): hazırlatan editöre bildirim
+    if (!t.auto && t.author && !t.deneme) await sb.from("notifications").insert({ user_id: t.author, body: `Taslağın hazır: ${String(t.title || "başlıksız").slice(0, 140)} (Haber Masası → Taslaklar)`, link: "#/haber-masasi" }).then(() => {}, () => {});
     return { ok: true, durum };
   } catch (e) {
     await sb.from("tr_drafts").update({ qc_state: "hata", editor_note: [String(t.editor_note ?? ""), "Kalite kontrolü hata verdi: " + String((e as Error).message ?? e).slice(0, 200)].filter(Boolean).join("\n") }).eq("id", id);
@@ -730,8 +732,9 @@ async function yukle(sb: Sb, id: number, g: Uretilen): Promise<string> {
   const yol = `uretim/${id}-${g.model}-${Date.now()}.${uz}`;
   const y = await sb.storage.from("haber-gorsel").upload(yol, Uint8Array.from(atob(g.b64), (c) => c.charCodeAt(0)), { contentType: g.mime, upsert: true });
   if (y.error) throw new Error("depolama: " + y.error.message);
-  return sb.storage.from("haber-gorsel").getPublicUrl(yol).data.publicUrl;
+  return disAdres(sb.storage.from("haber-gorsel").getPublicUrl(yol).data.publicUrl);
 }
+
 
 const adayGorsel = (a: YzAday, istem: string): GorselAday => ({ kaynak: "Yapay zekâ (Flux)", sayfa: a.url!, buyuk: a.url!, thumb: a.url!, yazar: `Updated (yapay zekâ, ${MODEL_AD[a.model] ?? a.model})`, lisans: "Yapay zekâ üretimi", aciklama: istem, w: 1600, h: 900, ...(a.odak ? { odak: a.odak } : {}) });
 
@@ -748,12 +751,18 @@ async function yzGorselUret(sb: Sb, id: number, o: YzKonu, bitis: number, kiyasl
       const m = (model || "klein") as UretimModeli;
       const g = await uret(sb, m, ist, Math.max(10_000, Math.min(60_000, bitis - Date.now() - 40_000)), m === "gpt" ? surumler?.gpt : m === "banana" ? surumler?.banana : undefined, surumler?.kalite);
       const d = await denetle(o, g, bitis, tarif);
-      return { model: g.model, surum: g.surum, ...d, url: d.gecti ? await yukle(sb, id, g) : undefined, sure: Date.now() - t0 };
+      // Denetimden geçemeyen görsel de saklanır (4 Kasım 2026, kullanıcı: "geçemese de sonucu göstersin, geçemediğini söylesin");
+      // kapak olarak yalnız geçen seçilir, kütüphaneye yalnız geçen girer
+      return { model: g.model, surum: g.surum, ...d, url: await yukle(sb, id, g).catch(() => undefined), sure: Date.now() - t0 };
     } catch (e) { return { model: model || "klein", gecti: false, puan: 0, neden: "", hata: String((e as Error).message ?? e).slice(0, 160), sure: Date.now() - t0 }; }
   };
   let adaylar: YzAday[];
   const kiyas = kiyasla && modeller.length > 1;
-  if (kiyas) adaylar = await Promise.all(modeller.map((m) => tek(m, istemi(m))));
+  // En yüksek kalite ayarları (gptmax, bananapro) yalnız kıyas süresince (yz_kiyas.bitis) ve yalnız açıkça istenince/kıyasta
+  const { data: kb } = await sb.from("tr_settings").select("value").eq("key", "yz_kiyas").maybeSingle();
+  const kiyasSurer = Date.now() <= Date.parse((kb?.value as { bitis?: string } | null)?.bitis ?? "2026-11-18T23:59:00+03:00");
+  const kiyasModelleri = modeller.filter((m) => kiyasSurer || izinli?.includes(m) || !KIYAS_YUKSEK.includes(m as UretimModeli));
+  if (kiyas) adaylar = await Promise.all(kiyasModelleri.map((m) => tek(m as UretimModeli, istemi(m))));
   else {
     // Tek model sırası (4 Kasım 2026): önce ücretsiz Cloudflare; günlük payı biterse ya da reddedilirse sırayla Nano Banana (ucuz), GPT Image.
     // Eskiden yalnız klein iki kez deneniyordu: Cloudflare payı bittiği günlerde hiç görsel çıkmıyordu, ücretli modeller hiç denenmiyordu.
@@ -772,7 +781,7 @@ async function yzGorselUret(sb: Sb, id: number, o: YzKonu, bitis: number, kiyasl
   const gecenler = adaylar.filter((a) => a.gecti && a.url);
   if (gecenler.length && bitis - Date.now() > 20_000) {
     const { data: dt } = await sb.from("tr_drafts").select("deneme").eq("id", id).maybeSingle();
-    if (!dt?.deneme) await Promise.all(gecenler.map((a) => yzKutuphane({ url: a.url!, alt: `${o.baslik} (temsili görsel)`.slice(0, 125), ad: [o.marka, o.urun, o.baslik].filter(Boolean).join(" "), model: a.model, odak: a.odak }).catch(() => null)));
+    if (!dt?.deneme) await Promise.all(gecenler.map((a) => yzKutuphane({ url: disAdres(a.url!), alt: `${o.baslik} (temsili görsel)`.slice(0, 125), ad: [o.marka, o.urun, o.baslik].filter(Boolean).join(" "), model: a.model, odak: a.odak }).catch(() => null)));
   }
   const iyi = adaylar.filter((a) => a.gecti && a.url).sort((a, b) => b.puan - a.puan)[0];
   const ozet = adaylar.map((a) => `${MODEL_AD[a.model] ?? a.model}: ${a.hata ? "üretilemedi (" + a.hata + ")" : a.gecti ? a.puan + "/10" : "reddedildi (" + a.neden + ")"}`).join("; ");
@@ -793,7 +802,7 @@ async function uretimBaslat(id: number) {
 
 /** Görselsiz taslağa üretim (otomatik: yz_bekliyor bayrağıyla; elle: Stüdyo düğmesi). Elle seçilmiş görsele dokunmaz. */
 // Ücretli görsel modelleri (yeniden üretmede yalnız yöneticiler; 4 Kasım 2026, kullanıcı: "ücretli olanları yöneticiler yeniden çizdirebilsin")
-const UCRETLI_MODEL = ["gpt", "banana"];
+const UCRETLI_MODEL = ["gpt", "banana", "gptmax", "bananapro"];
 const UCRETSIZ_MODEL = ["klein", "dev", "lucid"];
 
 /** Editör görseli beğenmedi: yeniden üret (görseli olan taslakta da). Adaylar eklenir/yenilenir; seçili görsel değişmez, editör seçer. */

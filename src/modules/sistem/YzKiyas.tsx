@@ -17,6 +17,7 @@ const MODELLER: [string, string, string, string][] = [
   ["Claude Haiku 5.5", "Anthropic", "Ucuz sınıf", "0,10 $ / 0,50 $"],
   ["GPT-6 Luna", "OpenAI", "Ucuz sınıf", "0,10 $ / 0,50 $"],
   ["Claude Sonnet 5.5", "Anthropic", "Güçlü sınıf", "2 $ / 10 $"],
+  ["Claude Opus 5.5", "Anthropic", "En güçlü (tavan ölçüsü)", "4 $ / 20 $"],
   ["GPT-6.1 Sol", "OpenAI", "Güçlü sınıf", "2 $ / 10 $"],
   ["Gemini 4 Argon", "Google", "Güçlü sınıf, ücretli proje", "2 $ / 10 $ (1 Aralık'tan sonra 4 $ / 20 $)"],
 ];
@@ -35,9 +36,9 @@ function Sayfa() {
   const tarih = bitis.toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
   const ozet: [string, string, string, string][] = [
     ["Taslak yazımı", "Claude Sonnet 5.5 yazar, Opus 5.5 denetler", "Gemini (ücretsiz) her taslakta kör yarışır; editör seçer", "yazi"],
-    ["Kapak görseli", "FLUX.2 klein → Nano Banana 2.1 → GPT Image 2.5", `Günde ${g.gunluk} taslakta bütün modeller birlikte üretir`, "gorsel"],
-    ["Haber eleme", "Gemini 3.5 Flash-Lite (ücretsiz)", `Haberlerin %${k.eleme_oran}'unda 6 model daha`, "eleme"],
-    ["Künye", "Gemini (ücretsiz)", `Ürünlerin %${k.kunye_oran}'sinde 6 model daha`, "kunye"],
+    ["Kapak görseli", "FLUX.2 klein → Nano Banana 2.1 → GPT Image 2.5", `Günde ${g.gunluk} taslakta bütün modeller birlikte üretir (kıyas süresince en yüksek kalite ayarları da)`, "gorsel"],
+    ["Haber eleme", "Gemini 3.5 Flash-Lite (ücretsiz)", `Haberlerin %${k.eleme_oran}'unda 7 model daha`, "eleme"],
+    ["Künye", "Gemini (ücretsiz)", `Ürünlerin %${k.kunye_oran}'sinde 7 model daha`, "kunye"],
   ];
   return (
     <section className="bg ay">

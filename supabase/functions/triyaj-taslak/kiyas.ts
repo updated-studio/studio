@@ -13,6 +13,8 @@ export type KiyasModel = { id: string; ad: string; saglayici: "claude" | "openai
 export const KIYAS_MODELLERI: KiyasModel[] = [
   { id: "claude-haiku-5-5", ad: "Claude Haiku 5.5", saglayici: "claude", sinif: "ucuz", fiyat: [0.1, 0.5] },
   { id: "claude-sonnet-5-5", ad: "Claude Sonnet 5.5", saglayici: "claude", sinif: "guclu", fiyat: [2, 10] },
+  // En güçlü metin modeli (kullanıcı: "metinde Claude birinci, onu da kıyasa al"): tavan ölçüsü, pahalı
+  { id: "claude-opus-5-5", ad: "Claude Opus 5.5", saglayici: "claude", sinif: "guclu", fiyat: [4, 20] },
   { id: "gpt-6-luna", ad: "GPT-6 Luna", saglayici: "openai", sinif: "ucuz", fiyat: [0.1, 0.5] },
   { id: "gpt-6.1-sol", ad: "GPT-6.1 Sol", saglayici: "openai", sinif: "guclu", fiyat: [2, 10] },
   { id: "gemini-4-argon", ad: "Gemini 4 Argon", saglayici: "gemini", sinif: "guclu", fiyat: [2, 10] },

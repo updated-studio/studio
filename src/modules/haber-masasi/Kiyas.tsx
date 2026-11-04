@@ -139,7 +139,7 @@ export function YaziKiyas({ onde }: { onde?: Onde }) {
 // kıyaslasın"; göç 0065, public.yz_kiyas). Asıl işi Gemini yapar; Claude Haiku ve Sonnet aynı girdiyle gölgede çalışır. ----------
 type KiyasSatir = { nesne: string; model: string; sonuc: Record<string, unknown>; karar: string | null; sure_ms: number | null; hata: string | null };
 // Kıyas modelleri sunucuda triyaj-taslak/kiyas.ts KIYAS_MODELLERI; "gemini:…" asıl işi yapan ücretsiz Gemini
-const KIYAS_AD: Record<string, string> = { "claude-haiku-5-5": "Claude Haiku 5.5", "claude-sonnet-5-5": "Claude Sonnet 5.5", "gpt-6-luna": "GPT-6 Luna", "gpt-6.1-sol": "GPT-6.1 Sol", "gemini-4-argon": "Gemini 4 Argon", "gemini-3.8-flash": "Gemini 3.8 Flash (ücretsiz)" };
+const KIYAS_AD: Record<string, string> = { "claude-haiku-5-5": "Claude Haiku 5.5", "claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-opus-5-5": "Claude Opus 5.5", "gpt-6-luna": "GPT-6 Luna", "gpt-6.1-sol": "GPT-6.1 Sol", "gemini-4-argon": "Gemini 4 Argon", "gemini-3.8-flash": "Gemini 3.8 Flash (ücretsiz)" };
 const MODEL_ADI = (m: string) => (m.startsWith("gemini:") ? `Gemini ${m.slice(7).replace(/^gemini-/, "")} (asıl, ücretsiz)` : KIYAS_AD[m] ?? m);
 const yuzde = (a: number, b: number) => (b ? Math.round((a / b) * 100) + "%" : "–");
 function useKiyas(is: "eleme" | "kunye") {
@@ -348,8 +348,8 @@ export function KiyasOrani({ ayar }: { ayar: AyarYaz }) {
   return (
     <>
       <div className="ay-alanlar">
-        <Alan ad="Haber eleme" not="Toplanan haber partilerinin bu kadarı kıyasa girer; giren her haberi 7 model de etiketler. %10 ≈ ayda 30 $ (çoğu üç güçlü model). 0 = kapalı."><Sayi ad="Eleme oranı" deger={eleme} degis={setEleme} birim="%" /></Alan>
-        <Alan ad="Künye" not="Künye otomasyonunun ürünlerinden bu kadarı kıyasa girer. %20 ≈ ayda 25 $. 0 = kapalı."><Sayi ad="Künye oranı" deger={kunye} degis={setKunye} birim="%" /></Alan>
+        <Alan ad="Haber eleme" not="Toplanan haber partilerinin bu kadarı kıyasa girer; giren her haberi 8 model de etiketler. %10 ≈ ayda 50 $ (çoğu güçlü modeller, en çok Opus). 0 = kapalı."><Sayi ad="Eleme oranı" deger={eleme} degis={setEleme} birim="%" /></Alan>
+        <Alan ad="Künye" not="Künye otomasyonunun ürünlerinden bu kadarı kıyasa girer. %20 ≈ ayda 45 $. 0 = kapalı."><Sayi ad="Künye oranı" deger={kunye} degis={setKunye} birim="%" /></Alan>
         <Alan ad="Bitiş" not="Bu günden sonra eleme ve künye kıyası kendiliğinden durur (görsel kıyası ayrı). Kıyas kalıcı bir masraf değil, karar vermek için."><input type="date" value={bitis} onChange={(e) => setBitis(e.target.value)} aria-label="Kıyas bitişi" /></Alan>
       </div>
       <div className="ay-kaydet"><button className="btn sm" onClick={() => ayar("yz_kiyas", { eleme_oran: sinirla(eleme, 10), kunye_oran: sinirla(kunye, 20), bitis: bitis ? bitis + "T23:59:00+03:00" : KIYAS_BITIS_VARSAYILAN }, "Kıyas oranları kaydedildi.")}>Kaydet</button></div>

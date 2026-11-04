@@ -19,6 +19,7 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
   const ben = profile!.id;
   useSaat();
   const [aktarAcik, setAktarAcik] = useState<Haber | null>(null);
+  const [ikinciOnay, setIkinciOnay] = useState<number | null>(null);
   const [kim, setKim] = useState<"ben" | "ekip" | "yayinda">("ben");
 
   const benim = v.haberler.filter((h) => h.status === "alindi" && h.taken_by === ben);
@@ -82,7 +83,11 @@ export default function Benim({ taslakAc }: { taslakAc: (id: number) => void }) 
               </>}
               {h.draft_url && <a className="btn ghost sm" href={h.draft_url} target="_blank" rel="noreferrer">Taslağı aç (eski) ↗</a>}
               {taslaklar.map((t) => <button key={t.id} className="btn ghost sm" onClick={() => taslakAc(t.id)}>Taslağı aç · {zamanOnce(t.updated_at)}</button>)}
-              {bende && <button className="btn ghost sm" disabled={calisiyor} onClick={() => is_(h, "taslak")}>{calisiyor ? "Taslak yazılıyor…" : taslaklar.length || h.draft_url ? "Yeni taslak" : "Taslak hazırla"}</button>}
+              {bende && <button className="btn ghost sm" disabled={calisiyor} onClick={() => {
+                // Taslağı varken ikinci taslak yanlışlıkla açılmasın: ilk basış uyarır, ikinci basış başlatır
+                if ((taslaklar.length || h.draft_url) && ikinciOnay !== h.id) { setIkinciOnay(h.id); window.setTimeout(() => setIkinciOnay((x) => (x === h.id ? null : x)), 4000); return; }
+                setIkinciOnay(null); is_(h, "taslak");
+              }}>{calisiyor ? "Taslak yazılıyor…" : ikinciOnay === h.id ? "Zaten taslağı var; yine de yeni? Tekrar bas" : taslaklar.length || h.draft_url ? "Yeni taslak" : "Taslak hazırla"}</button>}
             </HaberKart>
           );
         })}

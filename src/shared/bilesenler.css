@@ -156,6 +156,8 @@ details.ceviri[open] { display: flex; flex-direction: column; gap: 6px; }
 .stok img { width: 100%; aspect-ratio: 3/2; object-fit: cover; border-radius: 8px; background: var(--sunk); }
 /* Görsel model kıyası adayları (3 Kasım 2026) */
 .yz-adaylar { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.yz-resim { position: relative; width: 100%; }
+.yz-resim .pill { position: absolute; left: 8px; top: 8px; }
 /* Görsel yönetmeninin tarifi ve son üretim sonucu (4 Kasım 2026) */
 .yz-tarif { font-size: 13px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
 .yz-tarif summary { cursor: pointer; font-weight: 600; }
