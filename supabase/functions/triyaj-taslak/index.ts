@@ -13,6 +13,7 @@ import { CLAUDE_MODEL, claudeJson, SECIM_SEMA } from "./claude.ts";
 import { markaYazimi } from "./html.ts";
 import { kullanilabilir, MODEL_AD, uret, type Uretilen, type UretimModeli } from "./uretim.ts";
 import { VIDEO_SISTEM, videoAdaylari } from "./video.ts";
+import { ARA_SISTEM, araAdaylar, bolumler } from "./ara.ts";
 import { KONTROL_SISTEM, USLUP_VARSAYILAN, yapayIzler } from "./uslup.ts";
 import { ANA_SAYFA_ESIK, degerlendir } from "./puan.ts";
 import { ayniHaber, editorSec, turAdaylari, OTO_VARSAYILAN, type Aday, type OtoAyar, type Profil } from "./secim.ts";
@@ -312,6 +313,27 @@ async function gorselSec(sb: Sb, it: { brand: string; product: string; title: st
 function metinListe(x: unknown): string[] {
   const duz = (v: unknown): string => typeof v === "string" ? v : v && typeof v === "object" ? Object.values(v as Record<string, unknown>).map(duz).filter(Boolean).join(" — ") : String(v ?? "");
   return (Array.isArray(x) ? x : x ? [x] : []).map(duz).map((s) => s.trim()).filter(Boolean);
+}
+
+/** Haber içi resmî görseller: bölümler + resmî adaylar → yapay zekâ görerek seçer (ara.ts) */
+async function araGorselSec(sb: Sb, it: Record<string, any>, govde: string, kapak: string, bitis: number): Promise<{ secimler: { bolum: string; gorsel: GorselAday; alt: string }[]; neden: string }> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const bl = bolumler(govde);
+  if (!bl.length) return { secimler: [], neden: "Ara başlıklı bölüm yok" };
+  const iz: string[] = [];
+  const basin = it.brand ? (((await sb.from("tr_press").select("url").ilike("brand", it.brand).limit(1)).data ?? []) as { url: string }[]).map((x) => x.url) : [];
+  const linkler = [it.link, ...((it.other_sources ?? []) as { link: string }[]).map((o) => o.link)].filter((u: string) => u && !turkHaberSitesi(u));
+  const adaylar = await araAdaylar(sb, { linkler, marka: it.brand ?? "", urun: it.product ?? "", baslik: it.title, basin, bolumler: bl, kapak }, iz);
+  if (!adaylar.length) return { secimler: [], neden: "Resmî görsel adayı yok (" + iz.join("; ") + ")" };
+  const resimler = await Promise.all(adaylar.map((a) => kucukResim(a.thumb || a.buyuk)));
+  const gorunen = resimler.map((g, i) => (g ? i : -1)).filter((i) => i >= 0);
+  const istem = `Haber: ${it.title}\nMarka: ${it.brand || "-"} · Ürün: ${it.product || "-"}\n\nBÖLÜMLER:\n${bl.map((b, i) => `${i}. ${b.h2} — ${b.metin}`).join("\n")}\n\nGÖRSEL ADAYLARI:\n${adayListesi(adaylar)}\n\nResmi gösterilen adaylar: ${gorunen.join(", ") || "yok"}`;
+  const { veri } = await yz("gorsel", ARA_SISTEM, istem, ["gemini-3.5-flash", ...MODELLER], Math.min(bitis - 40_000, Date.now() + 60_000),
+    { claudeBitis: Math.min(bitis - 50_000, Date.now() + 50_000), resimler: gorunen.map((i) => ({ ...resimler[i]!, etiket: `Aday ${i}` })), maxTokens: 8000 });
+  const kullanildi = new Set<number>();
+  const secimler = (Array.isArray(veri.secimler) ? veri.secimler : []).map((x: { bolum?: unknown; gorsel?: unknown; alt?: unknown }) => ({ b: Number(x.bolum), g: Number(x.gorsel), alt: String(x.alt ?? "").slice(0, 140) }))
+    .filter((x: { b: number; g: number }) => bl[x.b] && adaylar[x.g] && !kullanildi.has(x.g) && kullanildi.add(x.g)).slice(0, 2)
+    .map((x: { b: number; g: number; alt: string }) => ({ bolum: bl[x.b].h2, gorsel: adaylar[x.g], alt: x.alt }));
+  return { secimler, neden: String(veri.neden ?? "").slice(0, 200) || (secimler.length ? "" : "Uygun resmî görsel yok") };
 }
 
 /** Resmî video seçimi (video.ts adaylarından): kanal resmî ve video bu haberin konusuysa; değilse null */
@@ -622,6 +644,18 @@ async function kontrol(sb: Sb, id: number) {
       const bekle = !oneCikan.secilen;
       await sb.from("tr_drafts").update({ image: { ...img, secilen: oneCikan.secilen, gorsel_adaylar: oneCikan.adaylar, gorsel_neden: bekle ? oneCikan.neden + " Yapay zekâ ile görsel üretiliyor." : oneCikan.neden, ...(bekle ? { yz_bekliyor: true } : {}) } }).eq("id", id);
       if (bekle) await uretimBaslat(id);
+    }
+
+    // 2b) Haber içi resmî görseller (4 Kasım 2026): en fazla 2, ara başlıkların altına; süre yetmezse atlanır
+    if (it && bitis - Date.now() > 90_000) {
+      try {
+        const { data: sim } = await sb.from("tr_drafts").select("image,body").eq("id", id).single();
+        const im = (sim?.image ?? {}) as Record<string, unknown> & { secilen?: GorselAday | null; ara?: unknown };
+        if (!im.ara) {
+          const ara = await araGorselSec(sb, it, String(sim?.body ?? govde), im.secilen?.buyuk ?? "", bitis);
+          await sb.from("tr_drafts").update({ image: { ...im, ara: ara.secimler, ara_neden: ara.neden } }).eq("id", id);
+        }
+      } catch (e) { console.error("ara görsel", e); }
     }
 
     // 3) Panele taslak haber olarak: otomatik ve elle hazırlanan bütün taslaklar (Fatih, 23 Ekim 2026: "hazırlayınca panelde görünsün").

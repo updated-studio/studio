@@ -11,6 +11,12 @@
           "Listelerde bir haberi şu an açık tutan kişi yeşil etiketle görünür.",
           "\"Yayın onayında\" kartı artık gerçeği yazar: şu an bakan varsa adı, yoksa ne zamandır beklediği."
         ]
+      },
+      {
+        "ad": "Haber içi görseller",
+        "maddeler": [
+          "Sistem uygun resmî görsel bulursa ara başlıkların altına en fazla 2 görsel koyar; taslakta görüp kaldırabilirsin."
+        ]
       }
     ]
   },

@@ -201,14 +201,17 @@ export async function siteGonder(sb: Sb, taslakId: number, s: Secenek = {}): Pro
       const { data: it } = await sb.from("tr_items").select("kind,event_key").eq("id", t.item_id).maybeSingle();
       tur = it?.kind ?? ""; kume = it?.event_key ?? "";
     }
-    const img = (t.image ?? {}) as { secilen?: GorselAday | null; alt_text?: string };
+    const img = (t.image ?? {}) as { secilen?: GorselAday | null; alt_text?: string; ara?: { bolum: string; gorsel: GorselAday; alt: string }[] };
     const qc = (t.qc ?? {}) as { onem?: number | null };
+    // Haber içi resmî görseller (4 Kasım 2026): markdown'da yer tutucu, panel indirip yazıya görsel olarak koyar
+    const araListe = (img.ara ?? []).slice(0, 2);
 
     const govde = {
-      studioId: String(t.id), title: t.title, spot: t.spot ?? "", markdown: yorumYeriSil(t.body ?? ""),
+      studioId: String(t.id), title: t.title, spot: t.spot ?? "", markdown: araYerlestir(yorumYeriSil(t.body ?? ""), araListe),
       category: kat.slug, label: etiketTuru(tur),
       sources: kaynakListesi(t.sources ?? ""),
       ...(img.secilen?.buyuk ? { image: gorselGovde(img.secilen, img.alt_text || t.title) } : {}),
+      ...(araListe.length ? { araGorseller: araListe.map((a) => gorselGovde(a.gorsel, a.alt || t.title)) } : {}),
       ...((seo as { video?: { url?: string } }).video?.url ? { video: (seo as { video: unknown }).video } : {}),
       seo: { title: seo.title_tag ?? "", description: seo.meta ?? "", slug: seo.slug ?? "" },
       shortAnswer: seo.kisa_cevap || undefined,
@@ -257,4 +260,20 @@ export async function yayinEsitle(sb: Sb): Promise<number> {
     n++;
   }
   return n;
+}
+
+/** Haber içi görsel yer tutucuları: her görsel kendi ara başlığının ilk paragrafından sonra "[[gorsel-N]]" satırı olur (panel değiştirir) */
+export function araYerlestir(md: string, ara: { bolum: string }[]): string {
+  if (!ara.length) return md;
+  const satirlar = md.split("\n");
+  ara.forEach((a, i) => {
+    const b = satirlar.findIndex((l) => l.trim() === "## " + a.bolum.trim());
+    if (b < 0) return;
+    // başlıktan sonraki ilk dolu paragrafın sonu
+    let j = b + 1;
+    while (j < satirlar.length && !satirlar[j].trim()) j++;
+    while (j < satirlar.length && satirlar[j].trim() && !satirlar[j].startsWith("## ")) j++;
+    satirlar.splice(j, 0, "", `[[gorsel-${i + 1}]]`, "");
+  });
+  return satirlar.join("\n").replace(/\n{3,}/g, "\n\n");
 }

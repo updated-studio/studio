@@ -49,6 +49,26 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     const r = (data ?? {}) as Record<string, unknown>;
     toast((r.hata as string) ?? (error ? error.message : basari(r)));
   }
+  // Haber içi resmî görseller (4 Kasım 2026): sistem ara başlıkların altına koyar; editör kaldırabilir
+  async function araKaldir(i: number) {
+    const ara = (g.ara ?? []).filter((_, j) => j !== i);
+    const r = await sb.from("tr_drafts").update({ image: { ...g, ara } }).eq("id", t.id);
+    if (r.error) return toast(r.error.message);
+    if (t.site_id) await sb.functions.invoke("triyaj-taslak", { body: { site: true, draft_id: t.id, zorla: true } });
+    toast(t.site_id ? "Görsel yazıdan çıkarıldı; paneldeki taslak güncellendi." : "Görsel yazıdan çıkarıldı.");
+  }
+  const araSatir = (g.ara?.length || g.ara_neden) ? <>
+    <b>Yazı içi resmî görseller</b>
+    {g.ara?.length ? <div className="yz-adaylar">
+      {g.ara.map((a, i) => (
+        <figure key={a.gorsel.buyuk}>
+          <img src={a.gorsel.thumb || a.gorsel.buyuk} alt={a.alt} loading="lazy" />
+          <figcaption><b>"{a.bolum}"</b> bölümünün altına · {a.gorsel.yazar}</figcaption>
+          <button className="btn ghost sm" onClick={() => araKaldir(i)}>Kaldır</button>
+        </figure>
+      ))}
+    </div> : <div className="muted">Eklenmedi: {g.ara_neden}</div>}
+  </> : null;
   const fotolar = g.gorsel_adaylar ?? [];
   const adaylar = g.yz_adaylar ?? [];
   const islemler = <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -94,6 +114,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     </>}
     {!g.secilen && !g.yz_bekliyor && <div><button className="btn ghost sm" onClick={uret} disabled={uretiliyor}>{uretiliyor ? "Üretiliyor, denetleniyor…" : "Yapay zekâ ile görsel üret"}</button></div>}
     {fotoSatir}
+    {araSatir}
     {islemler}
   </>;
   const stok = g.stok ?? [];
