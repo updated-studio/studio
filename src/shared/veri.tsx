@@ -64,12 +64,16 @@ export function VeriProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     yenile();
-    const kanal = sb.channel("studyo")
-      .on("postgres_changes", { event: "*", schema: "public" }, () => {
+    // Yalnız bu bağlamın tabloları (4 Kasım 2026): bütün şemayı dinlemek Haber Masası'nın sık güncellenen tablolarında her seferinde
+    // ekip verisini de baştan yükletiyordu
+    const kanal = sb.channel("studyo");
+    for (const t of ["availability", "week_notes", "jobs", "job_requests", "gear", "notifications", "profiles", "events", "invites"]) {
+      kanal.on("postgres_changes", { event: "*", schema: "public", table: t }, () => {
         window.clearTimeout(zamanlayici.current);
         zamanlayici.current = window.setTimeout(yenile, 400);
-      })
-      .subscribe();
+      });
+    }
+    kanal.subscribe();
     return () => { sb.removeChannel(kanal); };
   }, [yenile]);
 

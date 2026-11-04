@@ -59,7 +59,7 @@ export async function commons(q: string, adet = 6, iz?: string[]): Promise<Gorse
     const lisans = duz(m.LicenseShortName?.value ?? "");
     if (!SERBEST.test(lisans)) continue;
     out.push({
-      kaynak: "Wikimedia Commons", sayfa: i.descriptionurl, buyuk: i.thumburl ?? i.url, thumb: (i.thumburl ?? i.url).replace(/\/\d+px-/, "/400px-"),
+      kaynak: "Wikimedia Commons", sayfa: i.descriptionurl, buyuk: i.thumburl ?? i.url, thumb: (i.thumburl ?? i.url).replace(/\/\d+px-/, "/500px-"), // Wikimedia 2026: yalnız sabit boylar (250, 330, 500, 960…), 400 px 400 hatası verir
       yazar: duz(m.Artist?.value ?? "").slice(0, 80) || "Bilinmiyor", lisans,
       aciklama: (duz(m.ObjectName?.value ?? "") + " — " + duz(m.ImageDescription?.value ?? "")).slice(0, 220) || p.title,
       w: i.width, h: i.height,

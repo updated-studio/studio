@@ -18,6 +18,9 @@ import ModelSecici from "./ModelSecici";
 const metinYap = (x: unknown): string => typeof x === "string" ? x : x && typeof x === "object" ? Object.values(x as Record<string, unknown>).map((v) => metinYap(v)).filter(Boolean).join(" — ") : String(x ?? "");
 
 /** Eski taslak dokümanının "GÖRSEL" bölümü: öneri, alt text, basın kiti, stok önerileri, yapay zekâ istemi */
+// Wikimedia 2026'dan beri küçük resmi yalnız sabit boylarda veriyor (250, 330, 500, 960…); eski kayıtlardaki 400 px adresi 400 hatası verir
+const wikiKucuk = (u: string) => (u && /\.wikimedia\.org\//.test(u) ? u.replace(/\/400px-/, "/500px-") : u);
+
 function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
   const toast = useToast();
   const g = t.image ?? {};
@@ -61,7 +64,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
     {g.ara?.length ? <div className="yz-adaylar">
       {g.ara.map((a, i) => (
         <figure key={a.gorsel.buyuk}>
-          <img src={a.gorsel.thumb || a.gorsel.buyuk} alt={a.alt} loading="lazy" />
+          <img src={wikiKucuk(a.gorsel.thumb || a.gorsel.buyuk)} alt={a.alt} loading="lazy" />
           <figcaption><b>"{a.bolum}"</b> bölümünün altına · {a.gorsel.yazar}</figcaption>
           <button className="btn ghost sm" onClick={() => araKaldir(i)}>Kaldır</button>
         </figure>
@@ -85,7 +88,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
         const secili = !!g.secilen && g.secilen.buyuk === f.buyuk;
         return (
           <figure key={f.buyuk + i} className={secili ? "secili" : ""}>
-            <img src={f.thumb || f.buyuk} alt="" loading="lazy" />
+            <img src={wikiKucuk(f.thumb || f.buyuk)} alt="" loading="lazy" />
             <figcaption><b>{f.kaynak}</b> · {f.yazar}</figcaption>
             {secili ? <span className="pill ok">Kapak</span> : <button className="btn ghost sm" disabled={!!is_} onClick={() => cagir("foto" + i, { foto_sec: t.id, sira: i }, () => "Kapak değişti.")}>{is_ === "foto" + i ? "Seçiliyor…" : "Bunu kullan"}</button>}
           </figure>
@@ -125,7 +128,7 @@ function Gorsel({ t, marka }: { t: Taslak; marka: string }) {
       <h3>Görsel</h3>
       {sec ? (
         <div className="row" style={{ alignItems: "flex-start", gap: 12 }}>
-          <a href={sec.sayfa} target="_blank" rel="noreferrer"><img src={sec.thumb} alt={g.alt_text ?? ""} style={{ width: 200, borderRadius: 8 }} /></a>
+          <a href={sec.sayfa} target="_blank" rel="noreferrer"><img src={wikiKucuk(sec.thumb)} alt={g.alt_text ?? ""} style={{ width: 200, borderRadius: 8 }} /></a>
           <div>
             <b>Öne çıkan görsel (otomatik seçildi)</b>
             <div className="muted">Fotoğraf: {sec.yazar} / {sec.kaynak} · {sec.lisans}</div>

@@ -63,13 +63,15 @@ export default function Duzenle({ k, id, kullanici, kapat, ac }: { k: Koleksiyon
   const fRef = useRef(f); fRef.current = f;
   useEffect(() => {
     if (k !== "news") return;
-    const temizle = () => {
+    const temizle = (kapaniyor: boolean) => {
       const x = fRef.current as { title?: string; spot?: string; cover?: unknown } | null;
       if (!x || String(x.title ?? "").trim() || String(x.spot ?? "").trim() || x.cover) return;
-      api.bosTaslakSil(id).catch(() => {});
+      api.bosTaslakSil(id, kapaniyor).catch(() => {});
     };
-    window.addEventListener("pagehide", temizle);
-    return () => { window.removeEventListener("pagehide", temizle); temizle(); };
+    // Sekme kapanırken keepalive (tarayıcı izin vermezse 1 saatlik temizlik yakalar); sayfa içinde çıkışta düz istek
+    const kapanis = () => temizle(true);
+    window.addEventListener("pagehide", kapanis);
+    return () => { window.removeEventListener("pagehide", kapanis); temizle(false); };
   }, [k, id]);
   const [no, setNo] = useState(0); // her değişiklikte artar: otomatik kayıt bunu bekler
   const noRef = useRef(0);
