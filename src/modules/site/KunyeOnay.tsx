@@ -153,8 +153,15 @@ export default function KunyeOnay() {
     yukle();
   }
 
-  async function onayla(o: Oneri) {
+  // Onaylar sıraya girer: aynı anda tek onay çalışır (6 Kasım 2026: art arda basılan onayların görsel yüklemeleri panelde üst üste
+  // binince panelin veritabanı bağlantısı kopup panel asılı kaldı). Sıradaki satırda "Sırada…" yazar.
+  const onaySirasi = useRef<Promise<void>>(Promise.resolve());
+  function onayla(o: Oneri) {
     if (isliyor[o.id]) return;
+    setIsliyor((x) => ({ ...x, [o.id]: "Sırada…" }));
+    onaySirasi.current = onaySirasi.current.then(() => onaylaIc(o));
+  }
+  async function onaylaIc(o: Oneri) {
     const adim = (m: string) => setIsliyor((x) => ({ ...x, [o.id]: m }));
     adim("Künye okunuyor…");
     try {
@@ -241,7 +248,7 @@ export default function KunyeOnay() {
         <li key={o.id}>
           <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <button className="linkbtn" onClick={() => setAcik(acik === o.id ? null : o.id)}><b>{o.urun_adi}</b> · {o.ozellikler.length} özellik önerisi{(() => { const d = o.ozellikler.filter((x) => x.islem).length; return d ? ` · ikinci göz ${d} değeri düzeltti/ekledi` : ""; })()}</button>
-            <div className="row" style={{ gap: 6 }}>{isliyor[o.id] && <span className="muted" role="status" style={{ fontSize: 13 }}>{isliyor[o.id]}</span>}<button className="btn sm" disabled={!!isliyor[o.id]} onClick={() => onayla(o)}>{isliyor[o.id] ? "Onaylanıyor…" : "Onayla"}</button><button className="btn ghost sm" disabled={!!isliyor[o.id]} onClick={() => reddet(o)}>Reddet</button></div>
+            <div className="row" style={{ gap: 6 }}>{isliyor[o.id] && <span className="muted" role="status" style={{ fontSize: 13 }}>{isliyor[o.id]}</span>}<button className="btn sm" disabled={!!isliyor[o.id]} onClick={() => onayla(o)}>{isliyor[o.id] === "Sırada…" ? "Sırada" : isliyor[o.id] ? "Onaylanıyor…" : "Onayla"}</button><button className="btn ghost sm" disabled={!!isliyor[o.id]} onClick={() => reddet(o)}>Reddet</button></div>
           </div>
           {o.resmi_ad && <label className="muted" style={{ display: "flex", flexDirection: "row", gap: 6, alignItems: "center", fontSize: 14 }}><input type="checkbox" checked={!adsiz[o.id]} onChange={(e) => setAdsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Adı da düzelt: <b>{o.resmi_ad}</b></label>}
           {o.gorsel_durum === "hazir" && o.gorsel ? (

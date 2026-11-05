@@ -235,3 +235,15 @@ button.ed-marka { background: none; border: 0; color: inherit; font: inherit; cu
   .mas-tablo td.mas-sag:last-child { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
   .mas-kart-bas { padding: 12px 14px 10px; }
 }
+
+/* Gelen haberler (6 Kasım 2026): tek süzgeç satırı + seçili olanın ne olduğu; ayrıntılı süzgeçler açılır bölümde */
+.hm-bas { display: grid; gap: 8px; justify-items: start; }
+.hm-bas p { margin: 0; max-width: 86ch; font-size: 14px; }
+.hm-bas h2 { margin: 0; }
+.hm-ust input[type="search"] { flex: 1 1 240px; min-width: 0; }
+.hm-suz { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+/* Telefonda arama tam satır, Önemliler / Tümü / Süz ve sırala yan yana (ortak .filtre kuralı düğmeleri tam genişliğe çekiyor) */
+@media (max-width: 560px) {
+  .hm-ust > input[type="search"] { flex: 1 1 100%; }
+  .hm-ust > .chip { width: auto !important; flex: 0 0 auto; }
+}

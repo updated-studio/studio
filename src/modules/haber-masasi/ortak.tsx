@@ -87,15 +87,16 @@ export function useFiltre(liste: Haber[], degerle: (h: Haber) => Degerlendirme, 
       {secenek(f).map((k) => <option key={k} value={k}>{k}</option>)}
     </select>
   );
-  const ui = (
+  const cip = (o: string) => (
+    <button key={o} className="chip" aria-pressed={oncelik === o} onClick={() => setOncelik(o)}>
+      {o === "onemli" ? `Önemliler ${liste.filter((h) => degerle(h).seviye.ad !== enAlt).length}` : o === "hepsi" ? `Tümü ${liste.length}` : o}
+    </button>
+  );
+  // Üstte her zaman görünen kısa seçim (Önemliler / Tümü); ayrıntılı süzgeçler "Süz ve sırala" altında (6 Kasım 2026: ekran sadeleşti)
+  const ust = varsayilan === "onemli" ? <>{cip("onemli")}{cip("hepsi")}</> : null;
+  const alt = (
     <>
-      <div className="filtre">
-        {[...(varsayilan === "onemli" ? ["onemli"] : []), "hepsi", ...SEVIYELER.map((s) => s.ad)].map((o) => (
-          <button key={o} className="chip" aria-pressed={oncelik === o} onClick={() => setOncelik(o)}>
-            {o === "onemli" ? `Önemliler (${liste.filter((h) => degerle(h).seviye.ad !== enAlt).length})` : o === "hepsi" ? `Tümü (${liste.length})` : o}
-          </button>
-        ))}
-      </div>
+      <div className="filtre">{SEVIYELER.map((s) => cip(s.ad))}</div>
       <div className="filtre">
         {sec("Marka", marka, setMarka, (h) => h.brand)}
         {sec("Kategori", konu, setKonu, (h) => h.topic)}
@@ -103,7 +104,8 @@ export function useFiltre(liste: Haber[], degerle: (h: Haber) => Degerlendirme, 
       </div>
     </>
   );
-  return { ui, sonuc };
+  const suzuldu = marka !== "hepsi" || konu !== "hepsi" || kaynak !== "hepsi" || (oncelik !== "hepsi" && oncelik !== "onemli");
+  return { ust, alt, suzuldu, sonuc };
 }
 
 /** Kaynağın ham Türkçe çevirisi (açınca çevrilir; sadece fikir için) */

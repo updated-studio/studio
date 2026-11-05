@@ -13,8 +13,8 @@ const YONETIM_YOLLARI = ["/yonetim-merkezi", "/yonetim", "/baglantilar", "/siste
 const yonetimde = (yol: string, sp: URLSearchParams) => YONETIM_YOLLARI.some((y) => yol === y || yol.startsWith(y + "/")) || (masada(yol) && ["kaynak", "ayar"].includes(sp.get("b") ?? ""));
 
 export const MASAM: Oge = { yol: "/masam", ad: "Masam", ikon: "bugun", etkin: (y) => y.startsWith("/masam") };
-const GELEN: Oge = { yol: "/haber-masasi", ad: "Gelen", ikon: "triyaj", etkin: (y, sp) => masada(y) && !["rehber", "kaynak", "ayar"].includes(sp.get("b") ?? "") };
-const TASLAKLAR: Oge = { yol: "/taslaklar", ad: "Taslaklar", ikon: "taslak", etkin: (y) => y.startsWith("/taslaklar") || y.startsWith("/yaz") };
+const GELEN: Oge = { yol: "/haber-masasi", ad: "Gelen", ikon: "triyaj", etkin: (y, sp) => masada(y) && !["rehber", "kaynak", "ayar", "taslak"].includes(sp.get("b") ?? "") };
+const TASLAKLAR: Oge = { yol: "/taslaklar", ad: "Taslaklar", ikon: "taslak", etkin: (y, sp) => y.startsWith("/taslaklar") || y.startsWith("/yaz") || (masada(y) && sp.get("b") === "taslak") };
 const CEKIM: Oge = { yol: "/cekim", ad: "Çekim listesi", kisa: "Çekim", ikon: "klaket", etkin: (y) => y.startsWith("/cekim") };
 export const MENU: Oge = { yol: "/menu", ad: "Menü", ikon: "isler", etkin: (y) => y.startsWith("/menu") };
 

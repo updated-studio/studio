@@ -89,6 +89,7 @@ function TaslakListe() {
           <div className="mas-bos">{q || kim === "benim" ? "Bu süzgece uyan taslak yok." : "Bekleyen taslak yok. Gelen haberlerden taslak hazırlatabilir ya da kendin yazabilirsin."}</div>
         ) : <SiraTablo satirlar={tazeler} />}
       </section>
+      <p className="muted">Bir taslağın iki metnini (A/B), denetim notlarını ya da görsel adaylarını görmek için: <a href="#/haber-masasi?b=taslak">yazım kayıtları</a>.</p>
       {eski.length > 0 && (
         <details className="mas-kart mas-eski">
           <summary>Eskiyenler <span className="mas-say">{eski.length}</span><span className="muted"> · {TAZE_SAAT} saatten eski, sıradan düşenler</span></summary>

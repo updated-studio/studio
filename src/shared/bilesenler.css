@@ -93,7 +93,8 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
   .dock .kare { width: 42px; height: 42px; border-radius: 12px; }
   .dock .kare svg.i { width: 21px; height: 21px; }
 }
-body { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+/* Sayfa altındaki 104 px boşluk (eski dock için) kalktı (6 Kasım 2026): belge kabuktan uzun olduğu için aşağı kaydırınca sol menü
+   yukarı kayıp kesiliyordu. Telefonda alt çubuğun payı .ed-ana-alan'da. */
 
 /* Sağ üst profil menüsü */
 .profilmenu { position: relative; }

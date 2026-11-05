@@ -1,13 +1,11 @@
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
-import { sb } from "../../shared/supabase";
 import Ayarlar from "./Ayarlar";
 import Havuz from "./Havuz";
-import Kaynaklar, { sorunluKaynaklar } from "./Kaynaklar";
-import { tarihSaat, YapayZekaUyari } from "./ortak";
+import Kaynaklar from "./Kaynaklar";
+import { YapayZekaUyari } from "./ortak";
 import Taslaklar from "./Taslaklar";
-import { MasaProvider, useMasa, type Etkinlik } from "./veri";
-import { useState } from "react";
+import { MasaProvider, useMasa } from "./veri";
 
 // Haber Masası (eski adıyla Triyaj): kaynaklardan gelen haberler ve yapay zekânın yazım kayıtları.
 // 6 Kasım 2026 (yeni düzen, kullanıcı: "aldım falan işaretlemeye gerek yok, işleri basitleştiriyoruz"): "Benim aldıklarım" ve haber aktarma
@@ -15,60 +13,54 @@ import { useState } from "react";
 // (#/haber-masasi?b=rehber): menüdeki Gelen, Rehberler ve Yönetim'deki Kaynaklar/Otomasyon doğrudan o bölümü açar.
 type Bolum = "havuz" | "pas" | "taslak" | "rehber" | "belirsiz" | "elenen" | "kaynak" | "ayar";
 const BOLUMLER: Bolum[] = ["havuz", "pas", "taslak", "rehber", "belirsiz", "elenen", "kaynak", "ayar"];
-const TUR: Record<string, string> = { "aldı": "haberi aldı", "yayında": "haberi yayına aldı", "pas": "haberi pas geçti", "bıraktı": "haberi bıraktı", "geri aldı": "haberi pastan geri aldı" };
-const metin = (r: Etkinlik) => (r.kind === "oto" ? <><b>Stüdyo</b> otomatik taslak hazırladı</> : r.kind === "aktar" ? <><b>{r.actor_name}</b> → <b>{r.target_name}</b> haberi aktardı</> : <><b>{r.actor_name}</b> {TUR[r.kind] ?? r.kind}</>);
-
 function Masa() {
-  const { v, yukleniyor, hata, yenile } = useMasa();
+  const { v, yukleniyor, hata } = useMasa();
   const { profile } = useAuth();
-  const ben = profile!.id;
   const [sp, setSp] = useSearchParams();
   const istenen = sp.get("b") as Bolum | null;
   const bolum: Bolum = istenen && BOLUMLER.includes(istenen) && (profile!.is_admin || (istenen !== "kaynak" && istenen !== "ayar")) ? istenen : "havuz";
   const taslak = Number(sp.get("t")) || null;
   const git = (b: Bolum, t?: number | null) => setSp({ ...(b === "havuz" ? {} : { b }), ...(t ? { t: String(t) } : {}) }, { replace: !!t || b === bolum });
-  const [zilAcik, setZilAcik] = useState(false);
 
   if (yukleniyor) return <div className="muted">Yükleniyor…</div>;
   if (hata) return <div className="empty">Haber Masası yüklenemedi: {hata}</div>;
 
   const say = (d: string) => v.haberler.filter((h) => h.status === d).length;
-  const okunmamis = v.etkinlik.filter((r) => !r.read_by.includes(ben) && r.actor !== ben).length;
-  const sorunlu = profile!.is_admin ? sorunluKaynaklar(v.kaynaklar).length : 0;
-  const bolumler: [Bolum, string][] = [
-    ["havuz", `Gelen ${say("aday")}`], ["rehber", `Rehberler ${say("rehber")}`], ["belirsiz", `Belirsiz ${say("belirsiz")}`], ["pas", `Pas ${say("pas")}`],
-    ["elenen", `Elenenler ${say("elendi")}`], ["taslak", "Yazım kayıtları"],
+  // Gelen haberlerin dört hâli tek süzgeçte; her birinin ne olduğu altında yazar (6 Kasım 2026, kullanıcı: "belirsiz ne, neye göre belirsiz,
+  // yazım kayıtları ne, kaynaklar neden orada"). Rehberler menüde kendi yerinde; Kaynaklar ve Ayarlar yalnız Yönetim'den, yazım kayıtları
+  // Taslaklar'dan açılır: burada sekme olarak durmaz.
+  const GELEN: [Bolum, string, string][] = [
+    ["havuz", `Yeni ${say("aday")}`, "Kaynaklardan gelip elemeden geçen haberler. Önemlilerin taslağını sistem kendisi yazar; yazmadığı bir haber için \"Taslak hazırla\" de."],
+    ["belirsiz", `Türkiye ilgisi belirsiz ${say("belirsiz")}`, "Yapay zekâ bu haberlerin Türkiye'deki okuru ilgilendirip ilgilendirmediğinden emin olamadı. \"Havuza al\" dersen Yeni'ye geçer, \"Ele\" dersen elenir."],
+    ["pas", `Pas geçilen ${say("pas")}`, "Ekipten birinin \"Pas\" dediği haberler. \"Geri al\" ile Yeni'ye döner."],
+    ["elenen", `Elenen ${say("elendi")}`, "Kurallara takılan haberler: reklam ve indirim, Türkiye ile ilgisi olmayan, hariç tutulan marka. Yanlış elenen varsa \"Havuza al\" de; kural buna göre düzeltilir."],
   ];
-  // Kaynaklar ve Ayarlar yönetim işi: yöneticide sekme olarak da durur (Yönetim sayfasından da açılır)
-  if (profile!.is_admin) bolumler.push(["kaynak", `Kaynaklar${sorunlu ? " ⚠ " + sorunlu : ""}`], ["ayar", "Ayarlar"]);
-
-  async function okunduYap() {
-    await sb.rpc("tr_activity_read");
-    yenile();
-  }
+  const gelenMi = GELEN.some(([k]) => k === bolum);
+  const BASLIK: Partial<Record<Bolum, [string, string, string, string]>> = {
+    rehber: ["Rehberler", "Yabancı kaynakların rehber ve liste içerikleri (\"en iyi 10 kulaklık\", \"nasıl yapılır\"). Kendi rehberimiz için fikir; puanlanmaz.", "", ""],
+    taslak: ["Yazım kayıtları", "Yapay zekânın yazdığı her taslağın kaydı: iki metin (A/B), denetim notları, görsel adayları ve yeniden üretme. Taslağın kendisi Taslaklar'da.", "/taslaklar", "Taslaklar"],
+    kaynak: ["Kaynaklar ve eleme", "Haberlerin toplandığı kaynaklar ve durumları.", "/yonetim-merkezi", "Yönetim"],
+    ayar: ["Otomasyon", "Otomatik taslak, yazım üslubu, görsel üretimi, eleme listeleri.", "/yonetim-merkezi", "Yönetim"],
+  };
+  const baslik = BASLIK[bolum];
 
   return (
     <>
-      <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
-        <div className="segment" role="group" aria-label="Haber Masası bölümleri" style={{ flex: 1 }}>
-          {bolumler.map(([k, l]) => <button key={k} aria-pressed={bolum === k} onClick={() => git(k)}>{l}</button>)}
+      {gelenMi ? (
+        <div className="hm-bas">
+          <div className="segment" role="group" aria-label="Gelen haberler">
+            {GELEN.map(([k, l]) => <button key={k} aria-pressed={bolum === k} onClick={() => git(k)}>{l}</button>)}
+          </div>
+          <p className="muted">{GELEN.find(([k]) => k === bolum)![2]}</p>
         </div>
-        <button className="btn ghost sm" onClick={() => setZilAcik(!zilAcik)} aria-label="Bildirim havuzu" style={okunmamis ? { color: "var(--blue)" } : undefined}>Hareketler{okunmamis ? " · " + okunmamis : ""}</button>
-      </div>
-      <YapayZekaUyari />
-      {zilAcik && (
-        <div className="panel">
-          <div className="row"><b style={{ marginRight: "auto" }}>Haber Masası hareketleri</b>{okunmamis > 0 && <button className="btn ghost sm" onClick={okunduYap}>Hepsini okundu yap</button>}<button className="btn ghost sm" onClick={() => setZilAcik(false)}>Kapat</button></div>
-          {!v.etkinlik.length && <div className="muted">Henüz hareket yok.</div>}
-          {v.etkinlik.map((r) => (
-            <div key={r.id} className={"bildirim" + (!r.read_by.includes(ben) && r.actor !== ben ? " yeni" : "")}>
-              <div>{metin(r)} <span className="muted" style={{ fontSize: 12 }}>{tarihSaat(r.created_at)}</span></div>
-              <div className="muted">{r.title}</div>
-              {r.note && <div style={{ fontStyle: "italic" }}>“{r.note}”</div>}
-            </div>
-          ))}
+      ) : baslik && (
+        <div className="hm-bas">
+          {baslik[2] && <Link className="linkbtn" to={baslik[2]}>← {baslik[3]}</Link>}
+          <h2>{baslik[0]}</h2>
+          <p className="muted">{baslik[1]}</p>
         </div>
       )}
+      <YapayZekaUyari />
       {bolum === "havuz" && <Havuz durum="aday" />}
       {bolum === "pas" && <Havuz durum="pas" />}
       {bolum === "taslak" && <Taslaklar acik={taslak} setAcik={(id) => git("taslak", id)} />}

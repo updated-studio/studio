@@ -33,6 +33,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
   const [gorunum, setGorunum] = useState<"herkes" | "bana">("herkes");
   const [elKategori, setElKategori] = useState("hepsi");
   const [kac, setKac] = useState(60);
+  const [suzAcik, setSuzAcik] = useState(false);
   // Ekip isteği: öncelik yerine zamana göre sıralama (haberin yayın saati ya da sisteme giriş saati, yeniden eskiye)
   const [siralama, setSiralama] = useState<"oncelik" | "oncelik-zaman" | "haber" | "derleme">(() => { try { return (localStorage.getItem("hm-siralama") as "oncelik") || "oncelik"; } catch { return "oncelik"; } });
   const siralamaSec = (x: typeof siralama) => { setSiralama(x); try { localStorage.setItem("hm-siralama", x); } catch { /* yok */ } };
@@ -84,33 +85,42 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
   const taslakOf = new Map(v.taslaklar.filter((t) => t.item_id && !t.deneme).map((t) => [t.item_id as number, t]));
   return (
     <>
-      <div className="filtre">
+      {/* 6 Kasım 2026 (kullanıcı: "aşırı karışık"): üstte yalnız arama ve Önemliler/Tümü; görünüm, sıralama, öncelik grubu, marka, kategori,
+          kaynak süzgeçleri ve "şimdi topla" tek düğmenin ("Süz ve sırala") altında */}
+      <div className="filtre hm-ust">
         <input type="search" placeholder="Ara: marka, ürün, kaynak…" value={ara} onChange={(e) => setAra(e.target.value)} aria-label="Haberlerde ara" />
-        {durum === "aday" && (
-          <div className="segment" role="group" aria-label="Görünüm">
-            <button aria-pressed={gorunum === "herkes"} onClick={() => setGorunum("herkes")}>Herkes için</button>
-            <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiVar ? "Sana önerilenler üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
-          </div>
-        )}
-        <select value={durum !== "aday" && siralama.startsWith("oncelik") ? "haber" : siralama} onChange={(e) => siralamaSec(e.target.value as typeof siralama)} style={{ width: "auto" }} aria-label="Sıralama">
-          {durum === "aday" && <option value="oncelik">Sıra: öncelik puanı</option>}
-          {durum === "aday" && <option value="oncelik-zaman">Sıra: öncelik grubu, içinde yeni → eski</option>}
-          <option value="haber">Sıra: haber saati (yeni → eski)</option>
-          <option value="derleme">Sıra: sisteme düşme saati (yeni → eski)</option>
-        </select>
-        {durum === "aday" && <SimdiTopla />}
+        {durum !== "elendi" && filtre.ust}
+        <button className="chip" aria-expanded={suzAcik} aria-pressed={suzAcik || (durum !== "elendi" && filtre.suzuldu)} onClick={() => setSuzAcik(!suzAcik)}>Süz ve sırala{durum !== "elendi" && filtre.suzuldu ? " · açık" : ""}</button>
       </div>
-      {durum !== "elendi" && filtre.ui}
+      {suzAcik && (
+        <div className="hm-suz">
+          <div className="filtre">
+            {durum === "aday" && (
+              <div className="segment" role="group" aria-label="Görünüm">
+                <button aria-pressed={gorunum === "herkes"} onClick={() => setGorunum("herkes")}>Herkes için</button>
+                <button aria-pressed={gorunum === "bana"} onClick={() => setGorunum("bana")} title={ilgiVar ? "Sana önerilenler üstte" : "Profilim'de ilgi alanı girersen çalışır"}>Bana göre</button>
+              </div>
+            )}
+            <select value={durum !== "aday" && siralama.startsWith("oncelik") ? "haber" : siralama} onChange={(e) => siralamaSec(e.target.value as typeof siralama)} style={{ width: "auto" }} aria-label="Sıralama">
+              {durum === "aday" && <option value="oncelik">Sıra: öncelik puanı</option>}
+              {durum === "aday" && <option value="oncelik-zaman">Sıra: öncelik grubu, içinde yeni → eski</option>}
+              <option value="haber">Sıra: haber saati (yeni → eski)</option>
+              <option value="derleme">Sıra: sisteme düşme saati (yeni → eski)</option>
+            </select>
+            {durum === "aday" && <SimdiTopla />}
+          </div>
+          {durum !== "elendi" && filtre.alt}
+          {durum === "aday" && <OncelikBilgisi />}
+        </div>
+      )}
       {durum === "elendi" && (
         <div className="filtre">
           <button className="chip" aria-pressed={elKategori === "hepsi"} onClick={() => setElKategori("hepsi")}>Hepsi · {sirali.length}</button>
           {[...kats.entries()].map(([k, n]) => <button key={k} className="chip" aria-pressed={elKategori === k} onClick={() => setElKategori(k)}>{k} · {n}</button>)}
         </div>
       )}
-      {durum === "aday" && <OncelikBilgisi />}
       {durum === "aday" && gorunum === "bana" && !ilgiVar && <div className="msg err">"Bana göre" için Profilim'de ilgi alanlarını yaz (ör. sony, kamera, playstation).</div>}
       <div className="muted">{liste.length} haber</div>
-      {durum === "rehber" && <div className="muted">Yabancı kaynakların rehber ve liste içerikleri ("en iyi 10 kulaklık", "nasıl yapılır"). Kendi rehberimizi yazmak için fikir; puanlanmaz.</div>}
       {!liste.length && <div className="empty">{durum === "aday" ? "Havuz boş. Yeni haberler 15 dakikada bir gelir." : "Burada haber yok."}</div>}
       <div className="cards">
         {liste.slice(0, kac).map((h) => {

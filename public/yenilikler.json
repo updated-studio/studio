@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-11-06-c",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Gelen haberler sadeleşti",
+    "bolumler": [
+      {
+        "ad": "Gelen",
+        "maddeler": [
+          "Tek süzgeç satırı: Yeni, Türkiye ilgisi belirsiz, Pas geçilen, Elenen; seçili olanın ne olduğu altında yazar.",
+          "Sıralama ve ayrıntılı süzgeçler \"Süz ve sırala\" düğmesinin altında.",
+          "Kaynaklar ve Ayarlar yalnız Yönetim'de; yazım kayıtları Taslaklar'ın altındaki bağlantıda.",
+          "Künye onayları sıraya girer; aşağı kaydırınca sol menü artık kesilmez."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-a",
     "tarih": "6 Kasım 2026",
     "baslik": "Yeni düzen",
