@@ -373,6 +373,15 @@ async function surumZamani(sb: ReturnType<typeof createClient>) {
 // (kesilen ürün hiç kaydedilmez ve sonraki tur yine onunla başlar; süre yetmezse ikinci göz ya da görsel atlanır, görsel sonraki turda işlenir)
 const ISLE_BUTCE_MS = 120_000;
 
+// Boyut biçimi (5 Kasım 2026): model sırayı karıştırabiliyor (S25 Ultra yükseklik önce, iPhone 17 genişlik önce geldi).
+// Telefonda genişlik yükseklikten küçüktür: ilk iki sayı ters geldiyse yer değiştirir. Lenste iki sayı varsa çap işareti eklenir.
+function boyutDuzelt(tur: string, deger: string) {
+  if (tur === "phone") return deger.replace(/(\d+(?:,\d+)?)\s*×\s*(\d+(?:,\d+)?)(\s*×\s*\d+(?:,\d+)?)/g, (t, a: string, b: string, c: string) =>
+    Number(a.replace(",", ".")) > Number(b.replace(",", ".")) ? `${b} × ${a}${c}` : t);
+  if (tur === "lens" && !deger.includes("Ø") && /^\d+(?:,\d+)?\s*×\s*\d+(?:,\d+)?\s*mm/.test(deger)) return "Ø " + deger;
+  return deger;
+}
+
 // Görselsiz kalan yeni öneriler (5 Kasım 2026): görsel kuralları değişince (ör. telefonun önü+arkası artık geçer) bir kez daha aranır.
 // Yeni ürünler önce gelir; tur bittikten sonra süre kaldıysa tek öneri. Denenen öneri GORSEL_SURUMU ile işaretlenir, aynı sürümle tekrar denenmez.
 const GORSEL_SURUMU = "2026-11-05b";
@@ -445,7 +454,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       const adlar = new Set([...(u.specs ?? []).map((s) => s.key), "Boyutlar"]);
       const oz = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).filter((o: { key?: string; value?: string }) => o?.key && adlar.has(o.key) && o.value)
         .filter((o: { key: string }, i: number, l: { key: string }[]) => l.findIndex((x) => x.key === o.key) === i)
-        .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string; islem?: string; not?: string; alinti?: boolean }) => ({ key: o.key, value: String(o.value).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160),
+        .map((o: { key: string; value: string; num?: unknown; kaynak?: string; kanit?: string; islem?: string; not?: string; alinti?: boolean }) => ({ key: o.key, value: (o.key === "Boyutlar" ? boyutDuzelt(u.type, String(o.value)) : String(o.value)).slice(0, 120), num: typeof o.num === "number" && isFinite(o.num) ? o.num : null, kaynak: /^https?:\/\//.test(String(o.kaynak ?? "")) ? String(o.kaynak).slice(0, 400) : null, kanit: String(o.kanit ?? "").slice(0, 160),
           ...(o.islem && o.islem !== "ayni" ? { islem: o.islem, not: String(o.not ?? "").slice(0, 160) } : {}), ...(o.alinti === false ? { alinti: false } : {}) }));
       // Resmî ad (göç 0060): yalnız gerçekten farklı ve makul uzunluktaysa; markayla başlıyorsa marka çıkarılır
       let resmiAd = typeof v?.resmiAd === "string" ? v.resmiAd.trim().slice(0, 90) : "";
