@@ -100,7 +100,7 @@ async function kunyeKiyas(sb: ReturnType<typeof createClient>, oneriId: string, 
 let SAYFA_TESHIS = "";
 /** Ürünün özellik sayfaları: künyede kayıtlı bağlantılar (önceki onaylı değerlerin kaynakları) ve Brave Search API sonuçları okunur; arama motoru
  *  kazınmaz (31 Ekim 2026: robot doğrulaması olan aramalar kullanılmaz). Sayfa kendi adımızla (UA) istenir; engelleyen site atlanır. */
-const BRAVE_AY_SINIR = 700; // ücretsiz 1.000 aramanın güvenli altı
+const BRAVE_AY_SINIR = 1000; // ücretsiz 1.000 aramanın tamamı (5 Kasım 2026, kullanıcı: "kotayı 1000e çıkar, dolunca ücretli plana geçeriz")
 const ATLA = /youtube\.|amazon\.|reddit\.|facebook\.|instagram\.|tiktok\.|x\.com|twitter\.|pinterest\.|ebay\.|aliexpress\.|hepsiburada\.|trendyol\.|n11\.|teknosa\.|mediamarkt\.|vatanbilgisayar\.|akakce\.|cimri\.|epey\./i;
 // İkincil kaynaklar (5 Kasım 2026 genişledi: üretici sitesi sunucumuzu kabul etmediğinde değerler buradan gelir; üreticininki yine önce gelir)
 const IKINCIL = /bhphotovideo\.com|gsmarena\.com|dpreview\.com|adorama\.com|notebookcheck\.net|phonearena\.com|cined\.com|newsshooter\.com|imaging-resource\.com|photographyblog\.com|rtings\.com|soundguys\.com/i;
@@ -354,11 +354,13 @@ type GorselSatir = { id: number; urun_id: number; urun_adi?: string; gorsel_aday
 // seçilen aday ve yedekleri sırayla kesilir, denetimden geçenlerden en çok GORSEL_SECENEK tanesi saklanır (gorsel_aday.secenekler).
 // İlk geçen künyenin önerilen görseli olur; editör onay ekranında başkasını seçebilir. Süre azsa ilk geçenle yetinilir.
 const GORSEL_SECENEK = 3;
+const SECENEK_SURUMU = 2; // 2: aynı çekimin kopyaları ayıklanır; eski sürümle hazırlanmış bekleyen öneriler yeniden kesilir
 async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, s: GorselSatir, bitis = Date.now() + 150_000, mevcut?: string) {
   const yaz = (x: Record<string, unknown>) => sb.from("kunye_oneriler").update(x).eq("id", s.id);
   if (!s.gorsel_aday?.url) { await yaz({ gorsel_durum: "yok" }); return; }
   const sira = [{ url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa, alfa: s.gorsel_aday.alfa }, ...(s.gorsel_aday.yedekler ?? [])];
   const secenekler: { gorsel: string; url: string; sayfa: string }[] = [];
+  const boylar: number[] = [];
   let son = "";
   for (const a of sira) {
     if (secenekler.length >= GORSEL_SECENEK || (secenekler.length && bitis - Date.now() < 40_000)) break;
@@ -376,21 +378,25 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
         throw new Error(h);
       }
       const webp = new Uint8Array(await r.arrayBuffer());
+      // Aynı fotoğrafın başka boyutu seçenek olmasın (5 Kasım 2026, kullanıcı: "3 seçenek neden birbiriyle aynı"): kesilen görseller aynı
+      // tuvale oturduğu için aynı çekimin çıktıları neredeyse aynı büyüklükte olur; %4'ten yakınsa tekrar sayılır, denetime bile gitmez
+      if (boylar.some((n) => Math.abs(n - webp.byteLength) / n < 0.04)) continue;
       const d = await kesimDenetle(webp, s.urun_adi ?? "");
       if (!d.gecti) { son = "Kesim denetimden geçmedi: " + d.sorun; continue; }
       const yol = secenekler.length ? `${s.urun_id}-${s.id}-${secenekler.length + 1}.webp` : `${s.urun_id}-${s.id}.webp`;
       const { error } = await sb.storage.from("kunye").upload(yol, webp, { contentType: "image/webp", upsert: true });
       if (error) throw new Error("yükleme: " + error.message);
       secenekler.push({ gorsel: `${ADRES}/storage/v1/object/public/kunye/${yol}?v=${Date.now()}`, url: a.url, sayfa: a.sayfa });
+      boylar.push(webp.byteLength);
       await sb.from("baglanti_anahtarlari").update({ ek: { son_islem: new Date().toISOString(), hata: "" } }).eq("ad", "cloudflare_adres");
     } catch (e) { son = String((e as Error).message); }
   }
   // Var olan hazır görsele seçenek eklenirken hiçbiri geçmediyse eldeki görsel korunur
-  if (!secenekler.length && mevcut) { await yaz({ gorsel_aday: { ...s.gorsel_aday, secenekler: [{ gorsel: mevcut, url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa }] } }); return; }
+  if (!secenekler.length && mevcut) { await yaz({ gorsel_aday: { ...s.gorsel_aday, secenekler: [{ gorsel: mevcut, url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa }], secenek_surum: SECENEK_SURUMU } }); return; }
   if (!secenekler.length) { await yaz({ gorsel_durum: "hata", gorsel_hata: son.slice(0, 200) }); return; }
   const ilk = secenekler[0];
   await yaz({ gorsel: ilk.gorsel, gorsel_durum: "hazir", gorsel_hata: null,
-    gorsel_aday: { ...s.gorsel_aday, url: ilk.url, sayfa: ilk.sayfa, secenekler,
+    gorsel_aday: { ...s.gorsel_aday, url: ilk.url, sayfa: ilk.sayfa, secenekler, secenek_surum: SECENEK_SURUMU,
       ...(ilk.url !== s.gorsel_aday.url ? { neden: "Sıradaki aday (ilk seçimin kesimi denetimden geçmedi)" } : {}) } });
 }
 
@@ -435,7 +441,7 @@ async function gorselTekrar(sb: ReturnType<typeof createClient>, cf: { adres: st
   if (!s) {
     // Görseli hazır ama seçenekleri olmayan (5 Kasım 2026 öncesi) bekleyen öneriler: aday ve yedekleri yeniden kesilir, seçenekler eklenir
     const { data: h } = await sb.from("kunye_oneriler").select("id,urun_id,urun_adi,gorsel,gorsel_aday").eq("durum", "bekliyor").eq("gorsel_durum", "hazir").gte("created_at", surum).order("id").limit(50);
-    const x = (h ?? []).find((y) => !Array.isArray((y.gorsel_aday as { secenekler?: unknown } | null)?.secenekler));
+    const x = (h ?? []).find((y) => (y.gorsel_aday as { secenek_surum?: number } | null)?.secenek_surum !== SECENEK_SURUMU);
     if (!x) return null;
     await gorselIsle(sb, cf, x as GorselSatir, bitis, String(x.gorsel ?? ""));
     return { urun: String(x.urun_adi ?? ""), durum: "görsel seçenekleri" };

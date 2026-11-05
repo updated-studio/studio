@@ -13,7 +13,7 @@ const YT = /(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=|shorts\/|live\/)
 const VIMEO = /(?:player\.)?vimeo\.com\/(?:video\/)?(\d{6,12})/g;
 // Fragman ve tanıtım videosu en çok bu konularda olur; Brave araması yalnız bunlarda yapılır (aylık sınır ortak)
 const VIDEO_KONU = /oyun|game|film|dizi|sinema|fragman|trailer|teaser|tanıtım|tanitim|reveal|launch|lansman|announce/i;
-const BRAVE_AY_SINIR = 700;
+const BRAVE_AY_SINIR = 1000; // 5 Kasım 2026: ücretsiz kotanın tamamı (kunye-otomatik ile aynı)
 const sade = (s: string) => (s ?? "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
 const HABER_SITESI = /theverge|engadget|techcrunch|gsmarena|ign\.com|gamespot|polygon|eurogamer|pcgamer|kotaku|9to5|macrumors|androidauthority|wired|cnet|tomshardware|anandtech|arstechnica|reddit|twitter|x\.com|facebook|instagram|wikipedia/i;
 

@@ -8,7 +8,7 @@ import { kaynakGorselleri, resmiGorsel, type GorselAday } from "./gorsel.ts";
 
 type Sb = ReturnType<typeof createClient>;
 export type Bolum = { h2: string; metin: string };
-const BRAVE_AY_SINIR = 700;
+const BRAVE_AY_SINIR = 1000; // 5 Kasım 2026: ücretsiz kotanın tamamı (kunye-otomatik ile aynı)
 const sade = (s: string) => (s ?? "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, " ");
 const hostAl = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
 

@@ -159,7 +159,7 @@ const SERVISLER: Servis[] = [
   { id: "amazon", grup: "site", logo: "amazon", ad: "Amazon ortaklık", ne: "Ürün sayfasında Amazon Türkiye fiyatı ve bağlantısı", anahtarlar: ["amazon_kimlik", "amazon_gizli", "amazon_surum", "amazon_etiket"], eylem: "amazon",
     neIcin: "Günde iki kez çıkmış ürünlerin Amazon Türkiye fiyatını yeniler; eşleşmemiş ürünü arar, yapay zekâ tam modeli seçer. Sitede ürün sayfasında fiyat ve ortaklık bağlantısı.", ucret: "Ücretsiz (Amazon Ortaklık Programı). Eşleştirmede Claude Haiku ürün başına bir kez, kuruşluk.", olmazsa: "Ürün sayfasında Amazon kutusu görünmez." },
   { id: "brave", grup: "site", logo: "brave", ad: "Brave arama", ne: "Künye, resmî video ve haber içi resmî görsel araması", anahtarlar: ["brave_arama"], eylem: "brave",
-    neIcin: "Künye otomasyonu ürünün resmî sayfasını bulur; taslakta resmî fragman ve yazı içi resmî görsel aranır.", ucret: "Ücretsiz planla; sistem ayda en çok 700 arama yapar (künye, video, görsel ortak).", olmazsa: "Künye otomasyonu özellikleri bulamaz." },
+    neIcin: "Künye otomasyonu ürünün resmî sayfasını bulur; taslakta resmî fragman ve yazı içi resmî görsel aranır.", ucret: "Ücretsiz planla; sistem ayda en çok 1.000 arama yapar (künye, radar, video, görsel ortak); dolunca künye Claude web aramasına geçer.", olmazsa: "Künye otomasyonu özellikleri bulamaz." },
 ];
 const ADLAR: Record<string, string> = { cloudflare_adres: "Programın adresi", cloudflare_anahtar: "Ortak şifre (ANAHTAR)",
   amazon_kimlik: "Credential ID", amazon_gizli: "Credential Secret", amazon_surum: "Version (boş bırakılabilir)", amazon_etiket: "Partner Tag (ör. updated-21)" };

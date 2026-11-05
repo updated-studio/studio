@@ -100,7 +100,7 @@ Yanıtı YALNIZ şu JSON olarak ver: {"gercek":true,"marka":"...","ad":"...","du
 // Arama ve okuma (31 Ekim 2026): ücretsiz Gemini'de Google arama aracı her istekte 429 veriyor; ürün haberleri Brave Search API ile
 // bulunur (Stüdyo → Bağlantı anahtarları "brave_arama", künye otomasyonuyla ortak aylık sayaç ve sınır), sayfalar sunucuda okunur.
 const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; cikis radari)";
-const BRAVE_AY_SINIR = 700;
+const BRAVE_AY_SINIR = 1000; // 5 Kasım 2026: ücretsiz kotanın tamamı (kunye-otomatik ile aynı)
 const duz = (x: string) => String(x ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 const hostAl = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
 const ATLA = /youtube\.|amazon\.|reddit\.|facebook\.|instagram\.|tiktok\.|x\.com|twitter\.|pinterest\.|ebay\.|aliexpress\./i;

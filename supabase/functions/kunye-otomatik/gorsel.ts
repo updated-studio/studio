@@ -228,13 +228,17 @@ const SECIM_SEMA = {
 const SECIM_SISTEM = `Bir teknoloji sitesinin ürün künyesi için ÜRÜN GÖRSELİ seçiyorsun. Hedef versus.com'daki gibi: ürünün kendisi, tek başına; arka planı sonra silinecek ve ürün beyaz/şeffaf zeminde gösterilecek. Adaylar çoğunlukla üreticinin kendi sitesinden, bazen bayi ya da inceleme sitesinden (oradaki ürün görseli çoğu zaman üreticinin basın görselidir; sitenin üretici olmaması tek başına eleme nedeni DEĞİLDİR); numaralı ("Aday N:") geliyor.
 KURALLAR (hepsi sağlanmalı):
 1. Görsel TAM OLARAK bu modeli göstermeli. Kardeş model (FE, Pro, Ultra, Mini, Plus, Lite, farklı nesil, farklı lens yuvası/odak uzaklığı) SEÇİLMEZ. Emin değilsen seçme.
-2. Tek ürün; tamamı kadrajda, kenardan kesilmemiş; önden ya da 3/4 açı. Telefonda resmî ön yüz ya da ön+arka birlikte render olur. Lenste yandan ya da 3/4 görünüm olur.
+2. Tek ürün; tamamı kadrajda, kenardan kesilmemiş.
+   AÇI (5 Kasım 2026, kullanıcı: "amaç dümdüz açı"): en çok tercih edilen DÜMDÜZ, karşıdan, perspektifsiz görünüştür:
+   telefon ve tablet düz önden (ya da resmî düz ön+arka), fotoğraf makinesi ve aksiyon kamerası düz önden, lens düz yandan (gövde yatay, ön camı solda ya da sağda),
+   dizüstü düz önden açık, kulaklık ve mikrofon düz önden/yandan, drone ve gimbal düz önden ya da düz yandan. Otomobilde düz yan ya da sol ön çapraz.
+   Düz açı yoksa hafif 3/4 açı kabul edilir ama düz açılı aday her zaman önce gelir; üstten, alttan, aşırı perspektifli çekim en sona.
 3. Sade zemin (beyaz, gri, tek renk ya da zaten şeffaf). Yaşam tarzı fotoğrafı, elde tutulan, sahnede, kolaj, metinli afiş/banner, karşılaştırma, kutu, aksesuarlarla dolu kare, ekran görüntüsü, logo SEÇİLMEZ.
 4. Net ve yeterince büyük; ürün kareyi iyi doldurmalı.
 5. Renk seçeneklerinden hangisi olduğu fark etmez; en nötr/ana renk tercih edilir.
    Aynı modelin renklerinin yan yana dizildiği resmî render (renk dizisi) tek ürün sayılmaz ama başka uygun aday yoksa en sona konabilir; tek renkli görsel hep önce gelir.
 6. Uygunlar arasında yüksek çözünürlüklü olan ve şeffaf zeminli PNG (arka planı zaten yok, kesimi en temiz) öne alınır.
-Uygun olanları iyiden kötüye sırala. Hiçbiri uygun değilse "uygun": [].
+Uygun olanları iyiden kötüye sırala. Aynı fotoğrafın farklı boyutları ya da birebir kopyaları TEK aday sayılır: listede her farklı çekimden yalnız en büyüğü olsun (editöre farklı seçenekler sunulacak; aynı görselin üç kopyası seçenek değildir). Hiçbiri uygun değilse "uygun": [].
 Yanıt yalnız JSON: {"uygun":[3,1],"neden":"seçilenin kısa gerekçesi","elenen":"diğerlerinin kısa nedenleri"}`;
 
 const KESIM_SEMA = {

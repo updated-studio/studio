@@ -1160,7 +1160,7 @@ Deno.serve(async (req) => {
     const { data: sy } = await sb.from("tr_settings").select("value").eq("key", "brave_sayac").maybeSingle();
     const sayac = (sy?.value as { ay?: string; adet?: number } | null)?.ay === ay ? Number((sy!.value as { adet?: number }).adet ?? 0) : 0;
     await sb.from("tr_settings").upsert({ key: "brave_sayac", value: { ay, adet: sayac + 2 } });
-    return Response.json({ ok: web === "açık", web, gorsel, kullanim: sayac + 2, sinir: 700 }, { headers: CORS });
+    return Response.json({ ok: web === "açık", web, gorsel, kullanim: sayac + 2, sinir: 1000 }, { headers: CORS });
   }
   // Claude anahtarını dene (yönetici): en küçük modelle tek kısa istek
   if (govde?.claude_dene) {
