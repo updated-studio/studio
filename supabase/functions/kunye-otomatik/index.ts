@@ -306,29 +306,7 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date
       return { v, kaynaklar };
     }
   }
-  // 3) Son yedek: Groq kendi web aramasıyla dener.
-  // Groq'ta gpt-oss modelleri yerleşik web aramasıyla (browser_search) aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
-  // ("groq/compound" bu hesapta yok: 404, 31 Ekim 2026)
-  const groq = Deno.env.get("GROQ_API_KEY");
-  if (groq) for (const model of ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]) {
-    try {
-      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST", signal: AbortSignal.timeout(120_000), headers: { "Content-Type": "application/json", Authorization: "Bearer " + groq },
-        body: JSON.stringify({ model, temperature: 0.1, tools: [{ type: "browser_search" }], tool_choice: "required", messages: [{ role: "system", content: SISTEM }, { role: "user", content: istem }] }),
-      });
-      const g = await r.text();
-      if (!r.ok) { son += ` | Groq ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 200)}`; continue; }
-      const m = JSON.parse(g)?.choices?.[0]?.message;
-      const v = jsonOku(String(m?.content ?? ""));
-      if (!v) { son += ` | Groq ${model} geçersiz yanıt`; continue; }
-      // deno-lint-ignore no-explicit-any
-      const arananlar = (m?.executed_tools ?? []).flatMap((t: any) => t?.search_results?.results ?? []).map((x: { title?: string; url?: string }) => ({ baslik: x.title ?? "", url: x.url ?? "" }));
-      const ozKaynak = (Array.isArray(v?.ozellikler) ? v.ozellikler : []).map((o: { kaynak?: string }) => ({ baslik: "", url: String(o?.kaynak ?? "") }));
-      const kaynaklar = [...arananlar, ...ozKaynak].filter((x) => /^https?:\/\//.test(x.url)).filter((x, i, l) => l.findIndex((y) => y.url === x.url) === i).slice(0, 12);
-      SAYFA_TESHIS += ` → Groq ${model}`;
-      return { v, kaynaklar };
-    } catch (e) { son += ` | Groq ${model}: ${String(e).slice(0, 120)}`; }
-  }
+  // Groq yedeği 5 Kasım 2026'da çıkarıldı (kullanıcı: "bir şeye yaramıyor"; günlük sınırı dolup zinciri takıyordu, ikinci gözsüz ve zayıftı).
   throw new Error("Yapay zekâ yanıt vermedi (" + son + ")");
 }
 
@@ -408,7 +386,7 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
 
 // Yalnız yapay zekâ kotası (5 Kasım 2026: üretici sitesinin "429 çok fazla istek" yanıtı da kota sanılıyordu; ürün işaretlenmediği için
 // her tur aynı ürüne takılıyor, zincir de duruyordu). Sayfa okuma durumları ("shop.panasonic.com 429") sayılmaz.
-// Groq'un günlük sınırı kota sayılmaz (son yedek; dolduğunda ürün hata olarak işaretlenir, zincir sürer).
+// Yalnız Gemini kotası durdurur (Groq yedeği 5 Kasım 2026'da çıkarıldı).
 const kotaDolu = (m: string) => /RESOURCE_EXHAUSTED|\bgemini-[\w.-]+ 429\b|exceeded your current quota/i.test(m);
 // Künye yalnız çıkmış ürüne (5 Kasım 2026, kullanıcı onayı): söylenti, sızıntı, test kaydı, takvimdeki ürün atlanır
 const CIKMIS = new Set(["satista", "duyuruldu", "eol"]);
@@ -438,7 +416,7 @@ function boyutDuzelt(tur: string, deger: string) {
 
 // Görselsiz kalan yeni öneriler (5 Kasım 2026): görsel kuralları değişince (ör. telefonun önü+arkası artık geçer) bir kez daha aranır.
 // Yeni ürünler önce gelir; tur bittikten sonra süre kaldıysa tek öneri. Denenen öneri GORSEL_SURUMU ile işaretlenir, aynı sürümle tekrar denenmez.
-const GORSEL_SURUMU = "2026-11-05b";
+const GORSEL_SURUMU = "2026-11-05c"; // c: bayi sayfası yedeği geldi, görselsizler bir kez daha aranır
 async function gorselTekrar(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, surum: string, t0: number) {
   const bitis = t0 + 370_000;
   if (bitis - Date.now() < 200_000) return null;

@@ -65,7 +65,7 @@ export function boyut(b: Uint8Array): { w: number; h: number } | null {
 const b64 = (b: Uint8Array) => { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 const nitelik = (etiket: string, ad: string) => etiket.match(new RegExp(`\\s${ad}\\s*=\\s*["']([^"']+)["']`, "i"))?.[1] ?? "";
 
-type Aday = { url: string; sayfa: string; puan: number; alt: string };
+type Aday = { url: string; sayfa: string; puan: number; alt: string; bayi?: boolean }; // bayi: üreticinin görseli bayi/inceleme sitesinden
 /** Üretici sayfasının HTML'indeki ürün görseli adayları: JSON-LD ürün görselleri, img/source (srcset'in en büyüğü), paylaşım görseli ve
  *  sayfa içi verideki görsel adresleri (DJI, Apple, Samsung görselleri sayfaya gömülü veride, img etiketinde değil; yalnız markanın ya da
  *  sayfanın kendi sunucusundakiler). Puan: kaynak türü + adresinde/alt metninde ürün adının parçaları. */
@@ -142,10 +142,15 @@ async function braveGorsel(sb: Sb, q: string, marka: string, sinir: number): Pro
   const r = await fetch("https://api.search.brave.com/res/v1/images/search?count=40&safesearch=strict&q=" + encodeURIComponent(q), { headers: { Accept: "application/json", "X-Subscription-Token": anahtar }, signal: AbortSignal.timeout(12_000) }).catch(() => null);
   if (!r?.ok) { await r?.body?.cancel().catch(() => {}); return []; }
   const j = await r.json().catch(() => null);
-  return ((j?.results ?? []) as { url?: string; title?: string; properties?: { url?: string } }[])
-    .filter((x) => x.properties?.url && x.url && (ureticiAlani(x.url, marka) || ureticiAlani(x.properties.url, marka)) && !ELE.test(x.properties.url.split("?")[0]))
-    .slice(0, 8).map((x) => ({ url: x.properties!.url!, sayfa: x.url!, puan: 3, alt: (x.title ?? "").slice(0, 120) }));
+  const sonuc = ((j?.results ?? []) as { url?: string; title?: string; properties?: { url?: string } }[]).filter((x) => x.properties?.url && x.url && !ELE.test(x.properties.url.split("?")[0]));
+  const uretici = sonuc.filter((x) => ureticiAlani(x.url!, marka) || ureticiAlani(x.properties!.url!, marka));
+  // Üreticinin sitesi açılmazsa ya da düz zeminli görsel yoksa (5 Kasım 2026, kullanıcı: "sitesinde yoksa başka kaynak yok mu"): bayi ve inceleme
+  // sitelerindeki ürün görselleri (çoğu üreticinin kendi basın görseli) yedek aday olur; yalnız üreticide hiç uygun yoksa yarışır, denetim aynı
+  const bayi = sonuc.filter((x) => !uretici.includes(x) && (BAYI.test(x.url!) || BAYI.test(x.properties!.url!)));
+  return [...uretici.slice(0, 8).map((x) => ({ url: x.properties!.url!, sayfa: x.url!, puan: 3, alt: (x.title ?? "").slice(0, 120) })),
+    ...bayi.slice(0, 8).map((x) => ({ url: x.properties!.url!, sayfa: x.url!, puan: 0, alt: (x.title ?? "").slice(0, 120), bayi: true }))];
 }
+const BAYI = /bhphotovideo\.com|bhphoto\.com|adorama\.com|media-amazon\.com|amazon\.(?:com|com\.tr|de|co\.uk|fr|it|es)\/|gsmarena\.com|dpreview\.com|wex\.co\.uk|cvp\.com|thomann\.de|calumetphoto|hepsiburada\.com|trendyol\.com|teknosa\.com|mediamarkt\.|vatanbilgisayar\.com|fotografium\.com|notebookcheck\.net|phonearena\.com/i;
 
 // 5 Kasım 2026 (kullanıcı: "görüntü kalitesi düşük"): kısa kenarı 500, uzun kenarı 1000 pikselden küçük görsel aday olmaz.
 // Bellek (işçi 150 MB'ta kesilir; ilk sürüm büyük görselleri bellekte tutup turu öldürüyordu): görsel en çok 12 MB, ikişer ikişer indirilir,
@@ -317,7 +322,8 @@ export async function urunGorseliBul(sb: Sb, o: { marka: string; ad: string; tur
   const parca = o.ad.toLocaleLowerCase("tr-TR").split(/[^a-z0-9]+/).filter((p) => p.length >= 2 || /\d/.test(p));
   const brave = (await braveGorsel(sb, `${o.marka} ${o.ad}`, o.marka, o.braveSinir).catch(() => [] as Aday[]))
     .map((a) => ({ ...a, puan: a.puan + 2 * parca.filter((p) => a.alt.toLocaleLowerCase("tr-TR").includes(p)).length }));
-  const adaylar = [...o.sayfalar.filter((s) => ureticiAlani(s.url, o.marka)).flatMap((s) => sayfaGorselleri(s.html, s.url, o.ad, o.marka)), ...brave].sort((a, b) => b.puan - a.puan);
+  const bayiAday = brave.filter((a) => a.bayi);
+  const adaylar = [...o.sayfalar.filter((s) => ureticiAlani(s.url, o.marka)).flatMap((s) => sayfaGorselleri(s.html, s.url, o.ad, o.marka)), ...brave.filter((a) => !a.bayi)].sort((a, b) => b.puan - a.puan);
   let { essiz, sira, v } = adaylar.length ? await indirSec(o, adaylar, [], iz) : { essiz: [] as Inen[], sira: [] as Inen[], v: null };
   // Uygun yoksa ya da en iyisi düşük çözünürlüklüyse (uzun kenar 1400 px altı, şeffaf değil) ajan üreticinin mağaza/basın sayfalarını arar
   const zayif = !sira.length || (Math.max(sira[0].w, sira[0].h) < 1400 && !sira[0].alfa);
@@ -330,9 +336,15 @@ export async function urunGorseliBul(sb: Sb, o: { marka: string; ad: string; tur
       if (r2.sira.length) ({ essiz, sira, v } = r2);
     }
   }
-  if (!sira.length) { if (!adaylar.length && !essiz.length) iz.push("görsel adayı yok"); return null; }
+  // Üreticide uygun yoksa bayi/inceleme sitelerindeki görseller (aynı seçim ve kesim denetimi)
+  let bayidan = false;
+  if (!sira.length && bayiAday.length && (o.bitis ?? Date.now() + 300_000) - Date.now() > 70_000) {
+    const r3 = await indirSec(o, bayiAday.sort((a, b) => b.puan - a.puan), [], iz);
+    if (r3.sira.length) { ({ essiz, sira, v } = r3); bayidan = true; iz.push("görsel: üreticide uygun yoktu, bayi sayfasından"); }
+  }
+  if (!sira.length) { if (!adaylar.length && !essiz.length && !bayiAday.length) iz.push("görsel adayı yok"); return null; }
   iz.push(`görsel: ${essiz.length} adaydan seçildi (${sira[0].w}×${sira[0].h}${sira[0].alfa ? ", şeffaf" : ""})`);
-  return { url: sira[0].url, sayfa: sira[0].sayfa, kaynak: "Üretici", yazar: o.marka, lisans: "Basın görseli", neden: String(v?.neden ?? "").slice(0, 200), w: sira[0].w, h: sira[0].h, alfa: sira[0].alfa,
+  return { url: sira[0].url, sayfa: sira[0].sayfa, kaynak: bayidan ? `Üretici görseli (${hostAl(sira[0].sayfa)})` : "Üretici", yazar: o.marka, lisans: "Basın görseli", neden: String(v?.neden ?? "").slice(0, 200), w: sira[0].w, h: sira[0].h, alfa: sira[0].alfa,
     yedekler: sira.slice(1, 3).map((a) => ({ url: a.url, sayfa: a.sayfa, alfa: a.alfa })) };
 }
 
