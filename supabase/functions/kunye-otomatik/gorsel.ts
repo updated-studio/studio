@@ -152,7 +152,8 @@ async function braveGorsel(sb: Sb, q: string, marka: string, sinir: number): Pro
   return [...uretici.slice(0, 8).map((x) => ({ url: x.properties!.url!, sayfa: x.url!, puan: 3, alt: (x.title ?? "").slice(0, 120) })),
     ...bayi.slice(0, 8).map((x) => ({ url: x.properties!.url!, sayfa: x.url!, puan: 0, alt: (x.title ?? "").slice(0, 120), bayi: true }))];
 }
-const BAYI = /bhphotovideo\.com|bhphoto\.com|adorama\.com|media-amazon\.com|amazon\.(?:com|com\.tr|de|co\.uk|fr|it|es)\/|gsmarena\.com|dpreview\.com|wex\.co\.uk|cvp\.com|thomann\.de|calumetphoto|hepsiburada\.com|trendyol\.com|teknosa\.com|mediamarkt\.|vatanbilgisayar\.com|fotografium\.com|notebookcheck\.net|phonearena\.com/i;
+// cvp.com çıkarıldı (6 Kasım 2026): görsellerinde "CVP" filigranı var, kesim denetiminden hiç geçmiyor
+const BAYI = /bhphotovideo\.com|bhphoto\.com|adorama\.com|media-amazon\.com|amazon\.(?:com|com\.tr|de|co\.uk|fr|it|es)\/|gsmarena\.com|dpreview\.com|wex\.co\.uk|thomann\.de|calumetphoto|hepsiburada\.com|trendyol\.com|teknosa\.com|mediamarkt\.|vatanbilgisayar\.com|fotografium\.com|notebookcheck\.net|phonearena\.com/i;
 
 // 5 Kasım 2026 (kullanıcı: "görüntü kalitesi düşük"): kısa kenarı 500, uzun kenarı 1000 pikselden küçük görsel aday olmaz.
 // Bellek (işçi 150 MB'ta kesilir; ilk sürüm büyük görselleri bellekte tutup turu öldürüyordu): görsel en çok 12 MB, ikişer ikişer indirilir,
