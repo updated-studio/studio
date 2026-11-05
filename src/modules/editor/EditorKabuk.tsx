@@ -46,7 +46,7 @@ export default function EditorKabuk() {
     { yol: "/bugun", ad: "Bugün", ikon: "bugun" },
     { yol: "/yaz/yeni", ad: "Haber yaz", ikon: "yaz", esles: "/yaz" },
     { yol: "/taslaklar", ad: "Taslaklar", ikon: "taslak" },
-    { yol: "/onay", ad: "Onay bekleyenler", ikon: "check" },
+    // "Onay bekleyenler" menüden kalktı (5 Kasım 2026: herkes kendi yayınlıyor, onay adımı yok); /onay adresi eski bağlantılar için açık
     { yol: "/yayinda", ad: "Yayındakiler", ikon: "site" },
     { yol: "/haber-masasi", ad: "Haber Masası", ikon: "masa", kisa: "Masa" },
     { yol: "/cekim", ad: "Çekim listesi", ikon: "liste", kisa: "Çekim" },
