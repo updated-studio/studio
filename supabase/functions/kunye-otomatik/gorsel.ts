@@ -221,6 +221,7 @@ KURALLAR (hepsi sağlanmalı):
 3. Sade zemin (beyaz, gri, tek renk ya da zaten şeffaf). Yaşam tarzı fotoğrafı, elde tutulan, sahnede, kolaj, metinli afiş/banner, karşılaştırma, kutu, aksesuarlarla dolu kare, ekran görüntüsü, logo SEÇİLMEZ.
 4. Net ve yeterince büyük; ürün kareyi iyi doldurmalı.
 5. Renk seçeneklerinden hangisi olduğu fark etmez; en nötr/ana renk tercih edilir.
+   Aynı modelin renklerinin yan yana dizildiği resmî render (renk dizisi) tek ürün sayılmaz ama başka uygun aday yoksa en sona konabilir; tek renkli görsel hep önce gelir.
 6. Uygunlar arasında yüksek çözünürlüklü olan ve şeffaf zeminli PNG (arka planı zaten yok, kesimi en temiz) öne alınır.
 Uygun olanları iyiden kötüye sırala. Hiçbiri uygun değilse "uygun": [].
 Yanıt yalnız JSON: {"uygun":[3,1],"neden":"seçilenin kısa gerekçesi","elenen":"diğerlerinin kısa nedenleri"}`;
@@ -231,8 +232,9 @@ const KESIM_SEMA = {
   required: ["gecti", "sorun"], additionalProperties: false,
 };
 const KESIM_SISTEM = `Arka planı yazılımla silinmiş bir ürün görselini denetliyorsun (zemin şeffaf; sana koyu ya da açık zeminde görünebilir). Görsel bir teknoloji sitesinin ürün künyesinde, versus.com'daki gibi tek başına gösterilecek.
-GEÇER: ürün eksiksiz (kesilmiş, oyulmuş, eksik parça yok), zeminden kalıntı yok (gölge, masa, el, duvar, yazı, başka nesne), tek ürün, verilen ürünle uyumlu.
-GEÇMEZ: ürünün bir kısmı silinmiş ya da yarım; zemin parçaları kalmış; birden çok ürün/nesne; ürün değil.
+GEÇER: ürün eksiksiz (kesilmiş, oyulmuş, eksik parça yok), zeminden kalıntı yok (gölge, masa, el, duvar, yazı, başka nesne), verilen ürünle uyumlu.
+AYNI ÜRÜNÜN birden çok görünümü GEÇER: üreticinin resmî render'ında telefonun/tabletin önü ve arkası yan yana ya da aynı modelin renkleri dizili (bunlar "birden çok ürün" sayılmaz). Kameraya takılı lens, gimbale takılı kamera da tek ürün görünümüdür.
+GEÇMEZ: ürünün bir kısmı silinmiş, yarım ya da soluk/yarı saydam kalmış; zemin parçaları ya da kenarda kesimden kalan çizgi/hale var; FARKLI ürünler ya da aksesuar yığını; ürün değil.
 Yanıt yalnız JSON: {"gecti":true,"sorun":""} ya da {"gecti":false,"sorun":"kısa neden"}`;
 
 /** Görerek karar: önce Claude (görsel rolü), anahtarı/kredisi yoksa ya da hata verirse ücretsiz Gemini */

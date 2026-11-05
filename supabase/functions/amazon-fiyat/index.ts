@@ -29,11 +29,11 @@ type Kimlik = { id: string; gizli: string; surum: string; etiket: string };
 async function kimlik(sb: Sb): Promise<Kimlik | null> {
   const { data } = await sb.from("baglanti_anahtarlari").select("ad,deger").in("ad", ["amazon_kimlik", "amazon_gizli", "amazon_surum", "amazon_etiket"]);
   const m = Object.fromEntries(((data ?? []) as { ad: string; deger: string }[]).map((x) => [x.ad, x.deger]));
-  return m.amazon_kimlik && m.amazon_gizli && m.amazon_etiket ? { id: m.amazon_kimlik, gizli: m.amazon_gizli, surum: m.amazon_surum || "3.2", etiket: m.amazon_etiket } : null;
+  return m.amazon_kimlik && m.amazon_gizli && m.amazon_etiket ? { id: m.amazon_kimlik, gizli: m.amazon_gizli, surum: m.amazon_surum || (m.amazon_kimlik.startsWith("amzn1.application-oa2-client") ? "3.2" : "2.2"), etiket: m.amazon_etiket } : null;
 }
 
 // Kimlik sürümüne göre belirteç ucu (Amazon belgesi + açık kaynak istemciler): 3.x Login with Amazon, 2.x Cognito.
-// Türkiye Avrupa bölgesinde: 3.2 (ya da eski kimlikse 2.2).
+// Türkiye Avrupa bölgesinde: 3.2 (ya da eski kimlikse 2.2). Sürüm girilmediyse kimliğin biçiminden seçilir (kimlik()).
 const LWA: Record<string, string> = { "3.1": "https://api.amazon.com/auth/o2/token", "3.2": "https://api.amazon.co.uk/auth/o2/token", "3.3": "https://api.amazon.co.jp/auth/o2/token" };
 const COGNITO: Record<string, string> = {
   "2.1": "https://creatorsapi.auth.us-east-1.amazoncognito.com/oauth2/token",

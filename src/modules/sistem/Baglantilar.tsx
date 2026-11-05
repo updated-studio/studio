@@ -100,7 +100,7 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ],
   },
   { ad: "amazon_gizli", baslik: "Amazon: gizli anahtar (Credential Secret)", ikon: "yonetim", aciklama: "", adimlar: [{ metin: "Aynı ekrandaki Credential Secret'ı yapıştır → Kaydet" }] },
-  { ad: "amazon_surum", baslik: "Amazon: kimlik sürümü (Version)", ikon: "yonetim", aciklama: "", adimlar: [{ metin: "Kimliğin yanında yazan sürüm (Türkiye için genelde 3.2) → Kaydet" }] },
+  { ad: "amazon_surum", baslik: "Amazon: kimlik sürümü (Version)", ikon: "yonetim", aciklama: "", adimlar: [{ metin: "Boş bırakılabilir: kimlik amzn1.application-oa2-client ile başlıyorsa 3.2, değilse 2.2 kullanılır. Amazon başka bir sürüm yazıyorsa onu gir → Kaydet" }] },
   { ad: "amazon_etiket", baslik: "Amazon: ortaklık etiketi (Partner Tag)", ikon: "yonetim", aciklama: "", adimlar: [{ metin: "Ortaklık hesabının sağ üstündeki izleme kimliği (ör. updated-21) → Kaydet" }] },
   {
     ad: "cloudflare_anahtar", baslik: "Cloudflare görsel programı: anahtar", ikon: "yonetim",
@@ -162,8 +162,9 @@ const SERVISLER: Servis[] = [
     neIcin: "Künye otomasyonu ürünün resmî sayfasını bulur; taslakta resmî fragman ve yazı içi resmî görsel aranır.", ucret: "Ücretsiz planla; sistem ayda en çok 700 arama yapar (künye, video, görsel ortak).", olmazsa: "Künye otomasyonu özellikleri bulamaz." },
 ];
 const ADLAR: Record<string, string> = { cloudflare_adres: "Programın adresi", cloudflare_anahtar: "Ortak şifre (ANAHTAR)",
-  amazon_kimlik: "Credential ID", amazon_gizli: "Credential Secret", amazon_surum: "Version (ör. 3.2)", amazon_etiket: "Partner Tag (ör. updated-21)" };
+  amazon_kimlik: "Credential ID", amazon_gizli: "Credential Secret", amazon_surum: "Version (boş bırakılabilir)", amazon_etiket: "Partner Tag (ör. updated-21)" };
 const ACIK_DEGER = new Set(["amazon_surum", "amazon_etiket"]); // gizli olmayan kısa değerler
+const ISTEGE_BAGLI = new Set(["amazon_surum"]); // girilmese de servis bağlı sayılır (sürüm kimlikten anlaşılır)
 const kisaTarih = (s?: string) => (s ? new Date(s).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) : "");
 
 export default function Baglantilar() {
@@ -237,7 +238,7 @@ export default function Baglantilar() {
   const durumu = (s: Servis): "ok" | "yok" | "sorun" => {
     if (s.id === "gemini") return !gemini ? "yok" : !gemini.length ? "yok" : gemini.every((g) => g.durum === "gecersiz") ? "sorun" : "ok";
     if (s.anahtarlar.some((a) => durum[a]?.ek?.hata)) return "sorun";
-    return s.anahtarlar.every((a) => durum[a]) ? "ok" : "yok";
+    return s.anahtarlar.every((a) => durum[a] || ISTEGE_BAGLI.has(a)) ? "ok" : "yok";
   };
   const metaYaz = (s: Servis) => {
     if (s.id === "gemini") return gemini ? `${gemini.length} anahtar${gemini.filter((g) => g.durum === "kota_dolu").length ? ` · ${gemini.filter((g) => g.durum === "kota_dolu").length}'i kotada` : ""}` : "";

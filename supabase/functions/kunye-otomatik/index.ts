@@ -373,6 +373,34 @@ async function surumZamani(sb: ReturnType<typeof createClient>) {
 // (kesilen ürün hiç kaydedilmez ve sonraki tur yine onunla başlar; süre yetmezse ikinci göz ya da görsel atlanır, görsel sonraki turda işlenir)
 const ISLE_BUTCE_MS = 120_000;
 
+// Görselsiz kalan yeni öneriler (5 Kasım 2026): görsel kuralları değişince (ör. telefonun önü+arkası artık geçer) bir kez daha aranır.
+// Yeni ürünler önce gelir; tur bittikten sonra süre kaldıysa tek öneri. Denenen öneri GORSEL_SURUMU ile işaretlenir, aynı sürümle tekrar denenmez.
+const GORSEL_SURUMU = "2026-11-05b";
+async function gorselTekrar(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, surum: string, t0: number) {
+  const bitis = t0 + 370_000;
+  if (bitis - Date.now() < 200_000) return null;
+  const { data } = await sb.from("kunye_oneriler").select("id,urun_id,urun_adi,resmi_ad,kaynaklar,gorsel_aday").eq("durum", "bekliyor").in("gorsel_durum", ["yok", "hata"]).gte("created_at", surum).order("id").limit(50);
+  const s = (data ?? []).find((x) => (x.gorsel_aday as { surum?: string } | null)?.surum !== GORSEL_SURUMU);
+  if (!s) return null;
+  const r = await fetch(`${PANEL}/api/products/${s.urun_id}?depth=0`, { signal: AbortSignal.timeout(20_000) });
+  const u: Urun | null = r.ok ? await r.json() : null;
+  if (!u) return null;
+  const ad = s.resmi_ad || u.name;
+  const sayfalar: { url: string; html: string }[] = [];
+  for (const adr of [...new Set(((s.kaynaklar ?? []) as { url?: string }[]).map((k) => k.url).filter((x): x is string => typeof x === "string" && ureticiAlani(x, u.brand)))].slice(0, 2)) {
+    const h = await fetch(adr, { headers: { "User-Agent": UA, "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8" }, signal: AbortSignal.timeout(15_000) }).then((x) => (x.ok ? x.text() : "")).catch(() => "");
+    if (h) sayfalar.push({ url: adr, html: h.slice(0, 2_000_000) });
+  }
+  const iz: string[] = [];
+  const g = await urunGorseliBul(sb, { marka: u.brand, ad, tur: u.type, sayfalar, braveSinir: BRAVE_AY_SINIR, bitis }, iz).catch((e) => { iz.push("görsel hata: " + String(e).slice(0, 60)); return null; });
+  const yaz = (x: Record<string, unknown>) => sb.from("kunye_oneriler").update(x).eq("id", s.id);
+  if (!g) { await yaz({ gorsel_aday: { surum: GORSEL_SURUMU }, gorsel_durum: "yok", gorsel_hata: ("2. deneme: " + iz.join(" · ")).slice(0, 200) }); return { urun: `${u.brand} ${ad}`, durum: "görsel yine yok" }; }
+  const aday = { ...g, surum: GORSEL_SURUMU };
+  await yaz({ gorsel_aday: aday, gorsel_durum: "isleniyor", gorsel_hata: null });
+  if (bitis - Date.now() > 45_000) await gorselIsle(sb, cf, { id: s.id as number, urun_id: s.urun_id as number, urun_adi: `${u.brand} ${ad}`, gorsel_aday: aday });
+  return { urun: `${u.brand} ${ad}`, durum: "görsel yeniden arandı" };
+}
+
 async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown }, adet: number) {
   const t0 = Date.now();
   // Önce bekleyen görseller (program sonradan kurulduysa ya da önceki tur yarım kaldıysa)
@@ -452,6 +480,10 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       await sb.from("kunye_oneriler").insert({ urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, durum: "hata", hata: String((e as Error).message).slice(0, 300) });
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: "hata", hata: String((e as Error).message).slice(0, 200) }); await kaydet(false);
     }
+  }
+  if (!Number.isInteger(b.urun_id) && cf && Date.now() - t0 < ISLE_BUTCE_MS) {
+    const t = await gorselTekrar(sb, cf, surum, t0).catch((e) => ({ urun: "görsel tekrarı", durum: "hata", hata: String(e).slice(0, 120) }));
+    if (t) sonuc.push(t);
   }
   await kaydet(true);
   return { islenen: sonuc, kalan };
