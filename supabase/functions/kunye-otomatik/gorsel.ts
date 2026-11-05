@@ -225,7 +225,7 @@ const SECIM_SEMA = {
   properties: { uygun: { type: "array", items: { type: "integer" } }, neden: { type: "string" }, elenen: { type: "string" } },
   required: ["uygun", "neden", "elenen"], additionalProperties: false,
 };
-const SECIM_SISTEM = `Bir teknoloji sitesinin ürün künyesi için ÜRÜN GÖRSELİ seçiyorsun. Hedef versus.com'daki gibi: ürünün kendisi, tek başına; arka planı sonra silinecek ve ürün beyaz/şeffaf zeminde gösterilecek. Adaylar üreticinin kendi sitesinden; numaralı ("Aday N:") geliyor.
+const SECIM_SISTEM = `Bir teknoloji sitesinin ürün künyesi için ÜRÜN GÖRSELİ seçiyorsun. Hedef versus.com'daki gibi: ürünün kendisi, tek başına; arka planı sonra silinecek ve ürün beyaz/şeffaf zeminde gösterilecek. Adaylar çoğunlukla üreticinin kendi sitesinden, bazen bayi ya da inceleme sitesinden (oradaki ürün görseli çoğu zaman üreticinin basın görselidir; sitenin üretici olmaması tek başına eleme nedeni DEĞİLDİR); numaralı ("Aday N:") geliyor.
 KURALLAR (hepsi sağlanmalı):
 1. Görsel TAM OLARAK bu modeli göstermeli. Kardeş model (FE, Pro, Ultra, Mini, Plus, Lite, farklı nesil, farklı lens yuvası/odak uzaklığı) SEÇİLMEZ. Emin değilsen seçme.
 2. Tek ürün; tamamı kadrajda, kenardan kesilmemiş; önden ya da 3/4 açı. Telefonda resmî ön yüz ya da ön+arka birlikte render olur. Lenste yandan ya da 3/4 görünüm olur.
