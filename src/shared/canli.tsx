@@ -7,13 +7,13 @@ import { sb } from "./supabase";
 // Canlı durum (4 Kasım 2026, kullanıcı: "birisi bir yerdeyse orada olduğu görünsün, herkes görebilsin; kim nerede ne yapıyor, cowork").
 // Supabase Realtime presence ("studyo-canli" kanalı): her açık Stüdyo sekmesi kişiyi, bulunduğu bölümü ve açık tuttuğu nesneyi (haber,
 // taslak) yayınlar. Veritabanına bir şey yazılmaz; sekme kapanınca kişi listeden düşer.
-export type CanliNesne = { tur: "haber" | "taslak"; id: number; baslik: string; eylem: "düzenliyor" | "bakıyor" };
+export type CanliNesne = { tur: "haber" | "taslak" | "not"; id: number; baslik: string; eylem: "düzenliyor" | "bakıyor" };
 export type CanliKisi = { id: string; ad: string; foto: string | null; email: string; yol: string; nesne: CanliNesne | null; zaman: string };
 
 const BOLUM: [RegExp, string][] = [
   [/^\/bugun/, "Bugün"], [/^\/yaz\//, "Haber yaz"], [/^\/taslaklar/, "Taslaklar"], [/^\/yayinda/, "Yayındakiler"], [/^\/onay/, "Onay bekleyenler"], [/^\/haber-masasi/, "Haber Masası"],
   [/^\/cekim/, "Çekim listesi"], [/^\/takvim/, "Takvim"], [/^\/icerik/, "İçerik"], [/^\/site/, "Site"], [/^\/ekip/, "Ekip"], [/^\/marka/, "Marka Kiti"],
-  [/^\/baglantilar/, "Bağlantı anahtarları"], [/^\/deneme-masasi/, "Deneme masası"], [/^\/yz-kiyas/, "Yapay zekâ kıyası"], [/^\/sistem/, "Sistem"], [/^\/profil/, "Profil"],
+  [/^\/notlar/, "Notlar"], [/^\/baglantilar/, "Bağlantı anahtarları"], [/^\/deneme-masasi/, "Deneme masası"], [/^\/yz-kiyas/, "Yapay zekâ kıyası"], [/^\/sistem/, "Sistem"], [/^\/profil/, "Profil"],
 ];
 export const bolumAdi = (yol: string) => BOLUM.find(([r]) => r.test(yol))?.[1] ?? "Stüdyo";
 

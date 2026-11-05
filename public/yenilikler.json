@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-11-05-e",
+    "tarih": "5 Kasım 2026",
+    "baslik": "Notlar",
+    "bolumler": [
+      {
+        "ad": "Notlar",
+        "maddeler": [
+          "Sol menüde Notlar: klasörler, sayfalar ve alt sayfalarla ekibin ortak defteri.",
+          "Her satırın kimden geldiği görünür; satırlara yorum, yorumlara cevap yazılır.",
+          "Klasör ya da sayfa kilitlenebilir; yalnız seçilen kişiler görür.",
+          "Notlarda yazdığın günler katkı puanına az da olsa sayılır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-05-d",
     "tarih": "5 Kasım 2026",
     "baslik": "Künye onayı",

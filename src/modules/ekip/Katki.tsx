@@ -10,12 +10,13 @@ export type Donem = "hafta" | "ay" | "hepsi";
 
 // PUANLAMA KURALLARI: tek kaynak burası. Ekrandaki "Puan nasıl hesaplanır?" açıklaması bu listeden üretilir.
 // Kural değişince: listeyi güncelle, PUAN_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz.
-export const PUAN_SURUMU = "4 Kasım 2026";
+export const PUAN_SURUMU = "5 Kasım 2026";
 export const PUAN_KURALLARI = [
   { k: "yayin", etiket: "Yayına giden içerik", puan: 3, neden: "Asıl hedef bu: yazarı sen olan haber, inceleme ya da kıyas sitede yayınlanınca (Haber yaz'la yazılanlar dahil)." },
   { k: "is", etiket: "Biten ekip işi", puan: 3, neden: "Ekip > İşler'de sana atanan iş tamamlandı olarak işaretlenince." },
   { k: "alinan", etiket: "Alınan haber", puan: 1, neden: "Havuzdan haber aldığında. Az puan: almak tek başına iş değil." },
   { k: "taslak", etiket: "Taslak", puan: 1, neden: "Haber Masası'nda taslak hazırladığında." },
+  { k: "not", etiket: "Not günü", puan: 0.3, neden: "Notlar'da yazdığın, düzenlediğin ya da yorum yaptığın her gün bir kez (5 Kasım 2026, kullanıcı: \"sayılsın ama çok etkilemesin\")." },
   { k: "oy", etiket: "Oy", puan: 0.2, neden: "Havuzdaki haberlere ▲▼ verdiğinde; yapay zekânın öğrenmesine katkı." },
 ] as const;
 export const PUAN = Object.fromEntries(PUAN_KURALLARI.map((r) => [r.k, r.puan])) as Record<(typeof PUAN_KURALLARI)[number]["k"], number>;
@@ -28,6 +29,7 @@ type Ham = {
   haber: { taken_by: string | null; status: string; taken_at: string | null; updated_at: string; event: string; title: string; link: string }[];
   taslak: { author: string | null; created_at: string; title: string }[];
   oy: { user_id: string; created_at: string }[];
+  not: { kim: string; gun: string }[];
 };
 
 function baslangic(d: Donem): number {
@@ -42,13 +44,15 @@ export function useKatki() {
   const [ham, setHam] = useState<Ham | null>(null);
   useEffect(() => {
     (async () => {
-      const [h, t, o] = await Promise.all([
+      const [h, t, o, n] = await Promise.all([
         sb.from("tr_items").select("taken_by,status,taken_at,updated_at,event,title,link").eq("deneme", false).not("taken_by", "is", null),
         sb.from("tr_drafts").select("author,created_at,title").eq("deneme", false),
         sb.from("tr_votes").select("user_id,created_at"),
+        // Notlar (göç 0068): kişinin notlarda iz bıraktığı günler; göç yoksa boş
+        sb.rpc("not_katki_gunleri"),
       ]);
       const yayin = await yayinlar().catch(() => null);
-      setHam({ yayin, haber: (h.data ?? []) as Ham["haber"], taslak: (t.data ?? []) as Ham["taslak"], oy: (o.data ?? []) as Ham["oy"] });
+      setHam({ yayin, haber: (h.data ?? []) as Ham["haber"], taslak: (t.data ?? []) as Ham["taslak"], oy: (o.data ?? []) as Ham["oy"], not: (n.error ? [] : n.data ?? []) as Ham["not"] });
     })();
   }, []);
   return ham;
@@ -80,8 +84,9 @@ export function hesapla(ham: Ham | null, jobs: { assignee: string | null; status
     taslak: ham?.taslak.filter((x) => x.author === kisi && icinde(x.created_at)).length ?? 0,
     oy: ham?.oy.filter((x) => x.user_id === kisi && icinde(x.created_at)).length ?? 0,
     is: jobs.filter((j) => j.assignee === kisi && j.status === "bitti" && (donem === "hepsi" || icinde(j.done_at))).length,
+    not: ham?.not.filter((x) => x.kim === kisi && icinde(x.gun + "T23:59:59")).length ?? 0,
   };
-  const puan = Math.round(s.yayin * PUAN.yayin + s.alinan * PUAN.alinan + s.taslak * PUAN.taslak + s.is * PUAN.is + s.oy * PUAN.oy);
+  const puan = Math.round(s.yayin * PUAN.yayin + s.alinan * PUAN.alinan + s.taslak * PUAN.taslak + s.is * PUAN.is + s.oy * PUAN.oy + s.not * PUAN.not);
   return { ...s, puan };
 }
 
@@ -103,13 +108,13 @@ export function Siralama({ ac }: { ac: (id: string) => void }) {
       </div>
       <div className="tablo-kutu">
         <table>
-          <thead><tr><th>Kişi</th><th>Puan</th><th>Yayında</th><th>Aldığı haber</th><th>Taslak</th><th>Biten iş</th><th>Oy</th></tr></thead>
+          <thead><tr><th>Kişi</th><th>Puan</th><th>Yayında</th><th>Aldığı haber</th><th>Taslak</th><th>Biten iş</th><th>Not günü</th><th>Oy</th></tr></thead>
           <tbody>
             {satirlar.map(({ p, s }, i) => (
               <tr key={p.id} style={{ cursor: "pointer" }} onClick={() => ac(p.id)}>
                 <td><span className="row" style={{ gap: 8, flexWrap: "nowrap" }}><span className="mono">{i + 1}.</span><Avatar kisi={p} boyut={26} /><b>{p.name}</b></span></td>
                 <td className="mono"><b>{s.puan}</b></td><td className="mono">{s.yayin}</td><td className="mono">{s.alinan}</td>
-                <td className="mono">{s.taslak}</td><td className="mono">{s.is}</td><td className="mono">{s.oy}</td>
+                <td className="mono">{s.taslak}</td><td className="mono">{s.is}</td><td className="mono">{s.not}</td><td className="mono">{s.oy}</td>
               </tr>
             ))}
           </tbody>

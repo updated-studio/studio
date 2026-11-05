@@ -20,6 +20,7 @@ const Baglantilar = lazy(yukle(() => import("./sistem/Baglantilar")));
 const Hareketler = lazy(yukle(() => import("./sistem/Hareketler")));
 const DenemeMasasi = lazy(yukle(() => import("./sistem/DenemeMasasi")));
 const YzKiyas = lazy(yukle(() => import("./sistem/YzKiyas")));
+const Notlar = lazy(yukle(() => import("./notlar/Notlar")));
 
 // Stüdyo'nun modül listesi. Yeni araç = buraya bir satır + src/modules/<ad>/ klasörü.
 // (ARCHITECTURE.md, kural 1: ayrı araç açılmaz, modül eklenir.)
@@ -39,6 +40,7 @@ export const MODULLER: Modul[] = [
   { id: "icerik", ad: "İçerik", ikon: "icerik", bilesen: Icerik, renk: "ok" },
   { id: "site", ad: "Site", ikon: "site", bilesen: Site, renk: "blue" },
   { id: "takvim", ad: "Takvim", ikon: "takvim", bilesen: Takvim, renk: "orange" },
+  { id: "notlar", ad: "Notlar", ikon: "taslak", bilesen: Notlar, renk: "blue" }, // 5 Kasım 2026: ekip notları (Craft benzeri, göç 0068)
   { id: "marka-kiti", ad: "Marka Kiti", ikon: "marka", bilesen: MarkaKiti, renk: "purple" },
   { id: "profil", ad: "Profilim", ikon: "profil", bilesen: Profil, yer: "profil" },
   { id: "panel-giris", ad: "Site paneli (yedek)", ikon: "site", bilesen: PanelGiris, yer: "gizli" },
