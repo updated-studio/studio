@@ -29,14 +29,20 @@ export default function KunyeOnay() {
   const [gorselsiz, setGorselsiz] = useState<Record<number, boolean>>({});
   const [adsiz, setAdsiz] = useState<Record<number, boolean>>({});
   const dur = useRef(false);
+  // Onay sürerken satırda adım yazar (5 Kasım 2026, kullanıcı: "onayla'ya basıyorum tepki göstermiyor, uzun süre sonra ekliyor")
+  const [isliyor, setIsliyor] = useState<Record<number, string>>({});
+  // Yöntem değişince eski bekleyenler yenisi gelene kadar ayrı ve kapalı durur (kunye-otomatik YONTEM_SURUMU → tr_settings.kunye_surum)
+  const [surum, setSurum] = useState<string | null>(null);
   // Zamanlayıcının son turu (kunye-otomatik → tr_settings.son_kunye): öneri gelmiyorsa nedeni burada görünür
   const [sonTur, setSonTur] = useState<{ zaman: string; bitti: boolean; aday: number; islenen: { urun: string; durum: string; sayi?: number; hata?: string }[] } | null>(null)
 
   const yukle = useCallback(async () => {
     const { data } = await sb.from("kunye_oneriler").select("*").eq("durum", "bekliyor").order("created_at", { ascending: true }).limit(100);
     setListe((data as Oneri[]) ?? []);
-    const { data: t } = await sb.from("tr_settings").select("value").eq("key", "son_kunye").maybeSingle();
-    setSonTur((t?.value as typeof sonTur) ?? null);
+    const { data: t } = await sb.from("tr_settings").select("key,value").in("key", ["son_kunye", "kunye_surum"]);
+    const ayar = Object.fromEntries(((t ?? []) as { key: string; value: unknown }[]).map((x) => [x.key, x.value]));
+    setSonTur((ayar.son_kunye as typeof sonTur) ?? null);
+    setSurum((ayar.kunye_surum as { zaman?: string } | undefined)?.zaman ?? null);
   }, []);
   useEffect(() => { yukle(); }, [yukle]);
 
@@ -60,6 +66,9 @@ export default function KunyeOnay() {
   }
 
   async function onayla(o: Oneri) {
+    if (isliyor[o.id]) return;
+    const adim = (m: string) => setIsliyor((x) => ({ ...x, [o.id]: m }));
+    adim("Künye okunuyor…");
     try {
       const u = await istekYap<{ brand: string; name: string; image?: unknown; specs: Record<string, unknown>[] }>(`/products/${o.urun_id}?depth=0`);
       const marka = kucuk(u.brand || "");
@@ -81,16 +90,21 @@ export default function KunyeOnay() {
       if (o.gorsel_durum === "hazir" && o.gorsel && !gorselsiz[o.id]) {
         // Önbelleği atla (5 Kasım 2026): liste görseli önce <img> ile gösterdiği için tarayıcı izin başlığı olmayan kopyayı saklıyor
         // (depolama "Vary: Origin" göndermiyor); aynı adresi fetch ile istemek "Load failed / Failed to fetch" veriyordu
+        adim("Görsel panele yükleniyor…");
         const b = await fetch(o.gorsel + (o.gorsel.includes("?") ? "&" : "?") + "indir=" + Date.now(), { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("Görsel indirilemedi"); return r.blob(); });
         const m = await medyaYukle(new File([b], `${kucuk(o.urun_adi) || "urun"}.webp`, { type: "image/webp" }), `${o.urun_adi} ürün görseli`, gorselKunye(o.gorsel_aday, u.brand), false);
         govde.image = m.id;
       }
+      adim("Künyeye yazılıyor…");
       await istekYap(`/products/${o.urun_id}?depth=0`, { method: "PATCH", body: JSON.stringify(govde) });
       await sb.from("kunye_oneriler").update({ durum: "onaylandi", karar_veren: session?.user.id, karar_at: new Date().toISOString() }).eq("id", o.id);
+      setListe((l) => l?.filter((x) => x.id !== o.id) ?? l);
       toast(`${o.urun_adi}: ${o.ozellikler.length} özellik${govde.image ? " ve görsel" : ""} künyeye yazıldı.`); yukle();
     } catch (e) { toast((e as Error).message); }
+    finally { setIsliyor((x) => { const y = { ...x }; delete y[o.id]; return y; }); }
   }
   async function reddet(o: Oneri) {
+    setListe((l) => l?.filter((x) => x.id !== o.id) ?? l);
     await sb.from("kunye_oneriler").update({ durum: "reddedildi", karar_veren: session?.user.id, karar_at: new Date().toISOString() }).eq("id", o.id);
     yukle();
   }
@@ -108,41 +122,48 @@ export default function KunyeOnay() {
           : sonTur.bitti ? "doldurulacak ürün yok" : "başladı, sonuç gelmeden yarıda kaldı"}
         {sonTur.islenen.some((x) => x.durum === "kota dolu") && " · Gemini kotası dolu, kota Türkiye saatiyle 10.00-11.00 arası yenilenir."}
       </div>}
-      {liste === null ? <div className="muted">Yükleniyor…</div> : !liste.length ? <div className="muted">Onay bekleyen öneri yok.</div> : (
-        <ul className="ko-l">
-          {liste.map((o) => (
-            <li key={o.id}>
-              <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                <button className="linkbtn" onClick={() => setAcik(acik === o.id ? null : o.id)}><b>{o.urun_adi}</b> · {o.ozellikler.length} özellik önerisi{(() => { const d = o.ozellikler.filter((x) => x.islem).length; return d ? ` · ikinci göz ${d} değeri düzeltti/ekledi` : ""; })()}</button>
-                <div className="row" style={{ gap: 6 }}><button className="btn sm" onClick={() => onayla(o)}>Onayla</button><button className="btn ghost sm" onClick={() => reddet(o)}>Reddet</button></div>
+      {liste === null ? <div className="muted">Yükleniyor…</div> : !liste.length ? <div className="muted">Onay bekleyen öneri yok.</div> : (() => {
+        const eski = surum ? liste.filter((o) => o.created_at < surum) : [];
+        const yeni = liste.filter((o) => !eski.includes(o));
+        const satir = (o: Oneri) => (
+        <li key={o.id}>
+          <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <button className="linkbtn" onClick={() => setAcik(acik === o.id ? null : o.id)}><b>{o.urun_adi}</b> · {o.ozellikler.length} özellik önerisi{(() => { const d = o.ozellikler.filter((x) => x.islem).length; return d ? ` · ikinci göz ${d} değeri düzeltti/ekledi` : ""; })()}</button>
+            <div className="row" style={{ gap: 6 }}>{isliyor[o.id] && <span className="muted" role="status" style={{ fontSize: 13 }}>{isliyor[o.id]}</span>}<button className="btn sm" disabled={!!isliyor[o.id]} onClick={() => onayla(o)}>{isliyor[o.id] ? "Onaylanıyor…" : "Onayla"}</button><button className="btn ghost sm" disabled={!!isliyor[o.id]} onClick={() => reddet(o)}>Reddet</button></div>
+          </div>
+          {o.resmi_ad && <label className="muted" style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14 }}><input type="checkbox" checked={!adsiz[o.id]} onChange={(e) => setAdsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Adı da düzelt: <b>{o.resmi_ad}</b></label>}
+          {o.gorsel_durum === "hazir" && o.gorsel ? (
+            <div className="ko-gorsel">
+              <a href={o.gorsel} target="_blank" rel="noreferrer" title="Tam boyutta aç"><img src={o.gorsel} alt={`${o.urun_adi} (arka planı silinmiş)`} loading="lazy" /></a>
+              <div className="muted" style={{ fontSize: 13 }}>
+                {gorselKunye(o.gorsel_aday, o.urun_adi.split(" ")[0])}{o.gorsel_aday?.sayfa && <> · <a href={o.gorsel_aday.sayfa} target="_blank" rel="noreferrer">kaynak</a></>}
+                {o.gorsel_aday?.neden && <div>Seçim: {o.gorsel_aday.neden}</div>}
+                <label style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}><input type="checkbox" checked={!gorselsiz[o.id]} onChange={(e) => setGorselsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Görseli de künyeye koy</label>
               </div>
-              {o.resmi_ad && <label className="muted" style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14 }}><input type="checkbox" checked={!adsiz[o.id]} onChange={(e) => setAdsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Adı da düzelt: <b>{o.resmi_ad}</b></label>}
-              {o.gorsel_durum === "hazir" && o.gorsel ? (
-                <div className="ko-gorsel">
-                  <img src={o.gorsel} alt={`${o.urun_adi} (arka planı silinmiş)`} loading="lazy" />
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    {gorselKunye(o.gorsel_aday, o.urun_adi.split(" ")[0])}{o.gorsel_aday?.sayfa && <> · <a href={o.gorsel_aday.sayfa} target="_blank" rel="noreferrer">kaynak</a></>}
-                    {o.gorsel_aday?.neden && <div>Seçim: {o.gorsel_aday.neden}</div>}
-                    <label style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}><input type="checkbox" checked={!gorselsiz[o.id]} onChange={(e) => setGorselsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Görseli de künyeye koy</label>
-                  </div>
-                </div>
-              ) : o.gorsel_durum === "isleniyor" ? <div className="muted" style={{ fontSize: 13 }}>Görsel hazırlanıyor (arka plan siliniyor)…</div>
-                : o.gorsel_durum === "hata" ? <div className="muted" style={{ fontSize: 13 }}>Görsel işlenemedi: {o.gorsel_hata}</div>
-                : <div className="muted" style={{ fontSize: 13 }}>Kaynaklarda kullanılabilir ürün görseli bulunamadı.</div>}
-              {acik === o.id && (
-                <div className="kd-tablo">
-                  <table><thead><tr><th>Özellik</th><th>Değer</th><th>Kaynak</th></tr></thead>
-                    <tbody>{o.ozellikler.map((x) => <tr key={x.key}><th scope="row">{x.key}</th><td><b>{x.value}</b>{x.kanit && <div className="muted kd-kanit">“{x.kanit}”</div>}
-                      {x.islem && <div className="muted kd-kanit">İkinci göz {x.islem === "eklendi" ? "ekledi" : "düzeltti"}{x.not ? `: ${x.not}` : ""}</div>}
-                      {x.alinti === false && <div className="muted kd-kanit">Alıntı kaynak sayfada birebir bulunamadı; değeri sayfadan kontrol et.</div>}</td><td>{x.kaynak ? <a href={x.kaynak} target="_blank" rel="noreferrer">{alan(x.kaynak)}</a> : <span className="muted">—</span>}</td></tr>)}</tbody>
-                  </table>
-                  {(() => { const sil = o.kaynaklar.flatMap((k) => k.silinen ?? []); return sil.length ? <p className="muted kd-kanit">İkinci göz sildi: {sil.map((x) => `${x.key} (${x.neden})`).join(" · ")}</p> : null; })()}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+            </div>
+          ) : o.gorsel_durum === "isleniyor" ? <div className="muted" style={{ fontSize: 13 }}>Görsel hazırlanıyor (arka plan siliniyor)…</div>
+            : o.gorsel_durum === "hata" ? <div className="muted" style={{ fontSize: 13 }}>Görsel işlenemedi: {o.gorsel_hata}</div>
+            : <div className="muted" style={{ fontSize: 13 }}>Kaynaklarda kullanılabilir ürün görseli bulunamadı.</div>}
+          {acik === o.id && (
+            <div className="kd-tablo">
+              <table><thead><tr><th>Özellik</th><th>Değer</th><th>Kaynak</th></tr></thead>
+                <tbody>{o.ozellikler.map((x) => <tr key={x.key}><th scope="row">{x.key}</th><td><b>{x.value}</b>{x.kanit && <div className="muted kd-kanit">“{x.kanit}”</div>}
+                  {x.islem && <div className="muted kd-kanit">İkinci göz {x.islem === "eklendi" ? "ekledi" : "düzeltti"}{x.not ? `: ${x.not}` : ""}</div>}
+                  {x.alinti === false && <div className="muted kd-kanit">Alıntı kaynak sayfada birebir bulunamadı; değeri sayfadan kontrol et.</div>}</td><td>{x.kaynak ? <a href={x.kaynak} target="_blank" rel="noreferrer">{alan(x.kaynak)}</a> : <span className="muted">—</span>}</td></tr>)}</tbody>
+              </table>
+              {(() => { const sil = o.kaynaklar.flatMap((k) => k.silinen ?? []); return sil.length ? <p className="muted kd-kanit">İkinci göz sildi: {sil.map((x) => `${x.key} (${x.neden})`).join(" · ")}</p> : null; })()}
+            </div>
+          )}
+        </li>
+        );
+        return <>
+          {yeni.length ? <ul className="ko-l">{yeni.map(satir)}</ul> : <div className="muted">Yeni yöntemle çıkan öneri henüz yok.</div>}
+          {eski.length > 0 && <details className="ko-eski">
+            <summary className="muted">Eski yöntemle çıkanlar ({eski.length}): yeni yöntemle yeniden çıkarılıyor, yenisi gelince buradan kalkar</summary>
+            <ul className="ko-l">{eski.map(satir)}</ul>
+          </details>}
+        </>;
+      })()}
     </section>
   );
 }

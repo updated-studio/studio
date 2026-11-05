@@ -12,7 +12,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
 import { KIYAS_MODELLERI, kiyasCagir } from "../triyaj-taslak/kiyas.ts";
 import { claudeJson } from "../triyaj-taslak/claude.ts";
-import { kesimDenetle, ureticiAlani, urunGorseliBul, type UrunGorseli } from "./gorsel.ts";
+import { kesimDenetle, seffafTuval, ureticiAlani, urunGorseliBul, type UrunGorseli } from "./gorsel.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -322,7 +322,7 @@ type GorselSatir = { id: number; urun_id: number; urun_adi?: string; gorsel_aday
 async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, s: GorselSatir) {
   const yaz = (x: Record<string, unknown>) => sb.from("kunye_oneriler").update(x).eq("id", s.id);
   if (!s.gorsel_aday?.url) { await yaz({ gorsel_durum: "yok" }); return; }
-  const sira = [{ url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa }, ...(s.gorsel_aday.yedekler ?? [])];
+  const sira = [{ url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa, alfa: s.gorsel_aday.alfa }, ...(s.gorsel_aday.yedekler ?? [])];
   let son = "";
   for (const [i, a] of sira.entries()) {
     try {
@@ -330,7 +330,9 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
       if (!g.ok) throw new Error(`görsel indirilemedi (${g.status})`);
       const veri = new Uint8Array(await g.arrayBuffer());
       if (veri.byteLength > 20e6) throw new Error("görsel 20 MB üstü");
-      const r = await fetch(cf.adres, { method: "POST", headers: { "x-anahtar": cf.anahtar, "Content-Type": g.headers.get("content-type") || "image/jpeg" }, body: veri, signal: AbortSignal.timeout(60_000) });
+      // Şeffaf zeminli PNG'de arka plan silinmez, yalnız kırpılıp tuvale konur (gorsel.ts seffafTuval); olmazsa Cloudflare
+      const hazir = a.alfa ? await seffafTuval(veri) : null;
+      const r = hazir ? new Response(hazir) : await fetch(cf.adres, { method: "POST", headers: { "x-anahtar": cf.anahtar, "Content-Type": g.headers.get("content-type") || "image/jpeg" }, body: veri, signal: AbortSignal.timeout(60_000) });
       if (!r.ok) {
         const h = `Cloudflare ${r.status}: ${(await r.text()).slice(0, 140)}`;
         if (r.status === 401 || r.status === 500) { await sb.from("baglanti_anahtarlari").update({ ek: { hata: h } }).eq("ad", "cloudflare_adres"); son = h; break; }
@@ -428,7 +430,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
           if (h) uSayfa = [...uSayfa, { url: adr, html: h.slice(0, 2_000_000) }];
         }
       }
-      const gorsel = bitis - Date.now() < 100_000 ? (gIz.push("görsel: süre yetmedi"), null) : await urunGorseliBul(sb, { marka: u.brand, ad: resmiAd || u.name, tur: u.type, sayfalar: uSayfa, braveSinir: BRAVE_AY_SINIR }, gIz).catch((e) => { gIz.push("görsel hata: " + String(e).slice(0, 60)); return null; });
+      const gorsel = bitis - Date.now() < 100_000 ? (gIz.push("görsel: süre yetmedi"), null) : await urunGorseliBul(sb, { marka: u.brand, ad: resmiAd || u.name, tur: u.type, sayfalar: uSayfa, braveSinir: BRAVE_AY_SINIR, bitis }, gIz).catch((e) => { gIz.push("görsel hata: " + String(e).slice(0, 60)); return null; });
       const kayit = { urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar: [...kaynaklar, ...(Array.isArray(v?.silinen) && v.silinen.length ? [{ baslik: "İkinci gözün sildikleri", url: "", silinen: v.silinen }] : [])], durum: oz.length || resmiAd ? "bekliyor" : "hata", hata: oz.length || resmiAd ? null : "Kaynaklarda değer bulunamadı" };
       // Görsel sütunları göç 0043 ile geldi; uygulanmamışsa kayıt görselsiz yazılır
       const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, ...(resmiAd ? { resmi_ad: resmiAd } : {}), gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok", ...(gorsel ? {} : { gorsel_hata: gIz.join(" · ").slice(0, 200) || null }) }).select("id").single();

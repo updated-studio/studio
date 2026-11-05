@@ -102,3 +102,41 @@ export const SECIM_SEMA = {
   required: ["secim", "neden", "odak"],
   additionalProperties: false,
 };
+
+/** Web aramalı tek iş (5 Kasım 2026, künye görselleri: "hangi yapay zekâ buluyorsa onu zekileştirelim"): Claude, Anthropic'in sunucuda çalışan
+ *  web_search aracıyla arar (arama başına 0,01 $ + jeton). Uzun arama "pause_turn" ile dönerse kaldığı yerden sürdürülür.
+ *  Dönen: son metin ve aramalarda görülen sonuç adresleri. Anahtar yoksa null; hata fırlatılır. */
+export async function claudeAramali(o: { sistem: string; kullanici: string; model: string; ms: number; maxArama: number; fonk?: string }): Promise<{ metin: string; adresler: string[] } | null> {
+  if (Date.now() < krediYok) return null;
+  const apiKey = await claudeAnahtari();
+  if (!apiKey) return null;
+  const bitis = Date.now() + o.ms;
+  const client = new Anthropic({ apiKey, timeout: Math.max(8_000, o.ms), maxRetries: 0 });
+  const mesajlar: Anthropic.MessageParam[] = [{ role: "user", content: o.kullanici }];
+  const adresler: string[] = [];
+  try {
+    for (let tur = 0; tur < 4; tur++) {
+      if (bitis - Date.now() < 8_000) throw new Error("Claude araması için süre yetmedi");
+      const m = await client.messages.create({
+        model: o.model, max_tokens: 8000, system: o.sistem, messages: mesajlar,
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: o.maxArama }],
+        output_config: { effort: "medium" },
+      } as Anthropic.MessageCreateParamsNonStreaming, { timeout: Math.max(8_000, bitis - Date.now()) });
+      for (const b of m.content as unknown as { type: string; content?: unknown }[]) {
+        if (b.type === "web_search_tool_result" && Array.isArray(b.content)) for (const r of b.content as { url?: string }[]) if (r.url) adresler.push(r.url);
+      }
+      if (m.stop_reason === "pause_turn") { mesajlar.push({ role: "assistant", content: m.content as Anthropic.ContentBlockParam[] }); continue; }
+      if (m.stop_reason === "refusal") throw new Error("Claude yanıt vermeyi reddetti");
+      say(o.model, "basarili", o.fonk);
+      return { metin: m.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join(""), adresler };
+    }
+    throw new Error("Claude araması bitmedi");
+  } catch (e) {
+    const msg = String((e as Error).message ?? e);
+    const kredi = /credit balance|billing|insufficient/i.test(msg);
+    if (kredi) krediYok = Date.now() + 30 * 60_000;
+    if ((e as { status?: number }).status === 401) onbellek = null;
+    say(o.model, kredi || (e as { status?: number }).status === 429 ? "kota" : "hata", o.fonk);
+    throw new Error(kredi ? "Claude kredisi bitti" : msg.slice(0, 120));
+  }
+}

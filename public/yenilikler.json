@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-11-05-d",
+    "tarih": "5 Kasım 2026",
+    "baslik": "Künye onayı",
+    "bolumler": [
+      {
+        "ad": "Künye",
+        "maddeler": [
+          "Onayla'ya basınca adım adım ne yapıldığı yazar; bitince öneri listeden kalkar.",
+          "Eski yöntemle çıkan öneriler altta ayrı, kapalı bir bölümde durur.",
+          "Ürün görseli daha büyük önizlenir; tıklayınca tam boyutu açılır.",
+          "Görsel bulunamazsa yapay zekâ üreticinin mağaza ve basın sayfalarını kendisi arar; şeffaf zeminli resmî PNG'ler kesilmeden kullanılır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-05-c",
     "tarih": "5 Kasım 2026",
     "baslik": "Künyeler yenileniyor",

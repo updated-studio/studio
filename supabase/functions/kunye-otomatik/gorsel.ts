@@ -5,12 +5,16 @@
 // arka plan Cloudflare'de silinir (index.ts gorselIsle), kesilmiş hâli yeniden görerek denetlenir, geçmezse sıradaki aday denenir.
 // Uygun görsel yoksa hiç konmaz.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { claudeJson, CLAUDE_MODEL } from "../triyaj-taslak/claude.ts";
+import { claudeAramali, claudeJson, CLAUDE_MODEL } from "../triyaj-taslak/claude.ts";
+// Görsel çözme/küçültme (imagescript, MIT): istekte yüklenir; yüklenemezse görsel olduğu gibi kullanılır, fonksiyonun açılışı bozulmaz
+type IS = typeof import("npm:imagescript@1.3.0");
+let isYuk: Promise<IS | null> | null = null;
+const imagescript = () => (isYuk ??= import("npm:imagescript@1.3.0").then((m) => m as IS).catch((e) => { console.error("imagescript", e); return null; }));
 import { anahtarlar as geminiAnahtarlari } from "./anahtar.ts";
 
 type Sb = ReturnType<typeof createClient>;
 export type Resim = { mime: string; b64: string };
-export type UrunGorseli = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string; yedekler?: { url: string; sayfa: string }[] };
+export type UrunGorseli = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string; w?: number; h?: number; alfa?: boolean; yedekler?: { url: string; sayfa: string; alfa?: boolean }[] };
 
 const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; kunye gorseli)";
 const sade = (x: string) => x.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]/g, "");
@@ -143,17 +147,48 @@ async function braveGorsel(sb: Sb, q: string, marka: string, sinir: number): Pro
     .slice(0, 8).map((x) => ({ url: x.properties!.url!, sayfa: x.url!, puan: 3, alt: (x.title ?? "").slice(0, 120) }));
 }
 
-type Inen = Aday & { mime: string; veri: Uint8Array; w: number; h: number };
+// 5 Kasım 2026 (kullanıcı: "görüntü kalitesi düşük"): kısa kenarı 500, uzun kenarı 1000 pikselden küçük görsel aday olmaz; 20 MB'a kadar
+// iner (yüksek çözünürlüklü PNG'ler büyük). Yapay zekâya 1024 px'lik JPEG önizlemesi gider (Claude görsel başına 5 MB kabul eder).
+type Inen = Aday & { mime: string; veri: Uint8Array; w: number; h: number; alfa: boolean; onizleme: Resim };
 async function indir(a: Aday): Promise<Inen | null> {
-  const r = await fetch(a.url, { headers: { "User-Agent": UA, Accept: "image/webp,image/png,image/jpeg,image/*;q=0.8", Referer: a.sayfa }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+  const r = await fetch(a.url, { headers: { "User-Agent": UA, Accept: "image/webp,image/png,image/jpeg,image/*;q=0.8", Referer: a.sayfa }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
   const mime = (r?.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  if (!r?.ok || !/^image\/(jpeg|png|webp)$/.test(mime)) { await r?.body?.cancel().catch(() => {}); return null; }
+  if (!r?.ok || !/^image\/(jpeg|png|webp)$/.test(mime) || Number(r.headers.get("content-length") ?? 0) > 20e6) { await r?.body?.cancel().catch(() => {}); return null; }
   const veri = new Uint8Array(await r.arrayBuffer().catch(() => new ArrayBuffer(0)));
-  // Claude'a giden görsel 5 MB altında olmalı (base64 büyütür); 20 KB altı küçük resim/simge
-  if (veri.byteLength < 20_000 || veri.byteLength > 3_700_000) return null;
+  if (veri.byteLength < 20_000 || veri.byteLength > 20e6) return null;
   const b = boyut(veri);
-  if (!b || Math.min(b.w, b.h) < 500 || b.w / b.h > 2.6 || b.h / b.w > 2.2) return null;
-  return { ...a, mime, veri, w: b.w, h: b.h };
+  if (!b || Math.min(b.w, b.h) < 500 || Math.max(b.w, b.h) < 1000 || b.w * b.h > 40e6 || b.w / b.h > 2.6 || b.h / b.w > 2.2) return null;
+  // WebP çözülemiyor (imagescript): olduğu gibi gider; şeffaflığı VP8X başlığından
+  if (mime === "image/webp") return veri.byteLength > 3_700_000 ? null : { ...a, mime, veri, ...b, alfa: String.fromCharCode(...veri.slice(12, 16)) === "VP8X" && !!(veri[20] & 0x10), onizleme: { mime, b64: b64(veri) } };
+  try {
+    const is = await imagescript(); if (!is) throw new Error("imagescript yok");
+    const { Image } = is;
+    const im = await is.decode(veri) as InstanceType<IS["Image"]>;
+    let alfa = false;
+    if (mime === "image/png") for (let i = 3; i < im.bitmap.length; i += 4 * 61) if (im.bitmap[i] < 250) { alfa = true; break; }
+    const k = im.width >= im.height ? im.resize(1024, Image.RESIZE_AUTO) : im.resize(Image.RESIZE_AUTO, 1024);
+    const zemin = new Image(k.width, k.height).fill(0xffffffff); zemin.composite(k, 0, 0);
+    return { ...a, mime, veri, ...b, alfa, onizleme: { mime: "image/jpeg", b64: b64(await zemin.encodeJPEG(85)) } };
+  } catch { return veri.byteLength > 3_700_000 ? null : { ...a, mime, veri, ...b, alfa: false, onizleme: { mime, b64: b64(veri) } }; }
+}
+
+/** Şeffaf zeminli resmî PNG (çoğu üreticinin mağaza görseli): arka plan silinmeden, ürün sınırından kırpılıp 1600×900 şeffaf tuvale
+ *  ortalanır (ürün 1360×720 alana sığar; Cloudflare işçisiyle aynı ölçü). Silme yazılımının kenar bozmasını önler. Çözülemezse null. */
+export async function seffafTuval(veri: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    const is = await imagescript(); if (!is) return null;
+    const { Image } = is;
+    const im = await is.decode(veri) as InstanceType<IS["Image"]>;
+    const { width: W, height: H, bitmap: p } = im;
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (p[(y * W + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return null;
+    const k = im.crop(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+    const o = Math.min(1360 / k.width, 720 / k.height);
+    k.resize(Math.max(1, Math.round(k.width * o)), Math.max(1, Math.round(k.height * o)));
+    const t = new Image(1600, 900); t.composite(k, Math.round((1600 - k.width) / 2), Math.round((900 - k.height) / 2));
+    return await t.encodeWEBP(90);
+  } catch { return null; }
 }
 
 const SECIM_SEMA = {
@@ -168,6 +203,7 @@ KURALLAR (hepsi sağlanmalı):
 3. Sade zemin (beyaz, gri, tek renk ya da zaten şeffaf). Yaşam tarzı fotoğrafı, elde tutulan, sahnede, kolaj, metinli afiş/banner, karşılaştırma, kutu, aksesuarlarla dolu kare, ekran görüntüsü, logo SEÇİLMEZ.
 4. Net ve yeterince büyük; ürün kareyi iyi doldurmalı.
 5. Renk seçeneklerinden hangisi olduğu fark etmez; en nötr/ana renk tercih edilir.
+6. Uygunlar arasında yüksek çözünürlüklü olan ve şeffaf zeminli PNG (arka planı zaten yok, kesimi en temiz) öne alınır.
 Uygun olanları iyiden kötüye sırala. Hiçbiri uygun değilse "uygun": [].
 Yanıt yalnız JSON: {"uygun":[3,1],"neden":"seçilenin kısa gerekçesi","elenen":"diğerlerinin kısa nedenleri"}`;
 
@@ -204,26 +240,69 @@ export async function gorerekSor(sistem: string, kullanici: string, resimler: (R
 }
 
 /** Ürünün en doğru üretici görseli ve sıradaki yedekleri; uygun yoksa null. sayfalar: okunan üretici sayfaları (adres + HTML). */
-export async function urunGorseliBul(sb: Sb, o: { marka: string; ad: string; tur: string; sayfalar: { url: string; html: string }[]; braveSinir: number }, iz: string[]): Promise<UrunGorseli | null> {
+// Sayfa ajanı (5 Kasım 2026, kullanıcı: "üreticilerin yüksek kalite PNG'lerini bulmak bu kadar zor olmamalı; gerekirse yapay zekâyı zekileştirelim"):
+// sayfalarda ve Brave'de iyi görsel çıkmazsa Claude web aramasıyla üreticinin mağaza, basın/medya kiti ve ürün sayfalarını bulur; sayfaları
+// biz okuyup görselleri çıkarırız (yalnız markanın alan adı). Ürün başına en çok 4 arama (≈0,04 $ + jeton).
+const AJAN_SISTEM = `Bir teknoloji sitesinin ürün künyesi için üreticinin YÜKSEK ÇÖZÜNÜRLÜKLÜ, düz zeminli ya da şeffaf (PNG) ÜRÜN GÖRSELLERİNİN bulunduğu RESMÎ sayfaları buluyorsun.
+Öncelik: 1) üreticinin resmî mağaza/satın alma sayfası (ürün galerisi; ör. store.dji.com, apple.com/tr/shop, samsung.com/tr/.../buy), 2) üreticinin basın/medya merkezi (press kit, media assets, newsroom; yüksek çözünürlüklü indirme), 3) ürünün resmî sayfası (Türkiye ya da küresel).
+Yalnız üreticinin kendi alan adları ve alt alan adları. Bayi, pazar yeri, haber, inceleme, forum, Amazon, Wikipedia OLMAZ. Sayfa TAM OLARAK bu modelin olmalı (kardeş model değil).
+Gerekirse birkaç arama yap. Sayfada doğrudan görsel adresi (.png/.jpg) görürsen onu da ekleyebilirsin.
+Yanıtın sonunda YALNIZ şu JSON: {"sayfalar":["https://..."],"gorseller":["https://...png"]} (en çok 6 sayfa, 6 görsel).`;
+async function ajanAdaylari(o: { marka: string; ad: string; tur: string }, iz: string[], ms: number): Promise<Aday[]> {
+  const c = await claudeAramali({ sistem: AJAN_SISTEM, kullanici: `ÜRÜN: ${o.marka} ${o.ad} (${o.tur})`, model: CLAUDE_MODEL.gorsel, ms, maxArama: 4, fonk: "kunye-otomatik" })
+    .catch((e) => { iz.push("ajan: " + String((e as Error).message ?? e).slice(0, 60)); return null; });
+  if (!c) return [];
+  let j: { sayfalar?: unknown; gorseller?: unknown } = {};
+  try { const m = c.metin.match(/\{[\s\S]*\}/); j = m ? JSON.parse(m[0]) : {}; } catch { /* boş */ }
+  const sayfalar = [...new Set(([] as unknown[]).concat(j.sayfalar ?? []).map(String))].filter((u) => /^https?:\/\//.test(u) && ureticiAlani(u, o.marka)).slice(0, 6);
+  const out: Aday[] = ([] as unknown[]).concat(j.gorseller ?? []).map(String).filter((u) => /^https?:\/\//.test(u) && ureticiAlani(u, o.marka) && !ELE.test(u.split("?")[0]))
+    .slice(0, 6).map((u) => ({ url: u, sayfa: sayfalar[0] ?? u, puan: 6, alt: "" }));
+  const htmller = await Promise.all(sayfalar.map((u) => fetch(u, { headers: { "User-Agent": UA, "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8" }, signal: AbortSignal.timeout(12_000) })
+    .then((r) => (r.ok && /html/i.test(r.headers.get("content-type") ?? "") ? r.text() : "")).catch(() => "")));
+  sayfalar.forEach((u, i) => { if (htmller[i]) out.push(...sayfaGorselleri(htmller[i], u, o.ad, o.marka).map((a) => ({ ...a, puan: a.puan + 2 }))); });
+  iz.push(`ajan: ${sayfalar.length} sayfa, ${out.length} aday`);
+  return out;
+}
+
+/** Adayları indirir (en çok 8 uygun boyutlu), yapay zekâya gösterir; uygunları iyiden kötüye döner */
+async function indirSec(o: { marka: string; ad: string; tur: string }, adaylar: Aday[], onceki: Inen[], iz: string[]) {
+  const tekil = adaylar.filter((a, i, l) => l.findIndex((x) => x.url === a.url) === i && !onceki.some((x) => x.url === a.url)).slice(0, 16);
+  const inen: Inen[] = [...onceki];
+  for (let i = 0; i < tekil.length && inen.length < 8; i += 4) inen.push(...(await Promise.all(tekil.slice(i, i + 4).map((a) => indir(a).catch(() => null)))).filter((x): x is Inen => !!x));
+  // Aynı dosya iki adresten geldiyse biri kalır
+  const essiz = inen.filter((a, i, l) => !l.some((b, j) => j < i && b.veri.byteLength === a.veri.byteLength)).slice(0, 8);
+  if (!essiz.length) { iz.push(`görsel: ${tekil.length} aday indirilemedi/küçük`); return { essiz, sira: [] as Inen[], v: null }; }
+  const v = await gorerekSor(SECIM_SISTEM, `ÜRÜN: ${o.marka} ${o.ad} (${o.tur})\nAdaylar:\n${essiz.map((a, i) => `Aday ${i + 1}: ${a.w}×${a.h}${a.alfa ? ", şeffaf zeminli PNG" : ""}, ${hostAl(a.sayfa)}${a.alt ? `, "${a.alt}"` : ""}`).join("\n")}`,
+    essiz.map((a, i) => ({ ...a.onizleme, etiket: `Aday ${i + 1}` })), SECIM_SEMA, 90_000).catch(() => null);
+  if (!v) { iz.push("görsel: yapay zekâ göremedi"); return { essiz, sira: [] as Inen[], v: null }; }
+  const sira = (Array.isArray(v.uygun) ? v.uygun : []).map((n: unknown) => essiz[Number(n) - 1]).filter(Boolean) as Inen[];
+  if (!sira.length) iz.push("görsel: uygun yok (" + String(v.elenen ?? "").slice(0, 80) + ")");
+  return { essiz, sira, v };
+}
+
+/** Ürünün en doğru üretici görseli ve sıradaki yedekleri; uygun yoksa null. sayfalar: okunan üretici sayfaları (adres + HTML). */
+export async function urunGorseliBul(sb: Sb, o: { marka: string; ad: string; tur: string; sayfalar: { url: string; html: string }[]; braveSinir: number; bitis?: number }, iz: string[]): Promise<UrunGorseli | null> {
   // Üretici sayfaları + markanın alan adında görsel araması (mağaza sayfalarındaki düz zeminli ürün çekimleri çoğunlukla buradan gelir)
   const parca = o.ad.toLocaleLowerCase("tr-TR").split(/[^a-z0-9]+/).filter((p) => p.length >= 2 || /\d/.test(p));
   const brave = (await braveGorsel(sb, `${o.marka} ${o.ad}`, o.marka, o.braveSinir).catch(() => [] as Aday[]))
     .map((a) => ({ ...a, puan: a.puan + 2 * parca.filter((p) => a.alt.toLocaleLowerCase("tr-TR").includes(p)).length }));
   const adaylar = [...o.sayfalar.filter((s) => ureticiAlani(s.url, o.marka)).flatMap((s) => sayfaGorselleri(s.html, s.url, o.ad, o.marka)), ...brave].sort((a, b) => b.puan - a.puan);
-  const tekil = adaylar.filter((a, i, l) => l.findIndex((x) => x.url === a.url) === i).slice(0, 16);
-  if (!tekil.length) { iz.push("görsel adayı yok"); return null; }
-  const inen: Inen[] = [];
-  for (let i = 0; i < tekil.length && inen.length < 8; i += 4) inen.push(...(await Promise.all(tekil.slice(i, i + 4).map((a) => indir(a).catch(() => null)))).filter((x): x is Inen => !!x));
-  // Aynı dosya iki adresten geldiyse biri kalır
-  const essiz = inen.filter((a, i, l) => !l.some((b, j) => j !== i && b.veri.byteLength === a.veri.byteLength && j < i)).slice(0, 8);
-  if (!essiz.length) { iz.push(`görsel: ${tekil.length} aday indirilemedi/küçük`); return null; }
-  const v = await gorerekSor(SECIM_SISTEM, `ÜRÜN: ${o.marka} ${o.ad} (${o.tur})\nAdaylar:\n${essiz.map((a, i) => `Aday ${i + 1}: ${a.w}×${a.h}, ${hostAl(a.sayfa)}${a.alt ? `, "${a.alt}"` : ""}`).join("\n")}`,
-    essiz.map((a, i) => ({ mime: a.mime, b64: b64(a.veri), etiket: `Aday ${i + 1}` })), SECIM_SEMA, 90_000).catch(() => null);
-  if (!v) { iz.push("görsel: yapay zekâ göremedi"); return null; }
-  const sira = (Array.isArray(v.uygun) ? v.uygun : []).map((n: unknown) => essiz[Number(n) - 1]).filter(Boolean) as Inen[];
-  if (!sira.length) { iz.push("görsel: uygun yok (" + String(v.elenen ?? "").slice(0, 80) + ")"); return null; }
-  iz.push(`görsel: ${essiz.length} adaydan seçildi`);
-  return { url: sira[0].url, sayfa: sira[0].sayfa, kaynak: "Üretici", yazar: o.marka, lisans: "Basın görseli", neden: String(v.neden ?? "").slice(0, 200), yedekler: sira.slice(1, 3).map((a) => ({ url: a.url, sayfa: a.sayfa })) };
+  let { essiz, sira, v } = adaylar.length ? await indirSec(o, adaylar, [], iz) : { essiz: [] as Inen[], sira: [] as Inen[], v: null };
+  // Uygun yoksa ya da en iyisi düşük çözünürlüklüyse (uzun kenar 1400 px altı, şeffaf değil) ajan üreticinin mağaza/basın sayfalarını arar
+  const zayif = !sira.length || (Math.max(sira[0].w, sira[0].h) < 1400 && !sira[0].alfa);
+  const kalan = (o.bitis ?? Date.now() + 300_000) - Date.now();
+  if (zayif && kalan > 190_000) {
+    const ek = (await ajanAdaylari(o, iz, 100_000)).sort((a, b) => b.puan - a.puan);
+    if (ek.length) {
+      // Önceki uygunlar (en çok 3) yeni adaylarla yeniden yarışır
+      const r2 = await indirSec(o, ek, sira.slice(0, 3), iz);
+      if (r2.sira.length) ({ essiz, sira, v } = r2);
+    }
+  }
+  if (!sira.length) { if (!adaylar.length && !essiz.length) iz.push("görsel adayı yok"); return null; }
+  iz.push(`görsel: ${essiz.length} adaydan seçildi (${sira[0].w}×${sira[0].h}${sira[0].alfa ? ", şeffaf" : ""})`);
+  return { url: sira[0].url, sayfa: sira[0].sayfa, kaynak: "Üretici", yazar: o.marka, lisans: "Basın görseli", neden: String(v?.neden ?? "").slice(0, 200), w: sira[0].w, h: sira[0].h, alfa: sira[0].alfa,
+    yedekler: sira.slice(1, 3).map((a) => ({ url: a.url, sayfa: a.sayfa, alfa: a.alfa })) };
 }
 
 /** Arka planı silinmiş görselin denetimi; yapay zekâ yoksa geçti sayılır (editör yine görür) */

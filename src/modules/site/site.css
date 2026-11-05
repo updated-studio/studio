@@ -180,7 +180,10 @@
 .kd-kanit { font-size: 12px; max-width: 320px; }
 .ko-l { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .ko-gorsel { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.ko-gorsel img { width: 200px; aspect-ratio: 16/9; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 / 16px 16px; }
+.ko-gorsel img { width: min(100%, 360px); aspect-ratio: 16/9; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: #fff; display: block; }
+.ko-gorsel > div { flex: 1 1 240px; min-width: 0; }
+.ko-eski { border-top: 1px solid var(--line); padding-top: 10px; }
+.ko-eski summary { cursor: pointer; font-size: 14px; }
 .ko-l > li { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
 
 /* Site'nin üst seçimi: Haber Masası | Site içeriği (31 Ekim 2026) */
