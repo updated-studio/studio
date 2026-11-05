@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-11-05-f",
+    "tarih": "5 Kasım 2026",
+    "baslik": "Yayın ve künye",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Editörler haberlerini onaya göndermeden doğrudan yayınlar.",
+          "Künye önerileri art arda hazırlanır; üreticide görsel yoksa bayi sitesindeki ürün görseli önerilir.",
+          "Markaların son çıkan ürünleri künyeye kendiliğinden eklenir."
+        ]
+      },
+      {
+        "ad": "Notlar",
+        "maddeler": [
+          "Notlar açıldı: sol menüden ekibin ortak defteri."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-05-e",
     "tarih": "5 Kasım 2026",
     "baslik": "Notlar",
