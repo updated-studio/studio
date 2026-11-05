@@ -218,7 +218,9 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date
   if (sayfalar.length) {
     const metin = sayfalar.map((x, i) => `[${i + 1}] KAYNAK: ${x.url} (${x.resmi ? "ÜRETİCİ" : "İKİNCİ KAYNAK"})\n${x.metin}`).join("\n\n---\n\n");
     const izinli = new Set(sayfalar.map((x) => x.url));
-    for (const a of anahtarlar) { let hepsiKota = true; for (const model of ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
+    // 5 Kasım 2026: haber eleme (triyaj-topla) aynı ücretsiz Gemini kotasını kullanıyor; künye her üründe 3 anahtar × 3 model deneyip onun
+    // kotasını bitiriyordu (haberler elenemedi). Künye artık yalnız ilk uygun anahtarla tek model dener; olmazsa Claude çıkarır (aşağıda).
+    for (const a of anahtarlar.slice(0, 1)) { let hepsiKota = true; for (const model of ["gemini-3.5-flash-lite"]) {
       try {
         const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },

@@ -147,34 +147,52 @@ async function braveGorsel(sb: Sb, q: string, marka: string, sinir: number): Pro
     .slice(0, 8).map((x) => ({ url: x.properties!.url!, sayfa: x.url!, puan: 3, alt: (x.title ?? "").slice(0, 120) }));
 }
 
-// 5 Kasım 2026 (kullanıcı: "görüntü kalitesi düşük"): kısa kenarı 500, uzun kenarı 1000 pikselden küçük görsel aday olmaz; 20 MB'a kadar
-// iner (yüksek çözünürlüklü PNG'ler büyük). Yapay zekâya 1024 px'lik JPEG önizlemesi gider (Claude görsel başına 5 MB kabul eder).
-type Inen = Aday & { mime: string; veri: Uint8Array; w: number; h: number; alfa: boolean; onizleme: Resim };
+// 5 Kasım 2026 (kullanıcı: "görüntü kalitesi düşük"): kısa kenarı 500, uzun kenarı 1000 pikselden küçük görsel aday olmaz.
+// Bellek (işçi 150 MB'ta kesilir; ilk sürüm büyük görselleri bellekte tutup turu öldürüyordu): görsel en çok 12 MB, ikişer ikişer indirilir,
+// ham veri tutulmaz (yalnız önizleme); yapay zekâya 1,2 MB altı görsel olduğu gibi, üstü 7 megapikselden küçükse 1024 px JPEG'e küçültülüp
+// gider (çözme sırayla, aynı anda tek görsel).
+// Şeffaflık PNG başlığından okunur (renk türü 4/6 = alfa kanalı), çözmeden.
+type Inen = Aday & { mime: string; bayt: number; w: number; h: number; alfa: boolean; onizleme: Resim };
+const KUCULT_MP = 7e6;
 async function indir(a: Aday): Promise<Inen | null> {
   const r = await fetch(a.url, { headers: { "User-Agent": UA, Accept: "image/webp,image/png,image/jpeg,image/*;q=0.8", Referer: a.sayfa }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
   const mime = (r?.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  if (!r?.ok || !/^image\/(jpeg|png|webp)$/.test(mime) || Number(r.headers.get("content-length") ?? 0) > 20e6) { await r?.body?.cancel().catch(() => {}); return null; }
-  const veri = new Uint8Array(await r.arrayBuffer().catch(() => new ArrayBuffer(0)));
-  if (veri.byteLength < 20_000 || veri.byteLength > 20e6) return null;
+  if (!r?.ok || !/^image\/(jpeg|png|webp)$/.test(mime) || Number(r.headers.get("content-length") ?? 0) > 12e6) { await r?.body?.cancel().catch(() => {}); return null; }
+  let veri: Uint8Array | null = new Uint8Array(await r.arrayBuffer().catch(() => new ArrayBuffer(0)));
+  const bayt = veri.byteLength;
+  if (bayt < 20_000 || bayt > 12e6) return null;
   const b = boyut(veri);
-  if (!b || Math.min(b.w, b.h) < 500 || Math.max(b.w, b.h) < 1000 || b.w * b.h > 40e6 || b.w / b.h > 2.6 || b.h / b.w > 2.2) return null;
-  // WebP çözülemiyor (imagescript): olduğu gibi gider; şeffaflığı VP8X başlığından
-  if (mime === "image/webp") return veri.byteLength > 3_700_000 ? null : { ...a, mime, veri, ...b, alfa: String.fromCharCode(...veri.slice(12, 16)) === "VP8X" && !!(veri[20] & 0x10), onizleme: { mime, b64: b64(veri) } };
+  if (!b || Math.min(b.w, b.h) < 500 || Math.max(b.w, b.h) < 1000 || b.w / b.h > 2.6 || b.h / b.w > 2.2) return null;
+  const alfa = mime === "image/png" ? veri[25] === 6 || veri[25] === 4 : mime === "image/webp" ? String.fromCharCode(...veri.slice(12, 16)) === "VP8X" && !!(veri[20] & 0x10) : false;
+  if (bayt <= 1_200_000) return { ...a, mime, bayt, ...b, alfa, onizleme: { mime, b64: b64(veri) } };
+  if (mime === "image/webp" || b.w * b.h > KUCULT_MP) return null;
+  const birak = await sira();
   try {
-    const is = await imagescript(); if (!is) throw new Error("imagescript yok");
+    const is = await imagescript(); if (!is) return null;
     const { Image } = is;
-    const im = await is.decode(veri) as InstanceType<IS["Image"]>;
-    let alfa = false;
-    if (mime === "image/png") for (let i = 3; i < im.bitmap.length; i += 4 * 61) if (im.bitmap[i] < 250) { alfa = true; break; }
+    let im: InstanceType<IS["Image"]> | null = await is.decode(veri) as InstanceType<IS["Image"]>;
+    veri = null;
     const k = im.width >= im.height ? im.resize(1024, Image.RESIZE_AUTO) : im.resize(Image.RESIZE_AUTO, 1024);
+    im = null;
     const zemin = new Image(k.width, k.height).fill(0xffffffff); zemin.composite(k, 0, 0);
-    return { ...a, mime, veri, ...b, alfa, onizleme: { mime: "image/jpeg", b64: b64(await zemin.encodeJPEG(85)) } };
-  } catch { return veri.byteLength > 3_700_000 ? null : { ...a, mime, veri, ...b, alfa: false, onizleme: { mime, b64: b64(veri) } }; }
+    return { ...a, mime, bayt, ...b, alfa, onizleme: { mime: "image/jpeg", b64: b64(await zemin.encodeJPEG(85)) } };
+  } catch { return null; } finally { birak(); }
+}
+/** Görsel çözme sırası: aynı anda tek görsel çözülür (bellek) */
+let kuyruk: Promise<void> = Promise.resolve();
+function sira(): Promise<() => void> {
+  let birak!: () => void;
+  const once = kuyruk;
+  kuyruk = new Promise<void>((ok) => { birak = ok; });
+  return once.then(() => birak);
 }
 
 /** Şeffaf zeminli resmî PNG (çoğu üreticinin mağaza görseli): arka plan silinmeden, ürün sınırından kırpılıp 1600×900 şeffaf tuvale
  *  ortalanır (ürün 1360×720 alana sığar; Cloudflare işçisiyle aynı ölçü). Silme yazılımının kenar bozmasını önler. Çözülemezse null. */
 export async function seffafTuval(veri: Uint8Array): Promise<Uint8Array | null> {
+  const b = boyut(veri);
+  if (!b || b.w * b.h > KUCULT_MP) return null; // büyükse Cloudflare keser (bellek)
+  const birak = await sira();
   try {
     const is = await imagescript(); if (!is) return null;
     const { Image } = is;
@@ -188,7 +206,7 @@ export async function seffafTuval(veri: Uint8Array): Promise<Uint8Array | null> 
     k.resize(Math.max(1, Math.round(k.width * o)), Math.max(1, Math.round(k.height * o)));
     const t = new Image(1600, 900); t.composite(k, Math.round((1600 - k.width) / 2), Math.round((900 - k.height) / 2));
     return await t.encodeWEBP(90);
-  } catch { return null; }
+  } catch { return null; } finally { birak(); }
 }
 
 const SECIM_SEMA = {
@@ -268,9 +286,9 @@ async function ajanAdaylari(o: { marka: string; ad: string; tur: string }, iz: s
 async function indirSec(o: { marka: string; ad: string; tur: string }, adaylar: Aday[], onceki: Inen[], iz: string[]) {
   const tekil = adaylar.filter((a, i, l) => l.findIndex((x) => x.url === a.url) === i && !onceki.some((x) => x.url === a.url)).slice(0, 16);
   const inen: Inen[] = [...onceki];
-  for (let i = 0; i < tekil.length && inen.length < 8; i += 4) inen.push(...(await Promise.all(tekil.slice(i, i + 4).map((a) => indir(a).catch(() => null)))).filter((x): x is Inen => !!x));
+  for (let i = 0; i < tekil.length && inen.length < 8; i += 2) inen.push(...(await Promise.all(tekil.slice(i, i + 2).map((a) => indir(a).catch(() => null)))).filter((x): x is Inen => !!x));
   // Aynı dosya iki adresten geldiyse biri kalır
-  const essiz = inen.filter((a, i, l) => !l.some((b, j) => j < i && b.veri.byteLength === a.veri.byteLength)).slice(0, 8);
+  const essiz = inen.filter((a, i, l) => !l.some((b, j) => j < i && b.bayt === a.bayt && b.w === a.w)).slice(0, 8);
   if (!essiz.length) { iz.push(`görsel: ${tekil.length} aday indirilemedi/küçük`); return { essiz, sira: [] as Inen[], v: null }; }
   const v = await gorerekSor(SECIM_SISTEM, `ÜRÜN: ${o.marka} ${o.ad} (${o.tur})\nAdaylar:\n${essiz.map((a, i) => `Aday ${i + 1}: ${a.w}×${a.h}${a.alfa ? ", şeffaf zeminli PNG" : ""}, ${hostAl(a.sayfa)}${a.alt ? `, "${a.alt}"` : ""}`).join("\n")}`,
     essiz.map((a, i) => ({ ...a.onizleme, etiket: `Aday ${i + 1}` })), SECIM_SEMA, 90_000).catch(() => null);
