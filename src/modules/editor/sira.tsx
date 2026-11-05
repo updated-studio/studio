@@ -120,7 +120,7 @@ export function SiraTablo({ satirlar, ilkAna = true }: { satirlar: Satir[]; ilkA
   const git = useNavigate();
   const canli = useCanli();
   const is_ = useIs();
-  const ac = (s: Satir) => { if (s.siteId) git(`/yaz/${s.siteId}`); else if (s.taslakId) git(`/haber-masasi?b=taslak&t=${s.taslakId}`); };
+  const ac = (s: Satir) => { if (s.siteId) git(`/oku/${s.siteId}`); else if (s.taslakId) git(`/haber-masasi?b=taslak&t=${s.taslakId}`); };
   return (
     <table className="mas-tablo">
       <thead><tr><th>Haber</th><th>Yol</th><th className="mas-sag mas-genis">Öncelik</th><th className="mas-sag"><span className="mas-gizli">Sıradaki adım</span></th></tr></thead>

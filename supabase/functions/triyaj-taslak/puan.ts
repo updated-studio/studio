@@ -5,7 +5,7 @@
 // Kural değişince: değerleri güncelle, ONCELIK_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz (CLAUDE.md kural 10).
 // Enes'in kararları: puan markadan bağımsız; Öncelikli marka listesi puanı etkilemez (sadece elemede kullanılır).
 
-export const ONCELIK_SURUMU = "3 Kasım 2026";
+export const ONCELIK_SURUMU = "6 Kasım 2026";
 
 // 1) Haberin türü: markadan bağımsız temel değer. Yapay zekâ her haberi bu listeden birine koyar ("tip" etiketi).
 export const HABER_TURLERI: { ad: string; puan: number; aciklama: string }[] = [
@@ -26,8 +26,10 @@ const ESKI_TUR: Record<string, string> = { Resmi: "Önemli güncelleme", Sızın
 // 1b) Konunun Türkiye'deki genel ilgisi (Fatih, 18 Ekim 2026: "ülkemizdeki genel izlenmeye sahip teknoloji kategorileri, genele hitap eden").
 //     Haber türüne eklenir; markadan bağımsızdır. Telefon ve yapay zekâ en geniş kitle; kamera/drone Updated'ın uzman kitlesi.
 export const KONU_ILGI: Record<string, number> = {
-  telefon: 10, "yapay zeka": 8, oyun: 6, otomobil: 5, bilgisayar: 5, kamera: 5, giyilebilir: 3, drone: 3,
-  "video ekipmanı": 3, tablet: 3, ses: 2, bileşen: 2, yazılım: 2, eğlence: 1, "akıllı ev": 0, "ev aletleri": 0, sektör: -2, diğer: -4,
+  // 6 Kasım 2026 (Fatih: "sadece Apple/Android değil; genel kamera, aksiyon kameraları, akıllı ev ürünleri, güneş panelleri"):
+  // kamera 5→8, drone 3→6, video ekipmanı 3→6, akıllı ev 0→6, ev aletleri 0→2; yeni konu enerji 5 (güneş paneli, güç istasyonu)
+  telefon: 10, "yapay zeka": 8, kamera: 8, oyun: 6, drone: 6, "video ekipmanı": 6, "akıllı ev": 6, otomobil: 5, bilgisayar: 5, enerji: 5,
+  giyilebilir: 3, tablet: 3, ses: 2, bileşen: 2, yazılım: 2, "ev aletleri": 2, eğlence: 1, sektör: -2, diğer: -4,
 };
 
 // 2) Ek puanlar

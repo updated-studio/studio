@@ -247,3 +247,30 @@ button.ed-marka { background: none; border: 0; color: inherit; font: inherit; cu
   .hm-ust > input[type="search"] { flex: 1 1 100%; }
   .hm-ust > .chip { width: auto !important; flex: 0 0 auto; }
 }
+
+/* Taslağı oku (6 Kasım 2026): solda sitedeki görünüm, sağda karar, görsel ve denetim notları */
+.mas-oku-ust { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 14px; }
+.mas-oku-ust .linkbtn { flex: none; white-space: nowrap; text-decoration: none; }
+.mas-oku-ad { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mas-onizleme { display: flex; flex-direction: column; }
+.mas-sahne { display: flex; justify-content: center; height: calc(100dvh - 190px); min-height: 520px; background: var(--sunk); border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; overflow: hidden; }
+.mas-sahne iframe { height: 100%; max-width: 100%; border: 0; background: #fff; }
+.mas-sahne .mas-bos { border: 0; align-self: center; }
+.mas-karar { display: grid; gap: 12px; padding: 16px; }
+.mas-karar .btn { min-height: 40px; justify-content: center; }
+.mas-durum { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 3px 10px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-size: 13px; font-weight: 500; }
+.mas-durum::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.mas-durum.yayinda { background: var(--ok-soft); color: var(--ok); }
+.mas-alanlar { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 6px 10px; margin: 0; font-size: 13px; }
+.mas-alanlar dt { color: var(--muted); }
+.mas-alanlar dd { margin: 0; overflow-wrap: anywhere; }
+.mas-alanlar a { color: var(--blue); text-decoration: none; }
+.mas-metin-btn { justify-self: center; border: 0; background: none; padding: 2px 0; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.mas-kapak { display: block; width: calc(100% - 32px); margin: 0 16px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--sunk); }
+.mas-kapak-alt { display: flex; justify-content: space-between; gap: 8px; padding: 8px 16px 14px; font-size: 12.5px; color: var(--muted); }
+.mas-notlar { list-style: none; margin: 0; padding: 0 0 4px; }
+.mas-notlar li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 13.5px; line-height: 1.4; }
+.mas-notlar li svg.i { width: 16px; height: 16px; margin-top: 1px; color: var(--muted); }
+.mas-notlar li.tamam svg.i { color: var(--blue); }
+.mas-notlar li.uyari svg.i { color: var(--err); }
+@media (max-width: 1100px) { .mas-sahne { height: 70dvh; } }

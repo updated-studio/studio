@@ -11,7 +11,7 @@ export type CanliNesne = { tur: "haber" | "taslak" | "not"; id: number; baslik: 
 export type CanliKisi = { id: string; ad: string; foto: string | null; email: string; yol: string; nesne: CanliNesne | null; zaman: string };
 
 const BOLUM: [RegExp, string][] = [
-  [/^\/masam/, "Masam"], [/^\/bugun/, "Bugün"], [/^\/yaz\//, "Haber yazıyor"], [/^\/taslaklar/, "Taslaklar"], [/^\/yayinda/, "Yayındakiler"], [/^\/onay/, "Onay bekleyenler"], [/^\/haber-masasi/, "Gelen haberler"], [/^\/yonetim-merkezi/, "Yönetim"], [/^\/menu/, "Menü"],
+  [/^\/masam/, "Masam"], [/^\/bugun/, "Bugün"], [/^\/yaz\//, "Haber yazıyor"], [/^\/oku\//, "Taslak okuyor"], [/^\/taslaklar/, "Taslaklar"], [/^\/yayinda/, "Yayındakiler"], [/^\/onay/, "Onay bekleyenler"], [/^\/haber-masasi/, "Gelen haberler"], [/^\/yonetim-merkezi/, "Yönetim"], [/^\/menu/, "Menü"],
   [/^\/cekim/, "Çekim listesi"], [/^\/takvim/, "Takvim"], [/^\/icerik/, "İçerik"], [/^\/site/, "Site"], [/^\/ekip/, "Ekip"], [/^\/marka/, "Marka Kiti"],
   [/^\/notlar/, "Notlar"], [/^\/baglantilar/, "Bağlantı anahtarları"], [/^\/deneme-masasi/, "Deneme masası"], [/^\/yz-kiyas/, "Yapay zekâ kıyası"], [/^\/sistem/, "Sistem"], [/^\/profil/, "Profil"],
 ];

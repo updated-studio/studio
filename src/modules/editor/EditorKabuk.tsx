@@ -28,6 +28,7 @@ const OnayBekleyenler = lazy(() => import("./Taslaklarim").then((m) => ({ defaul
 const Yayindakiler = lazy(() => import("./Taslaklarim").then((m) => ({ default: m.Yayindakiler })));
 const HaberYazSayfa = lazy(() => import("./Taslaklarim").then((m) => ({ default: () => <YazRota Yaz={m.HaberYaz} /> })));
 const Cekim = lazy(() => import("./Cekim"));
+const Oku = lazy(() => import("./Oku"));
 const Yonetim = lazy(() => import("./Yonetim"));
 const MenuSayfa = lazy(() => import("./Yonetim").then((m) => ({ default: m.MenuSayfa })));
 
@@ -109,6 +110,7 @@ export default function EditorKabuk() {
             <Routes>
               <Route path="/masam" element={<Masam />} />
               <Route path="/bugun" element={<Bugun />} />
+              <Route path="/oku/:id" element={<Oku />} />
               <Route path="/yaz/:id" element={<HaberYazSayfa />} />
               <Route path="/taslaklar" element={<Taslaklar />} />
               <Route path="/yayinda" element={<Yayindakiler />} />

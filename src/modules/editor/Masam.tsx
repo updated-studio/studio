@@ -72,7 +72,7 @@ function Icerik() {
         </div>
         <div className="mas-eylem">
           <button className="btn ghost" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Yeni yaz</button>
-          <button className="btn" disabled={!ilk} onClick={() => ilk && git(ilk.siteId ? `/yaz/${ilk.siteId}` : `/haber-masasi?b=taslak&t=${ilk.taslakId}`)}>Sıradakini aç</button>
+          <button className="btn" disabled={!ilk} onClick={() => ilk && git(ilk.siteId ? `/oku/${ilk.siteId}` : `/haber-masasi?b=taslak&t=${ilk.taslakId}`)}>Sıradakini aç</button>
         </div>
       </div>
       {hata && <div className="msg err">Sitedeki taslaklar alınamadı: {hata}</div>}

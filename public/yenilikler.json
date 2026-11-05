@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-11-06-d",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Taslağı oku ve yayınla",
+    "bolumler": [
+      {
+        "ad": "Masam",
+        "maddeler": [
+          "Satırdaki \"Oku ve yayınla\" yazıyı sitedeki görünümüyle açar; yanında Yayınla, Düzenle ve \"Yayınlamıyoruz, sıradan çıkar\".",
+          "Aynı ekranda öne çıkan görsel ve denetimin notları durur."
+        ]
+      },
+      {
+        "ad": "Haber kapsamı",
+        "maddeler": [
+          "Kamera, drone, video ekipmanı, akıllı ev ve enerji haberleri öncelik sırasında yukarı çıktı."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-c",
     "tarih": "6 Kasım 2026",
     "baslik": "Gelen haberler sadeleşti",
