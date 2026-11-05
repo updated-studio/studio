@@ -102,7 +102,8 @@ let SAYFA_TESHIS = "";
  *  kazınmaz (31 Ekim 2026: robot doğrulaması olan aramalar kullanılmaz). Sayfa kendi adımızla (UA) istenir; engelleyen site atlanır. */
 const BRAVE_AY_SINIR = 700; // ücretsiz 1.000 aramanın güvenli altı
 const ATLA = /youtube\.|amazon\.|reddit\.|facebook\.|instagram\.|tiktok\.|x\.com|twitter\.|pinterest\.|ebay\.|aliexpress\.|hepsiburada\.|trendyol\.|n11\.|teknosa\.|mediamarkt\.|vatanbilgisayar\.|akakce\.|cimri\.|epey\./i;
-const IKINCIL = /bhphotovideo\.com|gsmarena\.com|dpreview\.com/i;
+// İkincil kaynaklar (5 Kasım 2026 genişledi: üretici sitesi sunucumuzu kabul etmediğinde değerler buradan gelir; üreticininki yine önce gelir)
+const IKINCIL = /bhphotovideo\.com|gsmarena\.com|dpreview\.com|adorama\.com|notebookcheck\.net|phonearena\.com|cined\.com|newsshooter\.com|imaging-resource\.com|photographyblog\.com|rtings\.com|soundguys\.com/i;
 const TR_SAYFA = /\/tr(?:[-_]tr)?(?:\/|$)|\.com\.tr|[?&](?:lang|locale)=tr/i;
 /** Aylık Brave sınırı (31 Ekim 2026, kullanıcı: "sınırı aşıp kartımdan çekmesin"): ücretsiz hak ayda 5 $ ≈ 1.000 arama; sistem ayda en çok
  *  BRAVE_AY_SINIR arama yapar, sayaç tr_settings.brave_sayac'ta (künye, radar, haber görselleri ortak; ay başında sıfırlanır). Hak varsa sayar. */
@@ -130,6 +131,20 @@ async function braveAra(sb: ReturnType<typeof createClient>, urun: Urun): Promis
   if (await braveHak(sb)) cikan.push(...(await sorgu(`${urun.brand} ${urun.name} teknik özellikler`, true)).filter((u) => ureticiAlani(u, urun.brand)));
   if (await braveHak(sb)) cikan.push(...await sorgu(`${urun.brand} ${urun.name} ${urun.type === "lens" ? "lens " : ""}specifications`, false));
   return [...new Set(cikan)];
+}
+/** Okunabilen sayfa azsa (5 Kasım 2026, kullanıcı: "takılınca yedek yerler var, gerekirse Brave aramayı kullansın"; Panasonic, B&H,
+ *  DPReview sunucumuzu 403/429 ile geri çeviriyordu) Brave'den üretici dışı, daha önce denenmemiş inceleme/özellik sayfaları istenir.
+ *  Siteler engellediyse kılık değiştirip girilmez; okumamıza izin veren başka kaynak aranır. */
+async function braveIkincil(sb: ReturnType<typeof createClient>, urun: Urun, denenen: string[]): Promise<string[]> {
+  const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", "brave_arama").maybeSingle();
+  const anahtar = (data as { deger?: string } | null)?.deger;
+  if (!anahtar || !(await braveHak(sb))) return [];
+  const r = await fetch("https://api.search.brave.com/res/v1/web/search?count=20&q=" + encodeURIComponent(`"${urun.name}" ${urun.brand} specs review`), { headers: { Accept: "application/json", "X-Subscription-Token": anahtar }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+  if (!r?.ok) { SAYFA_TESHIS += ` · Brave ek ${r?.status ?? "yok"}`; await r?.body?.cancel().catch(() => {}); return []; }
+  const j = await r.json().catch(() => null);
+  const eski = new Set(denenen.map(hostAl));
+  return ((j?.web?.results ?? []) as { url: string }[]).map((x) => x.url)
+    .filter((u) => /^https?:\/\//.test(u) && !ATLA.test(u) && !ureticiAlani(u, urun.brand) && !eski.has(hostAl(u)));
 }
 /** Sayfa metni: menü/alt bilgi atılır; uzun sayfada teknik özellik bölümü öne alınır (özellik tablosu çoğu zaman sayfanın sonunda) */
 function metinAl(html: string) {
@@ -214,7 +229,11 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date
   SAYFA_TESHIS = "";
   const bulunan = await braveAra(sb, urun).catch((e) => { SAYFA_TESHIS = "Brave hata: " + String(e).slice(0, 80); return [] as string[]; });
   const adaylar = [...kayitli, ...bulunan];
-  const sayfalar = adaylar.length ? await sayfaBul(adaylar, urun.brand).catch(() => [] as Sayfa[]) : [];
+  let sayfalar = adaylar.length ? await sayfaBul(adaylar, urun.brand).catch(() => [] as Sayfa[]) : [];
+  if (sayfalar.length < 2) {
+    const ek = await braveIkincil(sb, urun, adaylar).catch(() => [] as string[]);
+    if (ek.length) sayfalar = [...sayfalar, ...(await sayfaBul(ek, urun.brand).catch(() => [] as Sayfa[]))].slice(0, 3);
+  }
   if (sayfalar.length) {
     const metin = sayfalar.map((x, i) => `[${i + 1}] KAYNAK: ${x.url} (${x.resmi ? "ÜRETİCİ" : "İKİNCİ KAYNAK"})\n${x.metin}`).join("\n\n---\n\n");
     const izinli = new Set(sayfalar.map((x) => x.url));
