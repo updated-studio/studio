@@ -325,6 +325,17 @@ async function cevir(basliklar: string[]): Promise<string[]> {
   return out;
 }
 
+// Çıkış radarı (5 Kasım 2026, kullanıcı: "radarı sıklaştır"): radar günde bir tur atıyordu (08.20), yeni ürün künyeye ertesi gün düşüyordu.
+// Bu turda yeni bir ürünün söylenti/sızıntı/resmî haberi geldiyse radar hızlı turla (radar-otomatik {hizli}: yalnız radarda ve künyede
+// olmayan ürünler, en çok 3 arama) hemen bakar; en çok 2 saatte bir (Brave aylık sınırı künyeyle ortak). Günlük tam tur aynen sürer.
+async function radarDurt(sb: ReturnType<typeof createClient>, satirlar: Record<string, unknown>[]) {
+  if (!satirlar.some((x) => String(x.product ?? "") && ["Söylenti", "Sızıntı", "Resmi"].includes(String(x.kind ?? "")))) return;
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "radar_hizli").maybeSingle();
+  if (Date.now() - Date.parse((data?.value as { zaman?: string } | null)?.zaman ?? "1970") < 2 * 3600_000) return;
+  await sb.from("tr_settings").upsert({ key: "radar_hizli", value: { zaman: new Date().toISOString() } });
+  await fetch("http://functions:9000/radar-otomatik", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hizli: true }), signal: AbortSignal.timeout(15_000) });
+}
+
 async function topla(sb: ReturnType<typeof createClient>) {
   const bas = Date.now();
   const ayarlar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
@@ -597,6 +608,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
   };
   await sb.from("tr_settings").upsert({ key: "son_toplama", value: { ...ozet, durum: "bitti", zaman: new Date().toISOString() } });
   console.log(JSON.stringify(ozet));
+  await radarDurt(sb, [...yeniAday, ...belirsiz]).catch((e) => console.error("radar dürtme", e));
   return ozet;
 }
 

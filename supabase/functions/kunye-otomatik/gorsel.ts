@@ -13,7 +13,7 @@ const imagescript = () => (isYuk ??= import("npm:imagescript@1.3.0").then((m) =>
 import { anahtarlar as geminiAnahtarlari } from "./anahtar.ts";
 
 type Sb = ReturnType<typeof createClient>;
-export type Resim = { mime: string; b64: string };
+export type Resim = { mime: string; b64?: string; url?: string }; // url: Claude görseli kendisi indirir
 export type UrunGorseli = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string; w?: number; h?: number; alfa?: boolean; yedekler?: { url: string; sayfa: string; alfa?: boolean }[] };
 
 const UA = "Mozilla/5.0 (compatible; UpdatedStudyo/1.0; +https://www.updated.com.tr; kunye gorseli)";
@@ -165,6 +165,8 @@ async function indir(a: Aday): Promise<Inen | null> {
   if (!b || Math.min(b.w, b.h) < 500 || Math.max(b.w, b.h) < 1000 || b.w / b.h > 2.6 || b.h / b.w > 2.2) return null;
   const alfa = mime === "image/png" ? veri[25] === 6 || veri[25] === 4 : mime === "image/webp" ? String.fromCharCode(...veri.slice(12, 16)) === "VP8X" && !!(veri[20] & 0x10) : false;
   if (bayt <= 1_200_000) return { ...a, mime, bayt, ...b, alfa, onizleme: { mime, b64: b64(veri) } };
+  // 1,2-4,5 MB: sunucuda çözülmez, Claude adresten kendisi indirir (5 Kasım 2026: imagescript çözmesi işçinin işlemci sınırını aşıp turu kesiyordu)
+  if (bayt <= 4_500_000) return { ...a, mime, bayt, ...b, alfa, onizleme: { mime, url: a.url } };
   if (mime === "image/webp" || b.w * b.h > KUCULT_MP) return null;
   const birak = await sira();
   try {
@@ -239,13 +241,22 @@ Yanıt yalnız JSON: {"gecti":true,"sorun":""} ya da {"gecti":false,"sorun":"kı
 
 /** Görerek karar: önce Claude (görsel rolü), anahtarı/kredisi yoksa ya da hata verirse ücretsiz Gemini */
 export async function gorerekSor(sistem: string, kullanici: string, resimler: (Resim & { etiket?: string })[], sema: Record<string, unknown>, ms: number): Promise<Record<string, any> | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const bitis = Date.now() + ms;
   try {
     const c = await claudeJson({ sistem, kullanici, model: CLAUDE_MODEL.gorsel, ms, sema, resimler, maxTokens: 6000, caba: "medium", fonk: "kunye-otomatik" });
     if (c) return c.veri;
-  } catch (e) { console.error("künye görsel Claude", e); }
+  } catch (e) {
+    console.error("künye görsel Claude", e);
+    // Adresle gönderilen bir görseli Claude indiremediyse (site engelledi) yalnız sunucudan gönderilenlerle bir kez daha
+    const acilmayan = resimler.filter((r) => r.url).map((r) => r.etiket).filter(Boolean);
+    if (acilmayan.length && resimler.some((r) => r.b64) && bitis - Date.now() > 20_000) {
+      const c = await claudeJson({ sistem, kullanici: `${kullanici}\n(Görseli açılamayan adaylar: ${acilmayan.join(", ")}; bunları seçme.)`, model: CLAUDE_MODEL.gorsel, ms: bitis - Date.now(), sema, resimler: resimler.filter((r) => r.b64), maxTokens: 6000, caba: "medium", fonk: "kunye-otomatik" }).catch(() => null);
+      if (c) return c.veri;
+    }
+  }
   for (const a of await geminiAnahtarlari().catch(() => [])) {
     const parts: Record<string, unknown>[] = [];
-    for (const r of resimler) { if (r.etiket) parts.push({ text: r.etiket + ":" }); parts.push({ inline_data: { mime_type: r.mime, data: r.b64 } }); }
+    for (const r of resimler) { if (!r.b64) continue; if (r.etiket) parts.push({ text: r.etiket + ":" }); parts.push({ inline_data: { mime_type: r.mime, data: r.b64 } }); }
     parts.push({ text: kullanici });
     const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent", {
       method: "POST", signal: AbortSignal.timeout(Math.min(ms, 90_000)), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },

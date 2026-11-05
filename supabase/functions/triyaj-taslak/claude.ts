@@ -57,7 +57,7 @@ export function jsonAl(metin: string): Record<string, unknown> {
 
 /** JSON döndüren tek çağrı. sema verilirse yanıt şemaya bağlanır; resimler "Aday N:" etiketiyle sırayla eklenir. */
 // fonk: başka fonksiyondan çağrılınca kullanım sayacındaki ad (kıyaslar, 4 Kasım 2026)
-export async function claudeJson(o: { sistem: string; kullanici: string; model: string; ms: number; sema?: Record<string, unknown>; resimler?: { mime: string; b64: string; etiket?: string }[]; maxTokens?: number; caba?: "low" | "medium" | "high"; fonk?: string }): Promise<{ veri: Record<string, any>; model: string } | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
+export async function claudeJson(o: { sistem: string; kullanici: string; model: string; ms: number; sema?: Record<string, unknown>; resimler?: { mime: string; b64?: string; url?: string; etiket?: string }[]; maxTokens?: number; caba?: "low" | "medium" | "high"; fonk?: string }): Promise<{ veri: Record<string, any>; model: string } | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
   if (Date.now() < krediYok) return null;
   const apiKey = await claudeAnahtari();
   if (!apiKey) return null;
@@ -66,7 +66,9 @@ export async function claudeJson(o: { sistem: string; kullanici: string; model: 
   const icerik: Anthropic.ContentBlockParam[] = [];
   for (const r of o.resimler ?? []) {
     if (r.etiket) icerik.push({ type: "text", text: r.etiket + ":" });
-    icerik.push({ type: "image", source: { type: "base64", media_type: r.mime as "image/jpeg" | "image/png" | "image/webp", data: r.b64 } });
+    // Adresle gönderilen görseli Claude kendisi indirir (5 Kasım 2026: büyük görseli sunucuda çözüp küçültmek işçinin işlemci sınırını aşıyordu)
+    icerik.push(r.url ? { type: "image", source: { type: "url", url: r.url } } as Anthropic.ContentBlockParam
+      : { type: "image", source: { type: "base64", media_type: r.mime as "image/jpeg" | "image/png" | "image/webp", data: r.b64 ?? "" } });
   }
   icerik.push({ type: "text", text: o.kullanici });
   // Geçici hatada (aşırı yük 529, 5xx, 429) ve süre yetiyorsa bir kez yeniden dener; Gemini'ye ancak sonra düşülür (4 Kasım 2026)

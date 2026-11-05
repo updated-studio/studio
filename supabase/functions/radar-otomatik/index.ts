@@ -7,6 +7,7 @@
 // Günde bir tur, turda en çok ARAMA_MAX arama (Gemini kotası). Zamanlayıcı sunucu içinden çağırır; Stüdyo'dan yönetici elle başlatabilir.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
+import { claudeJson, CLAUDE_MODEL } from "../triyaj-taslak/claude.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -60,6 +61,9 @@ async function gemini(sistem: string, istem: string, arama: boolean): Promise<{ 
     } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
   }
   if (hepsiKota) await isaretle(a, "kota_dolu", son); }
+  // Yedek (5 Kasım 2026: o sabah tur ücretsiz Gemini kotası dolduğu için hiç çalışmadı): Claude Haiku aynı istemle
+  const c = await claudeJson({ sistem, kullanici: istem, model: CLAUDE_MODEL.kucuk, ms: 90_000, maxTokens: 8_000, caba: "low", fonk: "radar-otomatik" }).catch((e) => { son += ` | Claude: ${String((e as Error).message ?? e).slice(0, 80)}`; return null; });
+  if (c?.veri) return { v: c.veri, kaynaklar: [] };
   throw new Error("Yapay zekâ yanıt vermedi (" + son + ")");
 }
 const kotaDolu = (m: string) => /\b429\b|RESOURCE_EXHAUSTED|quota|kota/i.test(m);
@@ -132,7 +136,7 @@ type Grup = { marka: string; ad: string; turler: Set<string>; kaynaklar: Set<str
 type Mevcut = { id: number; ad: string; marka: string; tur: string; durum: string; radarda: boolean; radar_oto: boolean; tarih: string | null };
 type Satir = { anahtar: string; marka: string; ad: string; tur: string; durum: string; tarih: string | null; tarih_notu: string; kontrol_zamani: string; haberler: number[]; islem: string };
 
-async function isle(sb: Sb) {
+async function isle(sb: Sb, hizli = false) {
   const turler = ((await sb.rpc("radar_turler")).data as string[] | null ?? []).filter((t) => t !== "other");
   if (!turler.length) throw new Error("Ürün türleri okunamadı (göç 0053)");
   const mevcut = ((await sb.rpc("radar_urunler")).data as Mevcut[] | null) ?? [];
@@ -156,7 +160,10 @@ async function isle(sb: Sb) {
   // Zaten satışta olan ve yakın zamanda doğrulanmış ürünler elemeye hiç girmez
   const yakin = (k: string) => { const s = kayit.get(k); return !!s && Date.now() - Date.parse(s.kontrol_zamani) < TEKRAR_GUN * 864e5; };
   const liste = [...gruplar.entries()].filter(([k]) => { const u = urunHarita.get(k); return !yakin(k) && !(u && (u.durum === "satista" || u.durum === "eol")); })
-    .sort((a, b) => b[1].kaynaklar.size - a[1].kaynaklar.size || b[1].haberler.length - a[1].haberler.length).slice(0, 150);
+    .filter(([k]) => !hizli || (!kayit.has(k) && !urunHarita.has(k))) // hızlı tur: yalnız ilk kez görülen ürünler
+    .sort((a, b) => b[1].kaynaklar.size - a[1].kaynaklar.size || b[1].haberler.length - a[1].haberler.length).slice(0, hizli ? 40 : 150);
+  if (hizli && !liste.length) return { zaman: new Date().toISOString(), hizli: true, yeni: 0 }; // yeni ürün yok: yapay zekâ ve arama harcanmaz
+  const sinir = hizli ? 3 : ARAMA_MAX;
 
   // 2) Eleme (aramasız, ucuz model)
   type Secilen = { marka: string; ad: string; tur: string; haberler: number[]; kaynak: number };
@@ -179,12 +186,12 @@ async function isle(sb: Sb) {
     if (u && u.radar_oto && !u.radarda && u.durum !== "satista") return; // editör radardan çıkarmış: dokunma
     alinan.add(k); isler.push(x); };
   secilen.sort((a, b) => b.kaynak - a.kaynak).forEach((s) => ekle(s));
-  const yeniSinir = Math.max(ARAMA_MAX - 3, 1); // her turda en az 3 yer yeniden kontrole kalır
+  const yeniSinir = hizli ? sinir : Math.max(ARAMA_MAX - 3, 1); // tam turda en az 3 yer yeniden kontrole kalır; hızlı turda yeniden kontrol yok
   const yeniler = isler.splice(0, yeniSinir); isler.length = 0; yeniler.forEach((x) => isler.push(x));
   const radardakiler = mevcut.filter((u) => u.radarda && u.durum !== "satista").map((u) => ({ u, s: kayit.get(anahtarYap(u.marka, u.ad)) }))
     .sort((a, b) => Date.parse(a.s?.kontrol_zamani ?? "1970") - Date.parse(b.s?.kontrol_zamani ?? "1970"));
-  for (const { u } of radardakiler) if (isler.length < ARAMA_MAX) ekle({ marka: u.marka, ad: u.ad, tur: u.tur, haberler: kayit.get(anahtarYap(u.marka, u.ad))?.haberler ?? [] });
-  for (const s of secilen) if (isler.length < ARAMA_MAX) ekle(s);
+  if (!hizli) for (const { u } of radardakiler) if (isler.length < ARAMA_MAX) ekle({ marka: u.marka, ad: u.ad, tur: u.tur, haberler: kayit.get(anahtarYap(u.marka, u.ad))?.haberler ?? [] });
+  for (const s of secilen) if (isler.length < sinir) ekle(s);
 
   // 4) İnternetten doğrulama ve yazma
   const sonuc: { urun: string; sonuc: string }[] = [];
@@ -221,7 +228,7 @@ async function isle(sb: Sb) {
       sonuc.push({ urun: ad, sonuc: "hata: " + String((e as Error).message).slice(0, 120) });
     }
   }
-  const ozet = { zaman: new Date().toISOString(), haber_grubu: gruplar.size, elemeye_giren: liste.length, secilen: secilen.length, dogrulanan: sonuc };
+  const ozet = { zaman: new Date().toISOString(), ...(hizli ? { hizli: true } : {}), haber_grubu: gruplar.size, elemeye_giren: liste.length, secilen: secilen.length, dogrulanan: sonuc };
   await sb.from("tr_settings").upsert({ key: "son_radar", value: ozet });
   return ozet;
 }
@@ -238,7 +245,8 @@ Deno.serve(async (req) => {
     const { data: p } = await sb.from("profiles").select("is_admin").eq("id", k.user.id).maybeSingle();
     if (!p?.is_admin) return yanit({ error: "Yalnız yöneticiler" }, 403);
   }
-  const is = isle(sb).catch(async (e) => { const v = { zaman: new Date().toISOString(), hata: String((e as Error).message).slice(0, 300) }; await sb.from("tr_settings").upsert({ key: "son_radar", value: v }); return v; });
+  const b = await req.json().catch(() => ({}));
+  const is = isle(sb, b?.hizli === true && zamanlayici).catch(async (e) => { const v = { zaman: new Date().toISOString(), hata: String((e as Error).message).slice(0, 300) }; await sb.from("tr_settings").upsert({ key: "son_radar", value: v }); return v; });
   if (zamanlayici) { EdgeRuntime.waitUntil(is); return yanit({ basladi: true }); }
   return yanit(await is);
 });
