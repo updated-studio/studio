@@ -55,6 +55,7 @@ export default function KunyeOnay() {
         const r = await fetch(`${SUPABASE_URL}/functions/v1/kunye-otomatik`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${o.session?.access_token ?? ""}` }, body: JSON.stringify({ adet: 2 }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || `Hata ${r.status}`);
+        if (j.suruyor) { setDurum("Sistem şu an künyeleri kendisi dolduruyor; öneriler geldikçe aşağıda görünür."); return; }
         // Kota dolunca fonksiyon ürünü işaretlemeden döner; döngü 60 tur boşa dönüp "işlendi" demesin (31 Ekim 2026)
         const kota = (j.islenen as { durum: string }[]).some((x) => x.durum === "kota dolu");
         toplam += (j.islenen as { durum: string }[]).filter((x) => x.durum !== "kota dolu").length; await yukle();

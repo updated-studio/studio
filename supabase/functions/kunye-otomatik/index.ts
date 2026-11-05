@@ -298,6 +298,21 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date
   throw new Error("Yapay zekâ yanıt vermedi (" + son + ")");
 }
 
+// Zincir (5 Kasım 2026, kullanıcı: "künye neden bu kadar ağır gidiyor"): bir ürün ~1 dk sürüyor ama tur 1-3 ürün işleyip yarım saat
+// bekliyordu (yarım saatte bir zamanlayıcı). İş kaldıkça tur biter bitmez sıradakini başlatır; kalite ayarları aynı (her ürün yine kendi
+// süresiyle, ikinci göz ve görsel ajanıyla). Durur: iş kalmadıysa, turda hiçbir şey işlenmediyse, kota dolduysa, 80 turda ya da gece (UTC 21-05).
+async function turSuruyor(sb: ReturnType<typeof createClient>) {
+  const { data } = await sb.from("tr_settings").select("value").eq("key", "son_kunye").maybeSingle();
+  const v = data?.value as { bitti?: boolean; zaman?: string } | null;
+  return !!v && v.bitti === false && Date.now() - Date.parse(v.zaman ?? "") < 7 * 60_000;
+}
+async function zincirle(r: { islenen: { durum: string }[] }, sira: number) { // iş bitince sıradaki tur boş döner, zincir orada durur
+  const saat = new Date().getUTCHours();
+  if (!r.islenen.length || r.islenen.some((x) => x.durum === "kota dolu") || sira >= 80 || saat >= 21 || saat < 5) return;
+  await fetch("http://functions:9000/kunye-otomatik", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zincir: sira + 1 }), signal: AbortSignal.timeout(15_000) })
+    .catch((e) => console.error("künye zinciri", e));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return yanit({ error: "POST gerekli" }, 405);
@@ -308,7 +323,9 @@ Deno.serve(async (req) => {
   if (!k?.user && !zamanlayici) return yanit({ error: "Stüdyo girişi gerekli" }, 401);
   const b = await req.json().catch(() => ({}));
   const adet = Math.min(3, Math.max(1, Number(b.adet) || (zamanlayici ? 3 : 2)));
-  if (zamanlayici) { EdgeRuntime.waitUntil(isle(sb, b, adet)); return yanit({ basladi: true }); }
+  // Tek seferde bir tur (5 Kasım 2026): önceki tur sürüyorsa yeni tur başlamaz (zincirin sıradaki turu hariç); aynı ürün iki kez işlenmesin
+  if (!Number.isInteger(b.urun_id) && !b.zincir && await turSuruyor(sb)) return yanit(zamanlayici ? { atlandi: "önceki tur sürüyor" } : { islenen: [], kalan: 1, suruyor: true });
+  if (zamanlayici) { EdgeRuntime.waitUntil(isle(sb, b, adet).then((r) => zincirle(r, Number(b.zincir) || 0), (e) => console.error("künye turu", e))); return yanit({ basladi: true }); }
   return yanit(await isle(sb, b, adet));
 });
 
