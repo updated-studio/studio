@@ -3,7 +3,7 @@
 // Fiyatlar firmaların fiyat sayfalarından (4 Kasım 2026; Gemini 4 Argon 1 Aralık'ta iki katına çıkıyor), dolar / 1M jeton (girdi, çıktı).
 // Gemini 4 Argon'un ücretsiz katmanı yok: görsel için açılan ücretli projenin anahtarıyla (gemini_gorsel) çağrılır; asıl metin işleri
 // ücretsiz Gemini anahtar havuzunda kalır (kullanıcı: "ikisi birbirine girmesin").
-import { claudeJson } from "./claude.ts";
+import { claudeJson, jsonAl } from "./claude.ts";
 import { anahtarlar as havuzAnahtarlari } from "./anahtar.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -25,12 +25,6 @@ const say = (sb: Sb, fonk: string, model: string, sonuc: string) => { sb.rpc("ge
 async function anahtar(sb: Sb, ad: string) {
   const { data } = await sb.from("baglanti_anahtarlari").select("deger").eq("ad", ad).maybeSingle();
   return (data as { deger?: string } | null)?.deger || null;
-}
-function jsonAl(metin: string): Record<string, unknown> {
-  try { return JSON.parse(metin); } catch { /* aşağıda */ }
-  const a = metin.indexOf("{"), b = metin.lastIndexOf("}");
-  if (a >= 0 && b > a) return JSON.parse(metin.slice(a, b + 1));
-  throw new Error("Geçersiz JSON yanıtı");
 }
 
 /** Kıyas modelini aynı sistem istemi ve girdiyle çağırır; anahtarı yoksa null, hata olursa fırlatır */

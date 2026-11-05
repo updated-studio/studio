@@ -35,11 +35,24 @@ async function claudeAnahtari(): Promise<string | null> {
 }
 
 /** Yanıttaki ilk JSON nesnesi (şemasız çağrılarda model açıklama eklerse diye) */
-function jsonAl(metin: string): Record<string, unknown> {
+// 5 Kasım 2026: Opus denetimi JSON'dan sonra ikinci bir nesne/metin yazınca ("Unexpected non-whitespace character after JSON") ilk ile son
+// süslü parantez arası okunamıyordu; 3-5 Kasım'da 90 denetimin 33'ü bu yüzden Gemini'ye düştü (Opus ücreti boşa). Artık metindeki bütün
+// üst düzey JSON nesneleri (tırnak içi parantezler sayılmadan) ayrı ayrı okunur, en uzun geçerli olan alınır.
+export function jsonAl(metin: string): Record<string, unknown> {
   try { return JSON.parse(metin); } catch { /* aşağıda */ }
-  const a = metin.indexOf("{"), b = metin.lastIndexOf("}");
-  if (a < 0 || b <= a) throw new Error("Claude JSON döndürmedi");
-  return JSON.parse(metin.slice(a, b + 1));
+  let en: Record<string, unknown> | null = null, enUzun = 0;
+  for (let i = metin.indexOf("{"); i >= 0; i = metin.indexOf("{", i + 1)) {
+    let d = 0, tirnak = false, kac = false, j = i;
+    for (; j < metin.length; j++) {
+      const c = metin[j];
+      if (tirnak) { if (kac) kac = false; else if (c === "\\") kac = true; else if (c === '"') tirnak = false; continue; }
+      if (c === '"') tirnak = true; else if (c === "{") d++; else if (c === "}" && --d === 0) break;
+    }
+    if (d !== 0) continue;
+    try { const v = JSON.parse(metin.slice(i, j + 1)); if (v && typeof v === "object" && !Array.isArray(v) && j + 1 - i > enUzun) { en = v; enUzun = j + 1 - i; } i = j; } catch { /* sonraki { */ }
+  }
+  if (!en) throw new Error("Claude JSON döndürmedi");
+  return en;
 }
 
 /** JSON döndüren tek çağrı. sema verilirse yanıt şemaya bağlanır; resimler "Aday N:" etiketiyle sırayla eklenir. */
@@ -71,8 +84,9 @@ async function tekCagri(apiKey: string, o: Parameters<typeof claudeJson>[0], ice
   const client = new Anthropic({ apiKey, timeout: Math.max(8_000, ms), maxRetries: 0 });
   try {
     const m = await client.messages.create({
-      // Sistem istemi önbelleğe alınır (aynı üslup ve kontrol yönergesi her taslakta tekrar gider; tekrar okunması %90 ucuz)
-      model: o.model, max_tokens: o.maxTokens ?? 8000, system: [{ type: "text", text: o.sistem, cache_control: { type: "ephemeral" } }],
+      // Sistem istemi önbelleğe alınır (aynı üslup ve kontrol yönergesi her taslakta tekrar gider; tekrar okunması %90 ucuz).
+      // 5 Kasım 2026: önbellek 1 saat tutulur (5 dakikalıkta isabet %15'ti; taslaklar ve künye turları 20-40 dakika arayla geliyor)
+      model: o.model, max_tokens: o.maxTokens ?? 8000, system: [{ type: "text", text: o.sistem, cache_control: { type: "ephemeral", ttl: "1h" } }],
       messages: [{ role: "user", content: icerik }],
       output_config: { effort: o.caba ?? "medium", ...(o.sema ? { format: { type: "json_schema", schema: o.sema } } : {}) },
     } as Anthropic.MessageCreateParamsNonStreaming);
