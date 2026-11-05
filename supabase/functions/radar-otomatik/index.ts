@@ -237,7 +237,7 @@ async function isle(sb: Sb, hizli = false) {
 // Künyedeki markaların, künyedeki türlerinde son 12 ayda resmî duyurduğu ya da satışa çıkardığı ürünleri Claude web aramasıyla bulunur;
 // künyede olmayanlar radar_adaylari'na islem_notu 'katalog' ile yazılır. Panel (site deposu lib/radar.ts) künyeyi açar, künye otomasyonu doldurur.
 // Bir turda en çok KATALOG_SINIR yeni ürün (Brave aylık sınırı künyeyle ortak: ürün başına ~3 arama). Marka 30 günde bir taranır
-// (tr_settings.katalog); süre biterse kalan markalar için kendini yeniden çağırır.
+// (tr_settings.katalog_v2; ilk sürüm kaynak adresini birebir aradığı için DJI'de hiç ürün eklememişti); süre biterse kalan markalar için kendini yeniden çağırır.
 const KATALOG_SINIR = 40;
 const KATALOG_SISTEM = `Bir Türkçe teknoloji sitesinin ürün künyesi editörüsün. Verilen markanın, verilen ürün türlerinde SON 12 AYDA resmî olarak duyurduğu ya da satışa çıkardığı ürünleri web'de arayarak bul (bugün: ${new Date().toISOString().slice(0, 10)}).
 Kurallar:
@@ -254,7 +254,7 @@ async function katalog(sb: Sb, sira: number) {
   const mevcut = ((await sb.rpc("radar_urunler")).data as Mevcut[] | null) ?? [];
   const { data: satirlar } = await sb.from("radar_adaylari").select("anahtar");
   const var_ = new Set([...mevcut.map((u) => anahtarYap(u.marka, u.ad)), ...((satirlar ?? []) as { anahtar: string }[]).map((x) => x.anahtar)]);
-  const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "katalog").maybeSingle();
+  const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "katalog_v2").maybeSingle();
   const kayit = (ky?.value ?? {}) as { markalar?: Record<string, string>; eklenen?: number; ay?: string };
   const ay = new Date().toISOString().slice(0, 7);
   const markalar: Record<string, string> = kayit.markalar ?? {};
@@ -263,22 +263,27 @@ async function katalog(sb: Sb, sira: number) {
   const grup = new Map<string, { turler: Set<string>; adlar: string[] }>();
   for (const u of mevcut) { const g = grup.get(u.marka) ?? { turler: new Set(), adlar: [] }; if (turler.includes(u.tur)) g.turler.add(u.tur); g.adlar.push(u.ad); grup.set(u.marka, g); }
   const sirali = [...grup.entries()].filter(([m, g]) => g.turler.size && Date.now() - Date.parse(markalar[m] ?? "1970") > 30 * 864e5).sort((a, b) => b[1].adlar.length - a[1].adlar.length);
-  const sonuc: { marka: string; eklenen: string[] }[] = [];
+  const sonuc: { marka: string; eklenen: string[]; reddedilen?: string[] }[] = [];
   for (const [marka, g] of sirali) {
     if (eklenen >= KATALOG_SINIR || Date.now() - t0 > 250_000) break;
     const c = await claudeAramali({ sistem: KATALOG_SISTEM, kullanici: `MARKA: ${marka}\nTÜRLER: ${[...g.turler].join(", ")}\nKÜNYEDE ZATEN OLANLAR: ${g.adlar.join(", ")}`, model: CLAUDE_MODEL.taslak, ms: 120_000, maxArama: 3, fonk: "radar-otomatik" }).catch((e) => { console.error("katalog", marka, e); return null; });
     if (!c) break; // Claude yok ya da hata: sonraki tur dener
     let v: { urunler?: { ad?: string; tur?: string; durum?: string; ay?: string; kaynak?: string }[] } = {};
     try { v = jsonAl(c.metin) as typeof v; } catch { /* boş */ }
-    const gorulen = new Set(c.adresler);
-    const yeni: string[] = [];
+    const gorulen = new Set(c.adresler.map(hostAl)); // kaynak sitesi aramada görülmüş olmalı (adres birebir aynı olmayabilir)
+    const yeni: string[] = [], reddedilen: string[] = [];
+    if (!Array.isArray(v.urunler)) { // marka işaretlenmez, sonraki tur yine dener; yanıtın sonu teşhis için kaydedilir
+      sonuc.push({ marka, eklenen: [], reddedilen: [`yanıt okunamadı (${c.adresler.length} arama sonucu): ${c.metin.slice(-240)}`] });
+      await sb.from("tr_settings").upsert({ key: "katalog_v2", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
+      continue;
+    }
     for (const u of Array.isArray(v.urunler) ? v.urunler : []) {
       if (eklenen >= KATALOG_SINIR) break;
       const ad = markasiz(marka, String(u?.ad ?? "")).trim().slice(0, 80);
-      if (!ad || !g.turler.has(String(u?.tur)) || !["satista", "duyuruldu"].includes(String(u?.durum))) continue;
-      if (!gorulen.has(String(u?.kaynak ?? ""))) continue; // kaynak uydurulmasın: aramada görülen adres olmalı
+      if (!ad || !g.turler.has(String(u?.tur)) || !["satista", "duyuruldu"].includes(String(u?.durum))) { reddedilen.push(`${ad}: tür/durum`); continue; }
+      if (!gorulen.has(hostAl(String(u?.kaynak ?? "")))) { reddedilen.push(`${ad}: kaynak aramada yok`); continue; } // kaynak uydurulmasın
       const k = anahtarYap(marka, ad);
-      if (var_.has(k)) continue;
+      if (var_.has(k)) { reddedilen.push(`${ad}: zaten var`); continue; }
       const simdi = new Date().toISOString();
       const ayx = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(u.ay ?? "")) ? `${u.ay}-01` : null;
       const { error } = await sb.from("radar_adaylari").upsert({ anahtar: k, marka, ad, tur: u.tur, durum: u.durum, tarih: ayx, tarih_notu: "", ozet: "", kaynaklar: [{ baslik: hostAl(String(u.kaynak)), url: u.kaynak }], haberler: [], kontrol_zamani: simdi, updated_at: simdi, islem: "bekliyor", islem_notu: "katalog" }, { onConflict: "anahtar" });
@@ -286,8 +291,8 @@ async function katalog(sb: Sb, sira: number) {
       var_.add(k); eklenen++; yeni.push(ad);
     }
     markalar[marka] = new Date().toISOString();
-    sonuc.push({ marka, eklenen: yeni });
-    await sb.from("tr_settings").upsert({ key: "katalog", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
+    sonuc.push({ marka, eklenen: yeni, reddedilen: reddedilen.slice(0, 10) });
+    await sb.from("tr_settings").upsert({ key: "katalog_v2", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
   }
   const kalan = sirali.filter(([m]) => !sonuc.some((x) => x.marka === m)).length;
   if (kalan && eklenen < KATALOG_SINIR && sonuc.length && sira < 10) {

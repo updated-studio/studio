@@ -161,9 +161,13 @@ type Inen = Aday & { mime: string; bayt: number; w: number; h: number; alfa: boo
 const KUCULT_MP = 7e6;
 async function indir(a: Aday): Promise<Inen | null> {
   const r = await fetch(a.url, { headers: { "User-Agent": UA, Accept: "image/webp,image/png,image/jpeg,image/*;q=0.8", Referer: a.sayfa }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
-  const mime = (r?.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  if (!r?.ok || !/^image\/(jpeg|png|webp)$/.test(mime) || Number(r.headers.get("content-length") ?? 0) > 12e6) { await r?.body?.cancel().catch(() => {}); return null; }
+  const bildirilen = (r?.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (!r?.ok || !/^image\/(jpeg|png|webp)$/.test(bildirilen) || Number(r.headers.get("content-length") ?? 0) > 12e6) { await r?.body?.cancel().catch(() => {}); return null; }
   let veri: Uint8Array | null = new Uint8Array(await r.arrayBuffer().catch(() => new ArrayBuffer(0)));
+  // Tür dosyanın ilk baytlarından (5 Kasım 2026: sunucu "png" deyip JPEG gönderiyordu, Claude 400 verip bütün seçimi düşürüyordu)
+  const mime = veri[0] === 0x89 && veri[1] === 0x50 ? "image/png" : veri[0] === 0xff && veri[1] === 0xd8 ? "image/jpeg"
+    : String.fromCharCode(...veri.slice(8, 12)) === "WEBP" ? "image/webp" : "";
+  if (!mime) return null;
   const bayt = veri.byteLength;
   if (bayt < 20_000 || bayt > 12e6) return null;
   const b = boyut(veri);
