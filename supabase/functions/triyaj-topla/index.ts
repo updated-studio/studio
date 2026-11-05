@@ -7,6 +7,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { aktif, aktifDeger, anahtarHatasi, anahtarYukle, isaretle, sonrakine } from "./anahtar.ts";
 import { KIYAS_MODELLERI, kiyasCagir } from "../triyaj-taslak/kiyas.ts";
+import { claudeJson, CLAUDE_MODEL } from "../triyaj-taslak/claude.ts";
 
 // Eski TR_AYAR
 const SAAT = 24;          // bundan eski haberler alınmaz
@@ -245,6 +246,12 @@ async function gemini(model: string, kullanici: string, sistem = SISTEM): Promis
     if (!(hepsiKota && await sonrakine("kota_dolu", String(son)))) break;
   }
   if (son && / 429:/.test(String(son))) GEMINI_TIKALI = String(son);
+  // 5 Kasım 2026: ücretsiz Gemini kotası dolunca (o gün 100 haber elenmeden bekledi) Claude Haiku devralır; kıyasta aynı işte ölçülen model,
+  // haber partisi başına kuruşun altında. Claude anahtarı/kredisi yoksa Groq.
+  try {
+    const c = await claudeJson({ sistem, kullanici, model: CLAUDE_MODEL.kucuk, ms: 120_000, maxTokens: 16_000, caba: "medium", fonk: "triyaj-topla" });
+    if (c) { YEDEK_KULLANILDI = true; return c.veri; }
+  } catch (e) { son = String(son) + " | Claude: " + String((e as Error).message ?? e).slice(0, 120); }
   if (Deno.env.get("GROQ_API_KEY")) {
     try { return await groq(kullanici, sistem); }
     catch (e) { throw new Error(String(son) + " | Yedek (Groq) da olmadı: " + String((e as Error).message ?? e).slice(0, 200)); }
