@@ -6,7 +6,7 @@ import { veriAlanlari, type KoleksiyonSema } from "./sema";
 // Toplu işlemler: listede seçilen kayıtlar tek tek işlenir (her biri panelin kurallarından geçer; olmayanın nedeni gösterilir).
 // Yayınla / yayından kaldır / incelemeye gönder / sil / bir alanı değiştir (taslak olarak kaydedilir, yayını değiştirmez).
 type Kayit = Record<string, unknown>;
-const YAYINCI = ["admin", "yayin-yonetmeni"];
+const YAYINCI = ["admin", "yayin-yonetmeni", "editor"]; // 5 Kasım 2026: editör de doğrudan yayınlar
 const TOPLU_TURLER = new Set(["text", "textarea", "email", "number", "checkbox", "select", "radio", "date", "relationship", "upload"]);
 
 export function Secim({ secili, id, degis }: { secili: Set<number>; id: number; degis: (s: Set<number>) => void }) {

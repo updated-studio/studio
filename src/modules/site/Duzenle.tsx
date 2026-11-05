@@ -19,7 +19,7 @@ import CanliOnizleme, { useCanliAcik } from "./CanliOnizleme";
 // Grup alanları (seo, workflow) bütün olarak gönderilir ki alt alanlar silinmesin. Bu ekranda özel çizilmeyen bütün alanlar
 // (kaynaklar, ürün künyesi, sızıntı, düzeltmeler, SEO/GEO'nun kalanı, hazırlayan…) panelin alan yapısından genel formla çizilir.
 const OZEL = new Set(["title", "spot", "category", "label", "cover", "shortAnswer", "body", "author", "publishedAt", "seo", "workflow"]);
-const YAYINCI = ["admin", "yayin-yonetmeni"];
+const YAYINCI = ["admin", "yayin-yonetmeni", "editor"]; // 5 Kasım 2026: editör de doğrudan yayınlar
 type Form = {
   title: string; spot: string; category: number | null; label: string; cover: number | null; shortAnswer: string;
   author: number | null; publishedAt: string; seoTitle: string; seoDescription: string; checklist: Record<string, boolean>; body: unknown;

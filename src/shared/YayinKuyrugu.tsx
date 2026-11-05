@@ -7,7 +7,7 @@ import { useAuth } from "./auth";
 import { istekYap, sayi, type Koleksiyon } from "../modules/site/api";
 
 export const GUNLUK_HEDEF = 5;
-const YAYINCI = ["admin", "yayin-yonetmeni"];
+const YAYINCI = ["admin", "yayin-yonetmeni", "editor"]; // 5 Kasım 2026: editör de doğrudan yayınlar
 const TURLER: Koleksiyon[] = ["news", "reviews", "comparisons"];
 
 /** İstanbul saatiyle bugünün başlangıcı (ISO) */

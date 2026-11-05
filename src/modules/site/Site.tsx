@@ -21,7 +21,7 @@ const HaberMasasi = lazy(() => import("../haber-masasi/HaberMasasi"));
 // genel ekranda (GenelListe/GenelDuzenle). Payload'un kendi paneli yedek olarak açık kalır.
 type Sekme = "taslak" | "incelemede" | "planlandi" | "yayinda" | "hepsi";
 const SEKMELER: [Sekme, string][] = [["taslak", "Taslaklar"], ["incelemede", "İncelemede"], ["planlandi", "Planlandı"], ["yayinda", "Yayında"], ["hepsi", "Tümü"]];
-const YAYINCI = ["admin", "yayin-yonetmeni"];
+const YAYINCI = ["admin", "yayin-yonetmeni", "editor"]; // 5 Kasım 2026: editör de doğrudan yayınlar
 
 const zaman = (s?: string) => {
   if (!s) return "";
