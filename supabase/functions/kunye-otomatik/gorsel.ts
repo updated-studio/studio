@@ -293,7 +293,8 @@ export async function gorerekSor(sistem: string, kullanici: string, resimler: (R
 }
 
 /** Adayları indirir (en çok 6 üretici + 4 bayi, uygun boyutlu), yapay zekâya tek seferde gösterir; uygunları iyiden kötüye ve albüm adaylarını döner */
-const URETICI_ADAY = 6, BAYI_ADAY = 4;
+const URETICI_ADAY = 6, BAYI_ADAY = 4, ALBUM_ADAY = 3;
+const SAHNE = /[-_/](?:kv|key[-_]?visual|lifestyle|life|scene|gallery|feature|hero|story|usage|inuse|in[-_]use|ambient|mood)(?:[-_/.\d]|$)/i;
 async function indirSec(o: { marka: string; ad: string; tur: string }, adaylar: Aday[], iz: string[]) {
   const tekil = adaylar.filter((a, i, l) => l.findIndex((x) => x.url === a.url) === i);
   const inen: Inen[] = [];
@@ -306,8 +307,12 @@ async function indirSec(o: { marka: string; ad: string; tur: string }, adaylar: 
       for (const a of yeni) if (n < sinir) { inen.push(a); n++; }
     }
   };
-  await doldur(tekil.filter((a) => !a.bayi).slice(0, 14), URETICI_ADAY);
+  const uretici = tekil.filter((a) => !a.bayi);
+  await doldur(uretici.slice(0, 14), URETICI_ADAY);
   await doldur(tekil.filter((a) => a.bayi).slice(0, 8), BAYI_ADAY);
+  // Albüm için: üreticinin sahne/ana görselleri (adresinde kv, lifestyle, gallery, feature… geçenler) ana görsel sırasında geride kalır
+  // (GERI); albüm adayı olarak en çok ALBUM_ADAY tanesi ayrıca indirilir ve aynı seçimde gösterilir
+  await doldur(uretici.slice(14).concat(uretici.slice(0, 14)).filter((a) => SAHNE.test(a.url) && !inen.some((b) => b.url === a.url)).slice(0, 8), ALBUM_ADAY);
   if (!inen.length) { iz.push(`görsel: ${tekil.length} aday indirilemedi/küçük`); return { essiz: inen, sira: [] as Inen[], album: [] as Inen[], v: null }; }
   const v = await gorerekSor(SECIM_SISTEM, `ÜRÜN: ${o.marka} ${o.ad} (${o.tur})\nAdaylar:\n${inen.map((a, i) => `Aday ${i + 1}: ${a.w}×${a.h}${a.alfa ? ", şeffaf zeminli PNG" : ""}, ${a.bayi ? "bayi/inceleme sitesi " : "üretici "}${hostAl(a.sayfa)}${a.alt ? `, "${a.alt}"` : ""}`).join("\n")}`,
     inen.map((a, i) => ({ ...a.onizleme, etiket: `Aday ${i + 1}` })), SECIM_SEMA, 90_000).catch(() => null);
