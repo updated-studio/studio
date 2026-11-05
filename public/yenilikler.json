@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-11-05-c",
+    "tarih": "5 Kasım 2026",
+    "baslik": "Künyeler yenileniyor",
+    "bolumler": [
+      {
+        "ad": "Künye onayı",
+        "maddeler": [
+          "Bekleyen künye önerileri yeni yöntemle baştan çıkarılıyor; yenisi gelince eskisi listeden kalkar.",
+          "Değerler önce üreticinin Türkiye sayfasından ve tek biçimde yazılır; ikinci bir yapay zekâ kaynağa karşı denetler, düzelttiğini yanında yazar.",
+          "Ürün görseli yalnız üreticiden gelir, düz zeminli ürün çekimi seçilir ve arka planı silinir.",
+          "Henüz çıkmamış ürünlere künye önerilmez."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-05-b",
     "tarih": "5 Kasım 2026",
     "baslik": "FLUX 3 ve logo",

@@ -3,15 +3,16 @@
 // Onay: değerler panelde ürünün özellik satırlarına yazılır (kaynak üreticinin sitesiyse "Üretici beyanı", değilse "Diğer yayın").
 // Görsel (27 Ekim 2026): kunye-otomatik ürün görselini bulur, sunucudaki işçi arka planı silip standart tuvale koyar (gorsel_durum "hazir").
 // Onaylarken "Görseli de künyeye koy" işaretliyse görsel panele yüklenir ve ürünün görseli olur (künye: "Görsel: Marka" ya da CC yazarı).
+// 5 Kasım 2026: ikinci gözün (Claude) düzelttiği, eklediği ve sildiği değerler ile görsel seçiminin gerekçesi editöre gösterilir.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sb, SUPABASE_URL } from "../../shared/supabase";
 import { useAuth } from "../../shared/auth";
 import { useToast } from "../../shared/toast";
 import { istekYap, medyaYukle } from "./api";
 
-type Oz = { key: string; value: string; num: number | null; kaynak: string | null; kanit: string };
-type GorselAday = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string };
-type Oneri = { id: number; urun_id: number; urun_adi: string; resmi_ad?: string | null; tur: string; ozellikler: Oz[]; kaynaklar: { baslik: string; url: string }[]; durum: string; hata: string | null; created_at: string;
+type Oz = { key: string; value: string; num: number | null; kaynak: string | null; kanit: string; islem?: "duzeltildi" | "eklendi"; not?: string; alinti?: boolean };
+type GorselAday = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string };
+type Oneri = { id: number; urun_id: number; urun_adi: string; resmi_ad?: string | null; tur: string; ozellikler: Oz[]; kaynaklar: { baslik: string; url: string; silinen?: { key: string; neden: string }[] }[]; durum: string; hata: string | null; created_at: string;
   gorsel?: string | null; gorsel_durum?: string; gorsel_aday?: GorselAday | null; gorsel_hata?: string | null };
 /** Görsel künyesi: üretici görseli "Görsel: Sony"; serbest lisanslıysa yazar ve lisans */
 const gorselKunye = (g: GorselAday | null | undefined, marka: string) => !g || g.kaynak === "Üretici" ? `Görsel: ${marka}` : `Fotoğraf: ${g.yazar} / ${g.kaynak} (${g.lisans})`;
@@ -112,7 +113,7 @@ export default function KunyeOnay() {
           {liste.map((o) => (
             <li key={o.id}>
               <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                <button className="linkbtn" onClick={() => setAcik(acik === o.id ? null : o.id)}><b>{o.urun_adi}</b> · {o.ozellikler.length} özellik önerisi</button>
+                <button className="linkbtn" onClick={() => setAcik(acik === o.id ? null : o.id)}><b>{o.urun_adi}</b> · {o.ozellikler.length} özellik önerisi{(() => { const d = o.ozellikler.filter((x) => x.islem).length; return d ? ` · ikinci göz ${d} değeri düzeltti/ekledi` : ""; })()}</button>
                 <div className="row" style={{ gap: 6 }}><button className="btn sm" onClick={() => onayla(o)}>Onayla</button><button className="btn ghost sm" onClick={() => reddet(o)}>Reddet</button></div>
               </div>
               {o.resmi_ad && <label className="muted" style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14 }}><input type="checkbox" checked={!adsiz[o.id]} onChange={(e) => setAdsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Adı da düzelt: <b>{o.resmi_ad}</b></label>}
@@ -121,6 +122,7 @@ export default function KunyeOnay() {
                   <img src={o.gorsel} alt={`${o.urun_adi} (arka planı silinmiş)`} loading="lazy" />
                   <div className="muted" style={{ fontSize: 13 }}>
                     {gorselKunye(o.gorsel_aday, o.urun_adi.split(" ")[0])}{o.gorsel_aday?.sayfa && <> · <a href={o.gorsel_aday.sayfa} target="_blank" rel="noreferrer">kaynak</a></>}
+                    {o.gorsel_aday?.neden && <div>Seçim: {o.gorsel_aday.neden}</div>}
                     <label style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}><input type="checkbox" checked={!gorselsiz[o.id]} onChange={(e) => setGorselsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Görseli de künyeye koy</label>
                   </div>
                 </div>
@@ -130,8 +132,11 @@ export default function KunyeOnay() {
               {acik === o.id && (
                 <div className="kd-tablo">
                   <table><thead><tr><th>Özellik</th><th>Değer</th><th>Kaynak</th></tr></thead>
-                    <tbody>{o.ozellikler.map((x) => <tr key={x.key}><th scope="row">{x.key}</th><td><b>{x.value}</b>{x.kanit && <div className="muted kd-kanit">“{x.kanit}”</div>}</td><td>{x.kaynak ? <a href={x.kaynak} target="_blank" rel="noreferrer">{alan(x.kaynak)}</a> : <span className="muted">—</span>}</td></tr>)}</tbody>
+                    <tbody>{o.ozellikler.map((x) => <tr key={x.key}><th scope="row">{x.key}</th><td><b>{x.value}</b>{x.kanit && <div className="muted kd-kanit">“{x.kanit}”</div>}
+                      {x.islem && <div className="muted kd-kanit">İkinci göz {x.islem === "eklendi" ? "ekledi" : "düzeltti"}{x.not ? `: ${x.not}` : ""}</div>}
+                      {x.alinti === false && <div className="muted kd-kanit">Alıntı kaynak sayfada birebir bulunamadı; değeri sayfadan kontrol et.</div>}</td><td>{x.kaynak ? <a href={x.kaynak} target="_blank" rel="noreferrer">{alan(x.kaynak)}</a> : <span className="muted">—</span>}</td></tr>)}</tbody>
                   </table>
+                  {(() => { const sil = o.kaynaklar.flatMap((k) => k.silinen ?? []); return sil.length ? <p className="muted kd-kanit">İkinci göz sildi: {sil.map((x) => `${x.key} (${x.neden})`).join(" · ")}</p> : null; })()}
                 </div>
               )}
             </li>
