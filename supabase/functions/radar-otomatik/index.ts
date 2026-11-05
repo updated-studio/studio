@@ -247,6 +247,7 @@ Kurallar:
 - "tur": verilen türlerden biri. "durum": satışa çıktıysa "satista", yalnız duyurulduysa "duyuruldu". "ay": çıkış ya da duyuru ayı "YYYY-AA".
 - "kaynak": bunu doğrulayan sayfa (tercihen markanın kendi sitesi ya da basın bülteni), aramada gördüğün adres.
 - Künyede zaten olanları tekrar yazma. Türkiye'de satılmayan bölgeye özel modelleri yazma.
+Önce ara: her tür için en az bir arama yap (ör. "<marka> new <tür> announced 2026", "<marka> launches"); bilgine değil arama sonuçlarına dayan. Bulduğun her ürünü yaz, emin olmadığını yazma.
 En önemli en çok 8 ürün. Yanıtın sonunda YALNIZ şu JSON: {"urunler":[{"ad":"","tur":"","durum":"satista","ay":"2026-03","kaynak":"https://..."}]}`;
 async function katalog(sb: Sb, sira: number) {
   const t0 = Date.now();
@@ -254,7 +255,7 @@ async function katalog(sb: Sb, sira: number) {
   const mevcut = ((await sb.rpc("radar_urunler")).data as Mevcut[] | null) ?? [];
   const { data: satirlar } = await sb.from("radar_adaylari").select("anahtar");
   const var_ = new Set([...mevcut.map((u) => anahtarYap(u.marka, u.ad)), ...((satirlar ?? []) as { anahtar: string }[]).map((x) => x.anahtar)]);
-  const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "katalog_v2").maybeSingle();
+  const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "katalog_v3").maybeSingle();
   const kayit = (ky?.value ?? {}) as { markalar?: Record<string, string>; eklenen?: number; ay?: string };
   const ay = new Date().toISOString().slice(0, 7);
   const markalar: Record<string, string> = kayit.markalar ?? {};
@@ -266,15 +267,15 @@ async function katalog(sb: Sb, sira: number) {
   const sonuc: { marka: string; eklenen: string[]; reddedilen?: string[] }[] = [];
   for (const [marka, g] of sirali) {
     if (eklenen >= KATALOG_SINIR || Date.now() - t0 > 250_000) break;
-    const c = await claudeAramali({ sistem: KATALOG_SISTEM, kullanici: `MARKA: ${marka}\nTÜRLER: ${[...g.turler].join(", ")}\nKÜNYEDE ZATEN OLANLAR: ${g.adlar.join(", ")}`, model: CLAUDE_MODEL.taslak, ms: 120_000, maxArama: 3, fonk: "radar-otomatik" }).catch((e) => { console.error("katalog", marka, e); return null; });
+    const c = await claudeAramali({ sistem: KATALOG_SISTEM, kullanici: `MARKA: ${marka}\nTÜRLER: ${[...g.turler].join(", ")}\nKÜNYEDE ZATEN OLANLAR: ${g.adlar.join(", ")}`, model: CLAUDE_MODEL.taslak, ms: 120_000, maxArama: 5, fonk: "radar-otomatik" }).catch((e) => { console.error("katalog", marka, e); return null; });
     if (!c) break; // Claude yok ya da hata: sonraki tur dener
     let v: { urunler?: { ad?: string; tur?: string; durum?: string; ay?: string; kaynak?: string }[] } = {};
     try { v = jsonAl(c.metin) as typeof v; } catch { /* boş */ }
     const gorulen = new Set(c.adresler.map(hostAl)); // kaynak sitesi aramada görülmüş olmalı (adres birebir aynı olmayabilir)
     const yeni: string[] = [], reddedilen: string[] = [];
-    if (!Array.isArray(v.urunler)) { // marka işaretlenmez, sonraki tur yine dener; yanıtın sonu teşhis için kaydedilir
-      sonuc.push({ marka, eklenen: [], reddedilen: [`yanıt okunamadı (${c.adresler.length} arama sonucu): ${c.metin.slice(-240)}`] });
-      await sb.from("tr_settings").upsert({ key: "katalog_v2", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
+    if (!Array.isArray(v.urunler) || !v.urunler.length) { // boş ya da okunamayan yanıt: marka işaretlenmez, sonraki tur yine dener; yanıtın sonu teşhis için kaydedilir
+      sonuc.push({ marka, eklenen: [], reddedilen: [`${Array.isArray(v.urunler) ? "boş liste" : "yanıt okunamadı"} (${c.adresler.length} arama sonucu): ${c.metin.slice(-240)}`] });
+      await sb.from("tr_settings").upsert({ key: "katalog_v3", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
       continue;
     }
     for (const u of Array.isArray(v.urunler) ? v.urunler : []) {
@@ -292,7 +293,7 @@ async function katalog(sb: Sb, sira: number) {
     }
     markalar[marka] = new Date().toISOString();
     sonuc.push({ marka, eklenen: yeni, reddedilen: reddedilen.slice(0, 10) });
-    await sb.from("tr_settings").upsert({ key: "katalog_v2", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
+    await sb.from("tr_settings").upsert({ key: "katalog_v3", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
   }
   const kalan = sirali.filter(([m]) => !sonuc.some((x) => x.marka === m)).length;
   if (kalan && eklenen < KATALOG_SINIR && sonuc.length && sira < 10) {
