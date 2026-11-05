@@ -12,6 +12,12 @@
           "Klasör ya da sayfa kilitlenebilir; yalnız seçilen kişiler görür.",
           "Notlarda yazdığın günler katkı puanına az da olsa sayılır."
         ]
+      },
+      {
+        "ad": "Amazon",
+        "maddeler": [
+          "Bağlantı anahtarları'nda Amazon ortaklık satırı: anahtarlar girilince ürün sayfasında Amazon Türkiye fiyatı ve bağlantısı görünür."
+        ]
       }
     ]
   },

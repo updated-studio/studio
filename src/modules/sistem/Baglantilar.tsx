@@ -90,6 +90,19 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ],
   },
   {
+    ad: "amazon_kimlik", baslik: "Amazon: kimlik (Credential ID)", ikon: "site",
+    aciklama: "Amazon Ortaklık Programı'nın Creators API kimliği. Ürün sayfasında Amazon Türkiye fiyatı ve ortaklık bağlantısı bununla gelir.",
+    adimlar: [
+      { metin: "Amazon Ortaklık hesabına (Associates Central, Türkiye mağazası) gir; menüde Creators API bölümünü aç" },
+      { metin: "\"Create Application\" (Uygulama oluştur) → ad: updated-site. Amazon belgeleri", link: "https://affiliate-program.amazon.com/creatorsapi/docs/en-us/get-started/using-curl" },
+      { metin: "\"Add New Credential\" (Yeni kimlik ekle). Çıkan Credential ID, Credential Secret ve Version değerlerini not al; Secret yalnız bir kez gösterilir" },
+      { metin: "Credential ID'yi aşağıya yapıştır → Kaydet. Anahtarı sohbete yapıştırma" },
+    ],
+  },
+  { ad: "amazon_gizli", baslik: "Amazon: gizli anahtar (Credential Secret)", ikon: "yonetim", aciklama: "", adimlar: [{ metin: "Aynı ekrandaki Credential Secret'ı yapıştır → Kaydet" }] },
+  { ad: "amazon_surum", baslik: "Amazon: kimlik sürümü (Version)", ikon: "yonetim", aciklama: "", adimlar: [{ metin: "Kimliğin yanında yazan sürüm (Türkiye için genelde 3.2) → Kaydet" }] },
+  { ad: "amazon_etiket", baslik: "Amazon: ortaklık etiketi (Partner Tag)", ikon: "yonetim", aciklama: "", adimlar: [{ metin: "Ortaklık hesabının sağ üstündeki izleme kimliği (ör. updated-21) → Kaydet" }] },
+  {
     ad: "cloudflare_anahtar", baslik: "Cloudflare görsel programı: anahtar", ikon: "yonetim",
     aciklama: "Programa yalnız bizim sistemimizin erişebilmesi için ortak şifre. Cloudflare'de ANAHTAR adıyla girdiğin şifrenin aynısı.",
     adimlar: [{ metin: "Yukarıdaki 5. adımda oluşturduğun şifreyi buraya yapıştır → Kaydet" }],
@@ -110,6 +123,9 @@ function bicimHatasi(ad: string, v: string): string {
   if (ad === "openai" && !/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) return "Bu OpenAI anahtarına benzemiyor: anahtar sk- ile başlar.";
   if (ad === "gemini_gorsel" && !/^[A-Za-z0-9._-]{30,200}$/.test(v)) return "Bu Google anahtarına benzemiyor. AI Studio'da anahtarın satırındaki kopyala simgesine bas.";
   if (ad === "cloudflare_anahtar" && v.length < 24) return "Anahtar en az 24 karakter olmalı.";
+  if (ad === "amazon_etiket" && !/^[A-Za-z0-9_-]{3,64}$/.test(v)) return "Ortaklık etiketi yalnız harf, rakam ve tire içerir (ör. updated-21).";
+  if (ad === "amazon_surum" && !/^[23]\.[123]$/.test(v)) return "Sürüm 3.1, 3.2, 3.3 ya da 2.1-2.3 olmalı; Türkiye için genelde 3.2.";
+  if ((ad === "amazon_kimlik" || ad === "amazon_gizli") && (v.length < 20 || /\s/.test(v))) return "Bu Amazon kimlik bilgisine benzemiyor; Associates Central'daki değeri eksiksiz kopyala.";
   return "";
 }
 
@@ -118,12 +134,12 @@ function bicimHatasi(ad: string, v: string): string {
 // solda adımlar ve anahtar kutusu, sağda ne için / ücret / olmazsa.
 type Servis = {
   id: string; grup: "yazi" | "gorsel" | "site"; logo: string; ad: string; ne: string; anahtarlar: string[];
-  neIcin: string; ucret: string; olmazsa: string; eylem?: "claude" | "cloudflare" | "instagram" | "gemini" | "brave";
+  neIcin: string; ucret: string; olmazsa: string; eylem?: "claude" | "cloudflare" | "instagram" | "gemini" | "brave" | "amazon";
 };
 const GRUPLAR: { id: Servis["grup"]; ad: string; ne: string }[] = [
   { id: "yazi", ad: "Yazı ve denetim", ne: "Taslağı yazar, kaynaklara karşı denetler. Biri yoksa diğeri devralır." },
   { id: "gorsel", ad: "Görsel", ne: "Fotoğraf bulunamayan haberde görsel üretir; modeller kıyaslanır. Künye görsellerinin arka planını siler." },
-  { id: "site", ad: "Site ve veri", ne: "Sitedeki Reels ve künye otomasyonu." },
+  { id: "site", ad: "Site ve veri", ne: "Sitedeki Reels, künye otomasyonu ve Amazon fiyatları." },
 ];
 const SERVISLER: Servis[] = [
   { id: "claude", grup: "yazi", logo: "claude", ad: "Claude", ne: "Taslağı yazar (Sonnet), denetler (Opus)", anahtarlar: ["claude"], eylem: "claude",
@@ -140,10 +156,14 @@ const SERVISLER: Servis[] = [
     neIcin: "Görsel model kıyası: FLUX'un en yeni nesli. Cloudflare'de olmadığı için kendi servisinden.", ucret: "Görsel başı Klein ~1 sent, Image ~5 sent; BFL kredisinden.", olmazsa: "Kıyas diğer modellerle sürer." },
   { id: "instagram", grup: "site", logo: "instagram", ad: "Instagram", ne: "Sitedeki Reels sütunu için son videoları çeker", anahtarlar: ["instagram"], eylem: "instagram",
     neIcin: "Sitedeki Reels sütunu. Anahtar yalnız okuma izni taşır, paylaşım yapamaz.", ucret: "Ücretsiz. Süresi 60 gün; sistem dolmadan kendisi yeniler.", olmazsa: "Reels sütunu YouTube kısa videolarını gösterir." },
+  { id: "amazon", grup: "site", logo: "amazon", ad: "Amazon ortaklık", ne: "Ürün sayfasında Amazon Türkiye fiyatı ve bağlantısı", anahtarlar: ["amazon_kimlik", "amazon_gizli", "amazon_surum", "amazon_etiket"], eylem: "amazon",
+    neIcin: "Günde iki kez çıkmış ürünlerin Amazon Türkiye fiyatını yeniler; eşleşmemiş ürünü arar, yapay zekâ tam modeli seçer. Sitede ürün sayfasında fiyat ve ortaklık bağlantısı.", ucret: "Ücretsiz (Amazon Ortaklık Programı). Eşleştirmede Claude Haiku ürün başına bir kez, kuruşluk.", olmazsa: "Ürün sayfasında Amazon kutusu görünmez." },
   { id: "brave", grup: "site", logo: "brave", ad: "Brave arama", ne: "Künye, resmî video ve haber içi resmî görsel araması", anahtarlar: ["brave_arama"], eylem: "brave",
     neIcin: "Künye otomasyonu ürünün resmî sayfasını bulur; taslakta resmî fragman ve yazı içi resmî görsel aranır.", ucret: "Ücretsiz planla; sistem ayda en çok 700 arama yapar (künye, video, görsel ortak).", olmazsa: "Künye otomasyonu özellikleri bulamaz." },
 ];
-const ADLAR: Record<string, string> = { cloudflare_adres: "Programın adresi", cloudflare_anahtar: "Ortak şifre (ANAHTAR)" };
+const ADLAR: Record<string, string> = { cloudflare_adres: "Programın adresi", cloudflare_anahtar: "Ortak şifre (ANAHTAR)",
+  amazon_kimlik: "Credential ID", amazon_gizli: "Credential Secret", amazon_surum: "Version (ör. 3.2)", amazon_etiket: "Partner Tag (ör. updated-21)" };
+const ACIK_DEGER = new Set(["amazon_surum", "amazon_etiket"]); // gizli olmayan kısa değerler
 const kisaTarih = (s?: string) => (s ? new Date(s).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) : "");
 
 export default function Baglantilar() {
@@ -193,6 +213,14 @@ export default function Baglantilar() {
   async function dene(s: Servis) {
     if (s.eylem === "instagram") return instagramCek();
     if (s.eylem === "gemini") { setAcik(acik === s.id ? "" : s.id); return; }
+    if (s.eylem === "amazon") {
+      setMesgul(s.id + "-dene");
+      const { data, error } = await sb.functions.invoke("amazon-fiyat", { body: { dene: true } });
+      setMesgul("");
+      const a = (error ? { ok: false, mesaj: error.message } : data) as { ok?: boolean; mesaj?: string };
+      setSonuc((x) => ({ ...x, amazon: { ok: !!a.ok, metin: a.mesaj ?? "Yanıt yok" } }));
+      await yukle(); return;
+    }
     setMesgul(s.id + "-dene");
     const { data, error } = await sb.functions.invoke("triyaj-taslak", { body: s.eylem === "claude" ? { claude_dene: true } : s.eylem === "brave" ? { brave_dene: true } : { uret_dene: true } });
     setMesgul("");
@@ -262,7 +290,7 @@ export default function Baglantilar() {
                                 {d?.ek?.hata && <div className="msg err">{d.ek.hata}</div>}
                                 <label>{ADLAR[ad] ?? (d ? "Yeni anahtar (eskisinin yerine geçer)" : "Anahtar")}
                                   <span className="bg-birlesik">
-                                    <input type="password" autoComplete="off" spellCheck={false} value={deger[ad] ?? ""} onChange={(e) => setDeger((x) => ({ ...x, [ad]: e.target.value }))} placeholder="Buraya yapıştır" />
+                                    <input type={ACIK_DEGER.has(ad) ? "text" : "password"} autoComplete="off" spellCheck={false} value={deger[ad] ?? ""} onChange={(e) => setDeger((x) => ({ ...x, [ad]: e.target.value }))} placeholder="Buraya yapıştır" />
                                     <button className="btn" disabled={!!mesgul || !(deger[ad] ?? "").trim()} onClick={() => kaydet(ad)}>{mesgul === ad ? "Kaydediliyor…" : "Kaydet"}</button>
                                   </span>
                                 </label>
