@@ -195,6 +195,11 @@ async function ikinciGoz(istem: string, metin: string, ozellikler: unknown[], ms
 }
 
 /** bitis: bu ürün için son an (işçi 400 sn'de kesilir; ikinci göz süresi yetmiyorsa atlanır) */
+/** Alıntı gerçekten kaynak sayfada geçiyor mu (editör görür) */
+function alintiIsaretle(v: { ozellikler?: unknown }, sayfalar: Sayfa[]) {
+  const sayfaMetni = new Map(sayfalar.map((x) => [x.url, kucukHarf(x.metin)]));
+  for (const o of (Array.isArray(v.ozellikler) ? v.ozellikler : []) as { kaynak?: string; kanit?: string; alinti?: boolean }[]) { const k = kucukHarf(String(o.kanit ?? "")); o.alinti = k.length >= 3 && !!sayfaMetni.get(String(o.kaynak))?.includes(k); }
+}
 async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date.now() + 300_000) {
   const anahtarlar = await geminiAnahtarlari();
   if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
@@ -244,13 +249,26 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date
           const say = (i: string) => v.ozellikler.filter((o: { islem?: string }) => o.islem === i).length;
           SAYFA_TESHIS += ` → ikinci göz: ${say("duzeltildi")} düzeltme, ${say("eklendi")} ek, ${v.silinen.length} silme`;
         } else if (goz === null) SAYFA_TESHIS += " · ikinci göz yok (Claude anahtarı/kredisi)";
-        // Alıntı gerçekten kaynak sayfada geçiyor mu (editör görür)
-        const sayfaMetni = new Map(sayfalar.map((x) => [x.url, kucukHarf(x.metin)]));
-        for (const o of (v.ozellikler ?? []) as { kaynak?: string; kanit?: string; alinti?: boolean }[]) { const k = kucukHarf(String(o.kanit ?? "")); o.alinti = k.length >= 3 && !!sayfaMetni.get(String(o.kaynak))?.includes(k); }
+        alintiIsaretle(v, sayfalar);
         return { v, ham, sayfalar, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })), girdi: { kullanici: `${istem}\n\nSAYFALAR:\n${metin}`, sayfalar, model } };
       } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
     }
     if (hepsiKota) await isaretle(a, "kota_dolu", son); }
+    // Gemini olmadıysa (ücretsiz kota bitti ya da hata) okunan sayfalardan Claude Sonnet çıkarır (5 Kasım 2026: Groq'un kendi araması
+    // ikinci gözsüz ve zayıf kalıyordu); denetçiyle aynı model olduğundan ikinci göz atlanır, kıyasa girmez
+    const sure = Math.min(150_000, bitis - Date.now() - 90_000);
+    if (sure >= 30_000) {
+      const c = await claudeJson({ sistem: OKU_SISTEM, kullanici: `${istem}\n\nSAYFALAR:\n${metin}`, model: GOZ_MODEL, ms: sure, maxTokens: 16_000, caba: "medium", fonk: "kunye-otomatik" })
+        .catch((e) => { son += ` | Claude: ${String((e as Error).message ?? e).slice(0, 80)}`; return null; });
+      const v = c?.veri;
+      if (v && Array.isArray(v.ozellikler)) {
+        v.ozellikler = v.ozellikler.filter((o: { kaynak?: string }) => izinli.has(String(o?.kaynak ?? "")));
+        if (v.urunSayfasi && !izinli.has(v.urunSayfasi)) v.urunSayfasi = sayfalar.find((x) => x.resmi)?.url ?? null;
+        SAYFA_TESHIS += ` → Gemini yok, ${GOZ_MODEL} çıkardı`;
+        alintiIsaretle(v, sayfalar);
+        return { v, ham: v, sayfalar, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })) };
+      }
+    }
   } else son = adaylar.length ? `Sayfalar okunamadı (${SAYFA_TESHIS})` : `Sayfa adayı yok (${SAYFA_TESHIS || "Brave anahtarı girilmemiş"})`;
   // 2) Yedek: sayfa okunamadıysa ya da Gemini olmadıysa Groq kendi web aramasıyla dener.
   // Groq'ta gpt-oss modelleri yerleşik web aramasıyla (browser_search) aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
