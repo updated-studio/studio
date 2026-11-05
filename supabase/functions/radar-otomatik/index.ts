@@ -247,7 +247,7 @@ Kurallar:
 - "tur": verilen türlerden biri. "durum": satışa çıktıysa "satista", yalnız duyurulduysa "duyuruldu". "ay": çıkış ya da duyuru ayı "YYYY-AA".
 - "kaynak": bunu doğrulayan sayfa (tercihen markanın kendi sitesi ya da basın bülteni), aramada gördüğün adres.
 - Künyede zaten olanları tekrar yazma. Türkiye'de satılmayan bölgeye özel modelleri yazma.
-Önce ara: her tür için en az bir arama yap (ör. "<marka> new <tür> announced 2026", "<marka> launches"); bilgine değil arama sonuçlarına dayan. Bulduğun her ürünü yaz, emin olmadığını yazma.
+Önce ara: türlere göre birkaç arama yap (ör. "<marka> new <tür> announced 2026", "<marka> launches"); bilgine değil arama sonuçlarına dayan. Arama hakkın sınırlıdır; hak bitince ("arama sınırı" uyarısı) yeni arama isteme, o ana kadarki sonuçlarda doğrulanan ürünleri yaz. Emin olmadığını yazma.
 En önemli en çok 8 ürün. Yanıtın sonunda YALNIZ şu JSON: {"urunler":[{"ad":"","tur":"","durum":"satista","ay":"2026-03","kaynak":"https://..."}]}`;
 async function katalog(sb: Sb, sira: number) {
   const t0 = Date.now();
@@ -267,7 +267,7 @@ async function katalog(sb: Sb, sira: number) {
   const sonuc: { marka: string; eklenen: string[]; reddedilen?: string[] }[] = [];
   for (const [marka, g] of sirali) {
     if (eklenen >= KATALOG_SINIR || Date.now() - t0 > 250_000) break;
-    const c = await claudeAramali({ sistem: KATALOG_SISTEM, kullanici: `MARKA: ${marka}\nTÜRLER: ${[...g.turler].join(", ")}\nKÜNYEDE ZATEN OLANLAR: ${g.adlar.join(", ")}`, model: CLAUDE_MODEL.taslak, ms: 120_000, maxArama: 5, fonk: "radar-otomatik" }).catch((e) => { console.error("katalog", marka, e); return null; });
+    const c = await claudeAramali({ sistem: KATALOG_SISTEM, kullanici: `MARKA: ${marka}\nTÜRLER: ${[...g.turler].join(", ")}\nKÜNYEDE ZATEN OLANLAR: ${g.adlar.join(", ")}`, model: CLAUDE_MODEL.taslak, ms: 120_000, maxArama: 8, fonk: "radar-otomatik" }).catch((e) => { console.error("katalog", marka, e); return null; });
     if (!c) break; // Claude yok ya da hata: sonraki tur dener
     let v: { urunler?: { ad?: string; tur?: string; durum?: string; ay?: string; kaynak?: string }[] } = {};
     try { v = jsonAl(c.metin) as typeof v; } catch { /* boş */ }
