@@ -372,7 +372,9 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
   await yaz({ gorsel_durum: "hata", gorsel_hata: son.slice(0, 200) });
 }
 
-const kotaDolu = (m: string) => /\b429\b|RESOURCE_EXHAUSTED|quota/i.test(m);
+// Yalnız yapay zekâ kotası (5 Kasım 2026: üretici sitesinin "429 çok fazla istek" yanıtı da kota sanılıyordu; ürün işaretlenmediği için
+// her tur aynı ürüne takılıyor, zincir de duruyordu). Sayfa okuma durumları ("shop.panasonic.com 429") sayılmaz.
+const kotaDolu = (m: string) => /RESOURCE_EXHAUSTED|quota|\b(gemini-[\w.-]+|Groq [\w/.-]+) 429\b/i.test(m);
 // Künye yalnız çıkmış ürüne (5 Kasım 2026, kullanıcı onayı): söylenti, sızıntı, test kaydı, takvimdeki ürün atlanır
 const CIKMIS = new Set(["satista", "duyuruldu", "eol"]);
 // Yöntem sürümü: değişince eski yöntemin bekleyen önerileri yeniden çıkarılır (yenisi gelince eskisi "hata: yerine yeni öneri geldi" olur).
