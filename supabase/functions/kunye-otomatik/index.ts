@@ -11,7 +11,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
 import { KIYAS_MODELLERI, kiyasCagir } from "../triyaj-taslak/kiyas.ts";
-import { claudeJson } from "../triyaj-taslak/claude.ts";
+import { claudeAramali, claudeJson } from "../triyaj-taslak/claude.ts";
 import { kesimDenetle, seffafTuval, ureticiAlani, urunGorseliBul, type UrunGorseli } from "./gorsel.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -272,7 +272,22 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date
       }
     }
   } else son = adaylar.length ? `Sayfalar okunamadı (${SAYFA_TESHIS})` : `Sayfa adayı yok (${SAYFA_TESHIS || "Brave anahtarı girilmemiş"})`;
-  // 2) Yedek: sayfa okunamadıysa ya da Gemini olmadıysa Groq kendi web aramasıyla dener.
+  // 2) Sayfa okunamadıysa (üretici sitesi sunucumuzu engelliyor; Panasonic 403/429) Claude kendi web aramasıyla dener
+  //    (5 Kasım 2026: Groq'un günlük sınırı dolunca bu ürünler her turda takılıyordu). Kaynak yalnız aramada görülen adreslerden olabilir.
+  const sureA = Math.min(170_000, bitis - Date.now() - 100_000);
+  if (sureA >= 60_000) {
+    const c = await claudeAramali({ sistem: SISTEM, kullanici: istem, model: GOZ_MODEL, ms: sureA, maxArama: 5, fonk: "kunye-otomatik" })
+      .catch((e) => { son += ` | Claude arama: ${String((e as Error).message ?? e).slice(0, 80)}`; return null; });
+    const v = c ? jsonOku(c.metin) : null;
+    if (c && v && Array.isArray(v.ozellikler)) {
+      const gorulen = new Set(c.adresler);
+      v.ozellikler = v.ozellikler.filter((o: { kaynak?: string }) => gorulen.has(String(o?.kaynak ?? "")));
+      SAYFA_TESHIS += ` → sayfa okunamadı, ${GOZ_MODEL} web aramasıyla buldu`;
+      const kaynaklar = [...new Set(v.ozellikler.map((o: { kaynak: string }) => o.kaynak))].slice(0, 12).map((url) => ({ baslik: "", url: url as string }));
+      return { v, kaynaklar };
+    }
+  }
+  // 3) Son yedek: Groq kendi web aramasıyla dener.
   // Groq'ta gpt-oss modelleri yerleşik web aramasıyla (browser_search) aynı istemle denenir; kaynaklar modelin yaptığı aramalardan alınır.
   // ("groq/compound" bu hesapta yok: 404, 31 Ekim 2026)
   const groq = Deno.env.get("GROQ_API_KEY");
@@ -374,7 +389,8 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
 
 // Yalnız yapay zekâ kotası (5 Kasım 2026: üretici sitesinin "429 çok fazla istek" yanıtı da kota sanılıyordu; ürün işaretlenmediği için
 // her tur aynı ürüne takılıyor, zincir de duruyordu). Sayfa okuma durumları ("shop.panasonic.com 429") sayılmaz.
-const kotaDolu = (m: string) => /RESOURCE_EXHAUSTED|quota|\b(gemini-[\w.-]+|Groq [\w/.-]+) 429\b/i.test(m);
+// Groq'un günlük sınırı kota sayılmaz (son yedek; dolduğunda ürün hata olarak işaretlenir, zincir sürer).
+const kotaDolu = (m: string) => /RESOURCE_EXHAUSTED|\bgemini-[\w.-]+ 429\b|exceeded your current quota/i.test(m);
 // Künye yalnız çıkmış ürüne (5 Kasım 2026, kullanıcı onayı): söylenti, sızıntı, test kaydı, takvimdeki ürün atlanır
 const CIKMIS = new Set(["satista", "duyuruldu", "eol"]);
 // Yöntem sürümü: değişince eski yöntemin bekleyen önerileri yeniden çıkarılır (yenisi gelince eskisi "hata: yerine yeni öneri geldi" olur).
