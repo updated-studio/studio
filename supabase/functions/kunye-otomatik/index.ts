@@ -385,11 +385,11 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
   // Aday ürünler: tek ürün istendiyse o; yoksa çıkmış, değerlerinin yarısından azı dolu ve bu yöntemle bekleyen önerisi olmayanlar
   let urunler: Urun[] = [];
   if (Number.isInteger(b.urun_id)) {
-    const r = await fetch(`${PANEL}/api/products/${b.urun_id}?depth=0`); if (r.ok) urunler = [await r.json()];
+    const r = await fetch(`${PANEL}/api/products/${b.urun_id}?depth=0`, { signal: AbortSignal.timeout(20_000) }); if (r.ok) urunler = [await r.json()];
     const u = urunler[0];
     if (u && !CIKMIS.has(u.status ?? "satista")) return { islenen: [{ urun: `${u.brand} ${u.name}`, durum: "henüz çıkmadı" }], kalan: 0 };
   } else {
-    const r = await fetch(`${PANEL}/api/products?limit=500&depth=0&sort=updatedAt&select[name]=true&select[brand]=true&select[type]=true&select[status]=true&select[specs]=true`);
+    const r = await fetch(`${PANEL}/api/products?limit=500&depth=0&sort=updatedAt&select[name]=true&select[brand]=true&select[type]=true&select[status]=true&select[specs]=true`, { signal: AbortSignal.timeout(30_000) }); // panel takılırsa tur asılı kalmasın (5 Kasım 2026 kesintisi)
     const tum: Urun[] = r.ok ? (await r.json()).docs : [];
     const cikmamis = tum.filter((u) => !CIKMIS.has(u.status ?? "satista")).map((u) => u.id);
     if (cikmamis.length) await sb.from("kunye_oneriler").update({ durum: "hata", hata: "Ürün henüz çıkmadı; çıkınca künye yeniden çıkarılır" }).eq("durum", "bekliyor").in("urun_id", cikmamis);

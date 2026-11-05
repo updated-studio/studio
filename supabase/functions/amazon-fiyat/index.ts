@@ -116,7 +116,7 @@ async function panelYaz(urunler: Record<string, unknown>[]) {
 async function calis(sb: Sb) {
   const k = await kimlik(sb);
   if (!k) return { atlandi: "Amazon anahtarları girilmemiş" };
-  const r = await fetch(`${PANEL}/api/products?limit=1000&depth=0&select[name]=true&select[brand]=true&select[type]=true&select[status]=true&select[amazonAsin]=true&select[amazonGizle]=true`);
+  const r = await fetch(`${PANEL}/api/products?limit=1000&depth=0&select[name]=true&select[brand]=true&select[type]=true&select[status]=true&select[amazonAsin]=true&select[amazonGizle]=true`, { signal: AbortSignal.timeout(30_000) });
   if (!r.ok) throw new Error(`Ürün listesi alınamadı (${r.status})`);
   const tum = ((await r.json()).docs as Urun[]).filter((u) => CIKMIS.has(u.status ?? "satista") && !u.amazonGizle);
   const yaz: Record<string, unknown>[] = [];
