@@ -7,7 +7,7 @@
 // Günde bir tur, turda en çok ARAMA_MAX arama (Gemini kotası). Zamanlayıcı sunucu içinden çağırır; Stüdyo'dan yönetici elle başlatabilir.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
-import { claudeJson, CLAUDE_MODEL } from "../triyaj-taslak/claude.ts";
+import { claudeAramali, claudeJson, CLAUDE_MODEL, jsonAl } from "../triyaj-taslak/claude.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -233,6 +233,69 @@ async function isle(sb: Sb, hizli = false) {
   return ozet;
 }
 
+// ---------- Katalog (5 Kasım 2026, kullanıcı: "künyeye güncel markaların son ürünlerini ekle") ----------
+// Künyedeki markaların, künyedeki türlerinde son 12 ayda resmî duyurduğu ya da satışa çıkardığı ürünleri Claude web aramasıyla bulunur;
+// künyede olmayanlar radar_adaylari'na islem_notu 'katalog' ile yazılır. Panel (site deposu lib/radar.ts) künyeyi açar, künye otomasyonu doldurur.
+// Bir turda en çok KATALOG_SINIR yeni ürün (Brave aylık sınırı künyeyle ortak: ürün başına ~3 arama). Marka 30 günde bir taranır
+// (tr_settings.katalog); süre biterse kalan markalar için kendini yeniden çağırır.
+const KATALOG_SINIR = 40;
+const KATALOG_SISTEM = `Bir Türkçe teknoloji sitesinin ürün künyesi editörüsün. Verilen markanın, verilen ürün türlerinde SON 12 AYDA resmî olarak duyurduğu ya da satışa çıkardığı ürünleri web'de arayarak bul (bugün: ${new Date().toISOString().slice(0, 10)}).
+Kurallar:
+- Yalnız markanın resmî duyurusu yapılmış, belirli model adı olan donanımlar. Söylenti, sızıntı, sertifika kaydı OLMAZ.
+- Aksesuar, kılıf, kit/paket, yazılım, renk ya da depolama seçeneği ayrı ürün sayılmaz.
+- "ad": tam resmî model adı, marka adı olmadan (ör. "Osmo Pocket 4", "FE 50mm F1.4 GM", "Galaxy S26 Ultra").
+- "tur": verilen türlerden biri. "durum": satışa çıktıysa "satista", yalnız duyurulduysa "duyuruldu". "ay": çıkış ya da duyuru ayı "YYYY-AA".
+- "kaynak": bunu doğrulayan sayfa (tercihen markanın kendi sitesi ya da basın bülteni), aramada gördüğün adres.
+- Künyede zaten olanları tekrar yazma. Türkiye'de satılmayan bölgeye özel modelleri yazma.
+En önemli en çok 8 ürün. Yanıtın sonunda YALNIZ şu JSON: {"urunler":[{"ad":"","tur":"","durum":"satista","ay":"2026-03","kaynak":"https://..."}]}`;
+async function katalog(sb: Sb, sira: number) {
+  const t0 = Date.now();
+  const turler = ((await sb.rpc("radar_turler")).data as string[] | null ?? []).filter((t) => !["other", "accessory"].includes(t));
+  const mevcut = ((await sb.rpc("radar_urunler")).data as Mevcut[] | null) ?? [];
+  const { data: satirlar } = await sb.from("radar_adaylari").select("anahtar");
+  const var_ = new Set([...mevcut.map((u) => anahtarYap(u.marka, u.ad)), ...((satirlar ?? []) as { anahtar: string }[]).map((x) => x.anahtar)]);
+  const { data: ky } = await sb.from("tr_settings").select("value").eq("key", "katalog").maybeSingle();
+  const kayit = (ky?.value ?? {}) as { markalar?: Record<string, string>; eklenen?: number; ay?: string };
+  const ay = new Date().toISOString().slice(0, 7);
+  const markalar: Record<string, string> = kayit.markalar ?? {};
+  let eklenen = kayit.ay === ay ? Number(kayit.eklenen ?? 0) : 0;
+  // Markalar: künyedeki ürün sayısına göre; türleri künyedeki türleri
+  const grup = new Map<string, { turler: Set<string>; adlar: string[] }>();
+  for (const u of mevcut) { const g = grup.get(u.marka) ?? { turler: new Set(), adlar: [] }; if (turler.includes(u.tur)) g.turler.add(u.tur); g.adlar.push(u.ad); grup.set(u.marka, g); }
+  const sirali = [...grup.entries()].filter(([m, g]) => g.turler.size && Date.now() - Date.parse(markalar[m] ?? "1970") > 30 * 864e5).sort((a, b) => b[1].adlar.length - a[1].adlar.length);
+  const sonuc: { marka: string; eklenen: string[] }[] = [];
+  for (const [marka, g] of sirali) {
+    if (eklenen >= KATALOG_SINIR || Date.now() - t0 > 250_000) break;
+    const c = await claudeAramali({ sistem: KATALOG_SISTEM, kullanici: `MARKA: ${marka}\nTÜRLER: ${[...g.turler].join(", ")}\nKÜNYEDE ZATEN OLANLAR: ${g.adlar.join(", ")}`, model: CLAUDE_MODEL.taslak, ms: 120_000, maxArama: 3, fonk: "radar-otomatik" }).catch((e) => { console.error("katalog", marka, e); return null; });
+    if (!c) break; // Claude yok ya da hata: sonraki tur dener
+    let v: { urunler?: { ad?: string; tur?: string; durum?: string; ay?: string; kaynak?: string }[] } = {};
+    try { v = jsonAl(c.metin) as typeof v; } catch { /* boş */ }
+    const gorulen = new Set(c.adresler);
+    const yeni: string[] = [];
+    for (const u of Array.isArray(v.urunler) ? v.urunler : []) {
+      if (eklenen >= KATALOG_SINIR) break;
+      const ad = markasiz(marka, String(u?.ad ?? "")).trim().slice(0, 80);
+      if (!ad || !g.turler.has(String(u?.tur)) || !["satista", "duyuruldu"].includes(String(u?.durum))) continue;
+      if (!gorulen.has(String(u?.kaynak ?? ""))) continue; // kaynak uydurulmasın: aramada görülen adres olmalı
+      const k = anahtarYap(marka, ad);
+      if (var_.has(k)) continue;
+      const simdi = new Date().toISOString();
+      const ayx = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(u.ay ?? "")) ? `${u.ay}-01` : null;
+      const { error } = await sb.from("radar_adaylari").upsert({ anahtar: k, marka, ad, tur: u.tur, durum: u.durum, tarih: ayx, tarih_notu: "", ozet: "", kaynaklar: [{ baslik: hostAl(String(u.kaynak)), url: u.kaynak }], haberler: [], kontrol_zamani: simdi, updated_at: simdi, islem: "bekliyor", islem_notu: "katalog" }, { onConflict: "anahtar" });
+      if (error) { console.error("katalog yaz", error.message); continue; }
+      var_.add(k); eklenen++; yeni.push(ad);
+    }
+    markalar[marka] = new Date().toISOString();
+    sonuc.push({ marka, eklenen: yeni });
+    await sb.from("tr_settings").upsert({ key: "katalog", value: { markalar, eklenen, ay, son: { zaman: new Date().toISOString(), sonuc } } });
+  }
+  const kalan = sirali.filter(([m]) => !sonuc.some((x) => x.marka === m)).length;
+  if (kalan && eklenen < KATALOG_SINIR && sonuc.length && sira < 10) {
+    await fetch("http://functions:9000/radar-otomatik", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ katalog: true, sira: sira + 1 }), signal: AbortSignal.timeout(15_000) }).catch(() => {});
+  }
+  return { katalog: true, sonuc, eklenen, kalan };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return yanit({ error: "POST gerekli" }, 405);
@@ -246,7 +309,7 @@ Deno.serve(async (req) => {
     if (!p?.is_admin) return yanit({ error: "Yalnız yöneticiler" }, 403);
   }
   const b = await req.json().catch(() => ({}));
-  const is = isle(sb, b?.hizli === true && zamanlayici).catch(async (e) => { const v = { zaman: new Date().toISOString(), hata: String((e as Error).message).slice(0, 300) }; await sb.from("tr_settings").upsert({ key: "son_radar", value: v }); return v; });
+  const is = (b?.katalog === true ? katalog(sb, Number(b.sira) || 0) : isle(sb, b?.hizli === true && zamanlayici)).catch(async (e) => { const v = { zaman: new Date().toISOString(), hata: String((e as Error).message).slice(0, 300) }; await sb.from("tr_settings").upsert({ key: "son_radar", value: v }); return v; });
   if (zamanlayici) { EdgeRuntime.waitUntil(is); return yanit({ basladi: true }); }
   return yanit(await is);
 });
