@@ -350,12 +350,18 @@ async function cfAyar(sb: ReturnType<typeof createClient>) {
   return m.cloudflare_adres && m.cloudflare_anahtar ? { adres: String(m.cloudflare_adres).replace(/\/$/, ""), anahtar: String(m.cloudflare_anahtar) } : null;
 }
 type GorselSatir = { id: number; urun_id: number; urun_adi?: string; gorsel_aday: UrunGorseli | null };
-async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, s: GorselSatir) {
+// Görsel seçenekleri (5 Kasım 2026, kullanıcı: "fotoğraf seçeneklerini bize de sunsun, onaydan geçenlerden bir tane veriyor"):
+// seçilen aday ve yedekleri sırayla kesilir, denetimden geçenlerden en çok GORSEL_SECENEK tanesi saklanır (gorsel_aday.secenekler).
+// İlk geçen künyenin önerilen görseli olur; editör onay ekranında başkasını seçebilir. Süre azsa ilk geçenle yetinilir.
+const GORSEL_SECENEK = 3;
+async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, s: GorselSatir, bitis = Date.now() + 150_000, mevcut?: string) {
   const yaz = (x: Record<string, unknown>) => sb.from("kunye_oneriler").update(x).eq("id", s.id);
   if (!s.gorsel_aday?.url) { await yaz({ gorsel_durum: "yok" }); return; }
   const sira = [{ url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa, alfa: s.gorsel_aday.alfa }, ...(s.gorsel_aday.yedekler ?? [])];
+  const secenekler: { gorsel: string; url: string; sayfa: string }[] = [];
   let son = "";
-  for (const [i, a] of sira.entries()) {
+  for (const a of sira) {
+    if (secenekler.length >= GORSEL_SECENEK || (secenekler.length && bitis - Date.now() < 40_000)) break;
     try {
       const g = await fetch(a.url, { headers: { "User-Agent": UA, Accept: "image/*", Referer: a.sayfa }, signal: AbortSignal.timeout(30_000) });
       if (!g.ok) throw new Error(`görsel indirilemedi (${g.status})`);
@@ -372,16 +378,20 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
       const webp = new Uint8Array(await r.arrayBuffer());
       const d = await kesimDenetle(webp, s.urun_adi ?? "");
       if (!d.gecti) { son = "Kesim denetimden geçmedi: " + d.sorun; continue; }
-      const yol = `${s.urun_id}-${s.id}.webp`;
+      const yol = secenekler.length ? `${s.urun_id}-${s.id}-${secenekler.length + 1}.webp` : `${s.urun_id}-${s.id}.webp`;
       const { error } = await sb.storage.from("kunye").upload(yol, webp, { contentType: "image/webp", upsert: true });
       if (error) throw new Error("yükleme: " + error.message);
-      await yaz({ gorsel: `${ADRES}/storage/v1/object/public/kunye/${yol}?v=${Date.now()}`, gorsel_durum: "hazir", gorsel_hata: null,
-        ...(i ? { gorsel_aday: { ...s.gorsel_aday, url: a.url, sayfa: a.sayfa, neden: "Sıradaki aday (ilk seçimin kesimi denetimden geçmedi)" } } : {}) });
+      secenekler.push({ gorsel: `${ADRES}/storage/v1/object/public/kunye/${yol}?v=${Date.now()}`, url: a.url, sayfa: a.sayfa });
       await sb.from("baglanti_anahtarlari").update({ ek: { son_islem: new Date().toISOString(), hata: "" } }).eq("ad", "cloudflare_adres");
-      return;
     } catch (e) { son = String((e as Error).message); }
   }
-  await yaz({ gorsel_durum: "hata", gorsel_hata: son.slice(0, 200) });
+  // Var olan hazır görsele seçenek eklenirken hiçbiri geçmediyse eldeki görsel korunur
+  if (!secenekler.length && mevcut) { await yaz({ gorsel_aday: { ...s.gorsel_aday, secenekler: [{ gorsel: mevcut, url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa }] } }); return; }
+  if (!secenekler.length) { await yaz({ gorsel_durum: "hata", gorsel_hata: son.slice(0, 200) }); return; }
+  const ilk = secenekler[0];
+  await yaz({ gorsel: ilk.gorsel, gorsel_durum: "hazir", gorsel_hata: null,
+    gorsel_aday: { ...s.gorsel_aday, url: ilk.url, sayfa: ilk.sayfa, secenekler,
+      ...(ilk.url !== s.gorsel_aday.url ? { neden: "Sıradaki aday (ilk seçimin kesimi denetimden geçmedi)" } : {}) } });
 }
 
 // Yalnız yapay zekâ kotası (5 Kasım 2026: üretici sitesinin "429 çok fazla istek" yanıtı da kota sanılıyordu; ürün işaretlenmediği için
@@ -422,7 +432,14 @@ async function gorselTekrar(sb: ReturnType<typeof createClient>, cf: { adres: st
   if (bitis - Date.now() < 200_000) return null;
   const { data } = await sb.from("kunye_oneriler").select("id,urun_id,urun_adi,resmi_ad,kaynaklar,gorsel_aday").eq("durum", "bekliyor").in("gorsel_durum", ["yok", "hata"]).gte("created_at", surum).order("id").limit(50);
   const s = (data ?? []).find((x) => (x.gorsel_aday as { surum?: string } | null)?.surum !== GORSEL_SURUMU);
-  if (!s) return null;
+  if (!s) {
+    // Görseli hazır ama seçenekleri olmayan (5 Kasım 2026 öncesi) bekleyen öneriler: aday ve yedekleri yeniden kesilir, seçenekler eklenir
+    const { data: h } = await sb.from("kunye_oneriler").select("id,urun_id,urun_adi,gorsel,gorsel_aday").eq("durum", "bekliyor").eq("gorsel_durum", "hazir").gte("created_at", surum).order("id").limit(50);
+    const x = (h ?? []).find((y) => !Array.isArray((y.gorsel_aday as { secenekler?: unknown } | null)?.secenekler));
+    if (!x) return null;
+    await gorselIsle(sb, cf, x as GorselSatir, bitis, String(x.gorsel ?? ""));
+    return { urun: String(x.urun_adi ?? ""), durum: "görsel seçenekleri" };
+  }
   const r = await fetch(`${PANEL}/api/products/${s.urun_id}?depth=0`, { signal: AbortSignal.timeout(20_000) });
   const u: Urun | null = r.ok ? await r.json() : null;
   if (!u) return null;
@@ -438,7 +455,7 @@ async function gorselTekrar(sb: ReturnType<typeof createClient>, cf: { adres: st
   if (!g) { await yaz({ gorsel_aday: { surum: GORSEL_SURUMU }, gorsel_durum: "yok", gorsel_hata: ("2. deneme: " + iz.join(" · ")).slice(0, 200) }); return { urun: `${u.brand} ${ad}`, durum: "görsel yine yok" }; }
   const aday = { ...g, surum: GORSEL_SURUMU };
   await yaz({ gorsel_aday: aday, gorsel_durum: "isleniyor", gorsel_hata: null });
-  if (bitis - Date.now() > 45_000) await gorselIsle(sb, cf, { id: s.id as number, urun_id: s.urun_id as number, urun_adi: `${u.brand} ${ad}`, gorsel_aday: aday });
+  if (bitis - Date.now() > 45_000) await gorselIsle(sb, cf, { id: s.id as number, urun_id: s.urun_id as number, urun_adi: `${u.brand} ${ad}`, gorsel_aday: aday }, bitis);
   return { urun: `${u.brand} ${ad}`, durum: "görsel yeniden arandı" };
 }
 
@@ -448,7 +465,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
   const cf = await cfAyar(sb).catch(() => null);
   if (cf) {
     const { data: bekleyen } = await sb.from("kunye_oneriler").select("id,urun_id,urun_adi,gorsel_aday").eq("gorsel_durum", "isleniyor").order("id").limit(3);
-    for (const x of bekleyen ?? []) { if (Date.now() - t0 > 90_000) break; await gorselIsle(sb, cf, x as GorselSatir); }
+    for (const x of bekleyen ?? []) { if (Date.now() - t0 > 90_000) break; await gorselIsle(sb, cf, x as GorselSatir, t0 + 120_000); }
   }
   const surum = await surumZamani(sb);
   // Aday ürünler: tek ürün istendiyse o; yoksa çıkmış, değerlerinin yarısından azı dolu ve bu yöntemle bekleyen önerisi olmayanlar
@@ -515,7 +532,7 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
         // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
         EdgeRuntime.waitUntil(kunyeKiyas(sb, String(yeni.id), girdi, adlar, ham ?? v).catch((e) => console.error("künye kıyası", e)));
       }
-      if (gorsel && cf && yeni && bitis - Date.now() > 45_000) await gorselIsle(sb, cf, { id: yeni.id as number, urun_id: u.id, urun_adi: `${u.brand} ${resmiAd || u.name}`, gorsel_aday: gorsel });
+      if (gorsel && cf && yeni && bitis - Date.now() > 45_000) await gorselIsle(sb, cf, { id: yeni.id as number, urun_id: u.id, urun_adi: `${u.brand} ${resmiAd || u.name}`, gorsel_aday: gorsel }, bitis);
       sonuc.push({ urun: `${u.brand} ${u.name}`, durum: oz.length ? "öneri hazır" : "bulunamadı", sayi: oz.length, hata: [SAYFA_TESHIS, ...gIz].filter(Boolean).join(" · ") }); await kaydet(false);
     } catch (e) {
       // Kota dolduysa ürün işaretlenmez (yoksa 7 gün atlanırdı); kalanlar bir sonraki turda

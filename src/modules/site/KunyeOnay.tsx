@@ -9,18 +9,19 @@ import { sb, SUPABASE_URL } from "../../shared/supabase";
 import { useAuth } from "../../shared/auth";
 import { useToast } from "../../shared/toast";
 import { istekYap, medyaYukle } from "./api";
+import { kenarTemizle } from "./kenarTemizle";
 
 type Oz = { key: string; value: string; num: number | null; kaynak: string | null; kanit: string; islem?: "duzeltildi" | "eklendi"; not?: string; alinti?: boolean };
-type GorselAday = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string };
+type GorselAday = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string; secenekler?: { gorsel: string; url: string; sayfa: string }[] };
 type Oneri = { id: number; urun_id: number; urun_adi: string; resmi_ad?: string | null; tur: string; ozellikler: Oz[]; kaynaklar: { baslik: string; url: string; silinen?: { key: string; neden: string }[] }[]; durum: string; hata: string | null; created_at: string;
   gorsel?: string | null; gorsel_durum?: string; gorsel_aday?: GorselAday | null; gorsel_hata?: string | null };
 /** Görsel künyesi: üretici görseli "Görsel: Sony"; serbest lisanslıysa yazar ve lisans */
-const gorselKunye = (g: GorselAday | null | undefined, marka: string) => !g || g.kaynak === "Üretici" ? `Görsel: ${marka}` : `Fotoğraf: ${g.yazar} / ${g.kaynak} (${g.lisans})`;
+const gorselKunye = (g: GorselAday | null | undefined, marka: string) => !g || g.kaynak.startsWith("Üretici") ? `Görsel: ${marka}` : `Fotoğraf: ${g.yazar} / ${g.kaynak} (${g.lisans})`;
 const alan = (u: string | null) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
 const kucuk = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]/g, "");
 
 export default function KunyeOnay() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const toast = useToast();
   const [liste, setListe] = useState<Oneri[] | null>(null);
   const [calisiyor, setCalisiyor] = useState(false);
@@ -28,6 +29,10 @@ export default function KunyeOnay() {
   const [acik, setAcik] = useState<number | null>(null);
   const [gorselsiz, setGorselsiz] = useState<Record<number, boolean>>({});
   const [adsiz, setAdsiz] = useState<Record<number, boolean>>({});
+  // Görsel seçenekleri (5 Kasım 2026): kunye-otomatik denetimden geçen en çok 3 görsel hazırlar; editör birini seçer (varsayılan ilki)
+  const [secim, setSecim] = useState<Record<number, number>>({});
+  const secenekler = (o: Oneri) => o.gorsel_aday?.secenekler?.length ? o.gorsel_aday.secenekler : o.gorsel ? [{ gorsel: o.gorsel, url: o.gorsel_aday?.url ?? "", sayfa: o.gorsel_aday?.sayfa ?? "" }] : [];
+  const secili = (o: Oneri) => secenekler(o)[secim[o.id] ?? 0] ?? secenekler(o)[0];
   const dur = useRef(false);
   // Onay sürerken satırda adım yazar (5 Kasım 2026, kullanıcı: "onayla'ya basıyorum tepki göstermiyor, uzun süre sonra ekliyor")
   const [isliyor, setIsliyor] = useState<Record<number, string>>({});
@@ -66,6 +71,29 @@ export default function KunyeOnay() {
     } catch (e) { setDurum(""); toast((e as Error).message); } finally { setCalisiyor(false); }
   }
 
+  // Önceden onaylanmış künye görsellerinin kenar temizliği (5 Kasım 2026, bir kerelik, yönetici): onayda yüklenen görsel hâlâ ürünün
+  // görseliyse (alt metni "<ürün> ürün görseli") indirilir, kenarı temizlenir, yeni medya olarak yüklenip ürüne konur. Temizlenmiş dosya "-k" ile biter.
+  const [temizlik, setTemizlik] = useState("");
+  async function eskileriTemizle() {
+    const { data } = await sb.from("kunye_oneriler").select("urun_id,urun_adi").eq("durum", "onaylandi").eq("gorsel_durum", "hazir").order("id", { ascending: false }).limit(300);
+    const urunler = [...new Map(((data ?? []) as { urun_id: number; urun_adi: string }[]).map((x) => [x.urun_id, x])).values()];
+    let yapilan = 0, atlanan = 0;
+    for (const [i, x] of urunler.entries()) {
+      setTemizlik(`Kenarlar temizleniyor: ${i + 1}/${urunler.length}`);
+      try {
+        const u = await istekYap<{ name: string; brand: string; image?: { id: number; url?: string; filename?: string; alt?: string; credit?: string } | null }>(`/products/${x.urun_id}?depth=1`);
+        const g = u.image;
+        if (!g?.url || !g.alt?.endsWith("ürün görseli") || /-k\.(webp|png)$/.test(g.filename ?? "")) { atlanan++; continue; }
+        const ham = await fetch(g.url + (g.url.includes("?") ? "&" : "?") + "indir=" + Date.now(), { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("indirilemedi"); return r.blob(); });
+        const b = await kenarTemizle(ham);
+        const m = await medyaYukle(new File([b], `${kucuk(x.urun_adi) || "urun"}-k.${b.type === "image/png" ? "png" : "webp"}`, { type: b.type || "image/webp" }), g.alt, g.credit ?? `Görsel: ${u.brand}`, false);
+        await istekYap(`/products/${x.urun_id}?depth=0`, { method: "PATCH", body: JSON.stringify({ image: m.id }) });
+        yapilan++;
+      } catch { atlanan++; }
+    }
+    setTemizlik(""); toast(`${yapilan} künye görselinin kenarı temizlendi${atlanan ? `, ${atlanan} atlandı (görseli sonradan değişmiş ya da zaten temiz)` : ""}.`);
+  }
+
   async function onayla(o: Oneri) {
     if (isliyor[o.id]) return;
     const adim = (m: string) => setIsliyor((x) => ({ ...x, [o.id]: m }));
@@ -92,8 +120,13 @@ export default function KunyeOnay() {
         // Önbelleği atla (5 Kasım 2026): liste görseli önce <img> ile gösterdiği için tarayıcı izin başlığı olmayan kopyayı saklıyor
         // (depolama "Vary: Origin" göndermiyor); aynı adresi fetch ile istemek "Load failed / Failed to fetch" veriyordu
         adim("Görsel panele yükleniyor…");
-        const b = await fetch(o.gorsel + (o.gorsel.includes("?") ? "&" : "?") + "indir=" + Date.now(), { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("Görsel indirilemedi"); return r.blob(); });
-        const m = await medyaYukle(new File([b], `${kucuk(o.urun_adi) || "urun"}.webp`, { type: "image/webp" }), `${o.urun_adi} ürün görseli`, gorselKunye(o.gorsel_aday, u.brand), false);
+        const sec = secili(o);
+        const adres = sec?.gorsel ?? o.gorsel;
+        const ham = await fetch(adres + (adres.includes("?") ? "&" : "?") + "indir=" + Date.now(), { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("Görsel indirilemedi"); return r.blob(); });
+        // Koyu temada beyaz kenar kalmasın (kenarTemizle.ts); temizlenemezse görsel olduğu gibi gider
+        const b = await kenarTemizle(ham).catch(() => ham);
+        const gorselBilgi = sec && o.gorsel_aday ? { ...o.gorsel_aday, url: sec.url, sayfa: sec.sayfa } : o.gorsel_aday;
+        const m = await medyaYukle(new File([b], `${kucuk(o.urun_adi) || "urun"}.${b.type === "image/png" ? "png" : "webp"}`, { type: b.type || "image/webp" }), `${o.urun_adi} ürün görseli`, gorselKunye(gorselBilgi, u.brand), false);
         govde.image = m.id;
       }
       adim("Künyeye yazılıyor…");
@@ -114,7 +147,10 @@ export default function KunyeOnay() {
     <section className="panel kunye-onay">
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div><b>Künye otomasyonu</b><div className="muted" style={{ fontSize: 14 }}>Sistem her ürünün resmî özellik sayfasını internette bulur, değerleri kaynağıyla önerir. Sen kontrol edip onaylarsın.</div></div>
-        {calisiyor ? <button className="btn ghost" onClick={() => { dur.current = true; }}>Durdur</button> : <button className="btn" onClick={otomatik}>Eksik künyeleri doldur</button>}
+        <div className="row" style={{ gap: 6 }}>
+          {profile?.is_admin && <button className="btn ghost sm" disabled={!!temizlik} onClick={eskileriTemizle} title="Onaylanmış künye görsellerinde koyu temadaki beyaz kenarı temizler">{temizlik || "Eski görsellerin kenarını temizle"}</button>}
+          {calisiyor ? <button className="btn ghost" onClick={() => { dur.current = true; }}>Durdur</button> : <button className="btn" onClick={otomatik}>Eksik künyeleri doldur</button>}
+        </div>
       </div>
       {durum && <div className="muted">{durum}</div>}
       {sonTur && <div className="muted" style={{ fontSize: 13 }}>
@@ -135,9 +171,18 @@ export default function KunyeOnay() {
           {o.resmi_ad && <label className="muted" style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 14 }}><input type="checkbox" checked={!adsiz[o.id]} onChange={(e) => setAdsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Adı da düzelt: <b>{o.resmi_ad}</b></label>}
           {o.gorsel_durum === "hazir" && o.gorsel ? (
             <div className="ko-gorsel">
-              <a href={o.gorsel} target="_blank" rel="noreferrer" title="Tam boyutta aç"><img src={o.gorsel} alt={`${o.urun_adi} (arka planı silinmiş)`} loading="lazy" /></a>
+              <a href={secili(o)?.gorsel ?? o.gorsel} target="_blank" rel="noreferrer" title="Tam boyutta aç"><img src={secili(o)?.gorsel ?? o.gorsel} alt={`${o.urun_adi} (arka planı silinmiş)`} loading="lazy" /></a>
               <div className="muted" style={{ fontSize: 13 }}>
-                {gorselKunye(o.gorsel_aday, o.urun_adi.split(" ")[0])}{o.gorsel_aday?.sayfa && <> · <a href={o.gorsel_aday.sayfa} target="_blank" rel="noreferrer">kaynak</a></>}
+                {secenekler(o).length > 1 && (
+                  <div className="ko-secenek" role="radiogroup" aria-label="Görsel seçenekleri">
+                    {secenekler(o).map((x, i) => (
+                      <button key={x.gorsel} role="radio" aria-checked={(secim[o.id] ?? 0) === i} onClick={() => setSecim((y) => ({ ...y, [o.id]: i }))} title={`Seçenek ${i + 1}`}>
+                        <img src={x.gorsel} alt={`Seçenek ${i + 1}`} loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {gorselKunye(o.gorsel_aday, o.urun_adi.split(" ")[0])}{(secili(o)?.sayfa || o.gorsel_aday?.sayfa) && <> · <a href={secili(o)?.sayfa || o.gorsel_aday?.sayfa} target="_blank" rel="noreferrer">kaynak</a></>}
                 {o.gorsel_aday?.neden && <div>Seçim: {o.gorsel_aday.neden}</div>}
                 <label style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}><input type="checkbox" checked={!gorselsiz[o.id]} onChange={(e) => setGorselsiz((x) => ({ ...x, [o.id]: !e.target.checked }))} /> Görseli de künyeye koy</label>
               </div>

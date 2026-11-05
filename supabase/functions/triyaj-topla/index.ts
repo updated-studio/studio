@@ -339,6 +339,13 @@ async function radarDurt(sb: ReturnType<typeof createClient>, satirlar: Record<s
 async function topla(sb: ReturnType<typeof createClient>) {
   const bas = Date.now();
   const ayarlar = Object.fromEntries(((await sb.from("tr_settings").select("key,value")).data ?? []).map((r) => [r.key, r.value]));
+  // Gürültü listesi düzeltmesi (5 Kasım 2026, kullanıcı onayı): tek başına "deals" şirket anlaşması haberlerini de eliyordu
+  // ("Altman signs four Abu Dhabi deals"); yerine indirim kalıpları gelir. Bir kez yapılır; sonrası Ayarlar'dan.
+  if (Array.isArray(ayarlar.gurultu_kelimeleri) && ayarlar.gurultu_kelimeleri.includes("deals") && !ayarlar.gurultu_duzeltme) {
+    const yeni = [...new Set([...(ayarlar.gurultu_kelimeleri as string[]).filter((k) => k !== "deals"), "deals:", "best deals", "deals on", "deal alert", "holiday deals", "early black friday"])];
+    await sb.from("tr_settings").upsert([{ key: "gurultu_kelimeleri", value: yeni }, { key: "gurultu_duzeltme", value: { zaman: new Date().toISOString(), cikan: ["deals"] } }]);
+    ayarlar.gurultu_kelimeleri = yeni;
+  }
   const gurultu: string[] = (ayarlar.gurultu_kelimeleri ?? []).map((s: string) => String(s).toLowerCase()).filter(Boolean);
   const model = String(ayarlar.model_eleme ?? "gemini-3.5-flash-lite");
   // Kıyas bitiş tarihinden sonra kendiliğinden kapanır (kullanıcı: "iki hafta açık tutalım")
@@ -421,7 +428,8 @@ async function topla(sb: ReturnType<typeof createClient>) {
       if (gorulen.has(h.link) || bilinen.has(h.link)) continue;
       if (h.date && +h.date < sinir) continue;
       gorulen.add(h.link);
-      const metin = (h.title + " " + h.ozet).toLowerCase();
+      // Yalnız başlık (5 Kasım 2026): bazı sitelerin RSS özetinin sonundaki "sponsored by" / "in stock" dipnotu gerçek haberleri eliyordu
+      const metin = h.title.toLowerCase();
       const g = gurultu.find((x) => esle(metin, x));
       if (g) { onElenen.push(satir(h, { reason: "Gürültü kelimesi: " + g, model: "kural (yapay zeka öncesi)" })); continue; }
       const n = (sayac.get(h.source.name) ?? 0) + 1;
@@ -467,6 +475,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
 
   // --- Kurallar (eski triyajIs_) --- (karar kısmı kararVer ile aynı; biri değişirse öteki de, eleme kıyası onu kullanır)
   const MODEL = model + " · Stüdyo";
+  let etiketsiz = 0;
   const elenen: Record<string, unknown>[] = [...onElenen];
   const belirsiz: Record<string, unknown>[] = [];
   const rehber: Record<string, unknown>[] = [];
@@ -475,7 +484,9 @@ async function topla(sb: ReturnType<typeof createClient>) {
     const id = i + 1;
     if (!islenen.has(id)) return; // yanıt alınamadı: sonraki çalıştırmada yeniden denenir
     const e = etiketler.get(id);
-    if (!e) { elenen.push(satir(h, { reason: "Model etiket vermedi", model: MODEL })); return; }
+    // Yapay zekâ bu habere etiket vermediyse elenmez (5 Kasım 2026: 3 günde 27 gerçek haber böyle kaybolmuştu); hiçbir yere yazılmaz,
+    // haber 24 saat içinde kaldıkça sonraki turda yeniden etiketlenir
+    if (!e) { etiketsiz++; return; }
     const markaK = String(e.marka ?? "").toLowerCase(), urunK = String(e.urun ?? "").toLowerCase();
     const ortak = { model: MODEL, brand: String(e.marka ?? "").slice(0, 60), product: String(e.urun ?? "").slice(0, 80), topic: String(e.konu ?? "").slice(0, 40), kind: TUR[String(e.tur)] ?? String(e.tur ?? "").slice(0, 30), news_type: String(e.tip ?? "").slice(0, 30), event: String(e.neden ?? "").slice(0, 400) }; // Türkçe olay özeti elenen/rehber kartlarda da görünsün
     const haric = pazar.find((p) => p.grup === "Hariç" && (markaK === p.ad || urunK.includes(p.ad)));
@@ -604,7 +615,7 @@ async function topla(sb: ReturnType<typeof createClient>) {
     gundem: gundemTerim.length, gundemIsaret,
     kaynak: kaynaklar?.length ?? 0, okunan: tumLinkler.length, yeni: gorulen.size, kural: onElenen.length, sirada,
     yapayZeka: islenen.size, aday: yeniAday.length, elenen: elenen.length, belirsiz: belirsiz.length, rehber: rehber.length,
-    bekleyen: sirada + adaylar.length - islenen.size, hata, yedek: YEDEK_KULLANILDI, sure: Date.now() - bas,
+    bekleyen: sirada + adaylar.length - islenen.size, etiketsiz, hata, yedek: YEDEK_KULLANILDI, sure: Date.now() - bas,
   };
   await sb.from("tr_settings").upsert({ key: "son_toplama", value: { ...ozet, durum: "bitti", zaman: new Date().toISOString() } });
   console.log(JSON.stringify(ozet));

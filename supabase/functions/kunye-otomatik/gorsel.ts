@@ -349,7 +349,7 @@ export async function urunGorseliBul(sb: Sb, o: { marka: string; ad: string; tur
   if (!sira.length) { if (!adaylar.length && !essiz.length && !bayiAday.length) iz.push("görsel adayı yok"); return null; }
   iz.push(`görsel: ${essiz.length} adaydan seçildi (${sira[0].w}×${sira[0].h}${sira[0].alfa ? ", şeffaf" : ""})`);
   return { url: sira[0].url, sayfa: sira[0].sayfa, kaynak: bayidan ? `Üretici görseli (${hostAl(sira[0].sayfa)})` : "Üretici", yazar: o.marka, lisans: "Basın görseli", neden: String(v?.neden ?? "").slice(0, 200), w: sira[0].w, h: sira[0].h, alfa: sira[0].alfa,
-    yedekler: sira.slice(1, 3).map((a) => ({ url: a.url, sayfa: a.sayfa, alfa: a.alfa })) };
+    yedekler: sira.slice(1, 5).map((a) => ({ url: a.url, sayfa: a.sayfa, alfa: a.alfa })) }; // seçenekler için (index.ts gorselIsle)
 }
 
 /** Arka planı silinmiş görselin denetimi; yapay zekâ yoksa geçti sayılır (editör yine görür) */
