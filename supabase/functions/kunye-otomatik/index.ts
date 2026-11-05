@@ -7,9 +7,12 @@
 // 5 Kasım 2026 (kullanıcı onayı: "künyeler saçma sapan olmuş"; görseller "versus.com'daki gibi"): yalnız çıkmış ürün; kaynak sırası üreticinin Türkiye
 // sayfası → küresel sayfası → bir ikinci kaynak (en çok 3 sayfa); biçim kalıpları (BICIM), CE/Türkiye değeri, model ve tutarlılık kuralları; Gemini'nin
 // çıkardığını Claude Sonnet "ikinci göz" sayfalara karşı denetler; görsel yalnız üreticiden, yapay zekâ görerek seçer, kesimi denetlenir (gorsel.ts).
+// 6 Kasım 2026 (kullanıcı onayı: "künyeyi basitleştir, ucuzlat"): özellikleri tek okumada Claude Sonnet çıkarır (Gemini adımı ve ikinci göz kalktı);
+// görselde arama ajanı kalktı, üretici ve bayi adayları tek seçimde yarışır; şeffaf zeminli resmî PNG arka plan silinmeden kullanılır; ana görselin
+// yanında künye albümü (üreticinin yaşam tarzı/başka açı görselleri) önerilir; görsel bulunamazsa editör onay ekranında kendi görselini ekler
+// (POST { oneri_id, dosya | adres }); reddedilen ürün kendiliğinden yeniden denenmez.
 // Eski yöntemin bekleyen önerileri yenisi gelince kalkar (YONTEM_SURUMU).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { anahtarHatasi, anahtarlar as geminiAnahtarlari, isaretle } from "./anahtar.ts";
 import { KIYAS_MODELLERI, kiyasCagir } from "../triyaj-taslak/kiyas.ts";
 import { claudeAramali, claudeJson } from "../triyaj-taslak/claude.ts";
 import { kesimDenetle, seffafTuval, ureticiAlani, urunGorseliBul, type UrunGorseli } from "./gorsel.ts";
@@ -30,7 +33,7 @@ type Spec = { key: string; unit?: string | null; value?: string | null };
 type Urun = { id: number; name: string; brand: string; type: string; status?: string; specs?: Spec[] };
 
 // Biçim kalıpları (5 Kasım 2026, kullanıcı onayı: künyeler tutarsız, çevrilmemiş, bölge değeri yanlış): her özellik aynı kalıpla yazılır.
-// Hem çıkaran istem (SISTEM/OKU_SISTEM) hem ikinci göz (GOZ_SISTEM) bu listeyi kullanır.
+// Çıkaran istemler (SISTEM/OKU_SISTEM) bu listeyi kullanır.
 const BICIM = `BİÇİM KALIPLARI (değer bu kalıpla yazılır; birim özelliğin birimiyle aynı olmalı):
 - Genel: ondalıkta virgül (24,2), binlik ayırıcı nokta (5.000 mAh, 51.200), aralıkta uzun tire (100–51.200), çarpı işareti × (131 × 96 × 80 mm), farklı modlar/parçalar " · " ile (30 fps (elektronik) · 10 fps (mekanik)). Var/yok özelliklerinde "Var" ya da "Yok", gerekirse kısa ek: "Var (5,5 stop)".
 - Dil: kısa editoryal Türkçe. Pazarlama adını çevirmeden bırakma, ne olduğunu yaz ("AI Noise Cancelling" değil "Yapay zekâ gürültü engelleme"); parantez içinde İngilizce karşılık ekleme ("Tüm yönlü (Omnidirectional)" değil "Tüm yönlü"). Teknoloji/standart adları aynen kalır (CFexpress, ProRes RAW, S-Log3, Wi-Fi 7, LTPO, OIS).
@@ -73,7 +76,7 @@ type Sayfa = { url: string; baslik: string; metin: string; resmi: boolean; html?
 
 // ---------- Künye kıyası (4 Kasım 2026, kullanıcı: "künyeye de bir karşılaştırma ekleyelim"; göç 0065) ----------
 // Örneklenen ürünlerde aynı sayfa metinleri ve aynı istemle kıyas modelleri (triyaj-taslak/kiyas.ts: Claude, GPT, Gemini 4) de özellik çıkarır; sonuçları kullanılmaz, yalnız
-// public.yz_kiyas'a yazılır (Gemini'ninkiyle birlikte). Nesnel ölçü: modelin verdiği alıntı ("kanit") kaynak sayfanın metninde gerçekten
+// public.yz_kiyas'a yazılır (asıl modelinkiyle birlikte). Nesnel ölçü: modelin verdiği alıntı ("kanit") kaynak sayfanın metninde gerçekten
 // geçiyor mu (uydurma kontrolü). Oran: tr_settings.yz_kiyas.kunye_oran (yüzde).
 type KunyeGirdi = { kullanici: string; sayfalar: Sayfa[]; model: string };
 const kucukHarf = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
@@ -87,8 +90,8 @@ function kunyeSuz(v: Record<string, any> | null | undefined, adlar: Set<string>,
   return { ozellikler: oz, resmiAd: typeof v?.resmiAd === "string" ? v.resmiAd : null, bulunan: oz.length, dogrulanan: oz.filter((x: { dogru: boolean }) => x.dogru).length };
 }
 async function kunyeKiyas(sb: ReturnType<typeof createClient>, oneriId: string, g: KunyeGirdi, adlar: Set<string>, gemV: Record<string, any>) { // eslint-disable-line @typescript-eslint/no-explicit-any
-  const satirlar: Record<string, unknown>[] = [{ is_turu: "kunye", nesne: oneriId, model: "gemini:" + g.model, sonuc: kunyeSuz(gemV, adlar, g.sayfalar), sure_ms: 0 }];
-  await Promise.all(KIYAS_MODELLERI.map(async (m) => {
+  const satirlar: Record<string, unknown>[] = [{ is_turu: "kunye", nesne: oneriId, model: g.model, sonuc: kunyeSuz(gemV, adlar, g.sayfalar), sure_ms: 0 }];
+  await Promise.all(KIYAS_MODELLERI.filter((m) => m.id !== g.model).map(async (m) => {
     const t0 = Date.now();
     try {
       const v = await kiyasCagir(sb, m, OKU_SISTEM, g.kullanici, 150_000, "kunye-otomatik");
@@ -177,53 +180,22 @@ async function sayfaBul(adresler: string[], marka: string): Promise<Sayfa[]> {
 const OKU_SISTEM = SISTEM.replace("Görevin bir ürünün teknik özelliklerini İNTERNETTE ARAYARAK bulmak.", "Görevin bir ürünün teknik özelliklerini SANA VERİLEN SAYFA METİNLERİNDEN çıkarmak. İnternette arama yapma; yalnız bu metinlerde açıkça yazanı kullan. Sayfaların hangisinin üreticinin olduğu ÜRETİCİ/İKİNCİ KAYNAK etiketinde yazar.")
   .replace(/"kaynak": [^\n]*/, '"kaynak": değeri aldığın sayfanın KAYNAK satırındaki adres, aynen. "kanit": o sayfadan, sayfanın kendi dilinde, AYNEN kısa alıntı (en fazla 120 karakter; çeviri değil).');
 
-// İkinci göz (5 Kasım 2026, kullanıcı onayı): ücretsiz Gemini'nin çıkardığı değerleri Claude Sonnet aynı sayfalara karşı denetler: kaynakta yazmayanı
-// siler, yanlışı (kardeş model, FCC değeri, yanlış birim/biçim, çelişki) düzeltir, sayfalarda açıkça yazıp atlananı ekler. Claude yoksa Gemini'ninki kalır.
+// Künyeyi okuyan model (6 Kasım 2026: tek okuma; önceki "Gemini çıkarır, Claude ikinci göz denetler" düzeni kalktı)
 const GOZ_MODEL = "claude-sonnet-5-5";
-const GOZ_SISTEM = `Sen bir teknoloji sitesinin ürün künyesi denetçisisin. Okur Türkiye'de. Başka bir yapay zekâ verilen sayfa metinlerinden bir ürünün teknik özelliklerini çıkardı; sen her değeri AYNI SAYFALARA karşı denetleyip son listeyi verirsin.
-DENETİM:
-1. Kanıt: değer kaynak sayfada açıkça yazıyor mu, "kanit" alıntısı değeri destekliyor mu? Desteklemiyorsa sayfada doğrusu varsa düzelt, yoksa sil.
-2. Model: değer TAM OLARAK bu modelin mi (kardeş model FE/Pro/Ultra/Mini/Plus/Lite, önceki nesil, sayfadaki başka sürümün sütunu değil)?
-3. Bölge: bölgeye göre değişen değerlerde (kablosuz/iletim menzili, frekans, verici gücü, şarj adaptörü, fiyat) Türkiye ya da AB/CE değeri. Yalnız FCC/ABD değeri varsa sil.
-4. Kaynak sırası: üretici sayfasındaki değer ikinci kaynağınkinden önce gelir; çelişirse üreticininki.
-5. Tutarlılık: değerler birbiriyle çelişmez (Maks. video en yüksek çözünürlük ve 4K kare hızıyla uyumlu; ağırlık/boyut; ekran/çözünürlük).
-6. Biçim: aşağıdaki BİÇİM KALIPLARINA uymayanın yalnız yazımını düzelt (anlamı değiştirme). Çevrilmemiş pazarlama dilini kısa Türkçeye çevir.
-7. Eksik: istenen özelliklerden sayfalarda AÇIKÇA yazıp listede olmayanları ekle. Tahmin, çıkarım, hesap yok.
-"kaynak" yalnız sayfaların KAYNAK satırındaki adreslerden biri olur. "kanit" o sayfadan, sayfanın kendi dilinde AYNEN kısa alıntı (en fazla 120 karakter). "num": özelliğin birimi cinsinden tek sayı ya da null.
-"islem": değer aynen kaldıysa "ayni", değiştirdiysen "duzeltildi", yeni eklediysen "eklendi". "not": düzelttiysen ya da eklediysen tek kısa cümleyle neden (ör. "Sayfada FE modelinin değeri vardı"), yoksa boş.
-Sildiklerini "silinen" listesine özellik adı ve kısa nedenle yaz.
-${BICIM}`;
-const GOZ_SEMA = {
-  type: "object",
-  properties: {
-    ozellikler: { type: "array", items: { type: "object", properties: {
-      key: { type: "string" }, value: { type: "string" }, num: { anyOf: [{ type: "number" }, { type: "null" }] }, kaynak: { type: "string" }, kanit: { type: "string" },
-      islem: { type: "string", enum: ["ayni", "duzeltildi", "eklendi"] }, not: { type: "string" },
-    }, required: ["key", "value", "num", "kaynak", "kanit", "islem", "not"], additionalProperties: false } },
-    silinen: { type: "array", items: { type: "object", properties: { key: { type: "string" }, neden: { type: "string" } }, required: ["key", "neden"], additionalProperties: false } },
-  },
-  required: ["ozellikler", "silinen"], additionalProperties: false,
-};
-async function ikinciGoz(istem: string, metin: string, ozellikler: unknown[], ms: number) {
-  const r = await claudeJson({ sistem: GOZ_SISTEM, kullanici: `${istem}\n\nÇIKARILAN DEĞERLER:\n${JSON.stringify(ozellikler)}\n\nSAYFALAR:\n${metin}`, model: GOZ_MODEL, ms, sema: GOZ_SEMA, maxTokens: 16_000, caba: "medium", fonk: "kunye-otomatik" });
-  return r ? r.veri as { ozellikler: Record<string, unknown>[]; silinen: { key: string; neden: string }[] } : null;
-}
 
-/** bitis: bu ürün için son an (işçi 400 sn'de kesilir; ikinci göz süresi yetmiyorsa atlanır) */
 /** Alıntı gerçekten kaynak sayfada geçiyor mu (editör görür) */
 function alintiIsaretle(v: { ozellikler?: unknown }, sayfalar: Sayfa[]) {
   const sayfaMetni = new Map(sayfalar.map((x) => [x.url, kucukHarf(x.metin)]));
   for (const o of (Array.isArray(v.ozellikler) ? v.ozellikler : []) as { kaynak?: string; kanit?: string; alinti?: boolean }[]) { const k = kucukHarf(String(o.kanit ?? "")); o.alinti = k.length >= 3 && !!sayfaMetni.get(String(o.kaynak))?.includes(k); }
 }
 async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date.now() + 300_000) {
-  const anahtarlar = await geminiAnahtarlari();
-  if (!anahtarlar.length) throw new Error("GEMINI_API_KEY yok");
   const liste = (urun.specs ?? []).some((s) => s.key === "Boyutlar") ? urun.specs ?? [] : [...(urun.specs ?? []), { key: "Boyutlar", unit: "mm" }];
   const ozellikler = liste.map((s) => `- ${s.key}${s.unit ? " · " + s.unit : ""}`).join("\n");
   const istem = `ÜRÜN: ${urun.brand} ${urun.name}\nDOLDURULACAK ÖZELLİKLER (ad · birim):\n${ozellikler}`;
   let son = "";
-  // 1) Asıl yol (31 Ekim 2026): sayfayı sunucu kendisi bulur ve okur, ücretsiz Gemini (araçsız istek, kota içinde) yalnız okunan metinden
-  //    değer çıkarır. Ücretsiz katmanda Gemini'nin Google arama aracı her istekte 429 veriyordu; aramasız istekler geçiyor.
+  // 1) Asıl yol: sayfayı sunucu kendisi bulur ve okur (kayıtlı adresler + Brave), Claude Sonnet yalnız okunan metinden değer çıkarır.
+  //    6 Kasım 2026 (kullanıcı onayı: "künyeyi basitleştir"): ücretsiz Gemini adımı ve ardındaki ikinci göz kalktı; 5 Kasım'da Gemini 136
+  //    denemenin 112'sinde hata verdi, iş zaten Claude'a kalıyordu. Tek okuma: aynı kurallar (BICIM, model, bölge, tutarlılık) tek istemde.
   // Kayıtlı adresler: ürünün sourceUrl'leri (onaylanmış değerlerin kaynakları)
   const kayitli = (urun.specs ?? []).map((x) => (x as Spec & { sourceUrl?: string | null }).sourceUrl ?? "").filter(Boolean) as string[];
   SAYFA_TESHIS = "";
@@ -237,57 +209,20 @@ async function ara(sb: ReturnType<typeof createClient>, urun: Urun, bitis = Date
   if (sayfalar.length) {
     const metin = sayfalar.map((x, i) => `[${i + 1}] KAYNAK: ${x.url} (${x.resmi ? "ÜRETİCİ" : "İKİNCİ KAYNAK"})\n${x.metin}`).join("\n\n---\n\n");
     const izinli = new Set(sayfalar.map((x) => x.url));
-    // 5 Kasım 2026: haber eleme (triyaj-topla) aynı ücretsiz Gemini kotasını kullanıyor; künye her üründe 3 anahtar × 3 model deneyip onun
-    // kotasını bitiriyordu (haberler elenemedi). Künye artık yalnız ilk uygun anahtarla tek model dener; olmazsa Claude çıkarır (aşağıda).
-    for (const a of anahtarlar.slice(0, 1)) { let hepsiKota = true; for (const model of ["gemini-3.5-flash-lite"]) {
-      try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: "POST", signal: AbortSignal.timeout(90_000), headers: { "Content-Type": "application/json", "x-goog-api-key": a.deger },
-          body: JSON.stringify({ systemInstruction: { parts: [{ text: OKU_SISTEM }] }, contents: [{ role: "user", parts: [{ text: `${istem}\n\nSAYFALAR:\n${metin}` }] }], generationConfig: { temperature: 0.1, responseMimeType: "application/json" } }),
-        });
-        const g = await r.text();
-        if (!r.ok) {
-          son = `${a.etiket} · ${model} ${r.status} ${g.replace(/\s+/g, " ").slice(0, 300)}`;
-          const ah = anahtarHatasi(r.status, g);
-          if (ah === "gecersiz") { await isaretle(a, "gecersiz", son); hepsiKota = false; break; }
-          if (ah !== "kota_dolu") hepsiKota = false;
-          continue;
-        }
-        hepsiKota = false; await isaretle(a, "calisiyor");
-        const c = JSON.parse(g)?.candidates?.[0];
-        const v = jsonOku((c?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join(""));
-        if (!v) { son = `${model} geçersiz yanıt`; continue; }
-        // Kaynak yalnız okunan sayfalardan biri olabilir (model adres uyduramaz)
-        if (Array.isArray(v.ozellikler)) v.ozellikler = v.ozellikler.filter((o: { kaynak?: string }) => izinli.has(String(o?.kaynak ?? "")));
-        if (v.urunSayfasi && !izinli.has(v.urunSayfasi)) v.urunSayfasi = sayfalar.find((x) => x.resmi)?.url ?? null;
-        SAYFA_TESHIS += ` → ${model}`;
-        const ham = structuredClone(v);
-        const gozSure = Math.min(150_000, bitis - Date.now() - 90_000);
-        const goz = gozSure < 30_000 ? (SAYFA_TESHIS += " · ikinci göz: süre yetmedi", undefined) : await ikinciGoz(istem, metin, v.ozellikler ?? [], gozSure).catch((e) => { SAYFA_TESHIS += " · ikinci göz: " + String((e as Error).message ?? e).slice(0, 60); return null; });
-        if (goz && Array.isArray(goz.ozellikler)) {
-          v.ozellikler = goz.ozellikler.filter((o) => izinli.has(String(o?.kaynak ?? "")));
-          v.silinen = Array.isArray(goz.silinen) ? goz.silinen.slice(0, 40) : [];
-          const say = (i: string) => v.ozellikler.filter((o: { islem?: string }) => o.islem === i).length;
-          SAYFA_TESHIS += ` → ikinci göz: ${say("duzeltildi")} düzeltme, ${say("eklendi")} ek, ${v.silinen.length} silme`;
-        } else if (goz === null) SAYFA_TESHIS += " · ikinci göz yok (Claude anahtarı/kredisi)";
-        alintiIsaretle(v, sayfalar);
-        return { v, ham, sayfalar, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })), girdi: { kullanici: `${istem}\n\nSAYFALAR:\n${metin}`, sayfalar, model } };
-      } catch { son = `${model} yanıt vermedi`; hepsiKota = false; }
-    }
-    if (hepsiKota) await isaretle(a, "kota_dolu", son); }
-    // Gemini olmadıysa (ücretsiz kota bitti ya da hata) okunan sayfalardan Claude Sonnet çıkarır (5 Kasım 2026: Groq'un kendi araması
-    // ikinci gözsüz ve zayıf kalıyordu); denetçiyle aynı model olduğundan ikinci göz atlanır, kıyasa girmez
     const sure = Math.min(150_000, bitis - Date.now() - 90_000);
     if (sure >= 30_000) {
-      const c = await claudeJson({ sistem: OKU_SISTEM, kullanici: `${istem}\n\nSAYFALAR:\n${metin}`, model: GOZ_MODEL, ms: sure, maxTokens: 16_000, caba: "medium", fonk: "kunye-otomatik" })
+      const kullanici = `${istem}\n\nSAYFALAR:\n${metin}`;
+      const c = await claudeJson({ sistem: OKU_SISTEM, kullanici, model: GOZ_MODEL, ms: sure, maxTokens: 16_000, caba: "medium", fonk: "kunye-otomatik" })
         .catch((e) => { son += ` | Claude: ${String((e as Error).message ?? e).slice(0, 80)}`; return null; });
+      if (c === null && !son) son = "Claude anahtarı yok ya da kredisi bitti";
       const v = c?.veri;
       if (v && Array.isArray(v.ozellikler)) {
+        // Kaynak yalnız okunan sayfalardan biri olabilir (model adres uyduramaz)
         v.ozellikler = v.ozellikler.filter((o: { kaynak?: string }) => izinli.has(String(o?.kaynak ?? "")));
         if (v.urunSayfasi && !izinli.has(v.urunSayfasi)) v.urunSayfasi = sayfalar.find((x) => x.resmi)?.url ?? null;
-        SAYFA_TESHIS += ` → Gemini yok, ${GOZ_MODEL} çıkardı`;
+        SAYFA_TESHIS += ` → ${GOZ_MODEL}`;
         alintiIsaretle(v, sayfalar);
-        return { v, ham: v, sayfalar, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })) };
+        return { v, ham: structuredClone(v), sayfalar, kaynaklar: sayfalar.map((x) => ({ baslik: x.baslik, url: x.url })), girdi: { kullanici, sayfalar, model: GOZ_MODEL } };
       }
     }
   } else son = adaylar.length ? `Sayfalar okunamadı (${SAYFA_TESHIS})` : `Sayfa adayı yok (${SAYFA_TESHIS || "Brave anahtarı girilmemiş"})`;
@@ -334,6 +269,12 @@ Deno.serve(async (req) => {
   const zamanlayici = !k?.user && !req.headers.get("x-forwarded-for");
   if (!k?.user && !zamanlayici) return yanit({ error: "Stüdyo girişi gerekli" }, 401);
   const b = await req.json().catch(() => ({}));
+  // Editörün eklediği görsel: yalnız Stüdyo oturumuyla
+  if (Number.isInteger(b.oneri_id) && (b.dosya || b.adres)) {
+    if (!k?.user) return yanit({ error: "Stüdyo girişi gerekli" }, 401);
+    const r = await elleGorsel(sb, b).catch((e) => ({ error: String((e as Error).message ?? e).slice(0, 200) }));
+    return yanit(r, "error" in r ? 400 : 200);
+  }
   const adet = Math.min(3, Math.max(1, Number(b.adet) || (zamanlayici ? 3 : 2)));
   // Tek seferde bir tur (5 Kasım 2026): önceki tur sürüyorsa yeni tur başlamaz (zincirin sıradaki turu hariç); aynı ürün iki kez işlenmesin
   if (!Number.isInteger(b.urun_id) && !b.zincir && await turSuruyor(sb)) return yanit(zamanlayici ? { atlandi: "önceki tur sürüyor" } : { islenen: [], kalan: 1, suruyor: true });
@@ -350,6 +291,83 @@ async function cfAyar(sb: ReturnType<typeof createClient>) {
   return m.cloudflare_adres && m.cloudflare_anahtar ? { adres: String(m.cloudflare_adres).replace(/\/$/, ""), anahtar: String(m.cloudflare_anahtar) } : null;
 }
 type GorselSatir = { id: number; urun_id: number; urun_adi?: string; gorsel_aday: UrunGorseli | null };
+type AlbumGorsel = { gorsel: string; url: string; sayfa: string };
+const gorselTuru = (v: Uint8Array) => v[0] === 0x89 && v[1] === 0x50 ? "image/png" : v[0] === 0xff && v[1] === 0xd8 ? "image/jpeg" : String.fromCharCode(...v.slice(8, 12)) === "WEBP" ? "image/webp" : "";
+const seffafMi = (v: Uint8Array, mime: string) => mime === "image/png" ? v[25] === 6 || v[25] === 4 : mime === "image/webp" ? String.fromCharCode(...v.slice(12, 16)) === "VP8X" && !!(v[20] & 0x10) : false;
+/** Künye albümü (6 Kasım 2026, kullanıcı: "albümünde yaşam tarzı vs. kaliteli, öncelik kaynaktan görseller yer alabilir"): seçimin albüm
+ *  adayları (yalnız üreticinin kendi görselleri, en çok 5) indirilip olduğu gibi kovaya konur; editör onayda hangilerinin gireceğini seçer. */
+async function albumIsle(sb: ReturnType<typeof createClient>, s: GorselSatir, bitis: number): Promise<AlbumGorsel[]> {
+  const out: AlbumGorsel[] = [];
+  for (const a of (s.gorsel_aday?.albumAday ?? []).slice(0, 5)) {
+    if (bitis - Date.now() < 50_000) break;
+    try {
+      const g = await fetch(a.url, { headers: { "User-Agent": UA, Accept: "image/*", Referer: a.sayfa }, signal: AbortSignal.timeout(20_000) });
+      if (!g.ok) { await g.body?.cancel().catch(() => {}); continue; }
+      const veri = new Uint8Array(await g.arrayBuffer());
+      const mime = gorselTuru(veri);
+      if (!mime || veri.byteLength > 6e6) continue;
+      const yol = `${s.urun_id}-${s.id}-a${out.length + 1}.${mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg"}`;
+      const { error } = await sb.storage.from("kunye").upload(yol, veri, { contentType: mime, upsert: true });
+      if (!error) out.push({ gorsel: `${ADRES}/storage/v1/object/public/kunye/${yol}?v=${Date.now()}`, url: a.url, sayfa: a.sayfa });
+    } catch { /* sıradaki */ }
+  }
+  return out;
+}
+
+/** Yalnız dış ağdaki https/http adresleri (editörün yapıştırdığı görsel adresi sunucunun iç ağına istek attıramasın) */
+function disAdres(u: string): URL | null {
+  try {
+    const x = new URL(u);
+    const h = x.hostname.toLowerCase();
+    if (!/^https?:$/.test(x.protocol) || !h.includes(".") || /^[\d.]+$/.test(h) || h.includes(":") || /(^|\.)(localhost|local|internal|lan|home|corp)$/.test(h)) return null;
+    return x;
+  } catch { return null; }
+}
+/** Editörün eklediği görsel (6 Kasım 2026, kullanıcı onayı: "görsel bulunamazsa sen ekle"): POST { oneri_id, dosya (base64) | adres }.
+ *  Şeffaf zeminli PNG/WebP arka plan silinmeden tuvale konur; değilse Cloudflare arka planı siler. Yapay zekâ denetimi yok (görseli insan
+ *  seçti, sonucu ekranda görür). Görsel önerinin ilk seçeneği olur. */
+async function elleGorsel(sb: ReturnType<typeof createClient>, b: { oneri_id: number; dosya?: unknown; adres?: unknown }) {
+  const { data: s } = await sb.from("kunye_oneriler").select("id,urun_id,urun_adi,gorsel_aday").eq("id", b.oneri_id).maybeSingle();
+  if (!s) return { error: "Öneri bulunamadı" };
+  let veri: Uint8Array | null = null, kaynak = "";
+  if (typeof b.dosya === "string" && b.dosya) {
+    try { veri = Uint8Array.from(atob(b.dosya.replace(/^data:[^,]*,/, "")), (c) => c.charCodeAt(0)); } catch { return { error: "Dosya okunamadı" }; }
+  } else if (typeof b.adres === "string" && b.adres.trim()) {
+    let u = disAdres(b.adres.trim());
+    if (!u) return { error: "Bu adres kullanılamıyor; görselin tam adresini (https://…) yapıştır" };
+    kaynak = u.href;
+    for (let adim = 0; adim < 4 && u && !veri; adim++) {
+      const r: Response | null = await fetch(u, { headers: { "User-Agent": UA, Accept: "image/webp,image/png,image/jpeg,image/*;q=0.8" }, redirect: "manual", signal: AbortSignal.timeout(25_000) }).catch(() => null);
+      if (r && r.status >= 300 && r.status < 400 && r.headers.get("location")) { await r.body?.cancel().catch(() => {}); u = disAdres(new URL(r.headers.get("location")!, u).href); continue; }
+      if (!r?.ok) { await r?.body?.cancel().catch(() => {}); return { error: `Görsel bu adresten indirilemedi (${r?.status ?? "yanıt yok"}). Görseli bilgisayarına indirip buraya sürükle.` }; }
+      if (Number(r.headers.get("content-length") ?? 0) > 15e6) { await r.body?.cancel().catch(() => {}); return { error: "Görsel 15 MB'tan büyük" }; }
+      veri = new Uint8Array(await r.arrayBuffer());
+    }
+  }
+  if (!veri) return { error: "Görsel dosyası ya da adresi gerekli" };
+  if (veri.byteLength > 15e6) return { error: "Görsel 15 MB'tan büyük" };
+  const mime = gorselTuru(veri);
+  if (!mime) return { error: "Bu bir görsel değil (JPEG, PNG ya da WebP olmalı). Adres bir sayfanın adresiyse görselin kendi adresini yapıştır." };
+  let webp = seffafMi(veri, mime) ? await seffafTuval(veri) : null;
+  const seffaf = !!webp;
+  if (!webp) {
+    const cf = await cfAyar(sb);
+    if (!cf) return { error: "Arka plan silme programı kurulu değil (Bağlantı anahtarları → Cloudflare)" };
+    const r = await fetch(cf.adres, { method: "POST", headers: { "x-anahtar": cf.anahtar, "Content-Type": mime }, body: veri, signal: AbortSignal.timeout(60_000) }).catch(() => null);
+    if (!r?.ok) { const h = r ? (await r.text()).slice(0, 120) : "yanıt yok"; return { error: `Arka plan silinemedi (${r?.status ?? ""} ${h})` }; }
+    webp = new Uint8Array(await r.arrayBuffer());
+  }
+  const yol = `${s.urun_id}-${s.id}-e${Date.now().toString(36)}.webp`;
+  const { error } = await sb.storage.from("kunye").upload(yol, webp, { contentType: "image/webp", upsert: true });
+  if (error) return { error: "Yükleme: " + error.message };
+  const gorsel = `${ADRES}/storage/v1/object/public/kunye/${yol}`;
+  const eski = (s.gorsel_aday ?? {}) as Partial<UrunGorseli> & { secenekler?: { gorsel: string; url: string; sayfa: string }[] };
+  const marka = String(s.urun_adi ?? "").split(" ")[0];
+  await sb.from("kunye_oneriler").update({ gorsel, gorsel_durum: "hazir", gorsel_hata: null,
+    gorsel_aday: { ...eski, url: kaynak, sayfa: kaynak, kaynak: "Üretici", yazar: eski.yazar || marka, lisans: eski.lisans || "Basın görseli", neden: "Editör ekledi",
+      secenekler: [{ gorsel, url: kaynak, sayfa: kaynak }, ...(eski.secenekler ?? [])].slice(0, 4), secenek_surum: SECENEK_SURUMU } }).eq("id", s.id);
+  return { gorsel, seffaf };
+}
 // Görsel seçenekleri (5 Kasım 2026, kullanıcı: "fotoğraf seçeneklerini bize de sunsun, onaydan geçenlerden bir tane veriyor"):
 // seçilen aday ve yedekleri sırayla kesilir, denetimden geçenlerden en çok GORSEL_SECENEK tanesi saklanır (gorsel_aday.secenekler).
 // İlk geçen künyenin önerilen görseli olur; editör onay ekranında başkasını seçebilir. Süre azsa ilk geçenle yetinilir.
@@ -357,7 +375,10 @@ const GORSEL_SECENEK = 3;
 const SECENEK_SURUMU = 2; // 2: aynı çekimin kopyaları ayıklanır; eski sürümle hazırlanmış bekleyen öneriler yeniden kesilir
 async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, s: GorselSatir, bitis = Date.now() + 150_000, mevcut?: string) {
   const yaz = (x: Record<string, unknown>) => sb.from("kunye_oneriler").update(x).eq("id", s.id);
-  if (!s.gorsel_aday?.url) { await yaz({ gorsel_durum: "yok" }); return; }
+  // Künye albümü (6 Kasım 2026): üreticinin albüm adayları olduğu gibi (kesilmeden) "kunye" kovasına konur; bir kez hazırlanır
+  const album = (s.gorsel_aday as (UrunGorseli & { album?: AlbumGorsel[] }) | null)?.album ?? (s.gorsel_aday?.albumAday?.length ? await albumIsle(sb, s, bitis) : undefined);
+  const albumEk = album ? { album } : {};
+  if (!s.gorsel_aday?.url) { await yaz({ gorsel_durum: "yok", ...(s.gorsel_aday ? { gorsel_aday: { ...s.gorsel_aday, ...albumEk } } : {}) }); return; }
   const sira = [{ url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa, alfa: s.gorsel_aday.alfa }, ...(s.gorsel_aday.yedekler ?? [])];
   const secenekler: { gorsel: string; url: string; sayfa: string }[] = [];
   const boylar: number[] = [];
@@ -392,18 +413,18 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
     } catch (e) { son = String((e as Error).message); }
   }
   // Var olan hazır görsele seçenek eklenirken hiçbiri geçmediyse eldeki görsel korunur
-  if (!secenekler.length && mevcut) { await yaz({ gorsel_aday: { ...s.gorsel_aday, secenekler: [{ gorsel: mevcut, url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa }], secenek_surum: SECENEK_SURUMU } }); return; }
-  if (!secenekler.length) { await yaz({ gorsel_durum: "hata", gorsel_hata: son.slice(0, 200) }); return; }
+  if (!secenekler.length && mevcut) { await yaz({ gorsel_aday: { ...s.gorsel_aday, ...albumEk, secenekler: [{ gorsel: mevcut, url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa }], secenek_surum: SECENEK_SURUMU } }); return; }
+  if (!secenekler.length) { await yaz({ gorsel_durum: "hata", gorsel_hata: son.slice(0, 200), gorsel_aday: { ...s.gorsel_aday, ...albumEk } }); return; }
   const ilk = secenekler[0];
   await yaz({ gorsel: ilk.gorsel, gorsel_durum: "hazir", gorsel_hata: null,
-    gorsel_aday: { ...s.gorsel_aday, url: ilk.url, sayfa: ilk.sayfa, secenekler, secenek_surum: SECENEK_SURUMU,
+    gorsel_aday: { ...s.gorsel_aday, ...albumEk, url: ilk.url, sayfa: ilk.sayfa, secenekler, secenek_surum: SECENEK_SURUMU,
       ...(ilk.url !== s.gorsel_aday.url ? { neden: "Sıradaki aday (ilk seçimin kesimi denetimden geçmedi)" } : {}) } });
 }
 
 // Yalnız yapay zekâ kotası (5 Kasım 2026: üretici sitesinin "429 çok fazla istek" yanıtı da kota sanılıyordu; ürün işaretlenmediği için
 // her tur aynı ürüne takılıyor, zincir de duruyordu). Sayfa okuma durumları ("shop.panasonic.com 429") sayılmaz.
-// Yalnız Gemini kotası durdurur (Groq yedeği 5 Kasım 2026'da çıkarıldı).
-const kotaDolu = (m: string) => /RESOURCE_EXHAUSTED|\bgemini-[\w.-]+ 429\b|exceeded your current quota/i.test(m);
+// 6 Kasım 2026: künye yalnız Claude ile çalışır; kredisi biterse ya da anahtarı yoksa tur durur, ürün "hata" diye işaretlenmez.
+const kotaDolu = (m: string) => /Claude kredisi bitti|Claude anahtarı yok/i.test(m);
 // Künye yalnız çıkmış ürüne (5 Kasım 2026, kullanıcı onayı): söylenti, sızıntı, test kaydı, takvimdeki ürün atlanır
 const CIKMIS = new Set(["satista", "duyuruldu", "eol"]);
 // Yöntem sürümü: değişince eski yöntemin bekleyen önerileri yeniden çıkarılır (yenisi gelince eskisi "hata: yerine yeni öneri geldi" olur).
@@ -432,7 +453,7 @@ function boyutDuzelt(tur: string, deger: string) {
 
 // Görselsiz kalan yeni öneriler (5 Kasım 2026): görsel kuralları değişince (ör. telefonun önü+arkası artık geçer) bir kez daha aranır.
 // Yeni ürünler önce gelir; tur bittikten sonra süre kaldıysa tek öneri. Denenen öneri GORSEL_SURUMU ile işaretlenir, aynı sürümle tekrar denenmez.
-const GORSEL_SURUMU = "2026-11-05c"; // c: bayi sayfası yedeği geldi, görselsizler bir kez daha aranır
+const GORSEL_SURUMU = "2026-11-06a"; // 6 Kasım: tek seçim (üretici + bayi birlikte) ve albüm; görselsiz bekleyenler bir kez daha aranır
 async function gorselTekrar(sb: ReturnType<typeof createClient>, cf: { adres: string; anahtar: string }, surum: string, t0: number) {
   const bitis = t0 + 370_000;
   if (bitis - Date.now() < 200_000) return null;
@@ -458,7 +479,11 @@ async function gorselTekrar(sb: ReturnType<typeof createClient>, cf: { adres: st
   const iz: string[] = [];
   const g = await urunGorseliBul(sb, { marka: u.brand, ad, tur: u.type, sayfalar, braveSinir: BRAVE_AY_SINIR, bitis }, iz).catch((e) => { iz.push("görsel hata: " + String(e).slice(0, 60)); return null; });
   const yaz = (x: Record<string, unknown>) => sb.from("kunye_oneriler").update(x).eq("id", s.id);
-  if (!g) { await yaz({ gorsel_aday: { surum: GORSEL_SURUMU }, gorsel_durum: "yok", gorsel_hata: ("2. deneme: " + iz.join(" · ")).slice(0, 200) }); return { urun: `${u.brand} ${ad}`, durum: "görsel yine yok" }; }
+  if (!g?.url) {
+    await yaz({ gorsel_aday: { ...(g ?? {}), surum: GORSEL_SURUMU }, gorsel_durum: "yok", gorsel_hata: ("2. deneme: " + iz.join(" · ")).slice(0, 200) });
+    if (g?.albumAday?.length) await gorselIsle(sb, cf, { id: s.id as number, urun_id: s.urun_id as number, urun_adi: `${u.brand} ${ad}`, gorsel_aday: { ...g, surum: GORSEL_SURUMU } as UrunGorseli }, bitis);
+    return { urun: `${u.brand} ${ad}`, durum: "görsel yine yok" };
+  }
   const aday = { ...g, surum: GORSEL_SURUMU };
   await yaz({ gorsel_aday: aday, gorsel_durum: "isleniyor", gorsel_hata: null });
   if (bitis - Date.now() > 45_000) await gorselIsle(sb, cf, { id: s.id as number, urun_id: s.urun_id as number, urun_adi: `${u.brand} ${ad}`, gorsel_aday: aday }, bitis);
@@ -490,7 +515,10 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
     const { data: bekleyen } = await sb.from("kunye_oneriler").select("urun_id").eq("durum", "bekliyor").gte("created_at", surum);
     const yedi = new Date(Math.max(Date.now() - 7 * 864e5, Date.parse(surum))).toISOString();
     const { data: denenen } = await sb.from("kunye_oneriler").select("urun_id").gte("created_at", yedi);
-    const atla = new Set([...(bekleyen ?? []), ...(denenen ?? [])].map((x) => x.urun_id));
+    // Editörün reddettiği ürün kendiliğinden yeniden denenmez (6 Kasım 2026, kullanıcı onayı: 7 gün sonra baştan deneyip aynı parayı
+    // harcıyordu); yalnız ürün tek tek istenince (urun_id) ya da yöntem sürümü değişince yeniden çıkarılır
+    const { data: red } = await sb.from("kunye_oneriler").select("urun_id").eq("durum", "reddedildi").gte("created_at", surum);
+    const atla = new Set([...(bekleyen ?? []), ...(denenen ?? []), ...(red ?? [])].map((x) => x.urun_id));
     urunler = tum.filter((u) => CIKMIS.has(u.status ?? "satista") && !atla.has(u.id) && (u.specs?.length ?? 0) > 0 && (u.specs ?? []).filter((s) => s.value).length < (u.specs ?? []).length / 2);
   }
   const kalan = Math.max(0, urunler.length - adet);
@@ -529,11 +557,11 @@ async function isle(sb: ReturnType<typeof createClient>, b: { urun_id?: unknown 
       const gorsel = bitis - Date.now() < 100_000 ? (gIz.push("görsel: süre yetmedi"), null) : await urunGorseliBul(sb, { marka: u.brand, ad: resmiAd || u.name, tur: u.type, sayfalar: uSayfa, braveSinir: BRAVE_AY_SINIR, bitis }, gIz).catch((e) => { gIz.push("görsel hata: " + String(e).slice(0, 60)); return null; });
       const kayit = { urun_id: u.id, urun_adi: `${u.brand} ${u.name}`, tur: u.type, ozellikler: oz, kaynaklar: [...kaynaklar, ...(Array.isArray(v?.silinen) && v.silinen.length ? [{ baslik: "İkinci gözün sildikleri", url: "", silinen: v.silinen }] : [])], durum: oz.length || resmiAd ? "bekliyor" : "hata", hata: oz.length || resmiAd ? null : "Kaynaklarda değer bulunamadı" };
       // Görsel sütunları göç 0043 ile geldi; uygulanmamışsa kayıt görselsiz yazılır
-      const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, ...(resmiAd ? { resmi_ad: resmiAd } : {}), gorsel_aday: gorsel, gorsel_durum: gorsel ? "isleniyor" : "yok", ...(gorsel ? {} : { gorsel_hata: gIz.join(" · ").slice(0, 200) || null }) }).select("id").single();
+      const { data: yeni, error } = await sb.from("kunye_oneriler").insert({ ...kayit, ...(resmiAd ? { resmi_ad: resmiAd } : {}), gorsel_aday: gorsel, gorsel_durum: gorsel?.url ? "isleniyor" : "yok", ...(gorsel?.url ? {} : { gorsel_hata: gIz.join(" · ").slice(0, 200) || null }) }).select("id").single();
       if (error) await sb.from("kunye_oneriler").insert(kayit);
       // Yeni öneri hazırsa aynı ürünün eski yöntemle bekleyen önerisi kalkar
       if (yeni && kayit.durum === "bekliyor") await sb.from("kunye_oneriler").update({ durum: "hata", hata: "Yerine yeni öneri geldi (5 Kasım yöntemi)" }).eq("urun_id", u.id).eq("durum", "bekliyor").lt("created_at", surum);
-      // Künye kıyası (göç 0065): arka planda, öneriyi bekletmez; kıyasta asıl modelin (Gemini) ikinci gözden önceki hâli ölçülür
+      // Künye kıyası (göç 0065): arka planda, öneriyi bekletmez; asıl modelin (Claude Sonnet) çıkardığı da aynı ölçüyle yazılır
       if (yeni && girdi && Math.random() * 100 < kiyasOran) {
         // @ts-ignore EdgeRuntime Supabase ortamında tanımlı
         EdgeRuntime.waitUntil(kunyeKiyas(sb, String(yeni.id), girdi, adlar, ham ?? v).catch((e) => console.error("künye kıyası", e)));

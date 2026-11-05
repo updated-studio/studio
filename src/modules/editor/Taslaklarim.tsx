@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Ikon } from "../../shared/Ikon";
 import { useCanli } from "../../shared/canli";
@@ -8,10 +8,13 @@ import * as api from "../site/api";
 import type { Icerik, PanelKullanici } from "../site/api";
 import Duzenle from "../site/Duzenle";
 import Rehber, { HABER_ADIMLARI } from "./Rehber";
+import { useAuth } from "../../shared/auth";
+import { MasaProvider } from "../haber-masasi/veri";
+import { SiraTablo, TAZE_SAAT, useSira, type Satir } from "./sira";
 import "../site/site.css";
 
 // Taslaklar (1 Kasım 2026): sitedeki taslak ve incelemedeki haberler, herkesinki (kullanıcı: "sahiplikleri kaldır"). Haber yazma ekranı
-// Site modülünün haber editörüdür (Duzenle), üstünde ilk giriş rehberi açılır.
+// Site modülünün haber editörüdür (Duzenle), üstünde ilk giriş rehberi açılır. 6 Kasım 2026'dan beri liste Masam'la aynı sıradır (sira.tsx).
 
 let benOnbellek: Promise<PanelKullanici | null> | null = null;
 export function usePanelKullanici() {
@@ -51,63 +54,52 @@ export function HaberYaz({ id }: { id: number | "yeni" }) {
 
 export const SiteYetkisiYok = () => <div className="empty">Haber yazmak için site yetkin yok. Yöneticiden Stüdyo'da <b>Ekip → Yönetim</b> bölümünde sana bir site rolü vermesini iste.</div>;
 
-export default function Taslaklarim() {
+/** Taslaklar (6 Kasım 2026, yeni düzen): Masam'daki sıranın tamamı. Sitedeki haber taslakları ile Haber Masası'nda yazılıp siteye henüz
+ *  gitmemiş taslaklar tek listede; 48 saatten eski olanlar "Eskiyenler" altında. Satır sitedeki editörü (ya da yazım kaydını) açar. */
+function TaslakListe() {
+  const { profile } = useAuth();
   const { kullanici, hata } = usePanelKullanici();
-  const canli = useCanli();
-  const [liste, setListe] = useState<Icerik[] | null>(null);
   const git = useNavigate();
-  // Sıralama ve süzgeç (3 Kasım 2026, kullanıcı: "son hazırlattığım en üste gelmiyor; detaylı filtreleme ve sıralama")
-  const [sira, setSira] = useState<"yeni" | "guncel" | "kontrol">("yeni");
+  const { satirlar, taze, hata: siteHata, yenile } = useSira(kullanici, profile!.id);
   const [kim, setKim] = useState<"hepsi" | "benim">("hepsi");
-  const durum: "hepsi" | "taslak" = "hepsi";
   const [ara, setAra] = useState("");
-  // Açılışta 1 saatten eski boş taslaklar (sekme kapanınca kalanlar) panelde temizlenir, sonra liste gelir (4 Kasım 2026)
-  const yukle = useCallback(() => { if (kullanici) api.bosTaslakSil().catch(() => null).then(() => taslaklar()).then(setListe).catch(() => setListe([])); }, [kullanici]);
-  useEffect(yukle, [yukle]);
-  const benimYazar = kullanici ? (typeof kullanici.author === "object" ? kullanici.author?.id : kullanici.author) ?? null : null;
-  const yazarId = (x: Icerik) => { const a = (x as { author?: number | { id: number } | null }).author; return typeof a === "object" ? a?.id ?? null : a ?? null; };
-  const suz = (l: Icerik[]) => l
-    // Onaya gönderilenler kendi bölümünde (Onay bekleyenler, 4 Kasım 2026); burada yalnız taslaklar
-    .filter((x) => (kim === "hepsi" || yazarId(x) === benimYazar) && (x.workflow?.state ?? "taslak") !== "incelemede" && (durum === "hepsi" || (x.workflow?.state ?? "taslak") === durum)
-      && (!ara.trim() || (x.title ?? "").toLocaleLowerCase("tr").includes(ara.trim().toLocaleLowerCase("tr"))))
-    .sort((a, b) => sira === "kontrol" ? kontrolSayisi(b) - kontrolSayisi(a)
-      : sira === "guncel" ? +new Date(b.updatedAt) - +new Date(a.updatedAt)
-      : +new Date((b as { createdAt?: string }).createdAt ?? b.updatedAt) - +new Date((a as { createdAt?: string }).createdAt ?? a.updatedAt));
+  // Açılışta 1 saatten eski boş taslaklar (sekme kapanınca kalanlar) panelde temizlenir, sonra liste tazelenir (4 Kasım 2026)
+  useEffect(() => { if (kullanici) api.bosTaslakSil().catch(() => null).then(yenile); }, [kullanici]); // eslint-disable-line react-hooks/exhaustive-deps
   if (hata) return <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
-  if (kullanici === null) return <SiteYetkisiYok />;
+  const q = ara.trim().toLocaleLowerCase("tr");
+  const suz = (l: Satir[]) => l.filter((s) => (kim === "hepsi" || s.benim) && (!q || s.baslik.toLocaleLowerCase("tr").includes(q)));
+  const tazeler = suz(taze ?? []);
+  const eski = suz((satirlar ?? []).filter((s) => !(taze ?? []).includes(s)));
   return (
-    <div className="ed-sayfa">
-      <div className="ed-bas">
-        <div><span className="ed-ust">ONAYA GÖNDERİLMEMİŞ</span><h1>Taslaklar</h1></div>
-        <button className="btn ed-ana" onClick={() => git("/yaz/yeni")}><Ikon ad="plus" />Yeni haber yaz</button>
+    <div className="mas">
+      <div className="mas-bas">
+        <div><h1>Taslaklar</h1><p className="mas-bulgu">{satirlar === null ? "Yükleniyor…" : <><b>{(taze ?? []).filter((s) => s.adim === 2).length} taslak okunmayı bekliyor.</b> Sıra öncelik puanına göre; satır taslağı açar.</>}</p></div>
+        <div className="mas-eylem"><button className="btn" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Yeni yaz</button></div>
       </div>
-      {!liste ? <div className="muted">Yükleniyor…</div> : !liste.length ? (
-        <div className="ed-bos"><Ikon ad="taslak" /><b>Bekleyen taslak yok</b><span>Yeni bir haber yazmaya başla; rehber adım adım gösterecek.</span><button className="btn" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Haber yaz</button></div>
-      ) : (
-        <>
-        <div className="taslak-suzgec">
+      {kullanici === null && <div className="msg err">Sitede yetkin olmadığı için yalnız Haber Masası'nın yazım kayıtları görünüyor. Yöneticiden site rolü iste.</div>}
+      {siteHata && <div className="msg err">Sitedeki taslaklar alınamadı: {siteHata}</div>}
+      <section className="mas-kart" aria-label="Taslaklar">
+        <div className="mas-kart-bas">
           <div className="segment" role="group" aria-label="Kimin taslakları">
-            {([["hepsi", "Hepsi"], ["benim", "Benim"]] as const).map(([k, ad]) => <button key={k} aria-pressed={kim === k} onClick={() => setKim(k)}>{ad}</button>)}
+            {([["hepsi", "Hepsi"], ["benim", "Benim yazdırdıklarım"]] as const).map(([k, ad]) => <button key={k} aria-pressed={kim === k} onClick={() => setKim(k)}>{ad}</button>)}
           </div>
-          <input type="search" placeholder="Başlıkta ara" aria-label="Başlıkta ara" value={ara} onChange={(e) => setAra(e.target.value)} />
-          <label>Sırala<select value={sira} onChange={(e) => setSira(e.target.value as typeof sira)}><option value="yeni">En yeni hazırlanan</option><option value="guncel">Son güncellenen</option><option value="kontrol">Kontrolü en çok biten</option></select></label>
-
+          <input type="search" className="mas-ara" placeholder="Başlıkta ara" aria-label="Başlıkta ara" value={ara} onChange={(e) => setAra(e.target.value)} />
         </div>
-        <div className="ed-liste">
-          {suz(liste).map((x) => (
-            <button key={x.id} className="ed-satir" onClick={() => git(`/yaz/${x.id}`)}>
-              <span className="ed-satir-m"><b>{x.title || "Başlıksız taslak"}</b><span className="muted">{api.ad(x.category as never) || "Kategori yok"} · {zaman(x.updatedAt)}</span></span>
-              <AcikTutan kisiler={canli.kisiler.filter((k) => k.id !== canli.ben && k.nesne?.tur === "haber" && k.nesne.id === x.id)} />
-              <span className={`site-durum site-durum--${x.workflow?.state ?? "taslak"}`}>{api.DURUMLAR[x.workflow?.state ?? "taslak"]}</span>
-              <span className={kontrolSayisi(x) >= 10 ? "ed-sayi tamam" : "ed-sayi"} title="Yayın öncesi kontrol">{kontrolSayisi(x)}/10</span>
-              <Ikon ad="ileri" />
-            </button>
-          ))}
-        </div>
-        </>
+        {satirlar === null ? <div className="mas-bos">Yükleniyor…</div> : !tazeler.length ? (
+          <div className="mas-bos">{q || kim === "benim" ? "Bu süzgece uyan taslak yok." : "Bekleyen taslak yok. Gelen haberlerden taslak hazırlatabilir ya da kendin yazabilirsin."}</div>
+        ) : <SiraTablo satirlar={tazeler} />}
+      </section>
+      {eski.length > 0 && (
+        <details className="mas-kart mas-eski">
+          <summary>Eskiyenler <span className="mas-say">{eski.length}</span><span className="muted"> · {TAZE_SAAT} saatten eski, sıradan düşenler</span></summary>
+          <SiraTablo satirlar={eski} ilkAna={false} />
+        </details>
       )}
     </div>
   );
+}
+export default function Taslaklarim() {
+  return <MasaProvider><TaslakListe /></MasaProvider>;
 }
 
 /** Yayındakiler (4 Kasım 2026, kullanıcı: "yayındaki haberler taslaktan düzenlenmesin, onlara özel alan olsun"): sitede yayında olan haberler;
@@ -132,7 +124,7 @@ export function Yayindakiler() {
   return (
     <div className="ed-sayfa">
       <div className="ed-bas"><div><span className="ed-ust">SİTEDE YAYINDA</span><h1>Yayındakiler</h1></div></div>
-      <div className="muted">Yayındaki bir haberi açıp düzeltebilirsin. Kaydettiğin değişiklik taslak olarak bekler; sitedeki hâli yayın yönetmeni yeniden yayınlayınca değişir.</div>
+      <div className="muted">Yayındaki bir haberi açıp düzeltebilirsin. Kaydettiğin değişiklik taslak olarak bekler; sitedeki hâli yeniden yayınlayınca değişir.</div>
       <div className="taslak-suzgec"><input type="search" placeholder="Başlıkta ara" aria-label="Başlıkta ara" value={ara} onChange={(e) => { setAra(e.target.value); setSayfa(1); }} /></div>
       {!liste ? <div className="muted">Yükleniyor…</div> : !liste.length ? <div className="muted">Sonuç yok.</div> : (
         <div className="ed-liste">

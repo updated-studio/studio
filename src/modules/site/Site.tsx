@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "../../shared/toast";
 import * as api from "./api";
@@ -12,9 +12,6 @@ import TopluCubuk, { Secim, TumunuSec } from "./Toplu";
 import ListeAraclari, { aracAlanlari, hucre, kosullariEkle, sorguAnahtari, useAraclar, type AracAlan } from "./ListeAraclari";
 import "./site.css";
 import KunyeOnay from "./KunyeOnay";
-// Haber Masası Site'nin ilk bölümü (31 Ekim 2026, kullanıcı: "haber masası bence site modülünün içerisinde olmalı"): masadan seçilen haber
-// taslak olur, Site'de yayınlanır; tek yerde durur. Site rolü olmayan ekip üyesi de masayı görür. Eski #/haber-masasi adresi çalışmaya devam eder.
-const HaberMasasi = lazy(() => import("../haber-masasi/HaberMasasi"));
 
 // Site: updated.com.tr'deki haberler, incelemeler ve karşılaştırmalar (yayın paneli Payload'a Stüdyo girişiyle bağlanır).
 // Panelin bütün bölümleri Stüdyo'da: haberler özel ekranda (Duzenle.tsx), diğer her bölüm panelin alan yapısından çizilen
@@ -162,12 +159,9 @@ function Liste({ kullanici, k, ks, ilkSekme }: { kullanici: PanelKullanici; k: K
 export default function Site() {
   const [kullanici, setKullanici] = useState<PanelKullanici | null | undefined>(undefined);
   const [hata, setHata] = useState("");
-  const [sp] = useSearchParams();
-  // Bildirimden bir site bölümü istendiyse (#/site?bolum=…) doğrudan içerik açılır; yoksa son seçilen (varsayılan Haber Masası)
-  const [ust, setUst] = useState<"masa" | "icerik">(() => { if (sp.get("bolum")) return "icerik"; try { return localStorage.getItem("site-ust") === "icerik" ? "icerik" : "masa"; } catch { return "masa"; } });
+  // 6 Kasım 2026 (yeni düzen): üstteki "Haber Masası | Site içeriği" sekmesi kalktı; Haber Masası menüde "Gelen" olarak kendi yerinde.
+  // Açılan bölüm adreste durur (#/site?bolum=products): menüdeki Künyeler, İncelemeler, Kıyaslamalar, Topluluk, Site doğrudan o bölümü açar.
   useEffect(() => { api.ben().then(setKullanici).catch((e) => setHata((e as Error).message)); }, []);
-  useEffect(() => { if (sp.get("bolum")) setUst("icerik"); }, [sp]);
-  const sec = (x: "masa" | "icerik") => { setUst(x); try { localStorage.setItem("site-ust", x); } catch { /* depolama kapalı */ } };
 
   let icerik: React.ReactNode;
   if (hata) icerik = <div className="empty">Site paneline bağlanılamadı: {hata}</div>;
@@ -180,13 +174,7 @@ export default function Site() {
   );
   else icerik = <Gezinme kullanici={kullanici} />;
 
-  return <>
-    <div className="segment site-ust" role="tablist" aria-label="Site">
-      <button role="tab" aria-selected={ust === "masa"} aria-pressed={ust === "masa"} onClick={() => sec("masa")}>Haber Masası</button>
-      <button role="tab" aria-selected={ust === "icerik"} aria-pressed={ust === "icerik"} onClick={() => sec("icerik")}>Site içeriği</button>
-    </div>
-    {ust === "masa" ? <Suspense fallback={<div className="muted">Yükleniyor…</div>}><HaberMasasi /></Suspense> : icerik}
-  </>;
+  return <>{icerik}</>;
 }
 
 const GRUP_SIRASI = ["İçerik", "Topluluk", "Künye", "Kanallar", "Gelir", "Kulüp", "Ekip", "Ayarlar"];
@@ -197,39 +185,39 @@ type Bolum = { tur: "k"; s: KoleksiyonSema } | { tur: "g"; s: PanelSema["genel"]
 function Gezinme({ kullanici }: { kullanici: PanelKullanici }) {
   const [sema, setSema] = useState<PanelSema | null>(null);
   const [hata, setHata] = useState("");
-  const [grup, setGrup] = useState("İçerik");
-  const [secili, setSecili] = useState("news");
+  const [sp, setSp] = useSearchParams();
+  // Seçili bölüm adresten okunur ve adrese yazılır (menü hangi bölümde olduğumuzu buradan bilir)
+  const secili = sp.get("bolum") || "news";
+  const setSecili = (slug: string) => setSp({ bolum: slug }, { replace: true });
   const [genelAcik, setGenelAcik] = useState(false);
   const [ilkSekme, setIlkSekme] = useState<{ s: Sekme; n: number } | null>(null);
   // Bildirimden gelince (#/site?bolum=yorumlar) o bölüm açılır; yayın kuyruğundan gelince (&sekme=incelemede) o sekme
-  const [sp, setSp] = useSearchParams();
   useEffect(() => { alanlar().then(setSema).catch((e) => setHata((e as Error).message)); }, []);
+  useEffect(() => { setGenelAcik(false); }, [secili]);
   useEffect(() => {
-    const istenen = sp.get("bolum");
-    if (!sema || !istenen) return;
-    const x = [...sema.koleksiyonlar, ...sema.genel].find((s) => s.slug === istenen);
-    if (x) { setGrup(x.grup); setSecili(x.slug); setGenelAcik(false); }
     const sk = sp.get("sekme") as Sekme | null;
-    if (sk && SEKMELER.some(([a]) => a === sk)) setIlkSekme((o) => ({ s: sk, n: (o?.n ?? 0) + 1 }));
-    setSp({}, { replace: true });
-  }, [sema, sp, setSp]);
+    if (!sema || !sk) return;
+    if (SEKMELER.some(([a]) => a === sk)) setIlkSekme((o) => ({ s: sk, n: (o?.n ?? 0) + 1 }));
+    setSp({ bolum: secili }, { replace: true });
+  }, [sema, sp, setSp, secili]);
   if (hata) return <div className="empty">Bölümler alınamadı: {hata}</div>;
   if (!sema) return <div className="muted">Yükleniyor…</div>;
 
   const bolumler: Bolum[] = [...sema.koleksiyonlar.map((s) => ({ tur: "k" as const, s })), ...sema.genel.map((s) => ({ tur: "g" as const, s }))];
   const gruplar = [...new Set(bolumler.map((b) => b.s.grup))].sort((a, b) => (GRUP_SIRASI.indexOf(a) + 99) % 99 - (GRUP_SIRASI.indexOf(b) + 99) % 99);
-  const gruptakiler = bolumler.filter((b) => b.s.grup === grup);
-  const b = bolumler.find((x) => x.s.slug === secili) ?? gruptakiler[0];
+  const b = bolumler.find((x) => x.s.slug === secili) ?? bolumler.find((x) => x.s.slug === "news") ?? bolumler[0];
+  const grup = b.s.grup;
+  const gruptakiler = bolumler.filter((x) => x.s.grup === grup);
   const ad = (x: Bolum) => (x.tur === "k" ? x.s.cogul : x.s.ad);
 
   return (
     <SemaCtx.Provider value={sema}>
       <div className="segment" role="group" aria-label="Bölüm grubu">
-        {gruplar.map((g) => <button key={g} aria-pressed={grup === g} onClick={() => { setGrup(g); setSecili(bolumler.find((x) => x.s.grup === g)!.s.slug); setGenelAcik(false); }}>{g}</button>)}
+        {gruplar.map((g) => <button key={g} aria-pressed={grup === g} onClick={() => setSecili(bolumler.find((x) => x.s.grup === g)!.s.slug)}>{g}</button>)}
       </div>
       {gruptakiler.length > 1 && (
         <div className="segment" role="group" aria-label="Bölüm">
-          {gruptakiler.map((x) => <button key={x.s.slug} aria-pressed={b.s.slug === x.s.slug} onClick={() => { setSecili(x.s.slug); setGenelAcik(false); }}>{ad(x)}</button>)}
+          {gruptakiler.map((x) => <button key={x.s.slug} aria-pressed={b.s.slug === x.s.slug} onClick={() => setSecili(x.s.slug)}>{ad(x)}</button>)}
         </div>
       )}
       {grup === "Künye" && <KunyeOnay />}

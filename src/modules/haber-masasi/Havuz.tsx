@@ -74,21 +74,14 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
     toast,
   ).then((ok) => { if (ok && mesaj) toast(mesaj); return ok; });
 
-  async function al(h: Haber) {
-    const ok = await iyimser(
-      (x) => ({ ...x, haberler: x.haberler.map((y) => (y.id === h.id ? { ...y, status: "alindi", taken_by: ben, touched: true, last_dropped_by: null } : y)) }),
-      () => sb.rpc("tr_take", { p_item: h.id }),
-      toast,
-    );
-    if (ok) toast('Haber sende. "Benim aldıklarım" bölümünde.');
-  }
-
   async function yanlisElendi(h: Haber) {
     const ok = await durumYap(h, "elendi", { wrong_by: ben });
     if (ok) toast("Not alındı, kuralı buna göre düzelteceğiz.");
   }
 
   const ilgiVar = !!(profile!.interests ?? "").trim();
+  // Taslağı yazılmış haber (sistem ya da istekle): yeniden yazdırılmaz, taslağı açılır
+  const taslakOf = new Map(v.taslaklar.filter((t) => t.item_id && !t.deneme).map((t) => [t.item_id as number, t]));
   return (
     <>
       <div className="filtre">
@@ -125,10 +118,12 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
           return (
             <HaberKart key={h.id} h={h} d={d?.get(h.id)} oyGoster={durum === "aday" || durum === "pas"}
               ust={<IsDurumKutusu h={h} tekrar={() => is_(h, "taslak")} />}>
+              {/* 6 Kasım 2026 (kullanıcı: "aldım falan işaretlemeye gerek yok"): haber alınmaz; taslak doğrudan istenir, hazır olunca Masam'da görünür */}
               {durum === "aday" && <>
-                <button className="btn sm" onClick={() => al(h)}>Ben alıyorum</button>
+                {taslakOf.get(h.id)
+                  ? <a className="btn sm" href={taslakOf.get(h.id)!.site_id ? `#/yaz/${taslakOf.get(h.id)!.site_id}` : `#/haber-masasi?b=taslak&t=${taslakOf.get(h.id)!.id}`}>Taslağı aç</a>
+                  : <button className="btn sm" disabled={calisiyor} onClick={() => is_(h, "taslak")}>{calisiyor ? "Taslak yazılıyor…" : "Taslak hazırla"}</button>}
                 <button className="btn ghost sm" onClick={() => durumYap(h, "pas", {}, "Pas geçildi.")}>Pas</button>
-                <button className="btn ghost sm" disabled={calisiyor} onClick={() => is_(h, "taslak")}>{calisiyor ? "Taslak yazılıyor…" : "Taslak hazırla"}</button>
               </>}
               {durum === "pas" && <>
                 <span className="muted">Pas · {kisi(h.updated_by)?.name ?? ""}</span>
@@ -136,11 +131,10 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
               </>}
               {durum === "belirsiz" && <>
                 <button className="btn sm" onClick={() => durumYap(h, "aday", {}, "Havuza alındı.")}>Havuza al</button>
-                <button className="btn ghost sm" onClick={() => al(h)}>Al</button>
                 <button className="btn ghost sm" onClick={() => durumYap(h, "elendi", { reason: "Ekip eledi" })}>Ele</button>
               </>}
               {durum === "rehber" && <>
-                <button className="btn sm" onClick={() => al(h)}>Ben yazarım</button>
+                <button className="btn sm" disabled={calisiyor} onClick={() => is_(h, "taslak")}>{calisiyor ? "Taslak yazılıyor…" : "Taslak hazırla"}</button>
                 <button className="btn ghost sm" onClick={() => durumYap(h, "elendi", { reason: "Ekip eledi (rehber)" })}>İlgilenmiyoruz</button>
               </>}
               {durum === "elendi" && <>

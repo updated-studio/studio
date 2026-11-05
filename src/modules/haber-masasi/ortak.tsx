@@ -143,7 +143,7 @@ export function useIs() {
       const k = hataKaynagi(m, false);
       toast(k.etiket === "Sistem" ? "Başlatılamadı: " + m : `Başlatılamadı (${k.etiket}): ${m}`); return false;
     }
-    if (data?.basladi) toast(tur === "ceviri" ? "Çeviri hazırlanıyor (yaklaşık 20 sn)." : "Taslak yazılıyor (1–3 dakika). Haber \"Benim aldıklarım\"a geçti; taslak hazır olunca bildirim gelir.");
+    if (data?.basladi) toast(tur === "ceviri" ? "Çeviri hazırlanıyor (yaklaşık 20 sn)." : "Taslak yazılıyor (1–3 dakika). Hazır olunca Masam'da ve Taslaklar'da görünür.");
     return true;
   };
 }

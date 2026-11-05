@@ -10,11 +10,11 @@ export type Donem = "hafta" | "ay" | "hepsi";
 
 // PUANLAMA KURALLARI: tek kaynak burası. Ekrandaki "Puan nasıl hesaplanır?" açıklaması bu listeden üretilir.
 // Kural değişince: listeyi güncelle, PUAN_SURUMU tarihini değiştir, ARCHITECTURE.md karar günlüğüne yaz.
-export const PUAN_SURUMU = "5 Kasım 2026";
+// 6 Kasım 2026: "Alınan haber" (1 puan) kalktı; haber alma işareti artık yok (kullanıcı: "aldım falan işaretlemeye gerek yok").
+export const PUAN_SURUMU = "6 Kasım 2026";
 export const PUAN_KURALLARI = [
   { k: "yayin", etiket: "Yayına giden içerik", puan: 3, neden: "Asıl hedef bu: yazarı sen olan haber, inceleme ya da kıyas sitede yayınlanınca (Haber yaz'la yazılanlar dahil)." },
   { k: "is", etiket: "Biten ekip işi", puan: 3, neden: "Ekip > İşler'de sana atanan iş tamamlandı olarak işaretlenince." },
-  { k: "alinan", etiket: "Alınan haber", puan: 1, neden: "Havuzdan haber aldığında. Az puan: almak tek başına iş değil." },
   { k: "taslak", etiket: "Taslak", puan: 1, neden: "Haber Masası'nda taslak hazırladığında." },
   { k: "not", etiket: "Not günü", puan: 0.3, neden: "Notlar'da yazdığın, düzenlediğin ya da yorum yaptığın her gün bir kez (5 Kasım 2026, kullanıcı: \"sayılsın ama çok etkilemesin\")." },
   { k: "oy", etiket: "Oy", puan: 0.2, neden: "Havuzdaki haberlere ▲▼ verdiğinde; yapay zekânın öğrenmesine katkı." },
@@ -79,14 +79,13 @@ export function hesapla(ham: Ham | null, jobs: { assignee: string | null; status
   const icinde = (t: string | null | undefined) => !!t && Date.parse(t) >= b;
   const benim = ham?.haber.filter((x) => x.taken_by === kisi) ?? [];
   const s = {
-    alinan: benim.filter((x) => icinde(x.taken_at)).length,
     yayin: ham?.yayin && eposta ? ham.yayin.filter((x) => x.email === eposta.toLowerCase() && icinde(x.tarih)).length : benim.filter((x) => x.status === "yayinda" && icinde(x.updated_at)).length,
     taslak: ham?.taslak.filter((x) => x.author === kisi && icinde(x.created_at)).length ?? 0,
     oy: ham?.oy.filter((x) => x.user_id === kisi && icinde(x.created_at)).length ?? 0,
     is: jobs.filter((j) => j.assignee === kisi && j.status === "bitti" && (donem === "hepsi" || icinde(j.done_at))).length,
     not: ham?.not.filter((x) => x.kim === kisi && icinde(x.gun + "T23:59:59")).length ?? 0,
   };
-  const puan = Math.round(s.yayin * PUAN.yayin + s.alinan * PUAN.alinan + s.taslak * PUAN.taslak + s.is * PUAN.is + s.oy * PUAN.oy + s.not * PUAN.not);
+  const puan = Math.round(s.yayin * PUAN.yayin + s.taslak * PUAN.taslak + s.is * PUAN.is + s.oy * PUAN.oy + s.not * PUAN.not);
   return { ...s, puan };
 }
 
@@ -108,12 +107,12 @@ export function Siralama({ ac }: { ac: (id: string) => void }) {
       </div>
       <div className="tablo-kutu">
         <table>
-          <thead><tr><th>Kişi</th><th>Puan</th><th>Yayında</th><th>Aldığı haber</th><th>Taslak</th><th>Biten iş</th><th>Not günü</th><th>Oy</th></tr></thead>
+          <thead><tr><th>Kişi</th><th>Puan</th><th>Yayında</th><th>Taslak</th><th>Biten iş</th><th>Not günü</th><th>Oy</th></tr></thead>
           <tbody>
             {satirlar.map(({ p, s }, i) => (
               <tr key={p.id} style={{ cursor: "pointer" }} onClick={() => ac(p.id)}>
                 <td><span className="row" style={{ gap: 8, flexWrap: "nowrap" }}><span className="mono">{i + 1}.</span><Avatar kisi={p} boyut={26} /><b>{p.name}</b></span></td>
-                <td className="mono"><b>{s.puan}</b></td><td className="mono">{s.yayin}</td><td className="mono">{s.alinan}</td>
+                <td className="mono"><b>{s.puan}</b></td><td className="mono">{s.yayin}</td>
                 <td className="mono">{s.taslak}</td><td className="mono">{s.is}</td><td className="mono">{s.not}</td><td className="mono">{s.oy}</td>
               </tr>
             ))}
@@ -152,7 +151,7 @@ export function KisiProfil({ p, kapat }: { p: Profile; kapat: () => void }) {
       {!ham ? <div className="muted">Yükleniyor…</div> : <>
         <h3>Bu ay</h3>
         <div className="cards" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
-          {kutu("Puan", ay.puan, tum.puan)}{kutu("Yayına giden", ay.yayin, tum.yayin)}{kutu("Aldığı haber", ay.alinan, tum.alinan)}
+          {kutu("Puan", ay.puan, tum.puan)}{kutu("Yayına giden", ay.yayin, tum.yayin)}
           {kutu("Taslak", ay.taslak, tum.taslak)}{kutu("Biten ekip işi", ay.is, tum.is)}
         </div>
         <h3>Son yayına giden haberleri</h3>

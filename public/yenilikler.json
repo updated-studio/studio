@@ -1,5 +1,36 @@
 [
   {
+    "id": "2026-11-06-a",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Yeni düzen",
+    "bolumler": [
+      {
+        "ad": "Masam ve menü",
+        "maddeler": [
+          "Ana ekran artık Masam: okunmayı bekleyen taslaklar öncelik sırasıyla, satırdaki düğme taslağı açar.",
+          "Menü gruplandı: Haberler, Site içeriği, Ekip, Yönetim. Telefonda alt çubuk: Masam, Gelen, Taslaklar, Çekim, Menü.",
+          "Haber alma kalktı: Gelen'de doğrudan \"Taslak hazırla\". Taslağı olan haber yeniden yazılmaz, taslağı açılır.",
+          "Katkı puanında \"Alınan haber\" kalktı."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "2026-11-06-b",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Künye",
+    "bolumler": [
+      {
+        "ad": "Künye onayı",
+        "maddeler": [
+          "Görsel bulunamazsa ya da beğenmezsen kendi görselini eklersin: dosya ya da görsel adresi; arka planı sistem siler.",
+          "Künye albümü: üreticinin diğer görselleri öneriyle gelir, işaretliler ürün sayfasındaki albüme eklenir.",
+          "Reddedilen öneri \"Reddedilenler\"den geri alınır; reddedilen ürün kendiliğinden yeniden denenmez."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-05-g",
     "tarih": "5 Kasım 2026",
     "baslik": "Menü",

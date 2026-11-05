@@ -1195,6 +1195,18 @@ Deno.serve(async (req) => {
   if (!item_id || !["ceviri", "taslak"].includes(tur)) return Response.json({ hata: "item_id ve tur (ceviri|taslak) gerekli" }, { status: 400, headers: CORS });
 
   if (tur === "taslak") {
+    // Aynı haberin (ya da aynı olayın başka kartının) taslağı zaten varsa ikincisi yazılmaz (6 Kasım 2026: Instagram Edits haberi 12 dk arayla
+    // iki kez taslak oldu, biri otomatik biri elle). Bilerek yeniden yazdırmak için istek "yeniden: true" gönderir.
+    if (!govde?.yeniden) {
+      const { data: bu } = await sb.from("tr_items").select("event_key,deneme").eq("id", item_id).maybeSingle();
+      if (bu && !bu.deneme) {
+        const { data: ayni } = bu.event_key ? await sb.from("tr_items").select("id").eq("event_key", bu.event_key).eq("deneme", false).limit(50) : { data: [] };
+        const idler = [...new Set([Number(item_id), ...((ayni ?? []) as { id: number }[]).map((x) => x.id)])];
+        const { data: var_ } = await sb.from("tr_drafts").select("id,title,site_id").in("item_id", idler).eq("deneme", false).order("created_at", { ascending: false }).limit(1);
+        const v = (var_ ?? [])[0] as { id: number; title: string; site_id: number | null } | undefined;
+        if (v) return Response.json({ hata: `Bu haberin taslağı zaten var: “${String(v.title ?? "").slice(0, 80)}”. Taslaklar'dan açabilirsin.`, taslak_id: v.id, site_id: v.site_id }, { status: 409, headers: CORS });
+      }
+    }
     const { data: it } = await sb.from("tr_items").select("taken_by,status").eq("id", item_id).single();
     if (it?.taken_by && it.taken_by !== u.user.id && ["alindi", "yayinda"].includes(it.status)) {
       const { data: kim } = await sb.from("profiles").select("name").eq("id", it.taken_by).maybeSingle();

@@ -353,6 +353,11 @@ async function topla(sb: ReturnType<typeof createClient>) {
   const kiyasOran = Date.now() > Date.parse(kiyasA.bitis ?? "2026-11-18T23:59:00+03:00") ? 0 : Math.max(0, Math.min(100, Number(kiyasA.eleme_oran ?? 10)));
   // Kıyas kayıtları 90 gün tutulur
   sb.from("yz_kiyas").delete().lt("created_at", new Date(Date.now() - 90 * 864e5).toISOString()).then(() => {}, () => {});
+  // "Aldım" işareti kalktı (6 Kasım 2026, kullanıcı: "aldım falan işaretlemeye gerek yok; 1 gün dönmeyen aldım geri dönsün"): ekranda haber
+  // alma yok; taslak isteyenin kaydı (triyaj-taslak, aynı olayın yeniden yazılmaması için) bir gün sonra havuza döner. Dönen eski haber
+  // "dokunulmamış" sayılır, saklama kuralı (tr_cleanup) süresi geçince siler; taslağı silinmez.
+  sb.from("tr_items").update({ status: "aday", taken_by: null, taken_at: null, transfer_from: null, transfer_note: "", touched: false })
+    .eq("status", "alindi").eq("deneme", false).lt("taken_at", new Date(Date.now() - 864e5).toISOString()).then(() => {}, () => {});
   if (ayarlar.model_yedek) YEDEK_MODEL = String(ayarlar.model_yedek);
   YEDEK_KULLANILDI = false;
   GEMINI_TIKALI = "";

@@ -187,6 +187,20 @@
 .ko-secenek button { padding: 0; border: 2px solid transparent; border-radius: 8px; background: #1c1f24; cursor: pointer; }
 .ko-secenek button[aria-checked="true"] { border-color: var(--blue); }
 .ko-secenek img { width: 96px; aspect-ratio: 16/9; object-fit: contain; display: block; border-radius: 6px; }
+/* Kendi görselini ekle (6 Kasım 2026): dosya düğmesi + adres kutusu; üzerine dosya sürüklenince çerçeve mavileşir */
+.ko-ekle { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
+.ko-ekle.uzerinde { border-color: var(--blue); background: var(--blue-soft, var(--sunk)); }
+.ko-ekle.mesgul { opacity: .7; }
+.ko-ekle input[type="url"] { flex: 1 1 220px; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
+.ko-ekle > span { flex: 1 1 100%; font-size: 12.5px; }
+.ko-ekle label { cursor: pointer; }
+/* Künye albümü adayları: işaretli olanlar onayda ürünün albümüne eklenir */
+.ko-album { display: grid; gap: 6px; font-size: 13px; }
+.ko-album-l { display: flex; flex-wrap: wrap; gap: 8px; }
+.ko-album-l label { position: relative; display: block; cursor: pointer; }
+.ko-album-l img { height: 84px; width: auto; max-width: 180px; object-fit: cover; display: block; border-radius: 8px; border: 1px solid var(--line); }
+.ko-album-l input { position: absolute; top: 6px; left: 6px; width: 18px; height: 18px; accent-color: var(--blue); }
+.ko-album-l input:not(:checked) + img { opacity: .4; }
 .ko-eski { border-top: 1px solid var(--line); padding-top: 10px; }
 .ko-eski summary { cursor: pointer; font-size: 14px; }
 .ko-l > li { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
