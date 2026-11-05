@@ -78,7 +78,9 @@ export default function KunyeOnay() {
       // Önerilen resmî ad (göç 0060) onayla birlikte künyenin adı olur
       if (o.resmi_ad && !adsiz[o.id]) govde.name = o.resmi_ad;
       if (o.gorsel_durum === "hazir" && o.gorsel && !gorselsiz[o.id]) {
-        const b = await fetch(o.gorsel).then((r) => { if (!r.ok) throw new Error("Görsel indirilemedi"); return r.blob(); });
+        // Önbelleği atla (5 Kasım 2026): liste görseli önce <img> ile gösterdiği için tarayıcı izin başlığı olmayan kopyayı saklıyor
+        // (depolama "Vary: Origin" göndermiyor); aynı adresi fetch ile istemek "Load failed / Failed to fetch" veriyordu
+        const b = await fetch(o.gorsel + (o.gorsel.includes("?") ? "&" : "?") + "indir=" + Date.now(), { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error("Görsel indirilemedi"); return r.blob(); });
         const m = await medyaYukle(new File([b], `${kucuk(o.urun_adi) || "urun"}.webp`, { type: "image/webp" }), `${o.urun_adi} ürün görseli`, gorselKunye(o.gorsel_aday, u.brand), false);
         govde.image = m.id;
       }
