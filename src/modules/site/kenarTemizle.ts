@@ -45,3 +45,33 @@ export async function kenarTemizle(girdi: Blob): Promise<Blob> {
   const cikti = await new Promise<Blob | null>((ok) => tuval.toBlob(ok, "image/webp", 0.92));
   return cikti ?? girdi;
 }
+
+/** Dekupe (zemini şeffaf) ürün görselini künye tuvaline oturtur (6 Kasım 2026: üreticinin şeffaf PNG'si sunucuda hiç işlenmeden gelir):
+ *  ürünün sınır kutusundan kırpılır, 1360×720 alana sığdırılıp 1600×900 şeffaf tuvale ortalanır (arka plan silme programıyla aynı ölçü).
+ *  Şeffaf piksel bulunamazsa ya da tuval kurulamazsa görsel olduğu gibi döner. */
+export async function tuvaleOturt(girdi: Blob): Promise<Blob> {
+  const bmp = await createImageBitmap(girdi);
+  // Sınır kutusu en çok 3000 px'lik kopyada aranır (çok büyük dosyada bellek)
+  const o0 = Math.min(1, 3000 / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * o0)), h = Math.max(1, Math.round(bmp.height * o0));
+  const ara = document.createElement("canvas");
+  ara.width = w; ara.height = h;
+  const c = ara.getContext("2d", { willReadFrequently: true });
+  if (!c) return girdi;
+  c.imageSmoothingQuality = "high";
+  c.drawImage(bmp, 0, 0, w, h);
+  const p = c.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (p[(y * w + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return girdi;
+  const kw = x1 - x0 + 1, kh = y1 - y0 + 1, o = Math.min(1360 / kw, 720 / kh);
+  const tuval = document.createElement("canvas");
+  tuval.width = 1600; tuval.height = 900;
+  const t = tuval.getContext("2d");
+  if (!t) return girdi;
+  t.imageSmoothingQuality = "high";
+  t.drawImage(ara, x0, y0, kw, kh, Math.round((1600 - kw * o) / 2), Math.round((900 - kh * o) / 2), Math.round(kw * o), Math.round(kh * o));
+  const cikti = await new Promise<Blob | null>((ok) => tuval.toBlob(ok, "image/webp", 0.92));
+  if (cikti && cikti.type === "image/webp") return cikti;
+  return (await new Promise<Blob | null>((ok) => tuval.toBlob(ok, "image/png"))) ?? girdi;
+}

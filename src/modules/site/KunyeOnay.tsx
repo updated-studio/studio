@@ -12,10 +12,10 @@ import { sb, SUPABASE_URL } from "../../shared/supabase";
 import { useAuth } from "../../shared/auth";
 import { useToast } from "../../shared/toast";
 import { istekYap, medyaYukle } from "./api";
-import { kenarTemizle } from "./kenarTemizle";
+import { kenarTemizle, tuvaleOturt } from "./kenarTemizle";
 
 type Oz = { key: string; value: string; num: number | null; kaynak: string | null; kanit: string; islem?: "duzeltildi" | "eklendi"; not?: string; alinti?: boolean };
-type GorselAday = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string; secenekler?: { gorsel: string; url: string; sayfa: string }[]; album?: { gorsel: string; url: string; sayfa: string }[] };
+type GorselAday = { url: string; sayfa: string; kaynak: string; yazar: string; lisans: string; neden?: string; secenekler?: { gorsel: string; url: string; sayfa: string; seffaf?: boolean }[]; album?: { gorsel: string; url: string; sayfa: string }[] };
 type Oneri = { id: number; urun_id: number; urun_adi: string; resmi_ad?: string | null; tur: string; ozellikler: Oz[]; kaynaklar: { baslik: string; url: string; silinen?: { key: string; neden: string }[] }[]; durum: string; hata: string | null; created_at: string;
   gorsel?: string | null; gorsel_durum?: string; gorsel_aday?: GorselAday | null; gorsel_hata?: string | null };
 /** Görsel künyesi: üretici görseli "Görsel: Sony"; serbest lisanslıysa yazar ve lisans */
@@ -182,8 +182,10 @@ export default function KunyeOnay() {
         const sec = secili(o);
         const adres = sec?.gorsel ?? o.gorsel;
         const ham = await onbelleksiz(adres);
-        // Koyu temada beyaz kenar kalmasın (kenarTemizle.ts); temizlenemezse görsel olduğu gibi gider
-        const b = await kenarTemizle(ham).catch(() => ham);
+        // Üreticinin dekupe PNG'si sunucudan olduğu gibi gelir: burada künye tuvaline oturtulur (kesilmediği için kenar temizliği gerekmez).
+        // Arka planı silinmiş görselde koyu temada beyaz kenar kalmasın (kenarTemizle.ts); işlenemezse görsel olduğu gibi gider
+        const dekupe = !!(sec as { seffaf?: boolean } | undefined)?.seffaf || ham.type === "image/png";
+        const b = dekupe ? await tuvaleOturt(ham).catch(() => ham) : await kenarTemizle(ham).catch(() => ham);
         const gorselBilgi = sec && o.gorsel_aday ? { ...o.gorsel_aday, url: sec.url, sayfa: sec.sayfa } : o.gorsel_aday;
         const m = await medyaYukle(new File([b], `${kucuk(o.urun_adi) || "urun"}.${b.type === "image/png" ? "png" : "webp"}`, { type: b.type || "image/webp" }), `${o.urun_adi} ürün görseli`, gorselKunye(gorselBilgi, u.brand), false);
         govde.image = m.id;

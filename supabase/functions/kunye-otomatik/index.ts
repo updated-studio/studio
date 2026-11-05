@@ -15,7 +15,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { KIYAS_MODELLERI, kiyasCagir } from "../triyaj-taslak/kiyas.ts";
 import { claudeAramali, claudeJson } from "../triyaj-taslak/claude.ts";
-import { kesimDenetle, seffafTuval, ureticiAlani, urunGorseliBul, type UrunGorseli } from "./gorsel.ts";
+import { kesimDenetle, pngSeffaf, ureticiAlani, urunGorseliBul, type UrunGorseli } from "./gorsel.ts";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const yanit = (j: unknown, status = 200) => Response.json(j, { status, headers: CORS });
@@ -293,7 +293,6 @@ async function cfAyar(sb: ReturnType<typeof createClient>) {
 type GorselSatir = { id: number; urun_id: number; urun_adi?: string; gorsel_aday: UrunGorseli | null };
 type AlbumGorsel = { gorsel: string; url: string; sayfa: string };
 const gorselTuru = (v: Uint8Array) => v[0] === 0x89 && v[1] === 0x50 ? "image/png" : v[0] === 0xff && v[1] === 0xd8 ? "image/jpeg" : String.fromCharCode(...v.slice(8, 12)) === "WEBP" ? "image/webp" : "";
-const seffafMi = (v: Uint8Array, mime: string) => mime === "image/png" ? v[25] === 6 || v[25] === 4 : mime === "image/webp" ? String.fromCharCode(...v.slice(12, 16)) === "VP8X" && !!(v[20] & 0x10) : false;
 /** Künye albümü (6 Kasım 2026, kullanıcı: "albümünde yaşam tarzı vs. kaliteli, öncelik kaynaktan görseller yer alabilir"): seçimin albüm
  *  adayları (yalnız üreticinin kendi görselleri, en çok 5) indirilip olduğu gibi kovaya konur; editör onayda hangilerinin gireceğini seçer. */
 async function albumIsle(sb: ReturnType<typeof createClient>, s: GorselSatir, bitis: number): Promise<AlbumGorsel[]> {
@@ -324,7 +323,7 @@ function disAdres(u: string): URL | null {
   } catch { return null; }
 }
 /** Editörün eklediği görsel (6 Kasım 2026, kullanıcı onayı: "görsel bulunamazsa sen ekle"): POST { oneri_id, dosya (base64) | adres }.
- *  Şeffaf zeminli PNG/WebP arka plan silinmeden tuvale konur; değilse Cloudflare arka planı siler. Yapay zekâ denetimi yok (görseli insan
+ *  Zemini gerçekten şeffaf (dekupe) PNG olduğu gibi kullanılır; değilse Cloudflare arka planı siler. Yapay zekâ denetimi yok (görseli insan
  *  seçti, sonucu ekranda görür). Görsel önerinin ilk seçeneği olur. */
 async function elleGorsel(sb: ReturnType<typeof createClient>, b: { oneri_id: number; dosya?: unknown; adres?: unknown }) {
   const { data: s } = await sb.from("kunye_oneriler").select("id,urun_id,urun_adi,gorsel_aday").eq("id", b.oneri_id).maybeSingle();
@@ -348,8 +347,9 @@ async function elleGorsel(sb: ReturnType<typeof createClient>, b: { oneri_id: nu
   if (veri.byteLength > 15e6) return { error: "Görsel 15 MB'tan büyük" };
   const mime = gorselTuru(veri);
   if (!mime) return { error: "Bu bir görsel değil (JPEG, PNG ya da WebP olmalı). Adres bir sayfanın adresiyse görselin kendi adresini yapıştır." };
-  let webp = seffafMi(veri, mime) ? await seffafTuval(veri) : null;
-  const seffaf = !!webp;
+  // Dekupe PNG olduğu gibi kullanılır (pngSeffaf); değilse arka planı Cloudflare siler
+  const seffaf = mime === "image/png" && !!(await pngSeffaf(veri))?.seffaf;
+  let webp: Uint8Array | null = seffaf ? veri : null;
   if (!webp) {
     const cf = await cfAyar(sb);
     if (!cf) return { error: "Arka plan silme programı kurulu değil (Bağlantı anahtarları → Cloudflare)" };
@@ -357,15 +357,15 @@ async function elleGorsel(sb: ReturnType<typeof createClient>, b: { oneri_id: nu
     if (!r?.ok) { const h = r ? (await r.text()).slice(0, 120) : "yanıt yok"; return { error: `Arka plan silinemedi (${r?.status ?? ""} ${h})` }; }
     webp = new Uint8Array(await r.arrayBuffer());
   }
-  const yol = `${s.urun_id}-${s.id}-e${Date.now().toString(36)}.webp`;
-  const { error } = await sb.storage.from("kunye").upload(yol, webp, { contentType: "image/webp", upsert: true });
+  const yol = `${s.urun_id}-${s.id}-e${Date.now().toString(36)}.${seffaf ? "png" : "webp"}`;
+  const { error } = await sb.storage.from("kunye").upload(yol, webp, { contentType: seffaf ? "image/png" : "image/webp", upsert: true });
   if (error) return { error: "Yükleme: " + error.message };
   const gorsel = `${ADRES}/storage/v1/object/public/kunye/${yol}`;
-  const eski = (s.gorsel_aday ?? {}) as Partial<UrunGorseli> & { secenekler?: { gorsel: string; url: string; sayfa: string }[] };
+  const eski = (s.gorsel_aday ?? {}) as Partial<UrunGorseli> & { secenekler?: { gorsel: string; url: string; sayfa: string; seffaf?: boolean }[] };
   const marka = String(s.urun_adi ?? "").split(" ")[0];
   await sb.from("kunye_oneriler").update({ gorsel, gorsel_durum: "hazir", gorsel_hata: null,
     gorsel_aday: { ...eski, url: kaynak, sayfa: kaynak, kaynak: "Üretici", yazar: eski.yazar || marka, lisans: eski.lisans || "Basın görseli", neden: "Editör ekledi",
-      secenekler: [{ gorsel, url: kaynak, sayfa: kaynak }, ...(eski.secenekler ?? [])].slice(0, 4), secenek_surum: SECENEK_SURUMU } }).eq("id", s.id);
+      secenekler: [{ gorsel, url: kaynak, sayfa: kaynak, ...(seffaf ? { seffaf: true } : {}) }, ...(eski.secenekler ?? [])].slice(0, 4), secenek_surum: SECENEK_SURUMU } }).eq("id", s.id);
   return { gorsel, seffaf };
 }
 // Görsel seçenekleri (5 Kasım 2026, kullanıcı: "fotoğraf seçeneklerini bize de sunsun, onaydan geçenlerden bir tane veriyor"):
@@ -380,7 +380,7 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
   const albumEk = album ? { album } : {};
   if (!s.gorsel_aday?.url) { await yaz({ gorsel_durum: "yok", ...(s.gorsel_aday ? { gorsel_aday: { ...s.gorsel_aday, ...albumEk } } : {}) }); return; }
   const sira = [{ url: s.gorsel_aday.url, sayfa: s.gorsel_aday.sayfa, alfa: s.gorsel_aday.alfa }, ...(s.gorsel_aday.yedekler ?? [])];
-  const secenekler: { gorsel: string; url: string; sayfa: string }[] = [];
+  const secenekler: { gorsel: string; url: string; sayfa: string; seffaf?: boolean }[] = [];
   const boylar: number[] = [];
   let son = "";
   for (const a of sira) {
@@ -390,9 +390,20 @@ async function gorselIsle(sb: ReturnType<typeof createClient>, cf: { adres: stri
       if (!g.ok) throw new Error(`görsel indirilemedi (${g.status})`);
       const veri = new Uint8Array(await g.arrayBuffer());
       if (veri.byteLength > 20e6) throw new Error("görsel 20 MB üstü");
-      // Şeffaf zeminli PNG'de arka plan silinmez, yalnız kırpılıp tuvale konur (gorsel.ts seffafTuval); olmazsa Cloudflare
-      const hazir = a.alfa ? await seffafTuval(veri) : null;
-      const r = hazir ? new Response(hazir) : await fetch(cf.adres, { method: "POST", headers: { "x-anahtar": cf.anahtar, "Content-Type": g.headers.get("content-type") || "image/jpeg" }, body: veri, signal: AbortSignal.timeout(60_000) });
+      // Üreticinin dekupe (zemini gerçekten şeffaf) PNG'si hiç işlenmez (6 Kasım 2026, kullanıcı: "direkt kaynağından alsa dekupe PNG,
+      // Cloudflare ile uğraşmaya gerek kalmaz"): olduğu gibi kovaya konur, kesim denetimine de girmez (kesilmedi); tuvale oturtmayı onay
+      // sırasında tarayıcı yapar. Aynı dosya iki adaydan geldiyse biri kalır.
+      const dekupe = a.alfa && gorselTuru(veri) === "image/png" ? await pngSeffaf(veri) : null;
+      if (dekupe?.seffaf) {
+        if (boylar.includes(veri.byteLength)) continue;
+        const yol = secenekler.length ? `${s.urun_id}-${s.id}-${secenekler.length + 1}.png` : `${s.urun_id}-${s.id}.png`;
+        const { error } = await sb.storage.from("kunye").upload(yol, veri, { contentType: "image/png", upsert: true });
+        if (error) throw new Error("yükleme: " + error.message);
+        secenekler.push({ gorsel: `${ADRES}/storage/v1/object/public/kunye/${yol}?v=${Date.now()}`, url: a.url, sayfa: a.sayfa, seffaf: true });
+        boylar.push(veri.byteLength);
+        continue;
+      }
+      const r = await fetch(cf.adres, { method: "POST", headers: { "x-anahtar": cf.anahtar, "Content-Type": g.headers.get("content-type") || "image/jpeg" }, body: veri, signal: AbortSignal.timeout(60_000) });
       if (!r.ok) {
         const h = `Cloudflare ${r.status}: ${(await r.text()).slice(0, 140)}`;
         if (r.status === 401 || r.status === 500) { await sb.from("baglanti_anahtarlari").update({ ek: { hata: h } }).eq("ad", "cloudflare_adres"); son = h; break; }

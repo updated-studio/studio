@@ -9,10 +9,6 @@
 // her zaman önce) hem künye albümünü (yalnız üreticinin kendi görselleri) verir. Arama ajanı kalktı; bayi adayları aynı seçimde yarışır.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { claudeJson, CLAUDE_MODEL } from "../triyaj-taslak/claude.ts";
-// Görsel çözme/küçültme (imagescript, MIT): istekte yüklenir; yüklenemezse görsel olduğu gibi kullanılır, fonksiyonun açılışı bozulmaz
-type IS = typeof import("npm:imagescript@1.3.0");
-let isYuk: Promise<IS | null> | null = null;
-const imagescript = () => (isYuk ??= import("npm:imagescript@1.3.0").then((m) => m as IS).catch((e) => { console.error("imagescript", e); return null; }));
 import { anahtarlar as geminiAnahtarlari } from "./anahtar.ts";
 
 type Sb = ReturnType<typeof createClient>;
@@ -164,7 +160,6 @@ const BAYI = /bhphotovideo\.com|bhphoto\.com|adorama\.com|media-amazon\.com|amaz
 // gider (çözme sırayla, aynı anda tek görsel).
 // Şeffaflık PNG başlığından okunur (renk türü 4/6 = alfa kanalı), çözmeden.
 type Inen = Aday & { mime: string; bayt: number; w: number; h: number; alfa: boolean; onizleme: Resim };
-const KUCULT_MP = 7e6;
 async function indir(a: Aday): Promise<Inen | null> {
   const r = await fetch(a.url, { headers: { "User-Agent": UA, Accept: "image/webp,image/png,image/jpeg,image/*;q=0.8", Referer: a.sayfa }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
   const bildirilen = (r?.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
@@ -182,49 +177,62 @@ async function indir(a: Aday): Promise<Inen | null> {
   if (bayt <= 1_200_000) return { ...a, mime, bayt, ...b, alfa, onizleme: { mime, b64: b64(veri) } };
   // 1,2-4,5 MB: sunucuda çözülmez, Claude adresten kendisi indirir (5 Kasım 2026: imagescript çözmesi işçinin işlemci sınırını aşıp turu kesiyordu)
   if (bayt <= 4_500_000) return { ...a, mime, bayt, ...b, alfa, onizleme: { mime, url: a.url } };
-  if (mime === "image/webp" || b.w * b.h > KUCULT_MP) return null;
-  const birak = await sira();
-  try {
-    const is = await imagescript(); if (!is) return null;
-    const { Image } = is;
-    let im: InstanceType<IS["Image"]> | null = await is.decode(veri) as InstanceType<IS["Image"]>;
-    veri = null;
-    const k = im.width >= im.height ? im.resize(1024, Image.RESIZE_AUTO) : im.resize(Image.RESIZE_AUTO, 1024);
-    im = null;
-    const zemin = new Image(k.width, k.height).fill(0xffffffff); zemin.composite(k, 0, 0);
-    return { ...a, mime, bayt, ...b, alfa, onizleme: { mime: "image/jpeg", b64: b64(await zemin.encodeJPEG(85)) } };
-  } catch { return null; } finally { birak(); }
-}
-/** Görsel çözme sırası: aynı anda tek görsel çözülür (bellek) */
-let kuyruk: Promise<void> = Promise.resolve();
-function sira(): Promise<() => void> {
-  let birak!: () => void;
-  const once = kuyruk;
-  kuyruk = new Promise<void>((ok) => { birak = ok; });
-  return once.then(() => birak);
+  // 4,5 MB üstü görsel aday olmaz (6 Kasım 2026: sunucuda küçültme için kullanılan imagescript bu ortamda hiç yüklenmiyordu, yani bu adaylar
+  // zaten düşüyordu; kod sadeleşti)
+  return null;
 }
 
-/** Şeffaf zeminli resmî PNG (çoğu üreticinin mağaza görseli): arka plan silinmeden, ürün sınırından kırpılıp 1600×900 şeffaf tuvale
- *  ortalanır (ürün 1360×720 alana sığar; Cloudflare işçisiyle aynı ölçü). Silme yazılımının kenar bozmasını önler. Çözülemezse null. */
-export async function seffafTuval(veri: Uint8Array): Promise<Uint8Array | null> {
-  const b = boyut(veri);
-  if (!b || b.w * b.h > KUCULT_MP) return null; // büyükse Cloudflare keser (bellek)
-  const birak = await sira();
+/** PNG'nin zemini gerçekten şeffaf mı (6 Kasım 2026, kullanıcı: "direkt kaynağından alsa dekupe PNG, Cloudflare ile uğraşmaya gerek kalmaz").
+ *  Üreticinin dekupe görseli hiç işlenmeden kullanılır; tuvale oturtma onay sırasında tarayıcıda yapılır (KunyeOnay tuvaleOturt). Önceki
+ *  yol (imagescript ile kırpıp tuvale koyma) bu ortamda hiç çalışmıyordu: kütüphane yüklenemediği için şeffaf PNG de Cloudflare'e gidip
+ *  yeniden kesiliyor, bazen bozuluyordu (iPhone 17e).
+ *  Dosya çözülmeden satır satır okunur (bellekte iki satır): alfa kanalı olan (renk türü 4/6), 8 ya da 16 bit, geçmesiz PNG'de şeffaf piksel
+ *  payı en az %5 ise zemin şeffaftır. Alfa kanalı olup zemini opak olan (beyaz zeminli RGBA) görsel şeffaf sayılmaz. Okunamazsa null. */
+export async function pngSeffaf(v: Uint8Array): Promise<{ seffaf: boolean; w: number; h: number; kutu: [number, number, number, number] } | null> {
+  if (v.length < 64 || !(v[0] === 0x89 && v[1] === 0x50 && v[2] === 0x4e && v[3] === 0x47)) return null;
+  const dv = new DataView(v.buffer, v.byteOffset, v.byteLength);
+  const w = dv.getUint32(16), h = dv.getUint32(20), derinlik = v[24], tur = v[25], gecmeli = v[28];
+  if (!(tur === 6 || tur === 4) || !(derinlik === 8 || derinlik === 16) || gecmeli !== 0 || !w || !h || w * h > 9e6) return null; // 9 megapiksel üstü okunmaz (işçinin işlemci payı): Cloudflare yoluna düşer
+  const bpp = (tur === 6 ? 4 : 2) * (derinlik / 8), satirBoy = w * bpp, alfaKay = bpp - derinlik / 8; // alfa pikselin son örneği; 16 bitte yüksek bayt önce
+  const parcalar: Uint8Array[] = [];
+  for (let i = 8; i + 12 <= v.length;) {
+    const n = dv.getUint32(i), ad = String.fromCharCode(v[i + 4], v[i + 5], v[i + 6], v[i + 7]);
+    if (ad === "IDAT") parcalar.push(v.subarray(i + 8, i + 8 + n));
+    if (ad === "IEND") break;
+    i += 12 + n;
+  }
+  if (!parcalar.length) return null;
   try {
-    const is = await imagescript(); if (!is) return null;
-    const { Image } = is;
-    const im = await is.decode(veri) as InstanceType<IS["Image"]>;
-    const { width: W, height: H, bitmap: p } = im;
-    let x0 = W, y0 = H, x1 = -1, y1 = -1, dolu = 0;
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (p[(y * W + x) * 4 + 3] > 8) { dolu++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    // Alfa kanalı olup zemini opak olan PNG (beyaz zeminli RGBA) dekupe değildir: arka planı Cloudflare siler (6 Kasım 2026)
-    if (x1 < 0 || dolu > W * H * 0.97) return null;
-    const k = im.crop(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
-    const o = Math.min(1360 / k.width, 720 / k.height);
-    k.resize(Math.max(1, Math.round(k.width * o)), Math.max(1, Math.round(k.height * o)));
-    const t = new Image(1600, 900); t.composite(k, Math.round((1600 - k.width) / 2), Math.round((900 - k.height) / 2));
-    return await t.encodeWEBP(90);
-  } catch { return null; } finally { birak(); }
+    const okur = new Blob(parcalar as BlobPart[]).stream().pipeThrough(new DecompressionStream("deflate")).getReader();
+    let once = new Uint8Array(satirBoy), bu = new Uint8Array(satirBoy);
+    let y = 0, konum = -1, suzgec = 0, saydam = 0, x0 = w, y0 = h, x1 = -1, y1 = -1; // konum -1: satırın süzgeç baytı bekleniyor
+    for (;;) {
+      const { done, value } = await okur.read();
+      if (done || y >= h) break;
+      let p = 0;
+      while (p < value.length && y < h) {
+        if (konum < 0) { suzgec = value[p++]; konum = 0; continue; }
+        const al = Math.min(satirBoy - konum, value.length - p);
+        bu.set(value.subarray(p, p + al), konum); p += al; konum += al;
+        if (konum < satirBoy) break;
+        // Satır tamam: süzgeci geri al (PNG: 0 yok, 1 sol, 2 üst, 3 ortalama, 4 Paeth)
+        if (suzgec === 1) for (let i = bpp; i < satirBoy; i++) bu[i] = (bu[i] + bu[i - bpp]) & 255;
+        else if (suzgec === 2) for (let i = 0; i < satirBoy; i++) bu[i] = (bu[i] + once[i]) & 255;
+        else if (suzgec === 3) for (let i = 0; i < satirBoy; i++) bu[i] = (bu[i] + (((i >= bpp ? bu[i - bpp] : 0) + once[i]) >> 1)) & 255;
+        else if (suzgec === 4) for (let i = 0; i < satirBoy; i++) {
+          const a = i >= bpp ? bu[i - bpp] : 0, b = once[i], c = i >= bpp ? once[i - bpp] : 0, pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+          bu[i] = (bu[i] + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255;
+        } else if (suzgec !== 0) return null;
+        for (let x = 0, i = alfaKay; x < w; x++, i += bpp) {
+          if (bu[i] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; } else saydam++;
+        }
+        const t2 = once; once = bu; bu = t2; y++; konum = -1;
+      }
+    }
+    await okur.cancel().catch(() => {});
+    if (y < h || x1 < 0) return null;
+    return { seffaf: saydam >= w * h * 0.05, w, h, kutu: [x0, y0, x1, y1] };
+  } catch { return null; }
 }
 
 const SECIM_SEMA = {
