@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-05-b",
+    "tarih": "5 Kasım 2026",
+    "baslik": "FLUX 3 ve logo",
+    "bolumler": [
+      {
+        "ad": "Görseller",
+        "maddeler": [
+          "FLUX 3 Image ve FLUX 3 Image Klein görsel kıyasına girdi (Bağlantı anahtarları → Black Forest Labs).",
+          "Görsel yönetmeni mümkünse markanın logosunu kullanır; denetim logonun doğruluğunu ayrıca kontrol eder."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-05-a",
     "tarih": "5 Kasım 2026",
     "baslik": "Düzeltmeler",

@@ -71,6 +71,16 @@ const ANAHTARLAR: { ad: string; baslik: string; ikon: string; aciklama: string; 
     ],
   },
   {
+    ad: "bfl", baslik: "Black Forest Labs anahtarı (FLUX 3, görsel kıyası)", ikon: "foto",
+    aciklama: "FLUX 3 Image ve FLUX 3 Image Klein yalnız FLUX'u yapan şirketin kendi servisinde var (Cloudflare'de yok). Kıyasta diğer modellerle yan yana görsel üretir. Görsel başı Klein ~1 sent, Image ~5 sent; ücret BFL kredisinden düşer.",
+    adimlar: [
+      { metin: "BFL hesabı aç ve e-postanı doğrula", link: "https://dashboard.bfl.ai" },
+      { metin: "Sol menüde API → Credits → Add Credits → 10 $ yükle (1 kredi = 1 sent)", link: "https://dashboard.bfl.ai" },
+      { metin: "API → Keys → Add Key → ad: updated-studyo → anahtar bir kez gösterilir, hemen kopyala" },
+      { metin: "Anahtarı aşağıya yapıştır → Kaydet. Anahtarı sohbete yapıştırma" },
+    ],
+  },
+  {
     ad: "gemini_gorsel", baslik: "Google görsel anahtarı (Nano Banana, görsel kıyası)", ikon: "foto",
     aciklama: "Nano Banana görsel üretimi ücretsiz Gemini kotasında yok; faturalandırması açık AYRI bir Google projesinden anahtar gerekir (yazı işlerinde kullandığımız ücretsiz anahtarlar ücretsiz kalsın diye). Görsel başına yaklaşık 4 sent.",
     adimlar: [
@@ -126,6 +136,8 @@ const SERVISLER: Servis[] = [
     neIcin: "Görsel model kıyası: fotoğrafı bulunamayan haberde GPT Image da görsel üretir.", ucret: "Görsel başına yaklaşık 4 sent, OpenAI bakiyesinden.", olmazsa: "Kıyas diğer modellerle sürer." },
   { id: "banana", grup: "gorsel", logo: "gemini", ad: "Google görsel · Nano Banana", ne: "Kıyasta görsel üretir; ücretli proje", anahtarlar: ["gemini_gorsel"],
     neIcin: "Görsel model kıyası: Nano Banana da görsel üretir.", ucret: "Görsel başına yaklaşık 4 sent, Google faturasından. Yazı işlerindeki ücretsiz anahtarlardan ayrı proje.", olmazsa: "Kıyas diğer modellerle sürer." },
+  { id: "bfl", grup: "gorsel", logo: "bfl", ad: "Black Forest Labs · FLUX 3", ne: "Kıyasta görsel üretir (FLUX 3 Image, Klein)", anahtarlar: ["bfl"],
+    neIcin: "Görsel model kıyası: FLUX'un en yeni nesli. Cloudflare'de olmadığı için kendi servisinden.", ucret: "Görsel başı Klein ~1 sent, Image ~5 sent; BFL kredisinden.", olmazsa: "Kıyas diğer modellerle sürer." },
   { id: "instagram", grup: "site", logo: "instagram", ad: "Instagram", ne: "Sitedeki Reels sütunu için son videoları çeker", anahtarlar: ["instagram"], eylem: "instagram",
     neIcin: "Sitedeki Reels sütunu. Anahtar yalnız okuma izni taşır, paylaşım yapamaz.", ucret: "Ücretsiz. Süresi 60 gün; sistem dolmadan kendisi yeniler.", olmazsa: "Reels sütunu YouTube kısa videolarını gösterir." },
   { id: "brave", grup: "site", logo: "brave", ad: "Brave arama", ne: "Künye, resmî video ve haber içi resmî görsel araması", anahtarlar: ["brave_arama"], eylem: "brave",

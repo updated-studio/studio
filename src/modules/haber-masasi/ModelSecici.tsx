@@ -16,6 +16,11 @@ export const CF_MODELLER: { id: string; ad: string; aciklama: string; noron: num
   { id: "dev", ad: "FLUX.2 [dev]", aciklama: "Black Forest Labs; en gerçekçi ve ayrıntılı FLUX", noron: 6000 },
   { id: "lucid", ad: "Lucid Origin", aciklama: "Leonardo AI; canlı renk, güçlü istem uyumu", noron: 3500 },
 ];
+// Black Forest Labs'ın kendi servisi (FLUX 3; Cloudflare'de yok; 5 Kasım 2026). Ücretli, yalnız yönetici seçer; anahtar Bağlantı anahtarları'nda.
+export const BFL_MODELLER: { id: string; ad: string; aciklama: string; fiyat: string }[] = [
+  { id: "flux3klein", ad: "FLUX 3 Image Klein", aciklama: "Black Forest Labs; FLUX 3'ün hızlı, ucuz sürümü", fiyat: "≈ $0,009" },
+  { id: "flux3", ad: "FLUX 3 Image", aciklama: "Black Forest Labs; FLUX'un en yeni ve en güçlü sürümü", fiyat: "≈ $0,048 (1K)" },
+];
 const cfUcret = (noron: number) => "≈ $" + (noron * 0.011 / 1000).toLocaleString("tr", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
 export type Katalog = { modeller: KatalogModel[]; secim: Secim; hata: string[]; cf?: { kullanilan: number; sinir: number; bitti: boolean } };
@@ -48,6 +53,7 @@ export default function ModelSecici({ mod, uret, kaydet, mesgul, katalog, gomulu
   const [gpt, setGpt] = useState<string>("");
   const [banana, setBanana] = useState<string>("");
   const [kalite, setKalite] = useState("medium");
+  const [bflSec, setBflSec] = useState<string[]>([]);
   useEffect(() => { if (veri && mod === "varsayilan") { setGpt(veri.secim.gpt ?? ""); setBanana(veri.secim.banana ?? ""); setKalite(veri.secim.gpt_kalite ?? "medium"); } }, [veri, mod]);
   if (!veri) return <div className="muted">Modeller firmalardan alınıyor…</div>;
   const grup = (sg: "gpt" | "banana") => veri.modeller.filter((m) => m.saglayici === sg);
@@ -82,6 +88,15 @@ export default function ModelSecici({ mod, uret, kaydet, mesgul, katalog, gomulu
           );
         })}
       </section>}
+      {mod === "uret" && <section>
+        <h4>Black Forest Labs · FLUX 3 <span className="muted">(ücretli; anahtar girilmişse çalışır)</span></h4>
+        {BFL_MODELLER.map((m) => (
+          <label key={m.id} className={"ms-satir" + (bflSec.includes(m.id) ? " secili" : "")}>
+            <input type="checkbox" checked={bflSec.includes(m.id)} disabled={!yonetici} onChange={(e) => setBflSec((x) => e.target.checked ? [...x, m.id] : x.filter((y) => y !== m.id))} />
+            <span className="ms-ad"><b>{m.ad}</b><span className="muted">{m.aciklama}</span></span><span className="ms-fiyat">{m.fiyat}</span>
+          </label>
+        ))}
+      </section>}
       <section>
         <h4>OpenAI · GPT Image <span className="muted">(fiyat: görsel başına, 1536×1024)</span></h4>
         {hic("ms-gpt", !gpt, () => setGpt(""), mod === "uret" ? "Kullanma" : "Kendiliğinden: en yeni")}
@@ -97,7 +112,7 @@ export default function ModelSecici({ mod, uret, kaydet, mesgul, katalog, gomulu
       {veri.hata.length > 0 && <div className="msg err">{veri.hata.join(" · ")}</div>}
       <div className="muted ms-kaynak">Ad, açıklama ve fiyatlar firmaların kendi sayfalarından (OpenAI görsel üretim rehberi, Google AI Studio fiyatları). "Jeton fiyatından": OpenAI bu model için görsel başı fiyat yazmıyor, jeton fiyatından hesaplandı. "Hesapta yok": firma bu modeli hesabımıza açmıyor.</div>
       {mod === "uret"
-        ? <button className="btn sm" disabled={mesgul || (!cf.length && !gpt && !banana)} onClick={() => uret?.({ modeller: [...cf, ...(gpt ? ["gpt"] : []), ...(banana ? ["banana"] : [])], gpt: gpt || undefined, banana: banana || undefined, kalite })}>{mesgul ? "Üretiliyor, denetleniyor…" : `Seçilen ${cf.length + (gpt ? 1 : 0) + (banana ? 1 : 0)} modelle üret`}</button>
+        ? <button className="btn sm" disabled={mesgul || (!cf.length && !gpt && !banana && !bflSec.length)} onClick={() => uret?.({ modeller: [...cf, ...bflSec, ...(gpt ? ["gpt"] : []), ...(banana ? ["banana"] : [])], gpt: gpt || undefined, banana: banana || undefined, kalite })}>{mesgul ? "Üretiliyor, denetleniyor…" : `Seçilen ${cf.length + bflSec.length + (gpt ? 1 : 0) + (banana ? 1 : 0)} modelle üret`}</button>
         : <button className="btn sm" onClick={() => kaydet?.({ ...(gpt ? { gpt } : {}), ...(banana ? { banana } : {}), gpt_kalite: kalite })}>Kaydet</button>}
     </div>
   );

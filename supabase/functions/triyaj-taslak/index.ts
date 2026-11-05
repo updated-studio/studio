@@ -802,7 +802,7 @@ async function uretimBaslat(id: number) {
 
 /** Görselsiz taslağa üretim (otomatik: yz_bekliyor bayrağıyla; elle: Stüdyo düğmesi). Elle seçilmiş görsele dokunmaz. */
 // Ücretli görsel modelleri (yeniden üretmede yalnız yöneticiler; 4 Kasım 2026, kullanıcı: "ücretli olanları yöneticiler yeniden çizdirebilsin")
-const UCRETLI_MODEL = ["gpt", "banana", "gptmax", "bananapro"];
+const UCRETLI_MODEL = ["gpt", "banana", "gptmax", "bananapro", "flux3", "flux3klein"];
 const UCRETSIZ_MODEL = ["klein", "dev", "lucid"];
 
 /** Editör görseli beğenmedi: yeniden üret (görseli olan taslakta da). Adaylar eklenir/yenilenir; seçili görsel değişmez, editör seçer. */
