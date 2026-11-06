@@ -92,6 +92,7 @@
 .ed-grup .ed-baslik { margin: 6px 0 2px; }
 .ed-madde { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); text-align: left; }
 .ed-madde.tamam { opacity: .62; }
+.ed-madde.bulundu { border-color: var(--brand-blue); box-shadow: 0 0 0 2px var(--brand-blue); opacity: 1; transition: box-shadow .4s, border-color .4s; }
 .ed-kutu { flex: none; width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--busy); display: grid; place-items: center; }
 .ed-madde.tamam .ed-kutu { background: var(--brand-blue); border-color: var(--brand-blue); color: #FFFFFF; }
 .ed-madde.tamam .ed-kutu svg.i { width: 16px; height: 16px; stroke-width: 3; }

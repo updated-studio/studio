@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-06-k",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Aramada çekim listesi",
+    "bolumler": [
+      {
+        "ad": "Arama",
+        "maddeler": [
+          "Üstteki arama artık çekim listesinin türlerini ve maddelerini de buluyor.",
+          "Sonuca basınca çekim listesi o türde açılır, madde kısa süre işaretli görünür."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-j",
     "tarih": "6 Kasım 2026",
     "baslik": "Ayarlar özeti",

@@ -1,12 +1,13 @@
 // Stüdyo araması (6 Kasım 2026, kullanıcı: "üste arama butonu koy, tüm Stüdyo'da arama yapalım bölümler arasında"): üst çubukta
 // "Yalnız sen"in solunda. Tek kutudan arar: bölümler (menü), sitedeki taslak/yayınlar (panel), Gelen'deki yeni haberler (tr_items),
-// notlar (not_sayfalar), işler (jobs) ve yöneticide künyeler (panel /products).
+// notlar (not_sayfalar), işler (jobs), çekim listesinin türleri ve maddeleri (cekimListesi.ts, cihazda arar) ve yöneticide künyeler (panel /products).
 // Ctrl/⌘+K ile de açılır; ok tuşlarıyla gezilir, Enter açar. Panel oturumu yoksa o grup sessizce boş kalır.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Ikon } from "./Ikon";
 import { sb } from "./supabase";
 import { istekYap } from "../modules/site/api";
+import { maddeSayisi, TURLER as CEKIM_TURLERI } from "../modules/editor/cekimListesi";
 
 export type AramaBolumu = { ad: string; yol: string; ikon: string; grup?: string };
 type Sonuc = { grup: string; ad: string; alt?: string; yol: string; ikon: string };
@@ -64,7 +65,13 @@ export default function Arama({ bolumler, yonetici }: { bolumler: AramaBolumu[];
   const sonuclar = useMemo<Sonuc[]>(() => {
     const s = kucuk(q.trim());
     const b = bolumler.filter((x) => !s || kucuk(`${x.ad} ${x.grup ?? ""}`).includes(s)).map((x) => ({ grup: "Bölümler", ad: x.ad, alt: x.grup, yol: x.yol, ikon: x.ikon }));
-    return [...b, ...uzak];
+    // Çekim listesi sabit veri: tür adı ya da madde başlığı/açıklaması eşleşirse o tür açılır, madde vurgulanır
+    const c: Sonuc[] = s.length < 2 ? [] : CEKIM_TURLERI.flatMap((t) => [
+      ...(kucuk(t.ad).includes(s) ? [{ grup: "Çekim listesi", ad: `${t.ad} listesi`, alt: `${maddeSayisi(t)} madde`, yol: `/cekim?tur=${t.id}`, ikon: "klaket" }] : []),
+      ...t.gruplar.flatMap((g) => g.maddeler.filter((m) => kucuk(`${m.t} ${m.n}`).includes(s))
+        .map((m) => ({ grup: "Çekim listesi", ad: m.t, alt: `${t.ad} · ${g.ad}`, yol: `/cekim?tur=${t.id}&madde=${encodeURIComponent(`${g.ad}/${m.k}`)}`, ikon: "klaket" }))),
+    ]).slice(0, 6);
+    return [...b, ...c, ...uzak];
   }, [q, uzak, bolumler]);
   useEffect(() => setSira(0), [q, uzak.length]);
   useEffect(() => { liste.current?.querySelector(".ara-sonuc.on")?.scrollIntoView({ block: "nearest" }); }, [sira]);
@@ -85,7 +92,7 @@ export default function Arama({ bolumler, yonetici }: { bolumler: AramaBolumu[];
           <div className="pencere ara-pencere" role="dialog" aria-modal="true" aria-label="Stüdyo'da ara" onKeyDown={tus}>
             <div className="ara-kutu">
               <Ikon ad="ara" />
-              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Bölüm, haber, taslak, not ya da iş ara…" aria-label="Aranacak sözcük" autoFocus autoComplete="off" spellCheck={false} />
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Bölüm, haber, taslak, not, iş ya da çekim ara…" aria-label="Aranacak sözcük" autoFocus autoComplete="off" spellCheck={false} />
               <button type="button" className="linkbtn" onClick={() => setAcik(false)}>Kapat</button>
             </div>
             <div className="ara-liste" ref={liste} role="listbox" aria-label="Sonuçlar">
