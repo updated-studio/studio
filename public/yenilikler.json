@@ -7,7 +7,8 @@
       {
         "ad": "Üst çubuk",
         "maddeler": [
-          "Yeni \"Ara\" düğmesi tek kutudan bölümleri, Gelen'deki haberleri ve taslak/yayınları arar (Ctrl/⌘+K)."
+          "Yeni \"Ara\" düğmesi tek kutudan bölümleri, haberleri, taslak/yayınları, notları ve işleri arar (Ctrl/⌘+K).",
+          "Yöneticide künyeler de aranır."
         ]
       },
       {

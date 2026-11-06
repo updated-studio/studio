@@ -116,7 +116,7 @@ export default function EditorKabuk() {
         <header className="ed-tepe">
           <button type="button" className="ed-marka ed-marka-tel" aria-label="Updated Stüdyo, Masam" onClick={anaSayfa}><span className="logo" aria-hidden="true" /><i /><span>STÜDYO</span></button>
           <span style={{ flex: 1 }} />
-          <Arama bolumler={aramaBolumleri} />
+          <Arama bolumler={aramaBolumleri} yonetici={yonetici} />
           <CanliKisiler />
           <SohbetDugme />
           <Bildirimler />

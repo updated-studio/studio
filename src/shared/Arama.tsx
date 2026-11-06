@@ -1,5 +1,6 @@
 // Stüdyo araması (6 Kasım 2026, kullanıcı: "üste arama butonu koy, tüm Stüdyo'da arama yapalım bölümler arasında"): üst çubukta
-// "Yalnız sen"in solunda. Tek kutudan üç yerde arar: bölümler (menü), Gelen'deki yeni haberler (tr_items) ve sitedeki taslak/yayınlar (panel).
+// "Yalnız sen"in solunda. Tek kutudan arar: bölümler (menü), sitedeki taslak/yayınlar (panel), Gelen'deki yeni haberler (tr_items),
+// notlar (not_sayfalar), işler (jobs) ve yöneticide künyeler (panel /products).
 // Ctrl/⌘+K ile de açılır; ok tuşlarıyla gezilir, Enter açar. Panel oturumu yoksa o grup sessizce boş kalır.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +13,7 @@ type Sonuc = { grup: string; ad: string; alt?: string; yol: string; ikon: string
 const kucuk = (s: string) => s.toLocaleLowerCase("tr");
 const gun = (t?: string | null) => (t ? new Date(t).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) : "");
 
-export default function Arama({ bolumler }: { bolumler: AramaBolumu[] }) {
+export default function Arama({ bolumler, yonetici }: { bolumler: AramaBolumu[]; yonetici: boolean }) {
   const git = useNavigate();
   const [acik, setAcik] = useState(false);
   const [q, setQ] = useState("");
@@ -35,21 +36,30 @@ export default function Arama({ bolumler }: { bolumler: AramaBolumu[] }) {
     let guncel = true; setAraniyor(true);
     const t = setTimeout(async () => {
       const kalip = `%${s.replace(/[%_\\]/g, "\\$&")}%`;
-      const [gelen, site] = await Promise.all([
+      const [gelen, site, notlar, isler, kunyeler] = await Promise.all([
         sb.from("tr_items").select("id,title,source_name,published_at").eq("deneme", false).eq("status", "aday").ilike("title", kalip).order("published_at", { ascending: false }).limit(6)
           .then(({ data }) => (data ?? []) as { id: number; title: string; source_name: string; published_at: string | null }[]),
         istekYap<{ docs: { id: number; title?: string; _status?: string; updatedAt?: string }[] }>(`/news?where[title][like]=${encodeURIComponent(s)}&draft=true&depth=0&limit=6&sort=-updatedAt&select[title]=true&select[_status]=true&select[updatedAt]=true`)
           .then((r) => r.docs).catch(() => []),
+        sb.from("not_sayfalar").select("id,baslik,updated_at").ilike("baslik", kalip).order("updated_at", { ascending: false }).limit(5)
+          .then(({ data }) => (data ?? []) as { id: number; baslik: string; updated_at: string }[]),
+        sb.from("jobs").select("id,title,brand,status,due").ilike("title", kalip).order("due", { ascending: false }).limit(5)
+          .then(({ data }) => (data ?? []) as { id: number; title: string; brand: string | null; status: string | null; due: string | null }[]),
+        yonetici ? istekYap<{ docs: { id: number; name?: string; brand?: string }[] }>(`/products?where[name][like]=${encodeURIComponent(s)}&depth=0&limit=5&sort=name&select[name]=true&select[brand]=true`)
+          .then((r) => r.docs).catch(() => []) : Promise.resolve([]),
       ]);
       if (!guncel) return;
       setUzak([
         ...site.map((d) => ({ grup: "Taslaklar ve yayınlar", ad: d.title || "Başlıksız", alt: `${d._status === "published" ? "Yayında" : "Taslak"} · ${gun(d.updatedAt)}`, yol: `/oku/${d.id}`, ikon: d._status === "published" ? "check" : "taslak" })),
         ...gelen.map((h) => ({ grup: "Gelen haberler", ad: h.title, alt: `${h.source_name} · ${gun(h.published_at)}`, yol: `/haber-masasi?ara=${encodeURIComponent(h.title)}`, ikon: "triyaj" })),
+        ...kunyeler.map((k) => ({ grup: "Künyeler", ad: k.name || "Adsız", alt: k.brand, yol: `/site?bolum=products&ara=${encodeURIComponent(k.name || "")}`, ikon: "liste" })),
+        ...notlar.map((n) => ({ grup: "Notlar", ad: n.baslik || "Başlıksız not", alt: gun(n.updated_at), yol: `/notlar?s=${n.id}`, ikon: "yaz" })),
+        ...isler.map((i) => ({ grup: "İşler", ad: i.title, alt: [i.brand, gun(i.due)].filter(Boolean).join(" · "), yol: "/ekip", ikon: "ekip" })),
       ]);
       setAraniyor(false);
     }, 280);
     return () => { guncel = false; clearTimeout(t); };
-  }, [q]);
+  }, [q, yonetici]);
 
   const sonuclar = useMemo<Sonuc[]>(() => {
     const s = kucuk(q.trim());
@@ -75,7 +85,7 @@ export default function Arama({ bolumler }: { bolumler: AramaBolumu[] }) {
           <div className="pencere ara-pencere" role="dialog" aria-modal="true" aria-label="Stüdyo'da ara" onKeyDown={tus}>
             <div className="ara-kutu">
               <Ikon ad="ara" />
-              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Bölüm, haber ya da taslak ara…" aria-label="Aranacak sözcük" autoFocus autoComplete="off" spellCheck={false} />
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Bölüm, haber, taslak, not ya da iş ara…" aria-label="Aranacak sözcük" autoFocus autoComplete="off" spellCheck={false} />
               <button type="button" className="linkbtn" onClick={() => setAcik(false)}>Kapat</button>
             </div>
             <div className="ara-liste" ref={liste} role="listbox" aria-label="Sonuçlar">
@@ -87,8 +97,8 @@ export default function Arama({ bolumler }: { bolumler: AramaBolumu[] }) {
                   </button>
                 </div>
               ))}
-              {!sonuclar.length && <div className="ara-bos">{araniyor ? "Aranıyor…" : "Bu sözcükle bölüm, haber ya da taslak bulunamadı."}</div>}
-              {araniyor && sonuclar.length > 0 && <div className="ara-bos">Haberler ve taslaklar aranıyor…</div>}
+              {!sonuclar.length && <div className="ara-bos">{araniyor ? "Aranıyor…" : "Bu sözcükle bir şey bulunamadı."}</div>}
+              {araniyor && sonuclar.length > 0 && <div className="ara-bos">Haberler, taslaklar, notlar aranıyor…</div>}
             </div>
           </div>
         </div>

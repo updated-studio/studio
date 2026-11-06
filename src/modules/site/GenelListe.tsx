@@ -15,7 +15,8 @@ type Kayit = Record<string, unknown>;
 export default function GenelListe({ k, ac, kullanici }: { k: KoleksiyonSema; ac: (id: number | null) => void; kullanici: PanelKullanici }) {
   const toast = useToast();
   const [secili, setSecili] = useState<Set<number>>(new Set());
-  const [ara, setAra] = useState("");
+  // Üst çubuktaki aramadan gelindiyse (?ara=) liste o sözcükle açılır
+  const [ara, setAra] = useState(() => new URLSearchParams(location.hash.split("?")[1] ?? "").get("ara") ?? "");
   const [veri, setVeri] = useState<{ docs: Kayit[]; sonraki: boolean; sayfa: number; toplam: number } | null>(null);
   const [hata, setHata] = useState("");
   const [yukleAcik, setYukleAcik] = useState(false);
