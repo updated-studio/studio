@@ -1,5 +1,10 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
+import { sb } from "../../shared/supabase";
+import { istekYap } from "../site/api";
+import { satirlar, saat, type Durum } from "../sistem/SistemDurumu";
+import { OTO_VARSAYILAN, type OtoAyar } from "../../../supabase/functions/triyaj-taslak/secim.ts";
 import { Ikon } from "../../shared/Ikon";
 import { GRUPLAR } from "./menu";
 import { editorGibi, yonetirMi } from "./gorev";
@@ -23,12 +28,46 @@ const BOLUMLER: { ad: string; satirlar: Satir[] }[] = [
   ] },
 ];
 
+/** Sayfa başında dört sayı (onaylı düzen, Yönetim ekranı): etkin kaynak, günlük taslak sınırı, eşik, otomasyonların durumu. Durum
+ *  Sistem durumu ekranıyla aynı kurallardan (SistemDurumu satirlar) gelir; sayıya basınca ilgili ekran açılır. */
+function Ozet() {
+  const [kaynak, setKaynak] = useState<number | null>(null);
+  const [oto, setOto] = useState<OtoAyar | null>(null);
+  const [durum, setDurum] = useState<{ sorun: number; dikkat: number } | null | "yok">(null);
+  useEffect(() => {
+    let iptal = false;
+    sb.from("tr_sources").select("id", { count: "exact", head: true }).eq("active", true).then(({ count }) => { if (!iptal) setKaynak(count ?? null); });
+    sb.from("tr_settings").select("value").eq("key", "oto_taslak").maybeSingle().then(({ data }) => {
+      if (!iptal) setOto({ ...OTO_VARSAYILAN, ...((data?.value ?? {}) as Partial<OtoAyar>) });
+    });
+    istekYap<Durum>("/studyo/durum").then((d) => {
+      if (iptal) return;
+      const l = satirlar(d);
+      const eski = saat(d.zaman) > 0.3 ? 1 : 0;
+      setDurum({ sorun: l.filter((x) => x.seviye === "sorun").length, dikkat: l.filter((x) => x.seviye === "dikkat").length + eski });
+    }).catch(() => { if (!iptal) setDurum("yok"); });
+    return () => { iptal = true; };
+  }, []);
+  const durumMetni = durum === null ? "–" : durum === "yok" ? "Alınamadı" : durum.sorun ? `${durum.sorun} sorun` : durum.dikkat ? `${durum.dikkat} dikkat` : "Çalışıyor";
+  return (
+    <section className="mas-kart" aria-label="Özet">
+      <div className="mas-sayilar dort">
+        <Link to="/haber-masasi?b=kaynak"><b>{kaynak ?? "–"}</b><span>haber kaynağı</span></Link>
+        <Link to="/haber-masasi?b=ayar"><b>{oto ? (oto.acik ? `${oto.gunluk}/gün` : "Kapalı") : "–"}</b><span>otomatik taslak sınırı</span></Link>
+        <Link to="/haber-masasi?b=ayar"><b>{oto ? oto.esik : "–"}</b><span>taslak eşiği (100'de)</span></Link>
+        <Link to="/sistem"><b>{durumMetni}</b><span>bütün otomasyonlar</span></Link>
+      </div>
+    </section>
+  );
+}
+
 export default function Yonetim() {
   const { profile } = useAuth();
   const acik = BOLUMLER.map((b) => ({ ...b, satirlar: b.satirlar.filter((s) => !s.admin || profile?.is_admin) })).filter((b) => b.satirlar.length);
   return (
     <div className="mas">
       <div className="mas-bas"><div><h1>Ayarlar</h1><p className="mas-bulgu">Yönetim ayarlarının hepsi burada. Bir satıra basınca ilgili ekran açılır.</p></div></div>
+      {profile?.is_admin && <Ozet />}
       {!acik.length && <div className="mas-kart"><div className="mas-bos">Bu bölümleri yalnız yönetici açabilir.</div></div>}
       {acik.map((b) => (
         <section key={b.ad} className="mas-kart" aria-label={b.ad}>

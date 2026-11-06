@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-06-j",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Ayarlar özeti",
+    "bolumler": [
+      {
+        "ad": "Yönetim › Ayarlar",
+        "maddeler": [
+          "Sayfanın başında dört sayı: haber kaynağı, günlük otomatik taslak sınırı, taslak eşiği ve otomasyonların durumu.",
+          "Sayıya basınca ilgili ekran açılır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-i",
     "tarih": "6 Kasım 2026",
     "baslik": "Tasarım",

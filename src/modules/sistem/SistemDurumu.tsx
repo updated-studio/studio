@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { istekYap } from "../site/api";
 import { Ikon } from "../../shared/Ikon";
 
-type Durum = {
+export type Durum = {
   zaman: string;
   site: { hata: boolean; son_satir: string; son_derleme: string; son_yukleme: string; surum: string;
     icerik: { son_yayin: string | null; bugun: number; incelemede: number; uper: number; yorum_onayda: number } | null };
@@ -28,7 +28,7 @@ const GRUP: [string, string, string[]][] = [
 const SIMGE: Record<string, string> = { "Site (updated.com.tr)": "site", "Haber yayını": "icerik", "Haber Masası (haber toplama)": "triyaj", "Panel (yayın sistemi)": "yonetim", "Stüdyo ekranı": "marka", "Veritabanı ve giriş servisleri": "ekip", "Zamanlanmış işler": "saat", "Sunucu": "bilgisayar", "Gece yedeği": "check", "Durum özeti": "saat" };
 
 const SEVIYE: Record<Seviye, [string, string]> = { ok: ["Çalışıyor", "ok"], dikkat: ["Dikkat", "wait"], sorun: ["Sorun", "rose"] };
-const saat = (s?: string | null) => (s ? (Date.now() - new Date(s).getTime()) / 36e5 : Infinity);
+export const saat = (s?: string | null) => (s ? (Date.now() - new Date(s).getTime()) / 36e5 : Infinity);
 function once(s?: string | null) {
   if (!s) return "hiç";
   const dk = (Date.now() - new Date(s).getTime()) / 6e4;
@@ -40,7 +40,7 @@ function once(s?: string | null) {
 // Yedek günlüğü yerel saatle yazar ("2026-10-25 00:16:09", sunucu UTC)
 const yedekZaman = (s: string) => (s ? new Date(s.replace(" ", "T") + "Z").toISOString() : null);
 
-function satirlar(d: Durum): Satir[] {
+export function satirlar(d: Durum): Satir[] {
   const s: Satir[] = [];
   const ic = d.site.icerik;
   s.push({ ad: "Site (updated.com.tr)", seviye: d.site.hata ? "sorun" : saat(d.site.son_yukleme) > 26 ? "dikkat" : "ok",
