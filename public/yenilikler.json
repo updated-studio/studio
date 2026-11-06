@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-11-06-g",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Ürünlere yorum",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Okurlar artık ürünlere (künyelere) yorum yazabilir: ürün sayfasında ve kıyas aracında \"Yorumlar\" bölümü var.",
+          "Kıyas aracında kıyaslanan ürünlerden biri seçilir, o ürünün yorumları görünür."
+        ]
+      },
+      {
+        "ad": "Site › Topluluk",
+        "maddeler": [
+          "Ürün yorumları da aynı Yorumlar listesine düşer; onaylama ve gizleme haber yorumlarıyla aynı."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-f",
     "tarih": "6 Kasım 2026",
     "baslik": "Stüdyo'da arama",
