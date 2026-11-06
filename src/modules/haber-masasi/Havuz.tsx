@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../shared/auth";
 import { sb } from "../../shared/supabase";
 import { useToast } from "../../shared/toast";
@@ -29,7 +30,10 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
   const degerle = useDegerlendir();
   useSaat();
   const ben = profile!.id;
-  const [ara, setAra] = useState("");
+  // Üst çubuktaki aramadan gelindiyse (?ara=) kutu o sözcükle dolu açılır ve liste "Tümü"nde başlar
+  const urlAra = useSearchParams()[0].get("ara") ?? "";
+  const [ara, setAra] = useState(urlAra);
+  useEffect(() => { if (urlAra) setAra(urlAra); }, [urlAra]);
   const [gorunum, setGorunum] = useState<"herkes" | "bana">("herkes");
   const [elKategori, setElKategori] = useState("hepsi");
   const [kac, setKac] = useState(60);
@@ -54,7 +58,7 @@ export default function Havuz({ durum }: { durum: Extract<Durum, "aday" | "pas" 
     }
     return { liste: [...secili].sort((a, b) => zaman(b) - zaman(a)), d: undefined };
   }, [v.haberler, v.oylar, durum, ara, siralama]); // eslint-disable-line react-hooks/exhaustive-deps
-  const filtre = useFiltre(sirali, (h) => d?.get(h.id) ?? degerle(h), durum === "aday" ? "onemli" : "hepsi");
+  const filtre = useFiltre(sirali, (h) => d?.get(h.id) ?? degerle(h), durum === "aday" && !urlAra ? "onemli" : "hepsi");
 
   let liste = durum === "elendi" ? sirali : filtre.sonuc;
   // "Bana göre": önerilen editörü ben olanlar üstte; ortak sıra değişmez, sadece benim görünümüm

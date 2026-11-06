@@ -28,11 +28,13 @@ export const GRUPLAR: Grup[] = [
     { yol: "/haber-masasi?b=rehber", ad: "Rehberler", ikon: "yardim", etkin: (y, sp) => masada(y) && sp.get("b") === "rehber" },
   ] },
   { ad: "Ekip", ogeler: [
-    { yol: "/icerik", ad: "Sosyal medya", ikon: "icerik", etkin: (y) => y.startsWith("/icerik") || y.startsWith("/marka-kiti") },
+    { yol: "/icerik", ad: "Sosyal medya", ikon: "icerik", etkin: (y) => y.startsWith("/icerik") },
     CEKIM,
     { yol: "/ekip", ad: "İşler", ikon: "ekip", etkin: (y) => y.startsWith("/ekip") },
     { yol: "/takvim", ad: "Takvim", ikon: "takvim", etkin: (y) => y.startsWith("/takvim") },
     { yol: "/notlar", ad: "Notlar", ikon: "yaz", etkin: (y) => y.startsWith("/notlar") },
+    // 6 Kasım 2026 (kullanıcı: "marka kitini editörler de kullanmak isteyebilir"): profil menüsünden buraya taşındı
+    { yol: "/marka-kiti", ad: "Marka kiti", ikon: "marka", etkin: (y) => y.startsWith("/marka-kiti") },
   ] },
   // Yöneticiye özel her şey tek açılır grupta: site içeriği ve ayarlar
   { ad: "Yönetim", yonetici: true, acilir: true, ikon: "yonetim", ogeler: [

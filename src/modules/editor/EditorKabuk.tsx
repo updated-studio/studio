@@ -6,6 +6,7 @@ import Bildirimler from "../../shared/Bildirimler";
 import { Ikon, SimgeTanimlari } from "../../shared/Ikon";
 import IkonUyarisi from "../../shared/IkonUyarisi";
 import ProfilMenu from "../../shared/ProfilMenu";
+import Arama, { type AramaBolumu } from "../../shared/Arama";
 import CanliKisiler from "../../shared/CanliKisiler";
 import { CanliSaglayici } from "../../shared/canli";
 import SohbetDugme from "../../shared/SohbetDugme";
@@ -52,8 +53,14 @@ export default function EditorKabuk() {
     try { localStorage.removeItem("rehber-goruldu:haber-yaz"); } catch { /* depolama kapalı */ }
     if (konum.pathname.startsWith("/yaz/")) rehberBaslat("haber-yaz"); else git("/yaz/yeni");
   };
-  // Profil menüsü: yalnız profil ve marka kiti (ayar ekranları Yönetim'de, bölümler menüde)
-  const profilde = izinli.filter((m) => m.id === "profil" || m.id === "marka-kiti");
+  // Profil menüsü: yalnız profil (ayar ekranları Yönetim'de, bölümler ve marka kiti menüde)
+  const profilde = izinli.filter((m) => m.id === "profil");
+  // Üst çubuktaki aramanın "Bölümler" listesi: kişinin menüsünde ne varsa
+  const aramaBolumleri: AramaBolumu[] = [
+    ...gruplar.flatMap((g) => g.ogeler.map((o) => ({ ad: o.ad, yol: o.yol, ikon: o.ikon, grup: g.ad || undefined }))),
+    { ad: "Yeni yaz", yol: "/yaz/yeni", ikon: "yaz", grup: "Haberler" },
+    { ad: "Profilim", yol: "/profil", ikon: "profil" },
+  ];
   const onizleme = yonetirMi(profile) && editorGibi(profile);
   // Logoya basınca ana ekran (Masam); zaten oradaysa sayfa yenilenir (4 Kasım 2026, kullanıcı isteği)
   const anaSayfa = () => { if (konum.pathname.startsWith("/masam")) location.reload(); else git("/masam"); };
@@ -109,6 +116,7 @@ export default function EditorKabuk() {
         <header className="ed-tepe">
           <button type="button" className="ed-marka ed-marka-tel" aria-label="Updated Stüdyo, Masam" onClick={anaSayfa}><span className="logo" aria-hidden="true" /><i /><span>STÜDYO</span></button>
           <span style={{ flex: 1 }} />
+          <Arama bolumler={aramaBolumleri} />
           <CanliKisiler />
           <SohbetDugme />
           <Bildirimler />

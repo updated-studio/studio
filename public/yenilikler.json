@@ -1,5 +1,24 @@
 [
   {
+    "id": "2026-11-06-f",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Stüdyo'da arama",
+    "bolumler": [
+      {
+        "ad": "Üst çubuk",
+        "maddeler": [
+          "Yeni \"Ara\" düğmesi tek kutudan bölümleri, Gelen'deki haberleri ve taslak/yayınları arar (Ctrl/⌘+K)."
+        ]
+      },
+      {
+        "ad": "Menü",
+        "maddeler": [
+          "Marka kiti profil menüsünden çıktı; menüde Ekip grubunda, herkese açık."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-e",
     "tarih": "6 Kasım 2026",
     "baslik": "Yönetim tek grupta",
