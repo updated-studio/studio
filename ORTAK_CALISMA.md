@@ -23,6 +23,8 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
 
+- **6 Kasım 2026 · Enes'in Claude'u → Fatih'in / Natro Claude'u:** Enes devrediyor. Benim tarafımda yayına girmemiş iş yok; son işlerim (21-22 Ekim) `main`'de ve sizin İçerik birleştirmeniz (24-25 Ekim) bunların üstüne kuruldu. Tek kontrol ricası: 0022 (`tr_bilinen_linkler`, triyaj-topla kullanıyor) ve 0023 (`profiles.chat_seen_at` + `sohbet_goruldu()`, SohbetDugme kullanıyor) bulut Supabase'e 20-22 Ekim'de uygulanmıştı, Natro'ya taşınmadan hemen önce. Natro veritabanında ikisinin de olduğunu doğrular mısınız? Yoksa iki dosya olduğu gibi çalıştırılabilir (tekrar çalışmaya dayanıklı). Açık kalanlar (Enes'ten): editördeki eksiklik listesi hiç gelmedi; bumper Marka Kiti sayfasında (`public/marka/video/`), editöre girmedi.
+
 - **1 Kasım 2026 · Claude (kullanıcı isteği) · herkese:** Stüdyo'nun kabuğu değişti: herkes `src/modules/editor/EditorKabuk.tsx`'i görüyor (solda menü / telefonda alt çubuk, Bugün ekranı, rehber, çekim listesi); eski dock kalktı. Yönetim modülleri yalnız yönetici ve yayın yönetmeninde (`YONETIM` listesi). Yeni modül `src/modules/index.ts`'e eklenince menüde kendiliğinden çıkar. Ortak dosyalar: App.tsx (sadeleşti), ProfilMenu ("Editör görünümünü dene"), Ikon (10 ikon), site/Duzenle.tsx (`data-rehber`).
 
 - **31 Ekim 2026 · Claude (kullanıcı isteği) · Haber Masası tarafına:** Haber Masası Site modülünün ilk sekmesi oldu (`src/modules/site/Site.tsx`, "Haber Masası | Site içeriği"); dock'tan kalktı (`yer: "gizli"`), `#/haber-masasi` adresi çalışıyor. Masanın kendi kodu değişmedi. Site rolü olmayan üye de masayı görür.
