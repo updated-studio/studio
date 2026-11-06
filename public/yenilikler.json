@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-11-06-i",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Tasarım",
+    "bolumler": [
+      {
+        "ad": "Tasarım",
+        "maddeler": [
+          "Post, story ve Reels editörünün adı artık \"Tasarım\"; menüde Ekip grubunda."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-h",
     "tarih": "6 Kasım 2026",
     "baslik": "Künyeden ekipmana ekleme",

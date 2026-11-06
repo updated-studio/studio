@@ -12,7 +12,7 @@ export type CanliKisi = { id: string; ad: string; foto: string | null; email: st
 
 const BOLUM: [RegExp, string][] = [
   [/^\/masam/, "Masam"], [/^\/bugun/, "Bugün"], [/^\/yaz\//, "Haber yazıyor"], [/^\/oku\//, "Taslak okuyor"], [/^\/taslaklar/, "Taslaklar"], [/^\/yayinda/, "Yayındakiler"], [/^\/onay/, "Onay bekleyenler"], [/^\/haber-masasi/, "Gelen haberler"], [/^\/yonetim-merkezi/, "Yönetim"], [/^\/menu/, "Menü"],
-  [/^\/cekim/, "Çekim listesi"], [/^\/takvim/, "Takvim"], [/^\/icerik/, "İçerik"], [/^\/site/, "Site"], [/^\/ekip/, "Ekip"], [/^\/marka/, "Marka Kiti"],
+  [/^\/cekim/, "Çekim listesi"], [/^\/takvim/, "Takvim"], [/^\/icerik/, "Tasarım"], [/^\/site/, "Site"], [/^\/ekip/, "Ekip"], [/^\/marka/, "Marka Kiti"],
   [/^\/notlar/, "Notlar"], [/^\/baglantilar/, "Bağlantı anahtarları"], [/^\/deneme-masasi/, "Deneme masası"], [/^\/yz-kiyas/, "Yapay zekâ kıyası"], [/^\/sistem/, "Sistem"], [/^\/profil/, "Profil"],
 ];
 export const bolumAdi = (yol: string) => BOLUM.find(([r]) => r.test(yol))?.[1] ?? "Stüdyo";

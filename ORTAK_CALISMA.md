@@ -21,7 +21,23 @@ Bu depoda aynı anda iki kişi çalışıyor; ikisi de kendi Claude sohbetiyle. 
 6. **Ortak renk/yazı tipi değişkenleri** (`src/index.css`) değişecekse önce not; ikisinin ekranını da etkiler.
 7. Bir şey bozulursa ya da diğerinin işine dokunmak zorunda kalındıysa: aşağıya tarihli not + kullanıcıya hemen söylenir.
 
+## Sunucuda aynı anda çalışan sohbetler (6 Kasım 2026, kullanıcı isteği)
+
+Sunucuda (Natro) birden çok Claude sohbeti aynı anda çalışabilir. Her sohbet **kendi klasöründe ve kendi dalında** çalışır; `main`'e yalnız iş bitince, güncel `main`'in üstüne alıp (`git pull --rebase origin main`), derleyip gönderir. Böylece kimsenin yarım işi yayına çıkmaz.
+
+| Sohbet | Klasör | Dal | Alanı |
+|---|---|---|---|
+| Natro sunucu | `/opt/updated/studio`, `/opt/updated/calisma/site` | `main` | Stüdyo arayüzü (Masam, menü, taslaklar, Yönetim), site, panel |
+| Natro sunucu 2 | `/opt/updated/calisma/studio-tasarim` | `tasarim-araci` | Tasarım (eski adıyla İçerik / Sosyal medya): `src/modules/icerik/`, `public/araclar/post/` |
+| Motion (bulut) | GitHub üzerinden | kendi dalı | `uygulamalar/motion/` (kimse karışmaz) |
+
+- **Ağır işler sırayla:** derleme, `npm ci`, tarayıcı denemesi `/opt/updated/calisma/araclar/sirali.sh <komut>` ile çalıştırılır (sunucunun site/panel yayınıyla aynı kilit, `/run/updated-agir.lock`). Sunucu küçük (2 çekirdek, 3,8 GB).
+- **Ortak dosyalar** (kural 5) değişecekse önce buraya not; diğer sohbete `send_message` ile kısa haber.
+- Yeni sohbet açılınca ilk iş bu tabloya satırını eklemek.
+
 ## Notlar (en yeni üstte; tarih · kimden · kime)
+
+- **6 Kasım 2026 · Natro sunucu 2 → Natro sunucu:** Kullanıcı isteğiyle İçerik editörünün adı **"Tasarım"** oldu: `menu.ts` Ekip grubundaki "Sosyal medya" satırı, `modules/index.ts` ad, `shared/canli.tsx` konum adı (adres `/icerik` aynı). Senin alanındaki `menu.ts`'te yalnız o tek etiket değişti. Bundan sonra Tasarım'ı ben düzenliyorum; Masam, menü ve diğer arayüz senin.
 
 - **6 Kasım 2026 · Motion Claude'u (bulut oturumu, kullanıcı isteği) · herkese:** Yeni klasör `uygulamalar/motion/` (kodla video üretimi, Remotion). Stüdyo koduna, veritabanına, fonksiyonlara dokunmadı; yalnız `public/marka/` dosyalarını OKUR. Ortak dosyalara sadece ekleme: ARCHITECTURE karar günlüğü, GUNLUK, bu not. Marka kiti (`public/marka/makine/*`) değişirse `uygulamalar/motion`'da `npm run setup` yeterli.
 

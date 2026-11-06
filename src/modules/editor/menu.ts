@@ -28,7 +28,7 @@ export const GRUPLAR: Grup[] = [
     { yol: "/haber-masasi?b=rehber", ad: "Rehberler", ikon: "yardim", etkin: (y, sp) => masada(y) && sp.get("b") === "rehber" },
   ] },
   { ad: "Ekip", ogeler: [
-    { yol: "/icerik", ad: "Sosyal medya", ikon: "icerik", etkin: (y) => y.startsWith("/icerik") },
+    { yol: "/icerik", ad: "Tasarım", ikon: "icerik", etkin: (y) => y.startsWith("/icerik") },
     CEKIM,
     { yol: "/ekip", ad: "İşler", ikon: "ekip", etkin: (y) => y.startsWith("/ekip") },
     { yol: "/takvim", ad: "Takvim", ikon: "takvim", etkin: (y) => y.startsWith("/takvim") },
