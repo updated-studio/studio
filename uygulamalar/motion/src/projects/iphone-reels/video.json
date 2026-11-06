@@ -1,0 +1,32 @@
+{
+  "id": "iphone-reels",
+  "slug": "iphone-18-pro-17-pro-reels",
+  "title": "iPhone 18 Pro – 17 Pro reels — DİL ARAYIŞI (launch-motion kalitesi + Liquid Glass, marka kuralları gevşek)",
+  "durationSec": 40.5,
+  "fps": 60,
+  "formats": ["9x16"],
+  "motion": "dinamik",
+  "audio": {
+    "music": null, "musicVolume": 0.3,
+    "voice": "audio/iphone-reels-ses.mp3", "voiceVolume": 1,
+    "elevenlabs": {"voiceId": "IuRRIAcbQK5AQk1XevPj", "voiceName": "Doga - Upbeat and Rich", "model": "eleven_multilingual_v2", "text": "metin.txt"}
+  },
+  "scenes": [
+    {"id": "hook", "name": "18 Pro çıktı (hook)", "frames": 264, "key": 220},
+    {"id": "cip", "name": "A20 Pro", "frames": 348, "key": 300},
+    {"id": "kamera", "name": "Değişken diyafram", "frames": 732, "key": 560},
+    {"id": "pil", "name": "Pil ve şarj", "frames": 570, "key": 480},
+    {"id": "island", "name": "Dynamic Island", "frames": 276, "key": 240},
+    {"id": "final", "name": "Değer mi?", "frames": 240, "key": 200}
+  ],
+  "copy": {
+    "hook": {"title": "iPhone 18 Pro", "sub": "17 Pro'dan geçmeye değer mi?", "left": "17 Pro", "right": "18 Pro"},
+    "cip": {"chip": "A20 Pro", "chipSub": "2 nm · 6 çekirdekli CPU", "old": "A19 Pro", "gpu": "GPU", "gain": 40},
+    "kamera": {"lead": "Asıl fark kamerada", "label": "48 MP Fusion Ana kamera", "title": "Değişken diyafram", "stops": ["ƒ/1.48", "ƒ/1.8", "ƒ/2.8", "ƒ/4.0"],
+      "a": "ƒ/1.48 · karanlıkta daha çok ışık", "b": "ƒ/4 · grupta daha geniş netlik", "old": "17 Pro: sabit diyafram"},
+    "pil": {"title": "Video oynatma", "new": 34, "old": 31, "unit": "saat", "charge": "15 dk", "chargeSub": "%50 şarj · 60 W adaptörle"},
+    "island": {"a": "Daha küçük Dynamic Island", "b": "Aynı anda 3 canlı etkinlik"},
+    "final": {"q": "Peki sence değiştirmeye değer mi?"},
+    "source": "Kaynak: Apple · Türkiye'de satılan model"
+  }
+}

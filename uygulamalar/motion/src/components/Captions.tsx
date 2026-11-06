@@ -25,7 +25,7 @@ export const groupWords = (words: Word[], max = 3, maxChars = 22) => {
  * diğerleri beyaz; grup cam bir şeridin üstünde. Kelimeler sözle aynı anda hafif büyüyerek gelir, grup değişiminde kayma yok, sadece solma.
  * Konum: alt güvenli çizginin hemen üstü (9:16'da alt 340 px platformun).
  */
-export const Captions: React.FC<{words: Word[]; offset?: number; max?: number}> = ({words, offset = 0, max = 3}) => {
+export const Captions: React.FC<{words: Word[]; offset?: number; max?: number; font?: string; weight?: number}> = ({words, offset = 0, max = 3, font = FONT_BODY, weight = 600}) => {
   const f = useCurrentFrame();
   const {fps} = useVideoConfig();
   const L = useLayout();
@@ -45,7 +45,7 @@ export const Captions: React.FC<{words: Word[]; offset?: number; max?: number}> 
           const said = t >= w.s;
           const pop = Math.min(1, Math.max(0, (t - w.s) / 0.1));
           return (
-            <span key={i} style={{fontFamily: FONT_BODY, fontWeight: 600, fontSize: size, lineHeight: 1.2, padding: `0 ${size * 0.12}px`, borderRadius: 10,
+            <span key={i} style={{fontFamily: font, fontWeight: weight, fontSize: size, lineHeight: 1.2, padding: `0 ${size * 0.12}px`, borderRadius: 10,
               background: on ? C.blue : 'transparent', color: said ? C.white : 'rgba(242,242,242,0.45)', transform: `scale(${on ? 1 + 0.06 * (1 - Math.abs(pop - 0.5) * 2) : 1})`, display: 'inline-block'}}>
               {clean(w.w)}
             </span>

@@ -10,6 +10,22 @@ const RANGES = {
 } as const;
 
 let started = false;
+const extraStarted = new Set<string>();
+
+/** Markadan bağımsız font yükle (ör. Inter). Kare 0'dan önce biter. */
+export const loadFonts = (specs: {family: string; fontsource: string; weights: number[]}[]) => {
+  if (typeof document === 'undefined') return;
+  const todo = specs.filter((s) => !extraStarted.has(s.family));
+  if (!todo.length) return;
+  todo.forEach((s) => extraStarted.add(s.family));
+  const handle = delayRender('Ek fontlar');
+  const faces: FontFace[] = [];
+  for (const spec of todo) for (const w of spec.weights) for (const subset of Object.keys(RANGES) as (keyof typeof RANGES)[]) {
+    const face = new FontFace(spec.family, `url(${staticFile(`fonts/${spec.fontsource}-${subset}-${w}-normal.woff2`)}) format('woff2')`, {weight: String(w), unicodeRange: RANGES[subset]});
+    document.fonts.add(face); faces.push(face);
+  }
+  Promise.all(faces.map((f) => f.load())).then(() => continueRender(handle));
+};
 
 /** Fontları kare 0'dan ÖNCE yükler. Yedek font (Times New Roman) = hata. */
 export const loadBrandFonts = () => {

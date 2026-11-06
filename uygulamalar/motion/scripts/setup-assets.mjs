@@ -8,8 +8,10 @@ const brand = JSON.parse(fs.readFileSync(path.join(root, 'brand/brand.json'), 'u
 const fontsDir = path.join(root, 'public/fonts');
 fs.mkdirSync(fontsDir, {recursive: true});
 
+// Markadan bağımsız denemeler için ek fontlar (ör. iphone-reels: Inter)
+const EXTRA = [{fontsource: 'inter', weights: [400, 500, 600, 700, 800]}];
 let missing = [];
-for (const spec of Object.values(brand.fonts)) {
+for (const spec of [...Object.values(brand.fonts), ...EXTRA]) {
   for (const w of spec.weights) {
     for (const subset of ['latin', 'latin-ext']) {
       const name = `${spec.fontsource}-${subset}-${w}-normal.woff2`;
