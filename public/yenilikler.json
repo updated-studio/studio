@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-06-h",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Künyeden ekipmana ekleme",
+    "bolumler": [
+      {
+        "ad": "Site",
+        "maddeler": [
+          "Ürün sayfasındaki \"Kullananlar\" kutusunda \"Ben de kullanıyorum\" düğmesi var: ürün tek dokunuşla okurun ekipmanına eklenir. Kıyas aracındaki \"Sahipleri\" kutusunda da aynı düğme var.",
+          "Uper profilinde ekipman artık ürün görselleriyle raf olarak görünür; her ürün künyesine bağlanır.",
+          "Yazıların altındaki tepki düğmelerine simge eklendi; telefonda düğmeler iki sütun."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-g",
     "tarih": "6 Kasım 2026",
     "baslik": "Ürünlere yorum",
