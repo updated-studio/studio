@@ -2,6 +2,7 @@ import React from 'react';
 import {useCurrentFrame} from 'remotion';
 import {C, FONT_DISPLAY, brand} from '../lib/brand';
 import * as kit from '../lib/motion';
+import {upperTR} from '../lib/text';
 
 export type MotionAPI = {enterP: typeof kit.enterP; fadeIn: typeof kit.fadeIn; exitP: typeof kit.exitP};
 
@@ -15,13 +16,13 @@ export const Kinetic: React.FC<{
 }> = ({text, start, exitAt, size = 120, maxWidth = 900, align = 'center', color = C.white, highlight = [], highlightColor = C.blue, step = 5, m = kit, rise = 24}) => {
   const f = useCurrentFrame();
   const {enterP, exitP, fadeIn} = m;
-  const words = text.toLocaleUpperCase('tr-TR').split(' ');
+  const words = upperTR(text).split(' ');
   const ex = exitAt !== undefined ? exitP(f, exitAt) : 0;
   return (
     <div lang="tr" style={{fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: size, lineHeight: brand.type.headingLineHeight, maxWidth, width: 'max-content', textAlign: align, color, opacity: 1 - ex}}>
       {words.map((w, i) => {
         const s = start + i * step;
-        const hl = highlight.some((h) => w.includes(h.toLocaleUpperCase('tr-TR')));
+        const hl = highlight.some((h) => w.includes(upperTR(h)));
         return (
           <span key={i} style={{display: 'inline-block', marginRight: '0.22em', opacity: fadeIn(f, s), transform: `translateY(${(1 - enterP(f, s)) * rise}px)`, color: hl ? highlightColor : undefined}}>
             {w}

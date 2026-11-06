@@ -1,0 +1,29 @@
+{
+  "id": "iphone-kiyas",
+  "slug": "iphone-18-pro-17-pro-kiyas",
+  "title": "iPhone 18 Pro – iPhone 17 Pro kıyas (STİL TASLAĞI: ilk iki sahne)",
+  "durationSec": 20,
+  "fps": 60,
+  "formats": ["9x16", "16x9"],
+  "motion": "dinamik",
+  "audio": {"music": null, "musicVolume": 0.4, "voice": "audio/ses-deneme-george.mp3", "voiceVolume": 1},
+  "scenes": [
+    {"id": "hook", "name": "Hangisi? (hook)", "frames": 300, "key": 200},
+    {"id": "kamera", "name": "Kamera: değişken diyafram", "frames": 900, "key": 520}
+  ],
+  "copy": {
+    "headline": "Değiştirmeye değer mi?",
+    "models": [
+      {"name": "iPhone 18 Pro", "chip": "A20 Pro", "date": "Eylül 2026"},
+      {"name": "iPhone 17 Pro", "chip": "A19 Pro", "date": "Eylül 2025"}
+    ],
+    "kamera": {
+      "label": "Kamera",
+      "headline": "Değişken diyafram",
+      "stops": ["ƒ/1.48", "ƒ/1.8", "ƒ/2.8", "ƒ/4.0"],
+      "yeni": "iPhone 18 Pro · 48 MP Fusion Ana kamera",
+      "eski": "iPhone 17 Pro · sabit diyafram"
+    },
+    "source": "Kaynak: Apple"
+  }
+}

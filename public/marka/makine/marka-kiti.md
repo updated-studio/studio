@@ -26,6 +26,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 - Minimum genişlik: yatay 96 px / 25 mm · dikey 40 px / 12 mm · UP 16 px / 6 mm. Küçükte daima solid.
 - Outline sürüm logo değildir; yalnızca desen/doku.
 - Favicon ve app ikonu yalnızca UP.
+- Videolarda (YouTube, Reels, Shorts, story; 1.7): UP işareti sol üstte sabit; gerekirse üst orta. Ayrıntı §10.
 - Fotoğraf üstünde: açık bölge → siyah logo, koyu bölge → beyaz logo, karışık → düz renk kare kutu (siyah/mavi/turuncu), köşeye sıfır yaslı. Yüz/ürün/yazı üstüne konmaz; yarı saydam kutu ve gölge yok.
 - Yasak: germe, döndürme, düşük kontrast, gölge/efekt, logoyu fontla yazma, eğimi değiştirme, palet dışı renk, iki logoyu birlikte kullanma.
 - Ortak marka: yatay logo, UPDATED solda/üstte, partner aynı görsel yükseklikte, arada 2x boşluk ve 2 px dikey ayırıcı.
@@ -106,7 +107,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 ## 10. YouTube
 - Thumbnail 1280×720 (JPG ≤2 MB): haber siyah blok sol yarı + fotoğraf sağ · inceleme mavi zemin, ürün sağda, puan siyah kutuda · karşılaştırma iki ürün, turuncu VS karesi, soru alt bantta.
 - Başlık ≤4 kelime; video başlığını tekrar etmez. Logo yalnızca UP, sol üst.
-- Video içi: isim bandı sol alt (beyaz ad + mavi unvan), en fazla 5 sn · bölüm kartı mavi, 2 sn · bitiş ekranı son 20 sn, YouTube öğe alanlarına yazı konmaz. Yatay logo sağ üst, tam beyaz.
+- Video içi: isim bandı sol alt (beyaz ad + mavi unvan), en fazla 5 sn · bölüm kartı mavi, 2 sn · bitiş ekranı son 20 sn, YouTube öğe alanlarına yazı konmaz. Logo: UP işareti sol üstte, güvenli alan köşesinde, sabit (1.7); başlığın ortalandığı sahnelerde üst ortada olabilir. Koyu ve mavi zeminde beyaz, açık zeminde siyah. Kapanışta büyük logo varken gizlenir.
 - Video içi en küçük yazı 28 px; isim bandında ad 44, unvan 28 px.
 - Yayın öncesi thumbnail 320 px genişlikte kontrol edilir.
 - Dosya adı: yyyy-aa-gg-konu-thumbnail.jpg
@@ -180,7 +181,7 @@ Bu dosya marka kitinin yapay zekâ ve otomasyon için tek kaynağıdır. Görsel
 ## 15. Dosyalar
 - Logo: logo/ana-palet/{svg,png,sosyal,app-ikon,favicon,banner}/ · baskı: UPDATED Logo Baskı Dosyası · fontlar: Google Fonts (SIL OFL) · kurallar: makine/marka-kiti.md · değerler: makine/tokens.json · şablonlar: stüdyo panelinin düzenleyicisinde hazır kalıp (Figma/Canva kullanılmaz).
 - Dosya adı kuralı: küçük harf, Türkçe karakter ve boşluk yok, kelimeler tire ile: yyyy-aa-gg-konu-kanal.uzantı. Örnek: 2026-10-19-pixel-11-pro-thumbnail.jpg
-- Sürüm geçmişi: 1.6 — 06.11.2026 — Reels/Shorts/TikTok videoları için sağ sütun güvenli alanı 120 px (§6; tokens `safeArea.reelsArayuz`) · 1.5 — 01.11.2026 — ikon seti Solar kalın iki tonlu, çerçevesiz ve derinlikli; simge kitleri; mavi ana renk, turuncu nadir vurgu (§8) · 1.4 — 28.10.2026 — ikon seti tekleşti (§8): Stüdyo ve site aynı çizimler, 2 px düz uç; bilgi satırlarında ikon · 1.2 — 21.10.2026 — alan adı updated.com.tr (sayfalar, makine sürümü, alan adlı logo SVG/PNG), panel koyu modu (12b), tam yayın öncesi kontrol listesi (16), yapay zekâ paketine şablon örnek görselleri · 1.1 — 20.10.2026 — tutarlılık düzeltmeleri: başlık satır yüksekliği 1,2, Instagram başlık sınırı ve logo, YouTube video içi yazı ölçüsü, grid boşlukları ölçeğe çekildi, görsel oranları, hitap, dosya adı kuralı, imla. · 1.0 — 19.10.2026 — ilk sürüm, 19 sayfa + makine sürümü.
+- Sürüm geçmişi: 1.7 — 06.11.2026 — videolarda UP işareti sol üstte sabit, gerekirse üst orta (§2, §10; tokens `logo.video`) · 1.6 — 06.11.2026 — Reels/Shorts/TikTok videoları için sağ sütun güvenli alanı 120 px (§6; tokens `safeArea.reelsArayuz`) · 1.5 — 01.11.2026 — ikon seti Solar kalın iki tonlu, çerçevesiz ve derinlikli; simge kitleri; mavi ana renk, turuncu nadir vurgu (§8) · 1.4 — 28.10.2026 — ikon seti tekleşti (§8): Stüdyo ve site aynı çizimler, 2 px düz uç; bilgi satırlarında ikon · 1.2 — 21.10.2026 — alan adı updated.com.tr (sayfalar, makine sürümü, alan adlı logo SVG/PNG), panel koyu modu (12b), tam yayın öncesi kontrol listesi (16), yapay zekâ paketine şablon örnek görselleri · 1.1 — 20.10.2026 — tutarlılık düzeltmeleri: başlık satır yüksekliği 1,2, Instagram başlık sınırı ve logo, YouTube video içi yazı ölçüsü, grid boşlukları ölçeğe çekildi, görsel oranları, hitap, dosya adı kuralı, imla. · 1.0 — 19.10.2026 — ilk sürüm, 19 sayfa + makine sürümü.
 
 ## 16. Yayın öncesi kontrol
 Her madde işaretlenmeden yayın yapılmaz. Önce Ortak, sonra kanal listesi.
