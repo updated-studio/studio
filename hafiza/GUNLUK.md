@@ -70,6 +70,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 6 Kasım 2026
+- Kullanıcı Belgeden yaz düğmesini bulamadı (yalnız Taslaklar başlığındaydı). Artık: soldaki menüde Haberler altında "Belgeden yaz", Masam'da "Yeni yaz"ın yanında, üst aramada.
 - **UPscore tek puan** (kullanıcı onayı): site main'de `hooks/upscore.ts` (inceleme yayınlanınca puan künyeye), puan /10 tek ondalık. Stüdyo: belge-yaz istemi ve `hazirla.ts` /10, çekim listesi maddesi. Sırada: galeri görsel taslağı (onay bekleyecek).
 - **Belgeden yaz künye açar** (kullanıcı onayı "önerin iyi"): incelemenin künyesi sitede yoksa belgedeki marka, model ve türle panelde künye açılır, `kunye-otomatik { urun_id }` beklenmeden çağrılır (yarıda kalırsa günlük tur alır), inceleme yeni künyeye bağlı açılır. Sırada: UPscore (10 üzerinden tek puan, incelemeden künyeye) ve galeri görsel taslağı.
 - **Belgeden yaz sınırı:** kullanıcı "aynı anda kaç iş, sistem patlamasın" diye sordu. Yük yapay zekâda değil (Claude uzakta), panelde fotoğraf başına 6 boyut üretiminde. Aynı anda en çok 2 belge; üçüncü "Sıra bekleniyor" adımında 10 sn'de bir dener (işaret `icerik/belge-yaz/calisan/`, 15 dk ömür, taslak açılınca bırakılır). İlk denemeler: inceleme 8 Word'den (16 fotoğraf, kapak), inceleme 7 PDF'ten (fotoğrafsız, mükerrer).

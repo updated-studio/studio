@@ -62,6 +62,7 @@ export default function EditorKabuk() {
   const aramaBolumleri: AramaBolumu[] = [
     ...gruplar.flatMap((g) => g.ogeler.map((o) => ({ ad: o.ad, yol: o.yol, ikon: o.ikon, grup: g.ad || undefined }))),
     { ad: "Yeni yaz", yol: "/yaz/yeni", ikon: "yaz", grup: "Haberler" },
+    { ad: "Belgeden yaz", yol: "/belgeden-yaz", ikon: "taslak", grup: "Haberler" },
     { ad: "Profilim", yol: "/profil", ikon: "profil" },
   ];
   const onizleme = yonetirMi(profile) && editorGibi(profile);

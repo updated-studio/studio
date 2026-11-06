@@ -24,6 +24,8 @@ export const GRUPLAR: Grup[] = [
   { ad: "", ogeler: [MASAM] },
   { ad: "Haberler", ogeler: [
     GELEN, TASLAKLAR,
+    // 6 Kasım 2026 (kullanıcı: "bunun butonu nerede"): Word/PDF belgesinden taslak, menüde de görünür
+    { yol: "/belgeden-yaz", ad: "Belgeden yaz", ikon: "yaz", etkin: (y) => y.startsWith("/belgeden-yaz") },
     { yol: "/yayinda", ad: "Yayında", ikon: "check", etkin: (y) => y.startsWith("/yayinda") },
     { yol: "/haber-masasi?b=rehber", ad: "Rehberler", ikon: "yardim", etkin: (y, sp) => masada(y) && sp.get("b") === "rehber" },
   ] },
