@@ -13,7 +13,7 @@ export const useLayout = () => {
     mode === 'land'
       ? {left: -W / 2 + s.land.x, right: W / 2 - s.land.x, top: -H / 2 + s.land.y, bottom: H / 2 - s.land.y}
       : mode === 'port'
-        ? {left: -W / 2 + s.port.x, right: W / 2 - s.port.x, top: -H / 2 + s.port.top, bottom: H / 2 - s.port.bottom}
+        ? {left: -W / 2 + s.port.x, right: W / 2 - (s.port.right ?? s.port.x), top: -H / 2 + s.port.top, bottom: H / 2 - s.port.bottom} // sağ: Reels/Shorts düğme sütunu (kit §6, 1.6)
         : {left: -W / 2 + s.feed.x, right: W / 2 - s.feed.x, top: -H / 2 + s.feed.y, bottom: H / 2 - s.feed.y};
   return {W, H, mode, safe: box, safeW: box.right - box.left, pick: <V,>(v: Record<Mode, V>): V => v[mode]};
 };

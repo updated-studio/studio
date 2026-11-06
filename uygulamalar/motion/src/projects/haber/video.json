@@ -9,14 +9,9 @@
   ],
   "motion": "dinamik",
   "audio": {
-    "music": "audio/es-bulletin-world-15s.wav",
-    "musicVolume": 0.55,
-    "epidemic": {
-      "recordingId": "a82223bd-9e60-3af6-bca9-2d25036077e8",
-      "title": "Bulletin World",
-      "artist": "Out To The World",
-      "edit": "Epidemic EditRecording, 15000 ms, forceDuration"
-    }
+    "music": null,
+    "musicVolume": 0.5,
+    "_not": "Müzik her işte içeriğe göre seçilir ya da hiç konmaz (Epidemic Sound). Örnek: Bulletin World denendi; kullanıcı 'ana haber bülteni gibi' dedi."
   },
   "scenes": [
     {

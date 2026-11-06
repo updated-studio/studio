@@ -63,7 +63,7 @@ const out = {
   },
   safe: {
     land: {x: t.safeArea.video.left, y: t.safeArea.video.top},
-    port: {top: t.safeArea.story.top, bottom: t.safeArea.story.bottom, x: t.safeArea.story.left},
+    port: {top: t.safeArea.story.top, bottom: t.safeArea.story.bottom, x: t.safeArea.story.left, right: t.safeArea.reelsArayuz?.right ?? t.safeArea.story.right},
     feed: {x: t.safeArea.instagramPost.left, y: t.safeArea.instagramPost.top},
   },
   copy: {banned: t.copy.banned, address: t.copy.address.video, maxWords: t.copy.maxWords},

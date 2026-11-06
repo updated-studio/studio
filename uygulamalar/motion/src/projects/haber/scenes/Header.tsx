@@ -9,7 +9,7 @@ import {cfg} from '../config';
 /** Etiket + başlık bloğu (şablon örneklerindeki stil): turuncu etiket siyah yazı, başlık siyah blokta. Tek ebeveyn (null) altında. */
 export const headerGeom = (mode: Mode) =>
   ({
-    port: {size: 150, tag: 72, hookTop: 0, topScale: 0.5},
+    port: {size: 128, tag: 64, hookTop: -40, topScale: 0.55},
     land: {size: 150, tag: 64, hookTop: -230, topScale: 0.42},
     feed: {size: 124, tag: 60, hookTop: -90, topScale: 0.45},
   })[mode];

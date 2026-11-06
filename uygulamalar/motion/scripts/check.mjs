@@ -32,7 +32,8 @@ for (const spec of Object.values(brand.fonts))
       if (!fs.existsSync(path.join(root, 'public/fonts', `${spec.fontsource}-${sub}-${w}-normal.woff2`)))
         errs.push(`Font eksik: ${spec.fontsource} ${w} ${sub} → npm run setup`);
 if (!fs.existsSync(path.join(root, 'public/sfx/click.wav'))) errs.push('public/sfx/click.wav yok → npm run setup');
-if (v.audio?.music && !fs.existsSync(path.join(root, 'public', v.audio.music))) errs.push(`Müzik yok: public/${v.audio.music}`);
+if (v.audio?.music && !fs.existsSync(path.join(root, 'public', v.audio.music))) errs.push(`Müzik dosyası yok: public/${v.audio.music}${v.audio.epidemic ? ' → Epidemic\'ten yeniden indir (video.json → audio.epidemic)' : ''}`);
+if (!v.audio?.music) warns.push('Müzik yok (bilerek mi? İçeriğe göre Epidemic\'ten seçilebilir)');
 if (v.audio?.music?.includes('placeholder')) warns.push('Müzik yer tutucu — teslimden önce lisanslı müzikle değiştirin');
 
 

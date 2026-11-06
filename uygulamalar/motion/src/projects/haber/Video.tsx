@@ -6,6 +6,7 @@ import {Hook} from './scenes/Hook';
 import {Facts} from './scenes/Facts';
 import {Cta} from './scenes/Cta';
 import {LogoEnd} from './scenes/LogoEnd';
+import {UpMark} from '../../components/UpMark';
 
 loadBrandFonts();
 const SCENES: Record<string, React.FC> = {hook: Hook, facts: Facts, cta: Cta, logo: LogoEnd};
@@ -21,6 +22,7 @@ export const HaberVideo: React.FC = () => {
         from += s.frames;
         return el;
       })}
+      <UpMark hide={[[cfg.scenes.slice(0, -1).reduce((a, s) => a + s.frames, 0), durationInFrames]]} />
       {cfg.audio.music && (
         <Html5Audio src={staticFile(cfg.audio.music)}
           volume={(f) => interpolate(f, [0, 20, durationInFrames - 60, durationInFrames], [0, cfg.audio.musicVolume, cfg.audio.musicVolume, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})} />

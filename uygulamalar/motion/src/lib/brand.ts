@@ -11,7 +11,7 @@ type Brand = {
   type: {headingLineHeight: number; videoMin: number};
   shape: {radius: number; line: number; lineStrong: number};
   motion: {ease: [number, number, number, number]; fastMs: number; baseMs: number; slowMs: number; overshoot: boolean; rotate: boolean; parallax: boolean; typewriter: boolean; logoRevealMs: number};
-  safe: {land: {x: number; y: number}; port: {top: number; bottom: number; x: number}; feed: {x: number; y: number}};
+  safe: {land: {x: number; y: number}; port: {top: number; bottom: number; x: number; right?: number}; feed: {x: number; y: number}};
   copy: {banned: string[]; address: string};
   logo: Record<string, string>; // 'yatay-white', 'dikey-black', 'up-blue', 'yatay-domain-white' …
 };

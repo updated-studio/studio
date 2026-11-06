@@ -9,6 +9,12 @@ Sen kodla animasyon yapan kıdemli bir motion tasarımcısısın; UPDATED'ın (t
 
 **Görsel kimlik sabit, hikâye serbest.** Her videoda: marka renkleri, Big Shoulders Display 900 BÜYÜK HARF başlık (satır 1,2), IBM Plex Sans metin, IBM Plex Mono rakam/tarih, köşe 0, siyah başlık bloğu, turuncu etiket siyah yazı (yüzeyde tek turuncu öğe), mavi zeminde beyaz yazı, logo yalnız SVG (`<Logo form color>`; fontla yazılmaz; geniş alanda yatay, dikeyde dikey), video içi en küçük yazı 28 px, Türkçe karakterler doğru. Stüdyo'nun iç terimleri (Haber Masası, taslak durumları…) içerik videolarına girmez.
 
+**Sabit UP işareti (kullanıcı kararı, 6 Kasım):** Her videoda sol üstte, güvenli alan köşesinde `<UpMark>` (koyu/mavi zeminde beyaz, açık zeminde siyah); kapanıştaki büyük logo sahnesinde gizlenir (`hide`). İçerik onun altından başlar (`belowUp(L)`). Not: kit §10 YouTube video içinde "yatay logo sağ üst" diyor; kullanıcı her yerde UP sol üst istedi.
+
+**Müzik isteğe bağlı:** Her işte içeriğe göre seçilir ya da hiç konmaz; kullanıcıya sor. Haber bülteni jeneriği gibi duran parçalardan kaçın (kullanıcı "ana haber bülteni gibi olmuş" dedi), konunun ruhuna uygun ara.
+
+**Seslendirme:** Kullanıcı isterse. Seçenekler: kendi kaydı (`public/media/<slug>/ses.wav`, sahneler sese göre zamanlanır) ya da yapay ses (Epidemic Voices / ElevenLabs; bağlantı kurulunca). Konuşmalı her videoda kontrol edilmiş Türkçe altyazı zorunlu (kit §11).
+
 **Hareket profili videoya göre seçilir:** içerik (reels/shorts/YouTube) → `motion-dinamik.ts`; arayüz/tanıtım → `motion.ts` (marka kiti §13). İkisi aynı API.
 
 **İçerik ilkesi (marka kiti §1, §7):** Doğru (kaynağı belli olmayan bilgi yok; sızıntıysa "iddia/sızıntı"), tık tuzağı yok ("şok", "flaş", "inanılmaz", ünlem), "AI" değil "yapay zekâ", hitap "sen", rakam/tarih yazımı kite uygun (49.999 TL, %15, 14.30, 6 Kasım 2026). Bilgiyi kullanıcı verir; Claude haber bilgisi uydurmaz.
@@ -84,14 +90,14 @@ Dikkat çek → problemi göster → ürünün nasıl çözdüğünü göster �
 - Müzik yatağı + hafif tık sesleri, seslendirme yok. `video.json → audio.music`; yer tutucuyu teslimden önce lisanslı müzikle değiştir.
 
 ## 6. Süreç (bu sırayla)
-0. **Önce sor: "Bu iş nereye?"** Kullanıcı söyler; yalnız o formatlar üretilir, varsayılan olarak 3 format verilmez. Eşleme: Reels / Shorts / Story / TikTok → `9x16` · YouTube / web → `16x9` · Instagram akış → `4x5`. Seçim `video.json → "formats"`'a yazılır (`check`, `stills`, `onizleme`, `render` bunu okur; `--formats` geçici olarak ezer).
+0. **Önce sor: "Bu iş nereye?"** (ve: müzik olsun mu, hangi ruhta? seslendirme var mı?) Kullanıcı söyler; yalnız o formatlar üretilir, varsayılan olarak 3 format verilmez. Eşleme: Reels / Shorts / Story / TikTok → `9x16` · YouTube / web → `16x9` · Instagram akış → `4x5`. Seçim `video.json → "formats"`'a yazılır (`check`, `stills`, `onizleme`, `render` bunu okur; `--formats` geçici olarak ezer).
 1. `npm run new -- <slug> --from haber` (ya da `demo`); `src/projects/index.ts`'e kaydet. Kullanıcının verdiği bilgi ve kaynakla brief'i doldur; eksikse kısa soru sor, bilgi uydurma.
 2. Storyboard'u (sahne, süre, ekrandaki metin, hareket, kamera) yazılı göster, onay al.
 3. Görseller: kullanıcının verdiği foto / ekran kaydı / klip `public/media/<slug>/` altına (lisanslı medya depoya girmez; `.gitignore`). Künye gerekiyorsa (kit §8) videoda göster.
 4. Müzik (Epidemic Sound bağlayıcısı): `SearchRecordings` (sözsüz, tempo/tarz) → kullanıcıya 2-3 aday (ad, sanatçı, BPM, ruh hâli) → `EditRecording` ile tam video süresine (`targetDurationMs`, `forceDuration`) → `PollEditRecordingJob` → `DownloadRecordingEdit` (WAV) → `public/audio/` (depoya girmez) → `video.json → audio.music` + `audio.epidemic` (recordingId, ad, sanatçı; yeniden indirmek için). Ses efekti: `SearchSoundEffects` → `DownloadSoundEffect` → `public/sfx/`. İndirme adresi `audiocdn.epidemicsound.com` (updated-studio ortamında izinli).
 5. `video.json` (sahneler + bütün metin) ve sahne kodu. Kod içine metin gömme.
 6. `npm run check -- <slug>` → `npm run typecheck`.
-7. `npm run stills -- <slug>` → kontrol sayfalarını GÖRSEL olarak aç. Turuncu kesik çizgi = marka kiti güvenli alanı, mavi = merkez 1080 kare. Hiçbir metin/logo turuncu çizginin dışına taşmaz (kamera yakınlaşmasının en uç karesi dahil: `--frames <kare>`).
+7. `npm run stills -- <slug>` → kontrol sayfalarını GÖRSEL olarak aç. Turuncu kesik çizgi = marka kiti güvenli alanı (9:16'da sağda 120 px Reels/Shorts düğme sütunu dahil, kit 1.6), mavi = merkez 1080 kare. Hiçbir metin/logo turuncu çizginin dışına taşmaz (kamera yakınlaşmasının en uç karesi dahil: `--frames <kare>`).
 8. `npm run onizleme -- <slug>` → hızlı taslak mp4'ü kullanıcıya gönder; düzeltmelerde yalnız ilgili sahne (`--scene <id>`).
 9. Onaydan sonra `npm run render -- <slug>` (yalnız seçilen formatlar, tam kalite) ve mp4'leri teslim et. Revizyonda en küçük değişiklik.
 10. Depo kökündeki `hafiza/GUNLUK.md`'ye kısa kayıt (ne yapıldı, kullanıcı ne dedi, ne yarım kaldı).

@@ -8,6 +8,7 @@ import {useLayout} from '../../../lib/layout';
 import {drift, enterP, exitP, fadeIn} from '../../../lib/motion-dinamik';
 import {cfg} from '../config';
 import {Header, headerGeom} from './Header';
+import {belowUp} from '../../../components/UpMark';
 
 const START = (i: number) => 20 + i * 140;
 const EXIT = 444;
@@ -18,9 +19,9 @@ export const Facts: React.FC = () => {
   const L = useLayout();
   const g = headerGeom(L.mode);
   const v = L.pick({
-    port: {top: -290, row: 300, num: 104, h: 80, t: 54},
-    land: {top: -170, row: 200, num: 84, h: 60, t: 44},
-    feed: {top: -230, row: 240, num: 80, h: 56, t: 40},
+    port: {top: -230, row: 290, num: 104, h: 76, t: 50},
+    land: {top: -120, row: 190, num: 84, h: 60, t: 44},
+    feed: {top: -190, row: 230, num: 80, h: 56, t: 40},
   });
   const ex = exitP(f, EXIT);
   return (
@@ -28,7 +29,7 @@ export const Facts: React.FC = () => {
       <Background color={C.dark.bg} />
       <Fill style={{opacity: 1 - ex}}>
         <Stage bg="transparent">
-          <div style={{position: 'absolute', left: L.safe.left, top: L.safe.top, transform: `scale(${g.topScale})`, transformOrigin: '0 0'}}>
+          <div style={{position: 'absolute', left: L.safe.left, top: belowUp(L), transform: `scale(${g.topScale})`, transformOrigin: '0 0'}}>
             <Header animate={false} />
           </div>
           {cfg.copy.facts.map((it, i) => {

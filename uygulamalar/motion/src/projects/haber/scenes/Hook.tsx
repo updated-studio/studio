@@ -8,6 +8,7 @@ import {C} from '../../../lib/brand';
 import {useLayout} from '../../../lib/layout';
 import {EASE, tween} from '../../../lib/motion-dinamik';
 import {Header, headerGeom} from './Header';
+import {belowUp} from '../../../components/UpMark';
 
 const MOVE = 168;
 const PUSH = 1.04; // kamera en fazla bu kadar yaklaşır; başlık bu orana göre içeride başlar ki güvenli alandan taşmasın // başlık üste taşınır → sonraki sahneyle birebir aynı yer (eşleşen kesme)
@@ -18,7 +19,7 @@ export const Hook: React.FC = () => {
   const L = useLayout();
   const g = headerGeom(L.mode);
   const p = tween(f, MOVE, MOVE + 30, 0, 1, EASE.inOut);
-  const top = g.hookTop + (L.safe.top - g.hookTop) * p;
+  const top = g.hookTop + (belowUp(L) - g.hookTop) * p; // UP işaretinin altına
   const s = 1 + (g.topScale - 1) * p;
   return (
     <Stage bg={C.dark.bg}>
