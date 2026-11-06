@@ -10,7 +10,7 @@ const errs = [];
 const warns = [];
 
 const total = v.scenes.reduce((a, s) => a + s.frames, 0);
-const target = (v.durationSec ?? 30) * v.fps;
+const target = Math.round((v.durationSec ?? 30) * v.fps);
 if (total !== target) errs.push(`Sahne toplamı ${total} kare (${(total / v.fps).toFixed(2)} sn) ≠ hedef ${target} kare`);
 
 let from = 0;

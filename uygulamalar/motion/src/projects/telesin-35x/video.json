@@ -1,0 +1,178 @@
+{
+  "id": "telesin-35x",
+  "slug": "telesin-master-grip-35x-tanitim",
+  "title": "Telesin Master Grip + 3.5x tele lens — reels (Telesin iş birliği)",
+  "durationSec": 41.7167,
+  "fps": 60,
+  "formats": [
+    "9x16"
+  ],
+  "motion": "dinamik",
+  "audio": {
+    "music": "audio/telesin-muzik.wav",
+    "musicVolume": 0.16,
+    "voice": "audio/telesin-35x-ses.mp3",
+    "voiceVolume": 1,
+    "elevenlabs": {
+      "voiceId": "qUGjOGoUuQBTUqwY8n0e",
+      "voiceName": "Arman Yılmazkurt - Upbeat and Casual",
+      "model": "eleven_v4",
+      "text": "metin.txt"
+    },
+    "epidemic": {
+      "recordingId": "d865329d-81d2-49d4-8d28-02b56f426f8a",
+      "title": "Make It in Time (Instrumental Version)",
+      "artist": "Gamma Skies",
+      "edit": "41717 ms, forceDuration"
+    }
+  },
+  "kuyrukSn": 2.2,
+  "scenes": [
+    {
+      "id": "hook",
+      "name": "400 mm",
+      "frames": 122,
+      "key": 103
+    },
+    {
+      "id": "kit",
+      "name": "Set ve takma",
+      "basla": "Telesin'in",
+      "frames": 404,
+      "key": 343
+    },
+    {
+      "id": "odak",
+      "name": "100 → 400 mm",
+      "basla": "Uygulamada",
+      "frames": 220,
+      "key": 187
+    },
+    {
+      "id": "optik",
+      "name": "12 eleman, 6,4 cm",
+      "basla": "İçinde",
+      "frames": 305,
+      "key": 259
+    },
+    {
+      "id": "eis",
+      "name": "Sabitleme",
+      "basla": "400#3",
+      "frames": 370,
+      "key": 314
+    },
+    {
+      "id": "filtre",
+      "name": "43 mm filtre, parasoley",
+      "basla": "Önüne#2",
+      "frames": 343,
+      "key": 291
+    },
+    {
+      "id": "alan",
+      "name": "Kullanım alanları",
+      "basla": "Konser",
+      "frames": 146,
+      "key": 124
+    },
+    {
+      "id": "fiyat",
+      "name": "Fiyat",
+      "basla": "Setin#2",
+      "frames": 273,
+      "key": 232
+    },
+    {
+      "id": "final",
+      "name": "Yeter mi?",
+      "basla": "Peki",
+      "frames": 320,
+      "key": 272
+    }
+  ],
+  "altyaziGoster": [
+    {
+      "soyle": "400 milimetre",
+      "goster": "400 mm"
+    },
+    {
+      "soyle": "400 milimetreye",
+      "goster": "400 mm'ye"
+    },
+    {
+      "soyle": "400 milimetrede",
+      "goster": "400 mm'de"
+    },
+    {
+      "soyle": "üç buçuk ikslik",
+      "goster": "3.5x'lik"
+    },
+    {
+      "soyle": "6,4 santim",
+      "goster": "6,4 cm"
+    },
+    {
+      "soyle": "yüzde 10",
+      "goster": "%10"
+    },
+    {
+      "soyle": "43 milimetrelik",
+      "goster": "43 mm'lik"
+    }
+  ],
+  "copy": {
+    "isbirligi": "Telesin iş birliği",
+    "kaynak": "Bilgi ve görseller: Telesin",
+    "hook": {
+      "big": "400 mm",
+      "sub": "iPhone'una"
+    },
+    "kit": {
+      "a": "Telesin Master Grip",
+      "b": "3.5x tele lens",
+      "c": "iPhone 18 Pro · 4x kamera"
+    },
+    "odak": {
+      "iphone": "iPhone 4x",
+      "lens": "× 3.5x lens",
+      "kirp": "+ az kırpma",
+      "sonuc": "400 mm"
+    },
+    "optik": {
+      "eleman": "12 optik eleman",
+      "boy": "6,4 cm"
+    },
+    "eis": {
+      "titrek": "400 mm'de titreme",
+      "sabit": "%10 kırpmayla sabit"
+    },
+    "filtre": {
+      "dis": "43 mm filtre dişi",
+      "nd": "ND",
+      "cpl": "CPL",
+      "hood": "Parasoley kutudan çıkıyor"
+    },
+    "alan": [
+      "Konser",
+      "Spor",
+      "Kuş gözlemi"
+    ],
+    "fiyat": {
+      "fiyat": "229,99 dolar",
+      "alt": "Master Grip + 3.5x lens · Telesin mağazası"
+    },
+    "final": {
+      "q": "Peki sence telefonda 400 mm yeter mi?"
+    }
+  },
+  "gorseller": {
+    "kit": "media/telesin/removebackgrounds-ai_1.png",
+    "hero": "media/telesin/M_kv.png",
+    "yakin": "media/telesin/pc_img-1.png",
+    "hood": "media/telesin/pro-1.png",
+    "kus": "media/telesin/Frame_5.png",
+    "spor": "media/telesin/Frame_1.png",
+    "_kaynak": "telesinstore.com ürün ve iPhone 18 Pro sayfası görselleri (Kasım 2026); depoya girmez; künye: Görsel: Telesin. Kullanım alanı fotoğraflarının bu lensle çekildiği iddia edilmez."
+  }
+}
