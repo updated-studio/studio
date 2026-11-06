@@ -12,7 +12,7 @@ import {fadeIn} from '../lib/motion';
 /** UP işaretinin yüksekliği (içerik bunun altından başlar). */
 export const upHeight = (mode: 'land' | 'port' | 'feed') => ({land: 64, port: 84, feed: 72})[mode];
 /** İşaretin altındaki ilk serbest satır (merkezden y). */
-export const belowUp = (L: {mode: 'land' | 'port' | 'feed'; safe: {top: number}}) => L.safe.top + upHeight(L.mode) + 28;
+export const belowUp = (L: {mode: 'land' | 'port' | 'feed'; safe: {top: number}}) => L.safe.top + upHeight(L.mode) + 48;
 
 export const UpMark: React.FC<{color?: 'white' | 'black'; hide?: [number, number][]; start?: number; konum?: 'sol-ust' | 'ust-orta'}> = ({color = 'white', hide = [], start = 0, konum = 'sol-ust'}) => {
   const f = useCurrentFrame();

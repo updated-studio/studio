@@ -109,9 +109,9 @@ export const Kamera: React.FC = () => {
           </div>
         </>
       )}
-      <Pill text={c.a} x={L.cx} y={348} w={L.safeW} start={yani} size={38} />
-      {f >= grup && <Pill text={c.b} x={L.cx} y={348} w={L.safeW} start={grup} size={38} hue="mor" />}
-      {f < yani && <Pill text={c.old} x={L.cx} y={348} w={440} start={at('kamera', 'değişken') + 10} size={30} hue="turuncu" />}
+      <Pill text={c.a} x={L.cx} y={378} w={L.safeW} start={yani} size={38} />
+      {f >= grup && <Pill text={c.b} x={L.cx} y={378} w={L.safeW} start={grup} size={38} hue="mor" />}
+      {f < yani && <Pill text={c.old} x={L.cx} y={372} w={440} start={at('kamera', 'değişken') + 10} size={30} hue="turuncu" />}
     </Scene>
   );
 };

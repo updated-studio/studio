@@ -2,10 +2,13 @@ import React from 'react';
 import {Composition, Folder} from 'remotion';
 import {projects} from './projects';
 import {SafeGuides} from './components/SafeGuides';
+import {SafeOverride} from './lib/layout';
 
 /** guides: true → güvenli alan çizgileri (yalnız kontrol karelerinde). */
-const withGuides = (C: React.FC) => {
-  const W: React.FC<{guides?: boolean}> = ({guides}) => (<>{<C />}{guides && <SafeGuides />}</>);
+const withGuides = (C: React.FC, safeTop?: number) => {
+  const W: React.FC<{guides?: boolean}> = ({guides}) => (
+    <SafeOverride.Provider value={{top: safeTop}}>{<C />}{guides && <SafeGuides />}</SafeOverride.Provider>
+  );
   return W;
 };
 
@@ -21,7 +24,7 @@ export const Root: React.FC = () => (
     {projects.map((p) => (
       <Folder key={p.id} name={p.id}>
         {FORMATS.map((fmt) => (
-          <Composition key={fmt.id} id={`${p.id}-${fmt.id}`} component={withGuides(p.Component)} defaultProps={{guides: false}} durationInFrames={p.frames} fps={p.fps} width={fmt.width} height={fmt.height} />
+          <Composition key={fmt.id} id={`${p.id}-${fmt.id}`} component={withGuides(p.Component, p.safeTop)} defaultProps={{guides: false}} durationInFrames={p.frames} fps={p.fps} width={fmt.width} height={fmt.height} />
         ))}
       </Folder>
     ))}
