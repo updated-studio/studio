@@ -14,7 +14,7 @@ import { sb } from "../../shared/supabase";
 import Yenilikler from "../../shared/Yenilikler";
 import { MODULLER } from "..";
 import { editorGibi, ONIZLEME_ANAHTARI, yonetirMi } from "./gorev";
-import { ALT_CUBUK, GRUPLAR, type Oge } from "./menu";
+import { ALT_CUBUK, GRUPLAR, type Grup, type Oge } from "./menu";
 import { rehberBaslat } from "./Rehber";
 import "./editor.css";
 
@@ -64,6 +64,10 @@ export default function EditorKabuk() {
     sb.from("kunye_oneriler").select("id", { count: "exact", head: true }).eq("durum", "bekliyor").then(({ count }) => setKunye(count ?? 0));
   }, [yonetici, konum.pathname]);
   const say = (o: Oge) => (o.ad === "Künyeler" && kunye ? kunye : 0);
+  // Açılır grup (Yönetim): seçim tarayıcıda hatırlanır; içindeki bir sayfa açıkken hep açık görünür
+  const [acikGrup, setAcikGrup] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem("menu-acik") || "{}"); } catch { return {}; } });
+  const grupAcik = (g: Grup) => g.ogeler.some(etkin) || !!acikGrup[g.ad];
+  const grupDegis = (g: Grup) => setAcikGrup((x) => { const y = { ...x, [g.ad]: !grupAcik(g) }; try { localStorage.setItem("menu-acik", JSON.stringify(y)); } catch { /* depolama kapalı */ } return y; });
   const bag = (o: Oge, kisa = false) => (
     <NavLink key={o.yol} to={o.yol} className={etkin(o) ? "on" : ""} aria-current={etkin(o) ? "page" : undefined}>
       <Ikon ad={o.ikon} /><span>{kisa ? o.kisa ?? o.ad : o.ad}</span>{!kisa && say(o) > 0 && <span className="ed-say">{say(o)}</span>}
@@ -77,7 +81,17 @@ export default function EditorKabuk() {
       <nav className="ed-menu simge" aria-label="Stüdyo menüsü">
         <button type="button" className="ed-marka" aria-label="Updated Stüdyo, Masam" onClick={anaSayfa}><span className="logo" aria-hidden="true" /><i /><span>STÜDYO</span></button>
         <div className="ed-gruplar">
-          {gruplar.map((g, i) => (
+          {gruplar.map((g, i) => g.acilir ? (
+            // Açılır grup (yöneticiye özel): kapalıyken tek satır; içindeki bir sayfadayken kendiliğinden açık
+            <div key={i} className={"ed-grup-m ed-acilir" + (grupAcik(g) ? " acik" : "")} role="group" aria-label={g.ad}>
+              <button type="button" className="ed-grup-ac" aria-expanded={grupAcik(g)} onClick={() => grupDegis(g)}>
+                <Ikon ad={g.ikon ?? "yonetim"} /><span>{g.ad}</span>
+                {!grupAcik(g) && g.ogeler.reduce((n, o) => n + say(o), 0) > 0 && <span className="ed-say">{g.ogeler.reduce((n, o) => n + say(o), 0)}</span>}
+                <span className="ed-ok" aria-hidden="true"><Ikon ad="ileri" /></span>
+              </button>
+              {grupAcik(g) && <div className="ed-acilir-ic">{g.ogeler.map((o) => bag(o))}</div>}
+            </div>
+          ) : (
             <div key={i} className="ed-grup-m" role="group" aria-label={g.ad || undefined}>
               {g.ad && <h2>{g.ad}</h2>}
               {g.ogeler.map((o) => bag(o))}

@@ -4,7 +4,7 @@ import { Ikon } from "../../shared/Ikon";
 import { GRUPLAR } from "./menu";
 import { editorGibi, yonetirMi } from "./gorev";
 
-// Yönetim sayfası (6 Kasım 2026, yeni düzen): ayarların hepsi tek yerde, profil menüsünde ayar kalmaz. Her satır var olan ekranı açar.
+// Ayarlar sayfası (menüde Yönetim › Ayarlar; 6 Kasım 2026, yeni düzen): ayarların hepsi tek yerde, profil menüsünde ayar kalmaz. Her satır var olan ekranı açar.
 type Satir = { yol: string; ad: string; aciklama: string; admin?: boolean };
 const BOLUMLER: { ad: string; satirlar: Satir[] }[] = [
   { ad: "Haberler", satirlar: [
@@ -28,7 +28,7 @@ export default function Yonetim() {
   const acik = BOLUMLER.map((b) => ({ ...b, satirlar: b.satirlar.filter((s) => !s.admin || profile?.is_admin) })).filter((b) => b.satirlar.length);
   return (
     <div className="mas">
-      <div className="mas-bas"><div><h1>Yönetim</h1><p className="mas-bulgu">Ayarların hepsi burada. Bir satıra basınca ilgili ekran açılır.</p></div></div>
+      <div className="mas-bas"><div><h1>Ayarlar</h1><p className="mas-bulgu">Yönetim ayarlarının hepsi burada. Bir satıra basınca ilgili ekran açılır.</p></div></div>
       {!acik.length && <div className="mas-kart"><div className="mas-bos">Bu bölümleri yalnız yönetici açabilir.</div></div>}
       {acik.map((b) => (
         <section key={b.ad} className="mas-kart" aria-label={b.ad}>

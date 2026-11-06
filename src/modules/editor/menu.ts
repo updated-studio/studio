@@ -2,7 +2,9 @@
 // rol yalnız hangi grupların açık olduğunu değiştirir (Site içeriği ve Yönetim yöneticide). Telefonda alt çubuk: Masam, Gelen, Taslaklar,
 // Çekim, Menü; "Menü" bu listenin tamamını açar. Bir öğenin etkin olup olmadığı adresten (yol + ?b= / ?bolum=) anlaşılır.
 export type Oge = { yol: string; ad: string; ikon: string; kisa?: string; etkin: (yol: string, sp: URLSearchParams) => boolean };
-export type Grup = { ad: string; yonetici?: boolean; ogeler: Oge[] };
+/** acilir: grup menüde tek satır olarak durur, basınca açılır (yöneticiye özel bölümler: 6 Kasım 2026, kullanıcı: "yönetime özel kısımları
+ *  yönetim adı altında bir yerde toplayalım, açılır sekme gibi olsun") */
+export type Grup = { ad: string; yonetici?: boolean; acilir?: boolean; ikon?: string; ogeler: Oge[] };
 
 // Site bölümleri (panelin koleksiyon adları): menüdeki beş öğeden hangisine düştüğü
 const TOPLULUK = new Set(["yorumlar", "uyeler", "uye-giris", "yarismalar", "kulup-tracks", "kulup-quizzes", "gorevler", "gorev-fotolari", "gorev-gorselleri"]);
@@ -25,13 +27,6 @@ export const GRUPLAR: Grup[] = [
     { yol: "/yayinda", ad: "Yayında", ikon: "check", etkin: (y) => y.startsWith("/yayinda") },
     { yol: "/haber-masasi?b=rehber", ad: "Rehberler", ikon: "yardim", etkin: (y, sp) => masada(y) && sp.get("b") === "rehber" },
   ] },
-  { ad: "Site içeriği", yonetici: true, ogeler: [
-    { yol: "/site?bolum=products", ad: "Künyeler", ikon: "liste", etkin: (y, sp) => sitede(y) && siteBolum(sp) === "products" },
-    { yol: "/site?bolum=reviews", ad: "İncelemeler", ikon: "okuma", etkin: (y, sp) => sitede(y) && siteBolum(sp) === "reviews" },
-    { yol: "/site?bolum=comparisons", ad: "Kıyaslamalar", ikon: "kurgu", etkin: (y, sp) => sitede(y) && siteBolum(sp) === "comparisons" },
-    { yol: "/site?bolum=yorumlar", ad: "Topluluk", ikon: "sohbet", etkin: (y, sp) => sitede(y) && TOPLULUK.has(siteBolum(sp)) },
-    { yol: "/site?bolum=pages", ad: "Site", ikon: "site", etkin: (y, sp) => sitede(y) && !["products", "reviews", "comparisons"].includes(siteBolum(sp)) && !TOPLULUK.has(siteBolum(sp)) },
-  ] },
   { ad: "Ekip", ogeler: [
     { yol: "/icerik", ad: "Sosyal medya", ikon: "icerik", etkin: (y) => y.startsWith("/icerik") || y.startsWith("/marka-kiti") },
     CEKIM,
@@ -39,6 +34,14 @@ export const GRUPLAR: Grup[] = [
     { yol: "/takvim", ad: "Takvim", ikon: "takvim", etkin: (y) => y.startsWith("/takvim") },
     { yol: "/notlar", ad: "Notlar", ikon: "yaz", etkin: (y) => y.startsWith("/notlar") },
   ] },
-  { ad: "", yonetici: true, ogeler: [{ yol: "/yonetim-merkezi", ad: "Yönetim", ikon: "yonetim", etkin: yonetimde }] },
+  // Yöneticiye özel her şey tek açılır grupta: site içeriği ve ayarlar
+  { ad: "Yönetim", yonetici: true, acilir: true, ikon: "yonetim", ogeler: [
+    { yol: "/site?bolum=products", ad: "Künyeler", ikon: "liste", etkin: (y, sp) => sitede(y) && siteBolum(sp) === "products" },
+    { yol: "/site?bolum=reviews", ad: "İncelemeler", ikon: "okuma", etkin: (y, sp) => sitede(y) && siteBolum(sp) === "reviews" },
+    { yol: "/site?bolum=comparisons", ad: "Kıyaslamalar", ikon: "kurgu", etkin: (y, sp) => sitede(y) && siteBolum(sp) === "comparisons" },
+    { yol: "/site?bolum=yorumlar", ad: "Topluluk", ikon: "sohbet", etkin: (y, sp) => sitede(y) && TOPLULUK.has(siteBolum(sp)) },
+    { yol: "/site?bolum=pages", ad: "Site", ikon: "site", etkin: (y, sp) => sitede(y) && !["products", "reviews", "comparisons"].includes(siteBolum(sp)) && !TOPLULUK.has(siteBolum(sp)) },
+    { yol: "/yonetim-merkezi", ad: "Ayarlar", ikon: "masa", etkin: yonetimde },
+  ] },
 ];
 export const ALT_CUBUK: Oge[] = [MASAM, GELEN, TASLAKLAR, CEKIM, MENU];

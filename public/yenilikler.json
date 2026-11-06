@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-06-e",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Yönetim tek grupta",
+    "bolumler": [
+      {
+        "ad": "Menü",
+        "maddeler": [
+          "Yöneticiye özel bölümler (Künyeler, İncelemeler, Kıyaslamalar, Topluluk, Site, Ayarlar) menüde tek \"Yönetim\" satırında; basınca açılır.",
+          "Kapalıyken onay bekleyen künye sayısı satırda görünür."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-d",
     "tarih": "6 Kasım 2026",
     "baslik": "Taslağı oku ve yayınla",
