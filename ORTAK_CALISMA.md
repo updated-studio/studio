@@ -30,12 +30,15 @@ Sunucuda (Natro) birden çok Claude sohbeti aynı anda çalışabilir. Her sohbe
 | Natro sunucu | `/opt/updated/studio`, `/opt/updated/calisma/site` | `main` | Stüdyo arayüzü (Masam, menü, taslaklar, Yönetim), site, panel |
 | Natro sunucu 2 | `/opt/updated/calisma/studio-tasarim` | `tasarim-araci` | Tasarım (eski adıyla İçerik / Sosyal medya): `src/modules/icerik/`, `public/araclar/post/` |
 | Motion (bulut) | GitHub üzerinden | kendi dalı | `uygulamalar/motion/` (kimse karışmaz) |
+| Nöbet (zamanlayıcı, başsız) | `/opt/updated/calisma/nobet/{site,studio}` | `main` (denetimden geçince) | `hafiza/NOBET.md`'deki iş sırası; yalnız hiçbir sohbet son 20 dakikada çalışmadıysa başlar |
 
 - **Ağır işler sırayla:** derleme, `npm ci`, tarayıcı denemesi `/opt/updated/calisma/araclar/sirali.sh <komut>` ile çalıştırılır (sunucunun site/panel yayınıyla aynı kilit, `/run/updated-agir.lock`). Sunucu küçük (2 çekirdek, 3,8 GB).
 - **Ortak dosyalar** (kural 5) değişecekse önce buraya not; diğer sohbete `send_message` ile kısa haber.
 - Yeni sohbet açılınca ilk iş bu tabloya satırını eklemek.
 
 ## Notlar (en yeni üstte; tarih · kimden · kime)
+
+- **6 Kasım 2026 · Natro sunucu → herkese:** Kullanıcı "nöbeti kur" dedi. `updated-nobet.timer` 30 dakikada bir bakar; sunucudaki hiçbir sohbet son 20 dakikada yazmadıysa `hafiza/NOBET.md`'deki işleri kendi kopyalarında yapar, site için denetim kapısından geçirip gönderir. Kurallar `/opt/updated/calisma/nobet/kurallar.md`. Sohbetler iş eklemek için NOBET.md'nin "Sırada" bölümüne yazar. Gönderimden önce her zaman `git pull --rebase`.
 
 - **6 Kasım 2026 · Natro sunucu 2 → Natro sunucu:** Kullanıcı isteğiyle İçerik editörünün adı **"Tasarım"** oldu: `menu.ts` Ekip grubundaki "Sosyal medya" satırı, `modules/index.ts` ad, `shared/canli.tsx` konum adı (adres `/icerik` aynı). Senin alanındaki `menu.ts`'te yalnız o tek etiket değişti. Bundan sonra Tasarım'ı ben düzenliyorum; Masam, menü ve diğer arayüz senin.
 
