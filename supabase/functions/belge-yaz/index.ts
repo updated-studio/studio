@@ -69,7 +69,10 @@ const SISTEM = (uslup: string) => `Sen Updated (updated.com.tr) adlı Türkçe t
 - kisa: "Kısa cevap" kutusu; okurun aklındaki asıl soruya (incelemede "almaya değer mi, kimler için?") 2-3 cümlelik net cevap. Belgede olmayan
   bilgi yok.
 - seoBaslik en fazla 60 karakter; seoAciklama en fazla 155 karakter.
-- urun: yazının konusu olan ürünün markası ve modeli, belgede yazdığı gibi (marka ayrı). Ürün yoksa boş.
+- urun: yazının konusu olan ürün. marka ayrı; model markasız ve sade ("85mm F1.2 DG Art": "|" gibi işaretler yok, resmî model adı).
+  tur: ürünün türü şu değerlerden biri: camera (kamera), lens, drone, cam360 (360/aksiyon kamera), phone, gimbal, light (ışık), mic (mikrofon),
+  headphones, laptop, tablet, watch, pad (kumanda/konsol), audio (ses, diğer), accessory (aksesuar), other. Ürün yoksa üçü de boş.
+  Sitede künyesi yoksa bu bilgilerle yeni künye açılır; bu yüzden model adını doğru ve eksiksiz yaz.
 - yazar: imza satırındaki yazar adı (yoksa boş). katkı: imzadaki diğer kişiler ("Modeller: Mattaya ve Taylor" gibi), yoksa boş.
 - gorseller: belgedeki her fotoğraf için (n numarası belgedeki "FOTOĞRAF n"): alt (görme engelli okur için, en fazla 125 karakter, fotoğrafta
   gerçekten görüneni anlat; sana fotoğrafların küçük kopyaları verildiyse onlara bak) ve altyazi (fotoğraf altı satırındaki bilgi, sitenin
@@ -106,7 +109,7 @@ const SEMA = {
     mod: { type: "string", enum: ["koru", "yaz"] },
     baslik: { type: "string" }, spot: { type: "string" }, kisa: { type: "string" },
     seoBaslik: { type: "string" }, seoAciklama: { type: "string" },
-    urun: { type: "object", properties: { marka: { type: "string" }, model: { type: "string" } }, required: ["marka", "model"], additionalProperties: false },
+    urun: { type: "object", properties: { marka: { type: "string" }, model: { type: "string" }, tur: { type: "string", enum: ["camera", "lens", "drone", "cam360", "phone", "gimbal", "light", "mic", "headphones", "laptop", "tablet", "watch", "pad", "audio", "accessory", "other", ""] } }, required: ["marka", "model", "tur"], additionalProperties: false },
     yazar: { type: "string" }, katki: { type: "string" },
     cikar: { type: "array", items: { type: "integer" } },
     basliklar: { type: "array", items: { type: "integer" } },

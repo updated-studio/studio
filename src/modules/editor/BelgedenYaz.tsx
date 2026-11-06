@@ -73,7 +73,7 @@ export default function BelgedenYaz() {
             <p>{s.spot}</p>
           </div>
           <dl className="ed-belge-alan">
-            <dt>Künye</dt><dd>{sonuc.urun ? sonuc.urun.ad : "Bağlanmadı"}</dd>
+            <dt>Künye</dt><dd>{sonuc.urun ? `${sonuc.urun.ad}${sonuc.urun.yeni ? " · yeni açıldı" : ""}` : "Bağlanmadı"}</dd>
             <dt>Yazar</dt><dd>{sonuc.yazar ? sonuc.yazar.ad : "Senin imzan"}{s.katki ? ` · ${s.katki}` : ""}</dd>
             <dt>Fotoğraf</dt><dd>{sonuc.fotoSayisi ? `${sonuc.fotoSayisi} fotoğraf yüklendi, altyazı ve alt metinleriyle` : "Yok"}</dd>
             {sonuc.k === "reviews" && <><dt>Puan kutusu</dt><dd>{s.puanKutusu.arti.length} artı, {s.puanKutusu.eksi.length} eksi{s.puanKutusu.puan != null ? `, puan ${s.puanKutusu.puan}/20` : ", puan senin"}</dd></>}

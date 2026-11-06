@@ -8,13 +8,13 @@ import { docxOku, dosyaB64, kucukKopya, type Belge } from "./docx";
 export type YzSonuc = {
   tur: "inceleme" | "rehber" | "haber"; mod: "koru" | "yaz";
   baslik: string; spot: string; kisa: string; seoBaslik: string; seoAciklama: string;
-  urun: { marka: string; model: string }; yazar: string; katki: string;
+  urun: { marka: string; model: string; tur?: string }; yazar: string; katki: string;
   cikar: number[]; basliklar: number[]; duzeltmeler: { i: number; metin: string }[]; govde: string;
   gorseller: { n: number; alt: string; altyazi: string }[]; kapak: number;
   puanKutusu: { puan: number | null; arti: string[]; eksi: string[]; uygun: string[]; degil: string[]; kullanimGun: number | null; cihazKaynagi: string };
   degisiklikler: string[]; eksikler: string[];
 };
-export type Hazir = { k: api.Koleksiyon; id: number; sonuc: YzSonuc; urun: { id: number; ad: string } | null; yazar: { id: number; ad: string } | null; fotoSayisi: number; uyarilar: string[]; onizleme: string };
+export type Hazir = { k: api.Koleksiyon; id: number; sonuc: YzSonuc; urun: { id: number; ad: string; yeni?: boolean } | null; yazar: { id: number; ad: string } | null; fotoSayisi: number; uyarilar: string[]; onizleme: string };
 export type Adim = "okunuyor" | "sira" | "yz" | "fotolar" | "taslak";
 
 const kes = (s: string, n: number) => { const t = (s ?? "").trim(); return t.length <= n ? t : t.slice(0, n - 1).replace(/\s+\S*$/, "") + "…"; };
@@ -155,8 +155,20 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
   const s = data.sonuc as YzSonuc;
   const uyarilar: string[] = [];
 
-  const [urun, yazar] = await Promise.all([s.tur === "inceleme" || s.urun?.model ? urunBul(s.urun) : null, yazarBul(s.yazar)]);
-  if (s.tur === "inceleme" && !urun) uyarilar.push(`"${[s.urun?.marka, s.urun?.model].filter(Boolean).join(" ")}" künyesi sitede bulunamadı. Taslakta künyeyi seç ya da önce künyeyi aç.`);
+  const [bulunan, yazar] = await Promise.all([s.tur === "inceleme" || s.urun?.model ? urunBul(s.urun) : null, yazarBul(s.yazar)]);
+  let urun: Hazir["urun"] = bulunan;
+  // Künye yoksa açılır (6 Kasım 2026, kullanıcı onayı): ad, marka ve tür belgeden; teknik özellikleri künye otomasyonu üreticinin resmî
+  // sayfasından doldurur, öneriler Künye onayı'na düşer. Otomasyon çağrısı beklenmez; yarıda kalırsa günlük künye turu ürünü yine alır.
+  if (!urun && s.tur === "inceleme" && s.urun?.model?.trim() && s.urun?.marka?.trim()) {
+    try {
+      const y = await api.istekYap<{ doc: { id: number; name: string; brand: string } }>("/products?depth=0", { method: "POST",
+        body: JSON.stringify({ name: s.urun.model.trim(), brand: s.urun.marka.trim(), type: s.urun.tur || "other", status: "satista" }) });
+      urun = { id: y.doc.id, ad: `${y.doc.brand} ${y.doc.name}`, yeni: true };
+      sb.functions.invoke("kunye-otomatik", { body: { urun_id: y.doc.id } }).catch(() => null);
+      uyarilar.push(`"${urun.ad}" künyesi yeni açıldı. Teknik özellikler otomasyonla dolacak, Künye onayı ekranından onayla.`);
+    } catch (e) { uyarilar.push(`Künye açılamadı: ${(e as Error).message}`); }
+  }
+  if (s.tur === "inceleme" && !urun) uyarilar.push(`"${[s.urun?.marka, s.urun?.model].filter(Boolean).join(" ")}" künyesi bulunamadı ve açılamadı. Taslakta künyeyi seç.`);
   if (s.yazar && !yazar) uyarilar.push(`"${s.yazar}" adlı yazar sitede yok. Yönetici yazar profilini açınca imzayı değiştirebilir.`);
 
   // Fotoğraflar: alt metin ve altyazı yapay zekâdan; sitede fotoğrafın altında künye alanı görünür (altyazı + fotoğrafçı)
@@ -179,7 +191,7 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
 
   adim("taslak");
   const k: api.Koleksiyon = s.tur === "inceleme" && urun ? "reviews" : "news";
-  if (s.tur === "inceleme" && k === "news") uyarilar.push("Künye bulunamadığı için yazı haber taslağı olarak açıldı. Künye açılınca inceleme olarak yeniden yükle.");
+  if (s.tur === "inceleme" && k === "news") uyarilar.push("Künye olmadığı için yazı haber taslağı olarak açıldı.");
   const pk = s.puanKutusu;
   const veri: Record<string, unknown> = {
     title: kes(s.baslik, 70), spot: kes(s.spot, 160), shortAnswer: s.kisa,
