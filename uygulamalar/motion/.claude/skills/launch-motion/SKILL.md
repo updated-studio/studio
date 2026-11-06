@@ -38,6 +38,7 @@ npm run new -- <slug> --from haber # şablondan yeni proje; sonra src/projects/i
 npm run check -- <slug>            # storyboard toplamı, süreler, font/ses varlıkları, metin uzunluğu
 npm run stills -- <slug>           # her sahnenin key karesi + geçişler, 3 formatta → out/<slug>/stills/contact-*.png
 npm run brand                      # tokens.json → brand.json, logo SVG'lerini algılar
+npm run onizleme -- <slug> [--scene <id>] [--format 9x16]  # hızlı taslak mp4 (%40 boyut): tüm video ~40 sn, tek sahne ~10 sn
 npm run render -- <slug>           # out/<slug>/yyyy-aa-gg-<konu>-youtube.mp4, -reels.mp4, -ig.mp4
 npm run studio                     # canlı önizleme (yerel makinede)
 ```
@@ -90,7 +91,7 @@ Dikkat çek → problemi göster → ürünün nasıl çözdüğünü göster �
 5. Sahne başına bir bileşen (`scenes/`), paylaşılan bileşenlerle. `src/projects/index.ts`'e kaydet.
 6. `npm run check -- <slug>` → `npm run typecheck`.
 7. `npm run stills -- <slug>` → `out/<slug>/stills/contact-*.png` dosyalarını GÖRSEL olarak aç ve ön-render listesini her formatta uygula. Düzelt, tekrarla.
-8. `npm run render -- <slug>`; mp4'leri teslim et.
+8. Önce `npm run onizleme -- <slug>` ile hızlı taslak mp4'ü kullanıcıya gönder; düzeltmelerde yalnız ilgili sahneyi (`--scene`) önizle. Onaydan sonra `npm run render -- <slug>` (3 format, tam kalite) ve mp4'leri teslim et.
 9. Revizyon: sorunu çözen en küçük değişikliği yap, gerisini koru, ilgili still'i yeniden render et, sonra videoyu.
 
 ## 7. Ön-render kontrol listesi (daha önce görülen hatalar)

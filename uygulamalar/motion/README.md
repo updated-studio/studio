@@ -26,6 +26,7 @@ Elle:
 npm run new -- pixel-11-tanitim --from haber   # şablonu kopyalar; src/projects/index.ts'e ekleyin
 npm run check -- pixel-11-tanitim
 npm run stills -- pixel-11-tanitim
+npm run onizleme -- pixel-11-tanitim           # hızlı taslak: tek format, %40 boyut (~40 sn); --scene hook ile tek sahne (~10 sn)
 npm run render -- pixel-11-tanitim             # out/<id>/yyyy-aa-gg-<slug>-reels.mp4 / -youtube.mp4 / -ig.mp4
 ```
 
