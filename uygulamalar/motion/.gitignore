@@ -1,0 +1,6 @@
+node_modules/
+out/
+public/fonts/
+public/sfx/
+public/audio/music-placeholder.wav
+public/brand/

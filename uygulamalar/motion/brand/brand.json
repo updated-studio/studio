@@ -1,0 +1,154 @@
+{
+  "_source": "brand/kit/tokens.json v1.2 (2026-10-21) — ELLE DÜZENLEMEYİN, \"npm run brand\" ile üretilir",
+  "name": "UPDATED",
+  "domain": "updated.com.tr",
+  "lang": "tr",
+  "colors": {
+    "black": "#000000",
+    "white": "#FFFFFF",
+    "blue": "#2563EB",
+    "orange": "#FF6B1A",
+    "gray": "#F2F2F2",
+    "text": "#171717",
+    "text2": "#55585c",
+    "text3": "#6b6f74",
+    "line": "#e2e2e2",
+    "on": {
+      "blue": "#FFFFFF",
+      "orange": "#000000",
+      "black": "#FFFFFF",
+      "white": "#000000",
+      "gray": "#000000"
+    },
+    "dark": {
+      "bg": "#121212",
+      "surface": "#1C1C1C",
+      "surface2": "#262626",
+      "line": "#333333",
+      "text": "#F2F2F2",
+      "text2": "#B4B7BB",
+      "text3": "#8E9297"
+    }
+  },
+  "fonts": {
+    "display": {
+      "family": "Big Shoulders Display",
+      "fontsource": "big-shoulders-display",
+      "weights": [
+        900,
+        700
+      ],
+      "uppercase": true
+    },
+    "body": {
+      "family": "IBM Plex Sans",
+      "fontsource": "ibm-plex-sans",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    "mono": {
+      "family": "IBM Plex Mono",
+      "fontsource": "ibm-plex-mono",
+      "weights": [
+        400,
+        600
+      ]
+    }
+  },
+  "type": {
+    "headingLineHeight": 1.2,
+    "videoMin": 28,
+    "label": {
+      "desktop": 12,
+      "mobile": 12,
+      "lineHeight": 1.4,
+      "role": "veri",
+      "letterSpacing": "0.04em",
+      "transform": "uppercase"
+    }
+  },
+  "shape": {
+    "radius": 0,
+    "line": 1,
+    "lineStrong": 3,
+    "shadow": "none"
+  },
+  "motion": {
+    "ease": [
+      0.2,
+      0,
+      0,
+      1
+    ],
+    "fastMs": 120,
+    "baseMs": 200,
+    "slowMs": 320,
+    "overshoot": false,
+    "rotate": false,
+    "parallax": false,
+    "typewriter": false,
+    "logoRevealMs": 800
+  },
+  "safe": {
+    "land": {
+      "x": 96,
+      "y": 54
+    },
+    "port": {
+      "top": 250,
+      "bottom": 340,
+      "x": 64
+    },
+    "feed": {
+      "x": 64,
+      "y": 96
+    }
+  },
+  "copy": {
+    "banned": [
+      "şok",
+      "flaş",
+      "inanılmaz",
+      "!"
+    ],
+    "address": "sen",
+    "maxWords": {
+      "thumbnail": 4,
+      "instagramCover": 6,
+      "instagramNewsCard": 6,
+      "storyTitle": 5,
+      "tag": 3,
+      "carouselPage": 25
+    }
+  },
+  "fileName": {
+    "pattern": "yyyy-aa-gg-konu-kanal.uzanti",
+    "rules": "küçük harf, Türkçe karakter ve boşluk yok, tire ile",
+    "example": "2026-10-19-pixel-11-pro-thumbnail.jpg"
+  },
+  "logo": {
+    "dikey-black": "brand/logo/updated-dikey-black.svg",
+    "dikey-blue": "brand/logo/updated-dikey-blue.svg",
+    "dikey-domain-black": "brand/logo/updated-dikey-domain-black.svg",
+    "dikey-domain-blue": "brand/logo/updated-dikey-domain-blue.svg",
+    "dikey-domain-orange": "brand/logo/updated-dikey-domain-orange.svg",
+    "dikey-domain-white": "brand/logo/updated-dikey-domain-white.svg",
+    "dikey-orange": "brand/logo/updated-dikey-orange.svg",
+    "dikey-white": "brand/logo/updated-dikey-white.svg",
+    "up-black": "brand/logo/updated-up-black.svg",
+    "up-blue": "brand/logo/updated-up-blue.svg",
+    "up-orange": "brand/logo/updated-up-orange.svg",
+    "up-white": "brand/logo/updated-up-white.svg",
+    "yatay-black": "brand/logo/updated-yatay-black.svg",
+    "yatay-blue": "brand/logo/updated-yatay-blue.svg",
+    "yatay-domain-black": "brand/logo/updated-yatay-domain-black.svg",
+    "yatay-domain-blue": "brand/logo/updated-yatay-domain-blue.svg",
+    "yatay-domain-orange": "brand/logo/updated-yatay-domain-orange.svg",
+    "yatay-domain-white": "brand/logo/updated-yatay-domain-white.svg",
+    "yatay-orange": "brand/logo/updated-yatay-orange.svg",
+    "yatay-white": "brand/logo/updated-yatay-white.svg"
+  }
+}
