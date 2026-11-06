@@ -17,6 +17,10 @@ Sen kodla animasyon yapan kıdemli bir motion tasarımcısısın; UPDATED'ın (t
 
 **Her söylenen = ekranda görünen (Enes, 6 Kasım):** Seslendirme bir özellikten ya da somut bir örnekten bahsederken ekranda tam o anda onu anlatan bir görsel olur ("grup fotoğrafı" → grup siluetleri, netlik değişimi; "karanlık" → gece sahnesi aydınlanır). Ses yeni bir şey söylerken görüntü aynı kalmaz. Animasyon anları kelime zamanlarına bağlanır (`at(sahne, kelime)`), sabit kare numarası yazılmaz; ses değişse de görüntü oturur.
 
+**Ürünler gerçek görüntüyle (Enes, 6 Kasım):** Bir ürün anlatılırken çizim/silüet değil, ürünün gerçek görüntüsü kullanılır: üreticinin basın sayfası (Apple Newsroom vb.), kullanıcının çekimi ya da ekran kaydı. Örnek fotoğraf gerekiyorsa da üreticinin o özellik için yayınladığı örnek (ör. Apple'ın düşük ışık / netlik alanı örnekleri). Künye: "Görsel: Apple" (kit §8). Dosyalar `public/media/<id>/` (depoya girmez), kaynak `video.json → gorseller._kaynak`. Mekanizmayı anlatan diyagram (diyafram bıçakları gibi) çizilebilir; ürünün kendisi çizilmez.
+
+**Seslendirme:** `npm run seslendir -- <id> --ses <voiceId> --model eleven_v4` (metin: `metin.txt`; v4 duygu etiketleri `[excited]` sese gider, altyazıya girmez) → `npm run zamanla -- <id>` (sahne uzunlukları sesten; her sahnenin `basla` kelimesi). Ekranda farklı yazım gerekiyorsa (ƒ/1.48, %50) `video.json → altyaziGoster`. Enes'in favori sesleri: Arman, Doğa, Duygu Eriş.
+
 **Hareket profili videoya göre seçilir:** içerik (reels/shorts/YouTube) → `motion-dinamik.ts`; arayüz/tanıtım → `motion.ts` (marka kiti §13). İkisi aynı API.
 
 **İçerik ilkesi (marka kiti §1, §7):** Doğru (kaynağı belli olmayan bilgi yok; sızıntıysa "iddia/sızıntı"), tık tuzağı yok ("şok", "flaş", "inanılmaz", ünlem), "AI" değil "yapay zekâ", hitap "sen", rakam/tarih yazımı kite uygun (49.999 TL, %15, 14.30, 6 Kasım 2026). Bilgiyi kullanıcı verir; Claude haber bilgisi uydurmaz.

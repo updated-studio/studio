@@ -2,7 +2,7 @@
   "id": "iphone-reels",
   "slug": "iphone-18-pro-17-pro-reels",
   "title": "iPhone 18 Pro – 17 Pro reels — DİL ARAYIŞI (launch-motion kalitesi + Liquid Glass, marka kuralları gevşek)",
-  "durationSec": 32.25,
+  "durationSec": 38.6,
   "fps": 60,
   "formats": [
     "9x16"
@@ -11,55 +11,55 @@
   "audio": {
     "music": null,
     "musicVolume": 0.3,
-    "voice": "audio/iphone-reels-ses.mp3",
+    "voice": "audio/reels-3-duygu-eris-v4.mp3",
     "voiceVolume": 1,
     "elevenlabs": {
-      "voiceId": "qUGjOGoUuQBTUqwY8n0e",
+      "voiceId": "MzfWWOj9g3sIKex1YFMV",
       "voiceName": "Arman Yılmazkurt - Upbeat and Casual",
-      "model": "eleven_multilingual_v2",
-      "text": "metin.txt"
+      "model": "eleven_v4",
+      "text": "metin-duz.txt"
     }
   },
   "scenes": [
     {
       "id": "hook",
       "name": "18 Pro çıktı (hook)",
-      "frames": 224,
-      "key": 190
+      "frames": 281,
+      "key": 238
     },
     {
       "id": "cip",
       "name": "A20 Pro",
-      "frames": 282,
-      "key": 239,
+      "frames": 341,
+      "key": 289,
       "basla": "İçinde"
     },
     {
       "id": "kamera",
       "name": "Değişken diyafram",
-      "frames": 570,
-      "key": 484,
+      "frames": 652,
+      "key": 554,
       "basla": "Asıl"
     },
     {
       "id": "pil",
       "name": "Pil ve şarj",
-      "frames": 419,
-      "key": 356,
+      "frames": 526,
+      "key": 447,
       "basla": "Pil"
     },
     {
       "id": "island",
       "name": "Dynamic Island",
-      "frames": 204,
-      "key": 173,
+      "frames": 240,
+      "key": 204,
       "basla": "Dynamic"
     },
     {
       "id": "final",
       "name": "Değer mi?",
-      "frames": 236,
-      "key": 200,
+      "frames": 276,
+      "key": 234,
       "basla": "Peki#2"
     }
   ],
@@ -126,6 +126,14 @@
       "goster": "%50"
     }
   ],
-  "safeTop": 180,
-  "kuyrukSn": 2.2
+  "kuyrukSn": 2.2,
+  "gorseller": {
+    "m17": "media/iphone-reels/Apple-iPhone-17-Pro-cosmic-orange-250909_inline.jpg",
+    "m18": "media/iphone-reels/Apple-iPhone-18-Pro-2up-260909_inline.jpg",
+    "cip": "media/iphone-reels/Apple-iPhone-18-Pro-A20-Pro-chip-260909_inline.jpg",
+    "karanlik": "media/iphone-reels/Apple-iPhone-18-Pro-photography-aperture-low-light-260909_big.jpg",
+    "grup": "media/iphone-reels/Apple-iPhone-18-Pro-photography-aperture-focus-sharp-260909_big.jpg",
+    "renkler": "media/iphone-reels/Apple-iPhone-18-Pro-color-lineup-260909_big.jpg",
+    "_kaynak": "Apple Newsroom basın görselleri (iPhone 18 Pro: 9 Eylül 2026, iPhone 17 Pro: 9 Eylül 2025). Depoya girmez (public/media gitignore); künye: Görsel: Apple"
+  }
 }

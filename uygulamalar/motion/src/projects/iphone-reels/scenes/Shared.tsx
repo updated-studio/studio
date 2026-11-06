@@ -1,5 +1,5 @@
 import React from 'react';
-import {useCurrentFrame} from 'remotion';
+import {Img, staticFile, useCurrentFrame} from 'remotion';
 import {Stage} from '../../../components/Stage';
 import {Camera, CamKey} from '../../../components/Camera';
 import {Backdrop, GlassDefs, LiquidGlass} from '../../../components/LiquidGlass';
@@ -62,4 +62,19 @@ export const Phone: React.FC<{x: number; y: number; w: number; scale?: number; o
 export const useSafe = () => {
   const L = useLayout();
   return {...L, cx: (L.safe.left + L.safe.right) / 2};
+};
+
+/** Gerçek ürün/örnek fotoğrafı cam çerçevede; künye (kit §8: "Görsel: Apple"). */
+export const PhotoCard: React.FC<{src: string; x: number; y: number; w: number; h: number; r?: number; start?: number; fit?: 'cover' | 'contain'; pos?: string; label?: string; kunye?: boolean; hue?: 'mavi' | 'mor' | 'turuncu'; z?: number}> = ({
+  src, x, y, w, h, r = 56, start = 0, fit = 'cover', pos = 'center', label, kunye = true, hue, z,
+}) => {
+  const f = useCurrentFrame();
+  const p = enterP(f, start, 34);
+  return (
+    <LiquidGlass x={x} y={y + (1 - p) * 80 + drift(f, 3, 320, x)} w={w} h={h} r={r} scale={0.88 + 0.12 * p} opacity={fadeIn(f, start)} hue={hue} style={{zIndex: z}}>
+      <Img src={staticFile(src)} style={{position: 'absolute', inset: 10, width: w - 20, height: h - 20, objectFit: fit, objectPosition: pos, borderRadius: r - 10}} />
+      {label && <div style={{position: 'absolute', left: 0, right: 0, bottom: 26, textAlign: 'center', fontFamily: INTER, fontWeight: 700, fontSize: 40, color: '#fff', letterSpacing: '-0.02em', textShadow: '0 2px 12px rgba(0,0,0,0.6)'}}>{label}</div>}
+      {kunye && <div style={{position: 'absolute', right: 22, top: 18, fontFamily: INTER, fontWeight: 500, fontSize: 20, color: 'rgba(255,255,255,0.75)', textShadow: '0 1px 6px rgba(0,0,0,0.7)'}}>Görsel: Apple</div>}
+    </LiquidGlass>
+  );
 };

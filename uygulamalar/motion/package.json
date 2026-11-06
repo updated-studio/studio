@@ -12,6 +12,7 @@
     "render": "node scripts/render.mjs",
     "onizleme": "node scripts/preview.mjs",
     "zamanla": "node scripts/sahne-zamanla.mjs",
+    "seslendir": "node scripts/seslendir.mjs",
     "new": "node scripts/new-project.mjs",
     "typecheck": "tsc --noEmit"
   },

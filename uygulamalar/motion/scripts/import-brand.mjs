@@ -63,7 +63,8 @@ const out = {
   },
   safe: {
     land: {x: t.safeArea.video.left, y: t.safeArea.video.top},
-    port: {top: t.safeArea.story.top, bottom: t.safeArea.story.bottom, x: t.safeArea.story.left, right: t.safeArea.reelsArayuz?.right ?? t.safeArea.story.right},
+    // 9:16 Motion videoları Reels/Shorts/TikTok içindir → reelsArayuz; yoksa story
+    port: (() => { const r = t.safeArea.reelsArayuz ?? t.safeArea.story; return {top: r.top, bottom: r.bottom, x: r.left, right: r.right}; })(),
     feed: {x: t.safeArea.instagramPost.left, y: t.safeArea.instagramPost.top},
   },
   copy: {banned: t.copy.banned, address: t.copy.address.video, maxWords: t.copy.maxWords},

@@ -3,7 +3,7 @@ import {interpolate, useCurrentFrame} from 'remotion';
 import {LiquidGlass} from '../../../components/LiquidGlass';
 import {EASE, drift, enterP, exitP, fadeIn} from '../../../lib/motion-dinamik';
 import {INTER, at, cfg} from '../config';
-import {Pill, Scene, Title, useSafe} from './Shared';
+import {PhotoCard, Pill, Scene, Title, useSafe} from './Shared';
 
 const c = cfg.copy.kamera;
 const OPEN: Record<string, number> = {'ƒ/1.48': 0.66, 'ƒ/1.8': 0.56, 'ƒ/2.8': 0.4, 'ƒ/4.0': 0.26};
@@ -96,22 +96,20 @@ export const Kamera: React.FC = () => {
       {f >= ana - 4 && (
         <>
           <Title text={c.title} start={ana} size={92} x={L.cx} y={-590} w={L.safeW} />
-          <LiquidGlass x={L.cx} y={-170 + drift(f, 4, 320)} w={600} h={600} r={300} scale={0.7 + 0.3 * lp} opacity={fadeIn(f, ana)} mag={1.25}>
-            <div style={{position: 'absolute', inset: 42, borderRadius: '50%', overflow: 'hidden'}}>
-              <div style={{position: 'absolute', inset: 0, opacity: 1 - fadeIn(f, yani, 16)}}><Iris open={open} size={516} /></div>
-              {f >= yani && <div style={{position: 'absolute', inset: 0, opacity: fadeIn(f, yani, 16) * (1 - fadeIn(f, grup, 16))}}><Gece size={516} light={(open - 0.26) / 0.4} /></div>}
-              {f >= grup && <div style={{position: 'absolute', inset: 0, opacity: fadeIn(f, grup, 16)}}><Grup size={516} sharp={1 - (open - 0.26) / 0.4} /></div>}
-            </div>
+          <LiquidGlass x={L.cx} y={-170 + drift(f, 4, 320)} w={560} h={560} r={280} scale={0.7 + 0.3 * lp} opacity={fadeIn(f, ana) * (1 - fadeIn(f, yani, 14))} mag={1.25}>
+            <div style={{position: "absolute", inset: 38}}><Iris open={open} size={484} /></div>
           </LiquidGlass>
-          <div style={{position: 'absolute', left: L.cx - 300, width: 600, top: 150, textAlign: 'center', fontFamily: INTER, color: '#fff', opacity: fadeIn(f, ana + 10)}}>
+          <div style={{position: 'absolute', left: L.cx - 300, width: 600, top: 128, textAlign: 'center', fontFamily: INTER, color: '#fff', opacity: fadeIn(f, ana + 10)}}>
             <div style={{fontWeight: 800, fontSize: 96, letterSpacing: '-0.03em'}}>{stop}</div>
             <div style={{fontWeight: 500, fontSize: 32, opacity: 0.75}}>{c.label}</div>
           </div>
         </>
       )}
-      <Pill text={c.a} x={L.cx} y={378} w={L.safeW} start={yani} size={38} />
-      {f >= grup && <Pill text={c.b} x={L.cx} y={378} w={L.safeW} start={grup} size={38} hue="mor" />}
-      {f < yani && <Pill text={c.old} x={L.cx} y={372} w={440} start={at('kamera', 'değişken') + 10} size={30} hue="turuncu" />}
+      {f >= yani && f < grup + 16 && <div style={{opacity: 1 - fadeIn(f, grup, 16)}}><PhotoCard src={cfg.gorseller.karanlik} x={L.cx} y={-160} w={L.safeW} h={560} start={yani} pos="70% center" /></div>}
+      {f >= grup && <PhotoCard src={cfg.gorseller.grup} x={L.cx} y={-160} w={L.safeW} h={560} start={grup} hue="mor" pos="55% center" />}
+      <Pill text={c.a} x={L.cx} y={344} w={L.safeW} start={yani} size={38} />
+      {f >= grup && <Pill text={c.b} x={L.cx} y={344} w={L.safeW} start={grup} size={38} hue="mor" />}
+      {f < yani && <Pill text={c.old} x={L.cx} y={340} w={440} start={at('kamera', 'değişken') + 10} size={30} hue="turuncu" />}
     </Scene>
   );
 };

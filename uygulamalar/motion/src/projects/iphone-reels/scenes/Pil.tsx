@@ -33,7 +33,7 @@ export const Pil: React.FC = () => {
   const shift = tween(f, ust - 10, ust + 30, 0, 1, EASE.inOut);
   const ring = tween(f, at('pil', '15') , at('pil', '15') + 70, 0, 0.5, EASE.out);
   const mins = Math.round(tween(f, at('pil', '15'), at('pil', '15') + 70, 0, 15, EASE.out));
-  const R = 150;
+  const R = 128;
   const C = 2 * Math.PI * R;
   return (
     <Scene hue="mavi" cam={[{f: 0, scale: 1.02}, {f: 570, scale: 1.06}]}>
@@ -43,8 +43,8 @@ export const Pil: React.FC = () => {
         <Battery x={L.cx + 175} y={-60} label="17 Pro" value={c.old} start={n31} strong={false} scale={1} />
       </div>
       {f >= ust && (
-        <LiquidGlass x={L.cx} y={270} w={L.safeW} h={380} r={60} opacity={fadeIn(f, ust)} scale={0.9 + 0.1 * enterP(f, ust)}>
-          <div style={{display: 'flex', alignItems: 'center', gap: 40, padding: '30px 48px', fontFamily: INTER, color: '#fff'}}>
+        <LiquidGlass x={L.cx} y={225} w={L.safeW} h={330} r={60} opacity={fadeIn(f, ust)} scale={0.9 + 0.1 * enterP(f, ust)}>
+          <div style={{display: 'flex', alignItems: 'center', gap: 40, padding: '20px 44px', fontFamily: INTER, color: '#fff'}}>
             <svg width={R * 2 + 30} height={R * 2 + 30}>
               <circle cx={R + 15} cy={R + 15} r={R} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={22} />
               <circle cx={R + 15} cy={R + 15} r={R} fill="none" stroke="#7DD3FC" strokeWidth={22} strokeLinecap="round" strokeDasharray={`${C * ring} ${C}`} transform={`rotate(-90 ${R + 15} ${R + 15})`} style={{filter: 'drop-shadow(0 0 12px rgba(125,211,252,0.8))'}} />

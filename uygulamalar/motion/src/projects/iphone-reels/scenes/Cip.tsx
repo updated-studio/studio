@@ -3,7 +3,7 @@ import {useCurrentFrame} from 'remotion';
 import {LiquidGlass} from '../../../components/LiquidGlass';
 import {EASE, drift, enterP, fadeIn, tween} from '../../../lib/motion-dinamik';
 import {INTER, at, cfg} from '../config';
-import {Scene, useSafe} from './Shared';
+import {PhotoCard, Scene, useSafe} from './Shared';
 
 const c = cfg.copy.cip;
 /** Sahne 2 · A20 Pro — cam çip karesi, ardından GPU çubukları ve %40 sayacı. */
@@ -17,15 +17,12 @@ export const Cip: React.FC = () => {
   const barW = L.safeW - 120;
   return (
     <Scene hue="mor" cam={[{f: 0, scale: 1.02}, {f: 348, scale: 1.06}]}>
-      <LiquidGlass x={L.cx} y={-250 + drift(f, 5, 300)} w={520} h={520} r={110} scale={0.6 + 0.4 * p} opacity={fadeIn(f, 4)} hue="mor" mag={1.2}>
-        <div style={{position: 'absolute', inset: 46, borderRadius: 70, border: '2px solid rgba(255,255,255,0.22)'}} />
-        <div style={{height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: INTER, color: '#fff'}}>
-          <div style={{fontWeight: 800, fontSize: 104, letterSpacing: '-0.04em'}}>{c.chip}</div>
-          <div style={{fontWeight: 500, fontSize: 34, opacity: 0.8, marginTop: 6}}>{c.chipSub}</div>
-        </div>
-      </LiquidGlass>
-      <LiquidGlass x={L.cx} y={300} w={L.safeW} h={360} r={56} opacity={fadeIn(f, gpu)} scale={0.92 + 0.08 * enterP(f, gpu)} hue="mor">
-        <div style={{padding: '44px 56px', fontFamily: INTER, color: '#fff'}}>
+      <div style={{position: 'absolute', left: 0, top: 0, transform: `scale(${0.6 + 0.4 * p})`, transformOrigin: `${L.cx}px -280px`}}>
+        <PhotoCard src={cfg.gorseller.cip} x={L.cx} y={-280} w={500} h={500} r={110} hue="mor" />
+      </div>
+      <div style={{position: 'absolute', left: L.cx - 300, width: 600, top: -10, textAlign: 'center', fontFamily: INTER, fontWeight: 500, fontSize: 32, color: 'rgba(255,255,255,0.85)', opacity: fadeIn(f, 20)}}>{c.chipSub}</div>
+      <LiquidGlass x={L.cx} y={225} w={L.safeW} h={330} r={56} opacity={fadeIn(f, gpu)} scale={0.92 + 0.08 * enterP(f, gpu)} hue="mor">
+        <div style={{padding: '30px 50px', fontFamily: INTER, color: '#fff'}}>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'baseline'}}>
             <span style={{fontWeight: 600, fontSize: 40, opacity: 0.8}}>{c.gpu}</span>
             <span style={{fontWeight: 800, fontSize: 88, letterSpacing: '-0.04em'}}>+%{count}</span>
