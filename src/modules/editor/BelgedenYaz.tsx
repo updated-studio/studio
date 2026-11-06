@@ -7,7 +7,7 @@ import { usePanelKullanici, SiteYetkisiYok } from "./Taslaklarim";
 // Belgeden yaz (6 Kasım 2026, kullanıcı: "belgemiz var, yeni yazı olarak girilsin; studioda editörlere böyle veriden otomatik bizim
 // kurallarımızda bizim tarzımızda hazırlasın"). Editör Word ya da PDF belgesini bırakır; gerisi kendiliğinden: okuma, yapay zekâ
 // (supabase/functions/belge-yaz), fotoğrafların yüklenmesi, panelde taslak. Sonunda taslak ve yapılanların listesi; seçim yok.
-const ADIMLAR: [Adim, string][] = [["okunuyor", "Belge okunuyor"], ["yz", "Sitenin kuralları uygulanıyor"], ["fotolar", "Fotoğraflar yükleniyor"], ["taslak", "Taslak açılıyor"]];
+const ADIMLAR: [Adim, string][] = [["okunuyor", "Belge okunuyor"], ["sira", "Sıra bekleniyor"], ["yz", "Sitenin kuralları uygulanıyor"], ["fotolar", "Fotoğraflar yükleniyor"], ["taslak", "Taslak açılıyor"]];
 const TUR_AD = { inceleme: "İnceleme", rehber: "Rehber", haber: "Haber" } as const;
 
 export default function BelgedenYaz() {
@@ -18,18 +18,21 @@ export default function BelgedenYaz() {
   const [hata, setHata] = useState("");
   const [sonuc, setSonuc] = useState<Hazir | null>(null);
   const [ustunde, setUstunde] = useState(false);
+  const [siraGordu, setSiraGordu] = useState(false);
   const calisiyor = !!adim && !sonuc && !hata;
 
   const basla = async (f: File | undefined) => {
     if (!f || calisiyor) return;
-    setDosya(f.name); setHata(""); setSonuc(null); setAdim({ a: "okunuyor" });
-    try { setSonuc(await belgedenHazirla(f, (a, ek) => setAdim({ a, ek }))); }
+    setDosya(f.name); setHata(""); setSonuc(null); setSiraGordu(false); setAdim({ a: "okunuyor" });
+    try { setSonuc(await belgedenHazirla(f, (a, ek) => { if (a === "sira") setSiraGordu(true); setAdim({ a, ek }); })); }
     catch (e) { setHata((e as Error).message); }
   };
 
   if (panelHata) return <div className="empty">Site paneline bağlanılamadı: {panelHata}</div>;
   if (kullanici === null) return <SiteYetkisiYok />;
-  const sira = adim ? ADIMLAR.findIndex(([a]) => a === adim.a) : -1;
+  // "Sıra bekleniyor" yalnız sıra gerçekten beklendiyse görünür
+  const adimlar = ADIMLAR.filter(([a]) => a !== "sira" || siraGordu);
+  const sira = adim ? adimlar.findIndex(([a]) => a === adim.a) : -1;
   const s = sonuc?.sonuc;
 
   return (
@@ -52,12 +55,12 @@ export default function BelgedenYaz() {
         <section className="ed-belge-adim" aria-live="polite">
           <div className="ed-belge-dosya"><span className="ed-ust">BELGE</span><b>{dosya}</b></div>
           <ol>
-            {ADIMLAR.map(([a, ad], i) => {
+            {adimlar.map(([a, ad], i) => {
               const durum = hata && i === sira ? "hata" : sonuc || i < sira ? "bitti" : i === sira ? "suruyor" : "bekliyor";
               return <li key={a} data-durum={durum}><i aria-hidden="true">{durum === "bitti" ? <Ikon ad="check" /> : i + 1}</i><span>{ad}{i === sira && adim.ek && !sonuc ? <em> · {adim.ek}</em> : null}</span></li>;
             })}
           </ol>
-          {calisiyor && sira === 1 && <p className="muted">Uzun belgede bu adım bir iki dakika sürebilir. Sayfayı kapatma.</p>}
+          {calisiyor && adim?.a === "yz" && <p className="muted">Uzun belgede bu adım bir iki dakika sürebilir. Sayfayı kapatma.</p>}
           {hata && <div className="msg err">{hata}</div>}
         </section>
       )}

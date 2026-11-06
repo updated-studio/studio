@@ -15,7 +15,7 @@ export type YzSonuc = {
   degisiklikler: string[]; eksikler: string[];
 };
 export type Hazir = { k: api.Koleksiyon; id: number; sonuc: YzSonuc; urun: { id: number; ad: string } | null; yazar: { id: number; ad: string } | null; fotoSayisi: number; uyarilar: string[]; onizleme: string };
-export type Adim = "okunuyor" | "yz" | "fotolar" | "taslak";
+export type Adim = "okunuyor" | "sira" | "yz" | "fotolar" | "taslak";
 
 const kes = (s: string, n: number) => { const t = (s ?? "").trim(); return t.length <= n ? t : t.slice(0, n - 1).replace(/\s+\S*$/, "") + "…"; };
 const sade = (s: string) => s.toLocaleLowerCase("tr").replace(/[^a-z0-9ğüşöçı.]/g, "");
@@ -125,21 +125,31 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
   if (pdf && dosya.size > 10_000_000) throw new Error("PDF 10 MB'tan büyük. Word belgesi varsa onu yükle; fotoğraflar da ondan alınır.");
   const kucukler = await Promise.all(belge.fotolar.slice(0, 30).map(async (f) => ({ n: f.n, b64: await kucukKopya(f.veri).catch(() => "") })));
 
-  adim("yz", `${belge.bloklar.filter((b) => b.t !== "img").length} paragraf, ${belge.fotolar.length} fotoğraf`);
-  const cagir = async (body: Record<string, unknown>) => {
+  const cagir = async (body: Record<string, unknown>): Promise<{ is?: string; durum?: string; ok?: boolean; hata?: string; sonuc?: YzSonuc; sira?: boolean; onunde?: number }> => {
     const { data, error } = await sb.functions.invoke("belge-yaz", { body });
-    if (!error) return data as { is?: string; durum?: string; ok?: boolean; hata?: string; sonuc?: YzSonuc };
+    if (!error) return data;
     const j = await (error as { context?: Response }).context?.json?.().catch(() => null) as { hata?: string } | null;
     throw new Error(j?.hata || error.message || "Yapay zekâ yanıt vermedi.");
   };
   // İş arka planda yürür (uzun belgede 2-4 dakika); sonuç 5 saniyede bir sorulur, en çok 7 dakika
-  const bas = await cagir({ dosyaAdi: dosya.name, bloklar: belge.bloklar, kucukler: kucukler.filter((k) => k.b64), ...(pdf ? { pdf: await dosyaB64(dosya) } : {}) });
+  // Aynı anda en çok 2 belge işlenir (sunucu küçük); doluysa 10 saniyede bir yeniden denenir, en çok 15 dakika
+  const govde = { dosyaAdi: dosya.name, bloklar: belge.bloklar, kucukler: kucukler.filter((k) => k.b64), ...(pdf ? { pdf: await dosyaB64(dosya) } : {}) };
+  let bas = await cagir(govde);
+  for (const son = Date.now() + 15 * 60_000; (bas as { sira?: boolean }).sira; bas = await cagir(govde)) {
+    if (Date.now() > son) throw new Error("Sırada çok uzun beklendi. Biraz sonra yeniden dene.");
+    adim("sira", `önünde ${(bas as { onunde?: number }).onunde ?? 1} belge var`);
+    await new Promise((r) => setTimeout(r, 10_000));
+  }
   if (!bas.is) throw new Error(bas.hata || "İş başlatılamadı.");
+  adim("yz", `${belge.bloklar.filter((b) => b.t !== "img").length} paragraf, ${belge.fotolar.length} fotoğraf`);
+  const birak = () => cagir({ birak: bas.is }).catch(() => null);
+  try { return await bitir(bas.is); } finally { await birak(); }
+  async function bitir(is: string): Promise<Hazir> {
   let data: Awaited<ReturnType<typeof cagir>> = { durum: "suruyor" };
   for (const son = Date.now() + 7 * 60_000; data.durum !== "bitti"; ) {
     if (Date.now() > son) throw new Error("Yapay zekâ 7 dakikada bitiremedi. Biraz sonra yeniden dene.");
     await new Promise((r) => setTimeout(r, 5_000));
-    data = await cagir({ durum: bas.is }).catch((e) => ((e as Error).message.includes("başkasının") ? Promise.reject(e) : { durum: "suruyor" }));
+    data = await cagir({ durum: is }).catch((e) => ((e as Error).message.includes("başkasının") ? Promise.reject(e) : { durum: "suruyor" }));
   }
   if (!data.ok || !data.sonuc) throw new Error(data.hata || "Yapay zekâ yanıt vermedi.");
   const s = data.sonuc as YzSonuc;
@@ -195,5 +205,6 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
   if (yazar && yazili && yazili !== yazar.id) uyarilar.push(`İmza panelin kuralıyla senin adına açıldı. "${yazar.ad}" imzasını yalnız yönetici verebilir.`);
   const onizleme = await api.onizlemeAdresi(k, r.doc.id).catch(() => "");
   return { k, id: r.doc.id, sonuc: s, urun, yazar: yazar && yazili === yazar.id ? yazar : null, fotoSayisi: medya.size, uyarilar, onizleme };
+  }
 }
 

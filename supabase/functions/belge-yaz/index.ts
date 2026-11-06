@@ -27,6 +27,10 @@ function serviceKey(): string {
 // sonuç depoda icerik/belge-yaz/<iş>.json olarak bekler; Stüdyo { durum: iş } ile sorar, sonucu alınca dosya silinir.
 const SURE_MS = 330_000;
 const YER = (is: string) => `belge-yaz/${is}.json`;
+// Aynı anda en çok 2 belge (6 Kasım 2026, kullanıcı: "aynı anda kaç iş yaptırılabiliyor, sistem patlamasın"). Yapay zekâ adımı sunucuyu
+// yormaz (Claude'da yürür); yük, fotoğrafların panelde 6 boya çevrilmesinde (sharp, 2 çekirdek). Her iş belge-yaz/calisan/<zaman>-<iş>
+// işaretini Stüdyo taslağı açana dek tutar ({ birak }); 15 dakikadan eski işaret sayılmaz (sekme kapanmışsa kilit kalmasın).
+const ES_ZAMANLI = 2, ISARET_OMRU_MS = 15 * 60_000, CALISAN = "belge-yaz/calisan";
 
 type Blok = { i: number; t: "p" | "img" | "tablo"; s?: string; kalin?: boolean; boy?: number; n?: number };
 
@@ -153,6 +157,12 @@ Deno.serve(async (req) => {
     delete j.kim;
     return yanit({ durum: "bitti", ...j });
   }
+  if (typeof b.birak === "string") {
+    const { data: l } = await sb.storage.from("icerik").list(CALISAN, { limit: 100 });
+    const ad = (l ?? []).find((x) => x.name.endsWith("-" + b.birak))?.name;
+    if (ad) await sb.storage.from("icerik").remove([`${CALISAN}/${ad}`]);
+    return yanit({ ok: true });
+  }
   const bloklar: Blok[] = (Array.isArray(b.bloklar) ? b.bloklar : []).slice(0, 1500);
   const pdf = typeof b.pdf === "string" && b.pdf.length < 14_000_000 ? b.pdf : "";
   const kucukler = (Array.isArray(b.kucukler) ? b.kucukler : []).slice(0, 40)
@@ -165,7 +175,13 @@ Deno.serve(async (req) => {
   const kullanici = pdf
     ? `Belge PDF olarak ekte (dosya: ${String(b.dosyaAdi ?? "").slice(0, 120)}). PDF'te blok numarası yok: "koru" modunu seçsen bile metni govde alanına markdown olarak, yalnız izin verilen düzeltmelerle aynen yaz; fotoğraflar PDF'ten alınmadı, gorseller boş liste, kapak 0.`
     : `Dosya: ${String(b.dosyaAdi ?? "").slice(0, 120)}\n${kucukler.length ? "Fotoğrafların küçük kopyaları yukarıda, \"FOTOĞRAF n\" etiketiyle.\n" : ""}\nBELGE:\n${satirlar(bloklar)}`;
+  const { data: l } = await sb.storage.from("icerik").list(CALISAN, { limit: 100 });
+  const eski = (l ?? []).filter((x) => Date.now() - Number(x.name.split("-")[0]) > ISARET_OMRU_MS).map((x) => `${CALISAN}/${x.name}`);
+  if (eski.length) await sb.storage.from("icerik").remove(eski);
+  const calisan = (l?.length ?? 0) - eski.length;
+  if (calisan >= ES_ZAMANLI) return yanit({ sira: true, onunde: calisan - ES_ZAMANLI + 1 });
   const is = crypto.randomUUID();
+  await sb.storage.from("icerik").upload(`${CALISAN}/${Date.now()}-${is}`, new Blob(["{}"], { type: "application/json" }));
   const yaz = (j: unknown) => sb.storage.from("icerik").upload(YER(is), new Blob([JSON.stringify({ kim: k.user!.id, ...j as object })], { type: "application/json" }), { upsert: true });
   const calis = async () => {
     try {
