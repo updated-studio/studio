@@ -29,13 +29,16 @@ const OnayBekleyenler = lazy(() => import("./Taslaklarim").then((m) => ({ defaul
 const Yayindakiler = lazy(() => import("./Taslaklarim").then((m) => ({ default: m.Yayindakiler })));
 const HaberYazSayfa = lazy(() => import("./Taslaklarim").then((m) => ({ default: () => <YazRota Yaz={m.HaberYaz} /> })));
 const Cekim = lazy(() => import("./Cekim"));
+const BelgedenYaz = lazy(() => import("./BelgedenYaz"));
 const Oku = lazy(() => import("./Oku"));
 const Yonetim = lazy(() => import("./Yonetim"));
 const MenuSayfa = lazy(() => import("./Yonetim").then((m) => ({ default: m.MenuSayfa })));
 
-function YazRota({ Yaz }: { Yaz: (p: { id: number | "yeni" }) => React.ReactElement }) {
+// ?k=reviews: Belgeden yaz incelemeyi aynı düzenleyicide açar (6 Kasım 2026)
+function YazRota({ Yaz }: { Yaz: (p: { id: number | "yeni"; k?: "news" | "reviews" }) => React.ReactElement }) {
   const { id } = useParams();
-  return <Yaz key={id} id={id === "yeni" || !id ? "yeni" : Number(id)} />;
+  const [sp] = useSearchParams();
+  return <Yaz key={id} id={id === "yeni" || !id ? "yeni" : Number(id)} k={sp.get("k") === "reviews" ? "reviews" : "news"} />;
 }
 
 // Editörden gizlenen modüller (yönetim ekranları); Haber Masası kendi menü öğesiyle açılır
@@ -140,6 +143,7 @@ export default function EditorKabuk() {
               <Route path="/taslaklarim" element={<Navigate to="/taslaklar" replace />} />
               <Route path="/masa" element={<Navigate to="/haber-masasi" replace />} />
               <Route path="/cekim" element={<Cekim />} />
+              <Route path="/belgeden-yaz" element={<BelgedenYaz />} />
               <Route path="/menu" element={<MenuSayfa />} />
               {yonetici && <Route path="/yonetim-merkezi" element={<Yonetim />} />}
               {MODULLER.filter((m) => m.id === "haber-masasi" || izinli.includes(m)).map((m) => <Route key={m.id} path={"/" + m.id} element={<m.bilesen />} />)}

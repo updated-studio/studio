@@ -35,7 +35,7 @@ export async function taslaklar() {
 export const yeniHaber = () => api.yeniTaslak("news").then((d) => d.id);
 
 /** Haber yazma ekranı: id verilirse o taslak, "yeni" ise yeni taslak açılır */
-export function HaberYaz({ id }: { id: number | "yeni" }) {
+export function HaberYaz({ id, k = "news" }: { id: number | "yeni"; k?: "news" | "reviews" }) {
   const { kullanici, hata } = usePanelKullanici();
   const [acik, setAcik] = useState<number | null>(id === "yeni" ? null : id);
   const toast = useToast(), git = useNavigate();
@@ -47,8 +47,8 @@ export function HaberYaz({ id }: { id: number | "yeni" }) {
   if (kullanici === null) return <SiteYetkisiYok />;
   if (!kullanici || !acik) return <div className="muted">Hazırlanıyor…</div>;
   return <>
-    <Duzenle key={acik} k="news" id={acik} kullanici={kullanici} kapat={() => git("/taslaklar")} ac={(x) => git(`/yaz/${x}`)} />
-    <Rehber ad="haber-yaz" adimlar={HABER_ADIMLARI} />
+    <Duzenle key={acik} k={k} id={acik} kullanici={kullanici} kapat={() => git("/taslaklar")} ac={(x) => git(`/yaz/${x}${k === "reviews" ? "?k=reviews" : ""}`)} />
+    {k === "news" && <Rehber ad="haber-yaz" adimlar={HABER_ADIMLARI} />}
   </>;
 }
 
@@ -74,7 +74,7 @@ function TaslakListe() {
     <div className="mas">
       <div className="mas-bas">
         <div><h1>Taslaklar</h1><p className="mas-bulgu">{satirlar === null ? "Yükleniyor…" : <><b>{(taze ?? []).filter((s) => s.adim === 2).length} taslak okunmayı bekliyor.</b> Sıra öncelik puanına göre; satır taslağı açar.</>}</p></div>
-        <div className="mas-eylem"><button className="btn" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Yeni yaz</button></div>
+        <div className="mas-eylem"><button className="btn ghost" onClick={() => git("/belgeden-yaz")}><Ikon ad="taslak" />Belgeden yaz</button><button className="btn" onClick={() => git("/yaz/yeni")}><Ikon ad="yaz" />Yeni yaz</button></div>
       </div>
       {kullanici === null && <div className="msg err">Sitede yetkin olmadığı için yalnız Haber Masası'nın yazım kayıtları görünüyor. Yöneticiden site rolü iste.</div>}
       {siteHata && <div className="msg err">Sitedeki taslaklar alınamadı: {siteHata}</div>}

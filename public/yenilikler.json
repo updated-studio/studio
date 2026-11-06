@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-06-l",
+    "tarih": "6 Kasım 2026",
+    "baslik": "Belgeden yaz",
+    "bolumler": [
+      {
+        "ad": "Taslaklar",
+        "maddeler": [
+          "Yeni \"Belgeden yaz\" düğmesi: Word ya da PDF belgesinden taslak hazırlanır.",
+          "Yazarın imzalı metni korunur, yalnız yazım ve sitenin kuralları uygulanır; ham malzeme sitenin üslubuyla yazılır.",
+          "Başlık, spot, kısa cevap, fotoğraf altları ve incelemede puan kutusu hazır gelir. Puanı editör verir."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-k",
     "tarih": "6 Kasım 2026",
     "baslik": "Aramada çekim listesi",
