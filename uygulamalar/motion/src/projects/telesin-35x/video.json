@@ -174,5 +174,13 @@
     "kus": "media/telesin/Frame_5.png",
     "spor": "media/telesin/Frame_1.png",
     "_kaynak": "telesinstore.com ürün ve iPhone 18 Pro sayfası görselleri (Kasım 2026); depoya girmez; künye: Görsel: Telesin. Kullanım alanı fotoğraflarının bu lensle çekildiği iddia edilmez."
+  },
+  "gorselIndir": {
+    "media/telesin/removebackgrounds-ai_1.png": "https://www.telesinstore.com/cdn/shop/files/removebackgrounds-ai_1.png",
+    "media/telesin/M_kv.png": "https://www.telesinstore.com/cdn/shop/files/M_kv.png",
+    "media/telesin/pc_img-1.png": "https://www.telesinstore.com/cdn/shop/files/pc_img-1.png",
+    "media/telesin/pro-1.png": "https://www.telesinstore.com/cdn/shop/files/pro-1.png",
+    "media/telesin/Frame_5.png": "https://www.telesinstore.com/cdn/shop/files/Frame_5.png",
+    "media/telesin/Frame_1.png": "https://www.telesinstore.com/cdn/shop/files/Frame_1.png"
   }
 }

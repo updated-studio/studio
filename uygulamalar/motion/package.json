@@ -13,6 +13,7 @@
     "onizleme": "node scripts/preview.mjs",
     "zamanla": "node scripts/sahne-zamanla.mjs",
     "seslendir": "node scripts/seslendir.mjs",
+    "medya": "node scripts/medya.mjs",
     "new": "node scripts/new-project.mjs",
     "typecheck": "tsc --noEmit"
   },

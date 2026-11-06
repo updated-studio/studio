@@ -135,5 +135,13 @@
     "grup": "media/iphone-reels/Apple-iPhone-18-Pro-photography-aperture-focus-sharp-260909_big.jpg",
     "renkler": "media/iphone-reels/Apple-iPhone-18-Pro-color-lineup-260909_big.jpg",
     "_kaynak": "Apple Newsroom basın görselleri (iPhone 18 Pro: 9 Eylül 2026, iPhone 17 Pro: 9 Eylül 2025). Depoya girmez (public/media gitignore); künye: Görsel: Apple"
+  },
+  "gorselIndir": {
+    "media/iphone-reels/Apple-iPhone-17-Pro-cosmic-orange-250909_inline.jpg": "https://www.apple.com/newsroom/images/2025/09/apple-unveils-iphone-17-pro-and-iphone-17-pro-max/article/Apple-iPhone-17-Pro-cosmic-orange-250909_inline.jpg.large_2x.jpg",
+    "media/iphone-reels/Apple-iPhone-18-Pro-2up-260909_inline.jpg": "https://www.apple.com/newsroom/images/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/article/Apple-iPhone-18-Pro-2up-260909_inline.jpg.large_2x.jpg",
+    "media/iphone-reels/Apple-iPhone-18-Pro-A20-Pro-chip-260909_inline.jpg": "https://www.apple.com/newsroom/images/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/article/Apple-iPhone-18-Pro-A20-Pro-chip-260909_inline.jpg.large_2x.jpg",
+    "media/iphone-reels/Apple-iPhone-18-Pro-photography-aperture-low-light-260909_big.jpg": "https://www.apple.com/newsroom/images/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/article/Apple-iPhone-18-Pro-photography-aperture-low-light-260909_big.jpg.large_2x.jpg",
+    "media/iphone-reels/Apple-iPhone-18-Pro-photography-aperture-focus-sharp-260909_big.jpg": "https://www.apple.com/newsroom/images/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/article/Apple-iPhone-18-Pro-photography-aperture-focus-sharp-260909_big.jpg.large_2x.jpg",
+    "media/iphone-reels/Apple-iPhone-18-Pro-color-lineup-260909_big.jpg": "https://www.apple.com/newsroom/images/2026/09/apple-debuts-iphone-18-pro-and-iphone-18-pro-max/article/Apple-iPhone-18-Pro-color-lineup-260909_big.jpg.large_2x.jpg"
   }
 }
