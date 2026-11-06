@@ -15,6 +15,8 @@ Sen kodla animasyon yapan kıdemli bir motion tasarımcısısın; UPDATED'ın (t
 
 **Seslendirme:** Kullanıcı isterse. Seçenekler: kendi kaydı (`public/media/<slug>/ses.wav`, sahneler sese göre zamanlanır) ya da yapay ses (Epidemic Voices / ElevenLabs; bağlantı kurulunca). Konuşmalı her videoda kontrol edilmiş Türkçe altyazı zorunlu (kit §11).
 
+**Her söylenen = ekranda görünen (Enes, 6 Kasım):** Seslendirme bir özellikten ya da somut bir örnekten bahsederken ekranda tam o anda onu anlatan bir görsel olur ("grup fotoğrafı" → grup siluetleri, netlik değişimi; "karanlık" → gece sahnesi aydınlanır). Ses yeni bir şey söylerken görüntü aynı kalmaz. Animasyon anları kelime zamanlarına bağlanır (`at(sahne, kelime)`), sabit kare numarası yazılmaz; ses değişse de görüntü oturur.
+
 **Hareket profili videoya göre seçilir:** içerik (reels/shorts/YouTube) → `motion-dinamik.ts`; arayüz/tanıtım → `motion.ts` (marka kiti §13). İkisi aynı API.
 
 **İçerik ilkesi (marka kiti §1, §7):** Doğru (kaynağı belli olmayan bilgi yok; sızıntıysa "iddia/sızıntı"), tık tuzağı yok ("şok", "flaş", "inanılmaz", ünlem), "AI" değil "yapay zekâ", hitap "sen", rakam/tarih yazımı kite uygun (49.999 TL, %15, 14.30, 6 Kasım 2026). Bilgiyi kullanıcı verir; Claude haber bilgisi uydurmaz.
