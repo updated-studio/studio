@@ -14,11 +14,11 @@ export const headerGeom = (mode: Mode) =>
     feed: {size: 124, tag: 60, hookTop: -90, topScale: 0.45},
   })[mode];
 
-export const Header: React.FC<{animate: boolean}> = ({animate}) => {
+export const Header: React.FC<{animate: boolean; width?: number}> = ({animate, width}) => {
   const f = useCurrentFrame();
   const L = useLayout();
   const g = headerGeom(L.mode);
-  const w = L.mode === 'land' ? 1500 : L.safeW;
+  const w = width ?? (L.mode === 'land' ? 1500 : L.safeW);
   const A = animate ? f : 10_000; // animasyonsuz = son durum
   return (
     <div lang="tr" style={{width: w}}>

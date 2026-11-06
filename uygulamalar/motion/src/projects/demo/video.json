@@ -4,40 +4,125 @@
   "title": "UPDATED Stüdyo — 30 sn tanıtım (ÖRNEK, yayın için değil)",
   "durationSec": 30,
   "fps": 60,
-  "audio": {"music": "audio/music-placeholder.wav", "musicVolume": 0.35},
+  "formats": [
+    "16x9"
+  ],
+  "audio": {
+    "music": "audio/music-placeholder.wav",
+    "musicVolume": 0.35
+  },
   "scenes": [
-    {"id": "hook", "name": "Bir haber, dört kanal (hook)", "frames": 240, "key": 200},
-    {"id": "problem", "name": "Kopyala-yapıştır (problem)", "frames": 420, "key": 360},
-    {"id": "fix", "name": "Stüdyo (çözüm)", "frames": 480, "key": 440},
-    {"id": "payoff", "name": "Her kanalda yayında (payoff)", "frames": 360, "key": 300},
-    {"id": "cta", "name": "Logo + CTA", "frames": 300, "key": 240}
+    {
+      "id": "hook",
+      "name": "Bir haber, dört kanal (hook)",
+      "frames": 240,
+      "key": 200
+    },
+    {
+      "id": "problem",
+      "name": "Kopyala-yapıştır (problem)",
+      "frames": 420,
+      "key": 360
+    },
+    {
+      "id": "fix",
+      "name": "Stüdyo (çözüm)",
+      "frames": 480,
+      "key": 440
+    },
+    {
+      "id": "payoff",
+      "name": "Her kanalda yayında (payoff)",
+      "frames": 360,
+      "key": 300
+    },
+    {
+      "id": "cta",
+      "name": "Logo + CTA",
+      "frames": 300,
+      "key": 240
+    }
   ],
   "copy": {
     "channels": [
-      {"name": "Web", "format": "16:9 · 1920 px"},
-      {"name": "Instagram", "format": "4:5 · 1080×1350"},
-      {"name": "YouTube", "format": "1280×720"},
-      {"name": "Bülten", "format": "600 px"}
+      {
+        "name": "Web",
+        "format": "16:9 · 1920 px"
+      },
+      {
+        "name": "Instagram",
+        "format": "4:5 · 1080×1350"
+      },
+      {
+        "name": "YouTube",
+        "format": "1280×720"
+      },
+      {
+        "name": "Bülten",
+        "format": "600 px"
+      }
     ],
-    "hook": {"headline": "Bir haber. Dört kanal.", "highlight": ["Dört"], "counterLabel": "Yapılacak iş", "counterTo": 12},
+    "hook": {
+      "headline": "Bir haber. Dört kanal.",
+      "highlight": [
+        "Dört"
+      ],
+      "counterLabel": "Yapılacak iş",
+      "counterTo": 12
+    },
     "problem": {
       "headline": "Kopyala. Yapıştır. Tekrarla.",
-      "highlight": ["Tekrarla"],
-      "apps": {"doc": "Belge", "design": "Tasarım", "plan": "Takvim"},
-      "doc": ["Telefon incelemesi", "Yapay zekâ rehberi", "Haftalık bülten"],
-      "design": ["Instagram kapak", "YouTube thumbnail"],
-      "plan": ["Pazartesi 08.30", "Salı 14.30", "Çarşamba 10.00"]
+      "highlight": [
+        "Tekrarla"
+      ],
+      "apps": {
+        "doc": "Belge",
+        "design": "Tasarım",
+        "plan": "Takvim"
+      },
+      "doc": [
+        "Telefon incelemesi",
+        "Yapay zekâ rehberi",
+        "Haftalık bülten"
+      ],
+      "design": [
+        "Instagram kapak",
+        "YouTube thumbnail"
+      ],
+      "plan": [
+        "Pazartesi 08.30",
+        "Salı 14.30",
+        "Çarşamba 10.00"
+      ]
     },
     "fix": {
       "title": "Haber Masası",
-      "nav": ["Bugün", "Taslaklar", "Haber Masası", "Çekim listesi"],
+      "nav": [
+        "Bugün",
+        "Taslaklar",
+        "Haber Masası",
+        "Çekim listesi"
+      ],
       "fieldLabel": "Başlık",
       "headline": "Telefon incelemesi: 7 günlük kullanım",
       "maxChars": 70,
       "send": "Kanallara gönder",
-      "status": {"taslak": "Taslak", "inceleme": "İncelemede", "planlandi": "Planlandı", "yayinda": "Yayında"}
+      "status": {
+        "taslak": "Taslak",
+        "inceleme": "İncelemede",
+        "planlandi": "Planlandı",
+        "yayinda": "Yayında"
+      }
     },
-    "payoff": {"headline": "Her kanalda aynı başlık.", "highlight": ["aynı"]},
-    "cta": {"tagline": "Net. Hızlı. Meraklı. Dürüst.", "cta": "updated.com.tr"}
+    "payoff": {
+      "headline": "Her kanalda aynı başlık.",
+      "highlight": [
+        "aynı"
+      ]
+    },
+    "cta": {
+      "tagline": "Net. Hızlı. Meraklı. Dürüst.",
+      "cta": "updated.com.tr"
+    }
   }
 }

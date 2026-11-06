@@ -6,13 +6,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {renderMedia, selectComposition} from '@remotion/renderer';
-import {args, browserExecutable, loadProject, makeBundle, root} from './_lib.mjs';
+import {args, browserExecutable, loadProject, makeBundle, pickFormats, root} from './_lib.mjs';
 
 const {pos, opt} = args();
 const id = pos[0] ?? 'haber';
-const fmt = typeof opt.format === 'string' ? opt.format : '9x16';
 const scale = opt.scale ? Number(opt.scale) : 0.4;
 const v = loadProject(id);
+const fmt = typeof opt.format === 'string' ? opt.format : pickFormats(v, opt)[0];
 let frameRange = null;
 if (typeof opt.scene === 'string') {
   let from = 0;

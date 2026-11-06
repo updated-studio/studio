@@ -39,7 +39,7 @@ npm run check -- <slug>            # storyboard toplamı, süreler, font/ses var
 npm run stills -- <slug>           # her sahnenin key karesi + geçişler, 3 formatta → out/<slug>/stills/contact-*.png
 npm run brand                      # tokens.json → brand.json, logo SVG'lerini algılar
 npm run onizleme -- <slug> [--scene <id>] [--format 9x16]  # hızlı taslak mp4 (%40 boyut): tüm video ~40 sn, tek sahne ~10 sn
-npm run render -- <slug>           # out/<slug>/yyyy-aa-gg-<konu>-youtube.mp4, -reels.mp4, -ig.mp4
+npm run render -- <slug>           # yalnız video.json "formats": out/<slug>/yyyy-aa-gg-<konu>-reels.mp4 / -youtube.mp4 / -ig.mp4
 npm run studio                     # canlı önizleme (yerel makinede)
 ```
 Seçenekler: `--formats 16x9,4x5`, stills için `--frames 120,600` (ek kareler), `--scale 1`.
@@ -84,15 +84,17 @@ Dikkat çek → problemi göster → ürünün nasıl çözdüğünü göster �
 - Müzik yatağı + hafif tık sesleri, seslendirme yok. `video.json → audio.music`; yer tutucuyu teslimden önce lisanslı müzikle değiştir.
 
 ## 6. Süreç (bu sırayla)
-1. `npm run new -- <slug>`; `projects/<slug>/brief.md`'yi doldur (gerekirse 3 soru sor).
-2. `projects/<slug>/storyboard.md`'yi şablona göre yaz; sahne/kare tablosunu kullanıcıya göster, onay al.
-3. Marka/UI girdilerini hazırla: `brand/brand.json`, `public/brand/logo.svg`, Figma SVG'leri `public/ui/`.
-4. `src/projects/<slug>/video.json`: sahneler (id, name, frames, key) + tüm metin/sayılar. Kod içine metin gömme — revizyonlar tek satırlık değişiklik olmalı.
-5. Sahne başına bir bileşen (`scenes/`), paylaşılan bileşenlerle. `src/projects/index.ts`'e kaydet.
+0. **Önce sor: "Bu iş nereye?"** Kullanıcı söyler; yalnız o formatlar üretilir, varsayılan olarak 3 format verilmez. Eşleme: Reels / Shorts / Story / TikTok → `9x16` · YouTube / web → `16x9` · Instagram akış → `4x5`. Seçim `video.json → "formats"`'a yazılır (`check`, `stills`, `onizleme`, `render` bunu okur; `--formats` geçici olarak ezer).
+1. `npm run new -- <slug> --from haber` (ya da `demo`); `src/projects/index.ts`'e kaydet. Kullanıcının verdiği bilgi ve kaynakla brief'i doldur; eksikse kısa soru sor, bilgi uydurma.
+2. Storyboard'u (sahne, süre, ekrandaki metin, hareket, kamera) yazılı göster, onay al.
+3. Görseller: kullanıcının verdiği foto / ekran kaydı / klip `public/media/<slug>/` altına (lisanslı medya depoya girmez; `.gitignore`). Künye gerekiyorsa (kit §8) videoda göster.
+4. Müzik (Epidemic Sound bağlayıcısı): `SearchRecordings` (sözsüz, tempo/tarz) → kullanıcıya 2-3 aday (ad, sanatçı, BPM, ruh hâli) → `EditRecording` ile tam video süresine (`targetDurationMs`, `forceDuration`) → `PollEditRecordingJob` → `DownloadRecordingEdit` (WAV) → `public/audio/` (depoya girmez) → `video.json → audio.music` + `audio.epidemic` (recordingId, ad, sanatçı; yeniden indirmek için). Ses efekti: `SearchSoundEffects` → `DownloadSoundEffect` → `public/sfx/`. İndirme adresi `audiocdn.epidemicsound.com` (updated-studio ortamında izinli).
+5. `video.json` (sahneler + bütün metin) ve sahne kodu. Kod içine metin gömme.
 6. `npm run check -- <slug>` → `npm run typecheck`.
-7. `npm run stills -- <slug>` → `out/<slug>/stills/contact-*.png` dosyalarını GÖRSEL olarak aç ve ön-render listesini her formatta uygula. Düzelt, tekrarla.
-8. Önce `npm run onizleme -- <slug>` ile hızlı taslak mp4'ü kullanıcıya gönder; düzeltmelerde yalnız ilgili sahneyi (`--scene`) önizle. Onaydan sonra `npm run render -- <slug>` (3 format, tam kalite) ve mp4'leri teslim et.
-9. Revizyon: sorunu çözen en küçük değişikliği yap, gerisini koru, ilgili still'i yeniden render et, sonra videoyu.
+7. `npm run stills -- <slug>` → kontrol sayfalarını GÖRSEL olarak aç. Turuncu kesik çizgi = marka kiti güvenli alanı, mavi = merkez 1080 kare. Hiçbir metin/logo turuncu çizginin dışına taşmaz (kamera yakınlaşmasının en uç karesi dahil: `--frames <kare>`).
+8. `npm run onizleme -- <slug>` → hızlı taslak mp4'ü kullanıcıya gönder; düzeltmelerde yalnız ilgili sahne (`--scene <id>`).
+9. Onaydan sonra `npm run render -- <slug>` (yalnız seçilen formatlar, tam kalite) ve mp4'leri teslim et. Revizyonda en küçük değişiklik.
+10. Depo kökündeki `hafiza/GUNLUK.md`'ye kısa kayıt (ne yapıldı, kullanıcı ne dedi, ne yarım kaldı).
 
 ## 7. Ön-render kontrol listesi (daha önce görülen hatalar)
 - [ ] Kanvas 1920×1080'e kilitli; her şey merkezden konumlu.
@@ -104,6 +106,8 @@ Dikkat çek → problemi göster → ürünün nasıl çözdüğünü göster �
 - [ ] Bilerek çıkmıyorsa hiçbir şey kanvastan taşmaz.
 - [ ] **Stage içinde tam ekran katman için `AbsoluteFill` değil `<Fill>` kullan** — Stage'in merkezi 0×0; AbsoluteFill orada sıfır boyutlu kalır ve içeriği görünmez yapar (arka plan, karartma, opaklık sarmalayıcıları). İç içe `<Stage>` ancak `<Fill>` içinde çalışır.
 - [ ] Yığın/üst üste kartlarda yarım kesik metin yok: ya sıkı yığın (yalnız üstteki okunur) ya da tam aralık.
+- [ ] Güvenli alan: kontrol karelerinde hiçbir metin/logo turuncu kesik çizginin dışında değil (9:16'da üst 250, alt 340 platform arayüzüne ait).
+- [ ] Lisanslı medya (Epidemic müzik, ajans/foto) depoya girmedi (`public/audio/`, `public/media/` gitignore'da).
 - [ ] 4:5 ve 9:16'da dar alanlar: alan metni kesilmiyor, sayaç etiketi, kart başlığı çakışmıyor.
 - [ ] Marka: `npm run check` yasaklı kelime / "AI" / ünlem / logo uyarısı vermiyor; logo yer tutucusu (kesik çizgili kutu) çıktıda YOK.
 - [ ] Müzik yer tutucu değil (`check` uyarır).

@@ -31,3 +31,12 @@ export const makeBundle = async () => {
   process.stdout.write('… paketleniyor\n');
   return bundle({entryPoint: path.join(root, 'src/index.ts'), publicDir: path.join(root, 'public')});
 };
+
+/** Hangi formatlar? Öncelik: --formats > video.json "formats" > hata (her iş için sorulur). */
+export const pickFormats = (v, opt) => {
+  const f = opt.formats ? String(opt.formats).split(',') : v.formats;
+  if (!f?.length) throw new Error('Format seçilmedi: video.json\'a "formats": ["9x16"] gibi yazın ya da --formats verin (9x16 = reels/shorts/story, 16x9 = YouTube/web, 4x5 = Instagram akış).');
+  const bad = f.filter((x) => !FORMATS.includes(x));
+  if (bad.length) throw new Error(`Bilinmeyen format: ${bad.join(', ')} (geçerli: ${FORMATS.join(', ')})`);
+  return f;
+};

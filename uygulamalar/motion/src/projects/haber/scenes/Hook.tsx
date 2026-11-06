@@ -9,7 +9,8 @@ import {useLayout} from '../../../lib/layout';
 import {EASE, tween} from '../../../lib/motion-dinamik';
 import {Header, headerGeom} from './Header';
 
-const MOVE = 168; // başlık üste taşınır → sonraki sahneyle birebir aynı yer (eşleşen kesme)
+const MOVE = 168;
+const PUSH = 1.04; // kamera en fazla bu kadar yaklaşır; başlık bu orana göre içeride başlar ki güvenli alandan taşmasın // başlık üste taşınır → sonraki sahneyle birebir aynı yer (eşleşen kesme)
 
 /** Sahne 1 · Hook — etiket kayar, blok soldan açılır, kelimeler düşer; sonunda başlık bloğu üst başlığa küçülür. */
 export const Hook: React.FC = () => {
@@ -22,9 +23,9 @@ export const Hook: React.FC = () => {
   return (
     <Stage bg={C.dark.bg}>
       <Background color={C.dark.bg} />
-      <Camera keys={[{f: 0, scale: 1}, {f: MOVE, scale: 1.04}, {f: MOVE + 30, scale: 1}]} microPush={0}>
-        <div style={{position: 'absolute', left: L.safe.left, top, transform: `scale(${s})`, transformOrigin: '0 0'}}>
-          <Header animate />
+      <Camera keys={[{f: 0, scale: 1}, {f: MOVE, scale: PUSH}, {f: MOVE + 30, scale: 1}]} microPush={0}>
+        <div style={{position: 'absolute', left: L.safe.left / PUSH, top, transform: `scale(${s})`, transformOrigin: '0 0'}}>
+          <Header animate width={(L.mode === 'land' ? 1500 : L.safeW) / PUSH} />
         </div>
       </Camera>
       <Click at={6} volume={0.4} />

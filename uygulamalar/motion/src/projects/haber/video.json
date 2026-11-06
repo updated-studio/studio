@@ -4,21 +4,62 @@
   "title": "Haber reels / shorts şablonu — ÖRNEK içerik",
   "durationSec": 15,
   "fps": 60,
+  "formats": [
+    "9x16"
+  ],
   "motion": "dinamik",
-  "audio": {"music": "audio/music-placeholder.wav", "musicVolume": 0.4},
+  "audio": {
+    "music": "audio/es-bulletin-world-15s.wav",
+    "musicVolume": 0.55,
+    "epidemic": {
+      "recordingId": "a82223bd-9e60-3af6-bca9-2d25036077e8",
+      "title": "Bulletin World",
+      "artist": "Out To The World",
+      "edit": "Epidemic EditRecording, 15000 ms, forceDuration"
+    }
+  },
   "scenes": [
-    {"id": "hook", "name": "Etiket + başlık (hook)", "frames": 200, "key": 140},
-    {"id": "facts", "name": "Üç madde", "frames": 460, "key": 420},
-    {"id": "cta", "name": "Devamı sitede", "frames": 120, "key": 90},
-    {"id": "logo", "name": "Logo", "frames": 120, "key": 110}
+    {
+      "id": "hook",
+      "name": "Etiket + başlık (hook)",
+      "frames": 200,
+      "key": 140
+    },
+    {
+      "id": "facts",
+      "name": "Üç madde",
+      "frames": 460,
+      "key": 420
+    },
+    {
+      "id": "cta",
+      "name": "Devamı sitede",
+      "frames": 120,
+      "key": 90
+    },
+    {
+      "id": "logo",
+      "name": "Logo",
+      "frames": 120,
+      "key": 110
+    }
   ],
   "copy": {
     "tag": "Son dakika",
     "headline": "Android 17 beta yayında",
     "facts": [
-      {"h": "Ne oldu?", "t": "Haberin tek cümlelik özeti buraya gelir."},
-      {"h": "Neden önemli?", "t": "Okura doğrudan etkisi tek cümlede anlatılır."},
-      {"h": "Ne zaman?", "t": "6 Kasım 2026, 14.30"}
+      {
+        "h": "Ne oldu?",
+        "t": "Haberin tek cümlelik özeti buraya gelir."
+      },
+      {
+        "h": "Neden önemli?",
+        "t": "Okura doğrudan etkisi tek cümlede anlatılır."
+      },
+      {
+        "h": "Ne zaman?",
+        "t": "6 Kasım 2026, 14.30"
+      }
     ],
     "source": "Kaynak: örnek kaynak · 6 Kasım 2026",
     "cta": "Haberin tamamı updated.com.tr'de"

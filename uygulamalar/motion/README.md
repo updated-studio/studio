@@ -15,6 +15,10 @@ npm run setup          # marka (public/marka'dan), fontlar, ses
 npm run studio         # canlı önizleme
 ```
 
+## İş akışı
+Claude önce **"Bu iş nereye?"** diye sorar (Reels/Shorts/Story → 9:16 · YouTube/web → 16:9 · Instagram akış → 4:5); yalnız o formatlar üretilir.
+Sıra: storyboard (yazılı) → kontrol kareleri (güvenli alan çizgileriyle) → hızlı önizleme → onay → tam render.
+
 ## Claude ile yeni video
 Bu klasörde Claude Code açın (`.claude/skills/launch-motion` yüklenir). Örnek istek:
 
@@ -47,8 +51,11 @@ Tek kaynak deponun kendisi: `public/marka/makine/tokens.json` (değerler) ve `pu
 Sahne dosyasında import yolunu değiştirmek profili değiştirir.
 
 ## Müzik (Epidemic Sound)
-Bağlayıcı kurulunca Claude parçayı bulup `public/audio/`'ya indirir. Kurulana kadar: parçayı Epidemic'ten indirip `public/audio/` altına koyun,
-`video.json → audio.music` alanına yazın. `public/audio/music-placeholder.wav` sentetik yer tutucudur, yayına çıkmaz.
+Epidemic bağlayıcısı bağlı (claude.ai). Claude parça arar, 2-3 aday sunar, seçileni Epidemic'in düzenleyicisiyle tam video süresine uyarlar ve `public/audio/`'ya indirir.
+Lisanslı müzik depoya girmez (depo açık); `video.json → audio.epidemic` hangi parça olduğunu tutar, gerekince yeniden indirilir.
+
+## Güvenli alanlar
+Marka kiti §6: 16:9 kenar 96/54 · 9:16 üst 250, alt 340, kenar 64 · 4:5 kenar 64, üst/alt 96. Yerleşim bunlarla yapılır; `npm run stills` kontrol karelerine turuncu (güvenli alan) ve mavi (merkez 1080 kare) kesik çizgi çizer.
 
 ## Klasörler
 | | |

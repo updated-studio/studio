@@ -4,12 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {renderStill, selectComposition} from '@remotion/renderer';
-import {FORMATS, args, browserExecutable, loadProject, makeBundle, root} from './_lib.mjs';
+import {FORMATS, args, pickFormats, browserExecutable, loadProject, makeBundle, root} from './_lib.mjs';
 
 const {pos, opt} = args();
 const id = pos[0] ?? 'demo';
-const formats = opt.formats ? String(opt.formats).split(',') : FORMATS;
 const v = loadProject(id);
+const formats = pickFormats(v, opt);
 const serveUrl = await makeBundle();
 const outDir = path.join(root, 'out', id, 'stills');
 fs.mkdirSync(outDir, {recursive: true});
@@ -25,12 +25,13 @@ for (const [i, s] of v.scenes.entries()) {
 if (opt.frames) String(opt.frames).split(',').forEach((x) => frames.push({f: Number(x), label: `f${x}`}));
 
 for (const fmt of formats) {
-  const composition = await selectComposition({serveUrl, id: `${id}-${fmt}`, browserExecutable});
+  const inputProps = {guides: !opt['no-guides']}; // güvenli alan çizgileri (varsayılan açık)
+  const composition = await selectComposition({serveUrl, id: `${id}-${fmt}`, browserExecutable, inputProps});
   const files = [];
   for (const fr of frames) {
     const output = path.join(outDir, fmt, `${fr.label}.png`);
     fs.mkdirSync(path.dirname(output), {recursive: true});
-    await renderStill({serveUrl, composition, frame: fr.f, output, browserExecutable, scale: opt.scale ? Number(opt.scale) : 0.5});
+    await renderStill({serveUrl, composition, frame: fr.f, output, browserExecutable, inputProps, scale: opt.scale ? Number(opt.scale) : 0.5});
     files.push(output);
     process.stdout.write(`✓ ${fmt} ${fr.label} (kare ${fr.f})\n`);
   }

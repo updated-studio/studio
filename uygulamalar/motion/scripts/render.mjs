@@ -2,13 +2,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {renderMedia, selectComposition} from '@remotion/renderer';
-import {CHANNEL, FORMATS, args, browserExecutable, loadProject, makeBundle, root, today} from './_lib.mjs';
+import {CHANNEL, FORMATS, args, pickFormats, browserExecutable, loadProject, makeBundle, root, today} from './_lib.mjs';
 
 const {pos, opt} = args();
 const id = pos[0] ?? 'demo';
-const formats = opt.formats ? String(opt.formats).split(',') : FORMATS;
 const v = loadProject(id);
 const konu = v.slug ?? id;
+const formats = pickFormats(v, opt);
 if (!/^[a-z0-9-]+$/.test(konu)) throw new Error(`slug kurala uymuyor (küçük harf, Türkçe karakter yok, tire): ${konu}`);
 const serveUrl = await makeBundle();
 const outDir = path.join(root, 'out', id);
