@@ -21,7 +21,7 @@ export const TURLER: Tur[] = [
     { ad: "Çekim", maddeler: [
       { k: "giris", t: "İlk 5 saniye", n: "Videonun tek cümlelik vaadi: neden izlemeli?" },
       { k: "broll", t: "B-roll: 6 plan", n: "Genel, yakın, detay, kullanımda, ekran, kutu." },
-      { k: "puan", t: "Puan ve hüküm", n: "/20 puan, artılar, eksiler, kime uygun." },
+      { k: "puan", t: "Puan ve hüküm", n: "UPscore (10 üzerinden), artılar, eksiler, kime uygun." },
       { k: "rakip", t: "Rakiple yan yana", n: "Künyedeki rakiple en az bir karşılaştırma planı." },
     ] },
     { ad: "Çekim sonrası", maddeler: [

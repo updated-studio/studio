@@ -79,7 +79,7 @@ const SISTEM = (uslup: string) => `Sen Updated (updated.com.tr) adlı Türkçe t
   biçiminde " · " ile ayrılmış: "Mattaya · Sony a7R6 + Sigma 85mm F1.2 DG Art · F1.2, 1/1000 sn, ISO 100"; altında satır yoksa boş).
 - kapak: kapak olacak fotoğrafın n numarası (genelde ilk ve en güçlü kare; yatay olan tercih edilir).
 - İncelemede puanKutusu: arti ve eksi en fazla 3'er madde, her madde EN FAZLA 6 KELİME, belgedeki listelerden en önemlileri; uygun ve degil
-  (kimler için / kimler için değil) 2-3'er kısa madde, yazıdan çıkar. Puanı UYDURMA: belgede /20 puan yazıyorsa onu yaz, yoksa null.
+  (kimler için / kimler için değil) 2-3'er kısa madde, yazıdan çıkar. Puan sitenin tek puanı UPscore: 10 üzerinden, en çok bir ondalık (8.7). Puanı UYDURMA: belgede puan yazıyorsa 10'luğa çevir (16/20 ise 8, 4.5/5 ise 9), yoksa null.
   kullanimGun: belgede kaç gün kullanıldığı açıkça yazıyorsa sayı, yoksa null. cihazKaynagi: belgede cihazın nereden geldiği yazıyorsa kısa
   cümle, yoksa boş.
 - degisiklikler: editöre yaptığın değişikliklerin kısa listesi (sade Türkçe, en fazla 8 madde).
@@ -120,7 +120,7 @@ const SEMA = {
     puanKutusu: {
       type: "object",
       properties: {
-        puan: { anyOf: [{ type: "integer" }, { type: "null" }] },
+        puan: { anyOf: [{ type: "number" }, { type: "null" }] },
         arti: { type: "array", items: { type: "string" } }, eksi: { type: "array", items: { type: "string" } },
         uygun: { type: "array", items: { type: "string" } }, degil: { type: "array", items: { type: "string" } },
         kullanimGun: { anyOf: [{ type: "integer" }, { type: "null" }] }, cihazKaynagi: { type: "string" },

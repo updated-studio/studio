@@ -1,5 +1,20 @@
 [
   {
+    "id": "2026-11-06-m",
+    "tarih": "6 Kasım 2026",
+    "baslik": "UPscore tek puan",
+    "bolumler": [
+      {
+        "ad": "İncelemeler",
+        "maddeler": [
+          "İnceleme puanı artık UPscore: 10 üzerinden, tek ondalık (8,7).",
+          "İnceleme yayınlanınca puanı künyenin UPscore'u olur; puan bir kez girilir.",
+          "Belgeden yaz, künyesi olmayan ürüne künye açar; özellikleri otomasyon doldurur."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-l",
     "tarih": "6 Kasım 2026",
     "baslik": "Belgeden yaz",

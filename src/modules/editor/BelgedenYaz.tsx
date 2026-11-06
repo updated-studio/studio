@@ -76,7 +76,7 @@ export default function BelgedenYaz() {
             <dt>Künye</dt><dd>{sonuc.urun ? `${sonuc.urun.ad}${sonuc.urun.yeni ? " · yeni açıldı" : ""}` : "Bağlanmadı"}</dd>
             <dt>Yazar</dt><dd>{sonuc.yazar ? sonuc.yazar.ad : "Senin imzan"}{s.katki ? ` · ${s.katki}` : ""}</dd>
             <dt>Fotoğraf</dt><dd>{sonuc.fotoSayisi ? `${sonuc.fotoSayisi} fotoğraf yüklendi, altyazı ve alt metinleriyle` : "Yok"}</dd>
-            {sonuc.k === "reviews" && <><dt>Puan kutusu</dt><dd>{s.puanKutusu.arti.length} artı, {s.puanKutusu.eksi.length} eksi{s.puanKutusu.puan != null ? `, puan ${s.puanKutusu.puan}/20` : ", puan senin"}</dd></>}
+            {sonuc.k === "reviews" && <><dt>Puan kutusu</dt><dd>{s.puanKutusu.arti.length} artı, {s.puanKutusu.eksi.length} eksi{s.puanKutusu.puan != null ? `, UPscore ${s.puanKutusu.puan.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}/10` : ", UPscore senin"}</dd></>}
           </dl>
           <div className="ed-belge-iki">
             <div><span className="ed-ust">YAPILANLAR</span><ul>{s.degisiklikler.map((d) => <li key={d}>{d}</li>)}</ul></div>

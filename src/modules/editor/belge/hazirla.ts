@@ -203,7 +203,7 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
     ...(k === "reviews" ? {
       product: urun!.id,
       scoreBox: {
-        ...(pk.puan != null && pk.puan >= 0 && pk.puan <= 20 ? { score: Math.round(pk.puan) } : {}),
+        ...(pk.puan != null && pk.puan >= 0 && pk.puan <= 10 ? { score: Math.round(pk.puan * 10) / 10 } : {}), // UPscore /10, tek ondalık
         pros: pk.arti.slice(0, 3).map((x) => x.split(/\s+/).slice(0, 6).join(" ")),
         cons: pk.eksi.slice(0, 3).map((x) => x.split(/\s+/).slice(0, 6).join(" ")),
         ...(pk.kullanimGun ? { usageDays: pk.kullanimGun } : {}),
