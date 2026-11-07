@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-11-07-a",
+    "tarih": "7 Kasım 2026",
+    "baslik": "Hata bildir",
+    "bolumler": [
+      {
+        "ad": "Stüdyo",
+        "maddeler": [
+          "Üst barda uyarı düğmesiyle hata bildirilir; ekran görüntüsü eklenebilir.",
+          "Sayfa ve tarayıcı bilgisi kendiliğinden eklenir.",
+          "Yöneticiler cevap yazar; cevap ve çözüm zile bildirim olarak gelir.",
+          "Künye alanı artık numara değil, marka ve ürün adını gösteriyor."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-06-m",
     "tarih": "6 Kasım 2026",
     "baslik": "UPscore tek puan",

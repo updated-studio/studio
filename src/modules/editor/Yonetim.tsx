@@ -21,6 +21,7 @@ const BOLUMLER: { ad: string; satirlar: Satir[] }[] = [
   ] },
   { ad: "Sistem", satirlar: [
     { yol: "/baglantilar", ad: "Bağlantı anahtarları", aciklama: "Claude, Gemini, Cloudflare, Amazon, Brave", admin: true },
+    { yol: "/hatalar", ad: "Bildirilen hatalar", aciklama: "Ekibin bildirdiği hatalar, cevaplar, çözülenler", admin: true },
     { yol: "/sistem", ad: "Sistem durumu", aciklama: "Zamanlanmış işler, altyapı, son çalışmalar", admin: true },
     { yol: "/hareketler", ad: "Hareket geçmişi", aciklama: "Kim, ne zaman, neyi değiştirdi", admin: true },
     { yol: "/yz-kiyas", ad: "Yapay zekâ kıyası", aciklama: "Modellerin eleme, taslak ve künyedeki karşılaştırması", admin: true },

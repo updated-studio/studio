@@ -10,6 +10,7 @@ import Arama, { type AramaBolumu } from "../../shared/Arama";
 import CanliKisiler from "../../shared/CanliKisiler";
 import { CanliSaglayici } from "../../shared/canli";
 import SohbetDugme from "../../shared/SohbetDugme";
+import HataBildir from "../../shared/HataBildir";
 import SurumUyarisi from "../../shared/SurumUyarisi";
 import { sb } from "../../shared/supabase";
 import Yenilikler from "../../shared/Yenilikler";
@@ -30,6 +31,7 @@ const Yayindakiler = lazy(() => import("./Taslaklarim").then((m) => ({ default: 
 const HaberYazSayfa = lazy(() => import("./Taslaklarim").then((m) => ({ default: () => <YazRota Yaz={m.HaberYaz} /> })));
 const Cekim = lazy(() => import("./Cekim"));
 const BelgedenYaz = lazy(() => import("./BelgedenYaz"));
+const Hatalar = lazy(() => import("./Hatalar"));
 const Oku = lazy(() => import("./Oku"));
 const Yonetim = lazy(() => import("./Yonetim"));
 const MenuSayfa = lazy(() => import("./Yonetim").then((m) => ({ default: m.MenuSayfa })));
@@ -63,6 +65,7 @@ export default function EditorKabuk() {
     ...gruplar.flatMap((g) => g.ogeler.map((o) => ({ ad: o.ad, yol: o.yol, ikon: o.ikon, grup: g.ad || undefined }))),
     { ad: "Yeni yaz", yol: "/yaz/yeni", ikon: "yaz", grup: "Haberler" },
     { ad: "Belgeden yaz", yol: "/belgeden-yaz", ikon: "taslak", grup: "Haberler" },
+    { ad: yonetici ? "Bildirilen hatalar" : "Hata bildirimlerim", yol: "/hatalar", ikon: "uyari" },
     { ad: "Profilim", yol: "/profil", ikon: "profil" },
   ];
   const onizleme = yonetirMi(profile) && editorGibi(profile);
@@ -122,6 +125,7 @@ export default function EditorKabuk() {
           <span style={{ flex: 1 }} />
           <Arama bolumler={aramaBolumleri} yonetici={yonetici} />
           <CanliKisiler />
+          <HataBildir />
           <SohbetDugme />
           <Bildirimler />
           <ProfilMenu moduller={profilde} />
@@ -145,6 +149,7 @@ export default function EditorKabuk() {
               <Route path="/masa" element={<Navigate to="/haber-masasi" replace />} />
               <Route path="/cekim" element={<Cekim />} />
               <Route path="/belgeden-yaz" element={<BelgedenYaz />} />
+              <Route path="/hatalar" element={<Hatalar />} />
               <Route path="/menu" element={<MenuSayfa />} />
               {yonetici && <Route path="/yonetim-merkezi" element={<Yonetim />} />}
               {MODULLER.filter((m) => m.id === "haber-masasi" || izinli.includes(m)).map((m) => <Route key={m.id} path={"/" + m.id} element={<m.bilesen />} />)}

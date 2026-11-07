@@ -329,3 +329,61 @@ button.ed-marka { background: none; border: 0; color: inherit; font: inherit; cu
 .ed-belge-eylem { display: flex; flex-wrap: wrap; gap: 10px; }
 .ed-belge-eylem .btn { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
 @media (max-width: 640px) { .ed-belge-iki { grid-template-columns: 1fr; } .ed-belge-alan { grid-template-columns: 1fr; gap: 2px; } .ed-belge-alan dd { margin-bottom: 8px; } }
+
+/* Hata bildir (7 Kasım 2026): üst bardaki pencere ve Hatalar ekranı */
+.bildirimler.hata-panel { width: min(380px, calc(100vw - 32px)); }
+@media (max-width: 560px) { .bildirimler.hata-panel { position: fixed; left: 16px; right: 16px; top: calc(64px + env(safe-area-inset-top, 0px)); width: auto; } }
+.hata-panel h3 { margin: 0 0 10px; }
+.hata-form { display: flex; flex-direction: column; gap: 10px; }
+.hata-form textarea { width: 100%; resize: vertical; min-height: 84px; font: inherit; }
+.hata-not { margin: 0; font-size: 13px; }
+.hata-alt { justify-content: space-between; align-items: center; }
+.hata-tamam { display: flex; flex-direction: column; gap: 8px; }
+.hata-tamam p { margin: 0; }
+.hata-gorseller { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hata-kucuk { position: relative; width: 64px; height: 48px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+.hata-kucuk img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hata-kucuk button { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 6px; background: var(--surface); color: var(--ink); padding: 0; cursor: pointer; }
+.hata-kucuk button svg { width: 14px; height: 14px; }
+.hata-ekle { cursor: pointer; }
+
+.hatalar .hata-acik { max-width: 52ch; margin: 0; }
+.hata-duzen { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.hata-liste, .hata-konusma { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); min-width: 0; }
+.hata-liste ul { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 2px; max-height: 70vh; overflow: auto; }
+.hata-liste li button { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 0; border-radius: 12px; background: none; color: var(--ink); cursor: pointer; font: inherit; }
+.hata-liste li button:hover { background: var(--sunk); }
+.hata-liste li button.secili { background: var(--blue-soft); }
+.hata-sekmeler { display: flex; gap: 4px; padding: 6px; border-bottom: 1px solid var(--line); }
+.hata-sekmeler button { flex: 1; padding: 9px 10px; border: 0; border-radius: 10px; background: none; color: var(--muted); font: 600 14px var(--body); cursor: pointer; }
+.hata-sekmeler button.secili { background: var(--sunk); color: var(--ink); }
+.hata-sekmeler span { font-family: var(--mono); font-weight: 500; margin-left: 4px; }
+.hata-satir-ust { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hata-satir-ust .muted { margin-left: auto; font-size: 13px; white-space: nowrap; }
+.hata-satir-metin { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; overflow-wrap: anywhere; }
+.hata-satir-alt { font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hata-bos { padding: 28px 18px; }
+.hata-konusma { display: flex; flex-direction: column; gap: 18px; padding: 18px; }
+.hata-konusma-bas { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hata-konusma-bas .ed-ust { margin-right: auto; }
+.hata-konusma-bas .hata-geri { display: none; }
+.hata-ilk { display: flex; flex-direction: column; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.hata-govde { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; line-height: 1.55; max-width: 70ch; }
+.hata-resimler { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.hata-resimler a { display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.hata-resimler img { display: block; height: 120px; width: auto; max-width: 100%; object-fit: cover; }
+.hata-resim-bos { width: 160px; height: 120px; border-radius: 10px; background: var(--sunk); }
+.hata-ortam { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 13px; }
+.hata-ortam dt { color: var(--muted); font-family: var(--mono); }
+.hata-ortam dd { margin: 0; overflow-wrap: anywhere; }
+.hata-teknik summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.hata-teknik ul { margin: 8px 0 0; padding-left: 18px; font: 12px/1.5 var(--mono); overflow-wrap: anywhere; }
+.hata-cevaplar { display: flex; flex-direction: column; gap: 12px; }
+.hata-cevaplar:empty { display: none; }
+.hata-cevaplar .govde .hata-resimler img { height: 90px; }
+@media (max-width: 860px) {
+  .hata-duzen { grid-template-columns: minmax(0, 1fr); }
+  .hata-duzen.secili .hata-liste { display: none; }
+  .hata-duzen:not(.secili) .hata-konusma { display: none; }
+  .hata-konusma-bas .hata-geri { display: inline-flex; }
+}
