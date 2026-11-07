@@ -16,7 +16,7 @@ const KURALLAR = [
   "Başlıkta ünlem ve abartı yok; ürün adı başta.",
   "Kapak 16:9, en az 1600 px, kaynağı yazılı.",
   "En az bir birincil kaynak bağlantısı.",
-  "Sızıntıysa başlık \"Sızıntı:\" ile başlar.",
+  "Söylentiyse başlık \"Söylenti:\" ile başlar.",
   "Ürün künyesini bağla, en çok 3 etiket.",
 ];
 const selam = () => { const s = new Date().getHours(); return s < 6 ? "İyi geceler" : s < 12 ? "Günaydın" : s < 18 ? "İyi günler" : "İyi akşamlar"; };
