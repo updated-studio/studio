@@ -32,7 +32,7 @@ Sunucuda (Natro) birden çok Claude sohbeti aynı anda çalışabilir. Her sohbe
 | Motion (bulut) | GitHub üzerinden | kendi dalı | `uygulamalar/motion/` (kimse karışmaz) |
 | Nöbet (zamanlayıcı, başsız) | `/opt/updated/calisma/nobet/{site,studio}` | `main` (denetimden geçince) | `hafiza/NOBET.md`'deki iş sırası; yalnız hiçbir sohbet son 20 dakikada çalışmadıysa başlar |
 
-- **Ağır işler sırayla:** derleme, `npm ci`, tarayıcı denemesi `/opt/updated/calisma/araclar/sirali.sh <komut>` ile çalıştırılır (sunucunun site/panel yayınıyla aynı kilit, `/run/updated-agir.lock`). Sunucu küçük (2 çekirdek, 3,8 GB).
+- **Ağır işler sırayla:** derleme, `npm ci`, tarayıcı denemesi, büyük Python işleri `~/bin/agir <komut>` ile çalıştırılır (`/opt/updated/calisma/araclar/sirali.sh` de oraya yönlendirir; sunucunun site/panel yayınıyla aynı kilit, `/run/updated-agir.lock`; boş bellek bekçisi, 1500M tavan, önce bu iş ölür). Sunucu küçük (2 çekirdek, 3,8 GB). Ayrıntı: `hafiza/SUNUCU_KORUMA.md`.
 - **Ortak dosyalar** (kural 5) değişecekse önce buraya not; diğer sohbete `send_message` ile kısa haber.
 - Yeni sohbet açılınca ilk iş bu tabloya satırını eklemek.
 
