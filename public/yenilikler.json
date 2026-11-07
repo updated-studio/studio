@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-11-07-b",
+    "tarih": "7 Kasım 2026",
+    "baslik": "Tema seçimi",
+    "bolumler": [
+      {
+        "ad": "Stüdyo",
+        "maddeler": [
+          "Profil menüsünde Tema: Sistem, Açık ya da Koyu.",
+          "Sistem cihazın ayarına uyar; seçim bu cihazda saklanır."
+        ]
+      }
+    ]
+  },
+  {
     "id": "2026-11-07-a",
     "tarih": "7 Kasım 2026",
     "baslik": "Hata bildir",
