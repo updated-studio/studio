@@ -4,12 +4,14 @@ import { useAuth } from "./auth";
 import { Avatar } from "./Avatar";
 import { Ikon } from "./Ikon";
 import { sb } from "./supabase";
+import { temaOku, temaSec, type Tema } from "./tema";
 import type { Modul } from "../modules";
 
 // Sağ üstteki profil menüsü. Dock'ta değil burada görünen modüller (yer: "profil") listelenir.
 export default function ProfilMenu({ moduller }: { moduller: Modul[] }) {
   const { profile } = useAuth();
   const [acik, setAcik] = useState(false);
+  const [tema, setTema] = useState<Tema>(temaOku);
   const kutu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,6 +35,14 @@ export default function ProfilMenu({ moduller }: { moduller: Modul[] }) {
             <div style={{ minWidth: 0 }}>
               <div className="bname">{profile.name}</div>
               <div className="muted kisa-metin">{profile.role || profile.email}</div>
+            </div>
+          </div>
+          <div className="tema-sec">
+            <span className="muted">Tema</span>
+            <div className="segment" role="group" aria-label="Tema">
+              {([["sistem", "Sistem"], ["acik", "Açık"], ["koyu", "Koyu"]] as const).map(([t, ad]) => (
+                <button key={t} aria-pressed={tema === t} onClick={() => { temaSec(t); setTema(t); }}>{ad}</button>
+              ))}
             </div>
           </div>
           <div className="menuliste simge">

@@ -16,7 +16,7 @@
   --cam-zemin-turuncu: rgb(255 107 26 / .10);
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="acik"]) {
     --cam-kart: color-mix(in srgb, var(--surface) 74%, transparent);
     --cam-ust: color-mix(in srgb, var(--surface) 90%, transparent);
     --cam-acilir: color-mix(in srgb, var(--surface) 90%, transparent);
@@ -27,6 +27,17 @@
     --cam-zemin-mavi: rgb(37 99 235 / .22);
     --cam-zemin-turuncu: rgb(255 107 26 / .09);
   }
+}
+:root[data-tema="koyu"] {
+  --cam-kart: color-mix(in srgb, var(--surface) 74%, transparent);
+  --cam-ust: color-mix(in srgb, var(--surface) 90%, transparent);
+  --cam-acilir: color-mix(in srgb, var(--surface) 90%, transparent);
+  --cam-kenar: rgb(255 255 255 / .09);
+  --cam-isik: inset 0 1px 0 rgb(255 255 255 / .07);
+  --cam-golge: 0 1px 2px rgb(0 0 0 / .25), 0 8px 24px rgb(0 0 0 / .18);
+  --cam-golge-ust: 0 16px 44px rgb(0 0 0 / .45);
+  --cam-zemin-mavi: rgb(37 99 235 / .22);
+  --cam-zemin-turuncu: rgb(255 107 26 / .09);
 }
 
 /* Zemin: marka renklerinde yumuşak ışık (camın arkasında görünecek bir şey olsun) */

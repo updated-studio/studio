@@ -2,7 +2,8 @@
    Düz kullanım (düğme içi küçük ikonlar): yazı renginde, ikinci katman yarı saydam. Kit yalnız ".simge" içinde (menüler, büyük simgeler):
    ana katman ışık geçişli, ikinci katman kitin renginde, üstte parlama, altta katlı gölge. Seçili öğede (.on / aria-current) dolgulu hâl. */
 :root { --s-cam-ust: #8FB2FF; --s-cam-alt: #2D62DC; --s-ana-ust: #4A5160; --s-ana-alt: #0E1013; --s-gece-ust: #3A5BA8; --s-gece-alt: #0E1B3D; --s-isik: rgba(255, 255, 255, .85); --s-golge-yakin: rgba(22, 30, 52, .22); --s-golge-uzak: rgba(22, 40, 90, .12); --s-kalinlik: #0B0D10; }
-@media (prefers-color-scheme: dark) { :root { --s-cam-ust: #5B8DEF; --s-cam-alt: #1D3F9E; --s-ana-ust: #FFFFFF; --s-ana-alt: #AEB4BE; --s-gece-ust: #E6EEFF; --s-gece-alt: #9DB6F2; --s-isik: rgba(255, 255, 255, .14); --s-golge-yakin: rgba(0, 0, 0, .55); --s-golge-uzak: rgba(0, 0, 0, .35); --s-kalinlik: #000000; } }
+@media (prefers-color-scheme: dark) { :root:not([data-tema="acik"]) { --s-cam-ust: #5B8DEF; --s-cam-alt: #1D3F9E; --s-ana-ust: #FFFFFF; --s-ana-alt: #AEB4BE; --s-gece-ust: #E6EEFF; --s-gece-alt: #9DB6F2; --s-isik: rgba(255, 255, 255, .14); --s-golge-yakin: rgba(0, 0, 0, .55); --s-golge-uzak: rgba(0, 0, 0, .35); --s-kalinlik: #000000; } }
+:root[data-tema="koyu"] { --s-cam-ust: #5B8DEF; --s-cam-alt: #1D3F9E; --s-ana-ust: #FFFFFF; --s-ana-alt: #AEB4BE; --s-gece-ust: #E6EEFF; --s-gece-alt: #9DB6F2; --s-isik: rgba(255, 255, 255, .14); --s-golge-yakin: rgba(0, 0, 0, .55); --s-golge-uzak: rgba(0, 0, 0, .35); --s-kalinlik: #000000; }
 
 svg.i.s { fill: currentColor; stroke: none; }
 svg.i.s .sp, svg.i.s .sk, svg.i.s .sb { display: none; }

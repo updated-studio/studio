@@ -48,7 +48,8 @@
 .ed-kart.turuncu .ed-kart-ust, .ed-kart.turuncu .ed-kart-eylem { color: var(--blue); }
 .ed-kart.mavi .ed-kart-ust, .ed-kart.mavi .ed-kart-eylem { color: var(--blue); }
 .ed-kart.sari .ed-kart-ust, .ed-kart.sari .ed-kart-eylem { color: #B7791F; }
-@media (prefers-color-scheme: dark) { .ed-kart.sari .ed-kart-ust, .ed-kart.sari .ed-kart-eylem { color: #F2B84B; } }
+@media (prefers-color-scheme: dark) { :root:not([data-tema="acik"]) .ed-kart.sari .ed-kart-ust, :root:not([data-tema="acik"]) .ed-kart.sari .ed-kart-eylem { color: #F2B84B; } }
+:root[data-tema="koyu"] .ed-kart.sari .ed-kart-ust, :root[data-tema="koyu"] .ed-kart.sari .ed-kart-eylem { color: #F2B84B; }
 .ed-kart:hover { border-color: var(--ink); }
 
 .ed-iki { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: start; }

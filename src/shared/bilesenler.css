@@ -102,6 +102,8 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .profilbtn .avatar, .profilpanel .avatar { border-radius: 50%; }
 .profilpanel { position: absolute; right: 0; top: 46px; width: min(280px, calc(100vw - 32px)); z-index: 6; box-shadow: 0 12px 30px rgb(0 0 0 / .18); }
 .kisa-metin { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tema-sec { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0 8px; border-top: 1px solid var(--line); font-size: 14px; }
+.tema-sec .segment { padding: 3px; gap: 2px; } .tema-sec .segment button { padding: 5px 10px; font-size: 13px; }
 .menuliste { display: flex; flex-direction: column; border-top: 1px solid var(--line); padding-top: 6px; }
 .menuliste a, .menuliste button { display: flex; gap: 10px; align-items: center; padding: 9px 8px; border-radius: 9px; color: var(--ink); text-decoration: none; background: none; border: 0; text-align: left; }
 .menuliste a:hover, .menuliste button:hover { background: var(--sunk); }

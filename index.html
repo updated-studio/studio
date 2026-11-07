@@ -12,6 +12,8 @@
     <!-- Yazı tipleri kendi sunucumuzda (Google'a bağlanılmaz): public/yazi-tipleri; yenilemek için site deposu deploy/yazi-tipi-indir.mjs -->
     <link rel="stylesheet" href="./yazi-tipleri/yazi-tipleri.css" />
     <title>Updated Stüdyo</title>
+    <!-- Seçilen tema (profil menüsü → Tema, src/shared/tema.ts) ilk boyamadan önce uygulanır -->
+    <script>try { var t = localStorage.getItem("tema"); if (t === "acik" || t === "koyu") document.documentElement.dataset.tema = t; } catch (e) {}</script>
     <style>
       /* Açılış ekranı: telefonun kendi açılış ekranıyla aynı renk ve boyut (#1B1D21, ikon zemini de bu renk), dikiş görünmesin; uygulama yüklenince kaybolur (main.tsx) */
       #acilis { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: #1B1D21; transition: opacity .35s ease; }
