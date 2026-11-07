@@ -70,6 +70,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 7 Kasım 2026
+- Ana sayfa yeni düzen sitede yayında (kullanıcı onayı "kur"; site 5df7000, ARCHITECTURE 42): manşet + Reels, 6 haberlik şerit + Gündemde/Çıkış radarı, günün özeti prizması (sesli bülten bağlı), videolar, incelemeler, Versus kıyas robotu, kategoriler Stüdyo simgeleriyle. Dikey afiş ve sağ sütun reklamı ana sayfadan kalktı. Not: geçici klasör silindiği için site gönderim betikleri scratchpad'de yeniden kuruldu (~/bin/agir ile).
 - Stüdyo tema seçimi: profil menüsünde Sistem / Açık / Koyu (`shared/tema.ts`, data-tema). Yeni koyu CSS kuralı yazılırken hem medya bloğu hem `:root[data-tema="koyu"]` kopyası güncellenmeli.
 - Ana sayfa taslağı sürüm 3: kategori simgeleri Stüdyo stilinde (Solar iki tonlu, mavi geçiş; dron elle çizildi), Kıyasla yerine Versus düzeninde kıyas robotu (Nikon Z6III ve Sony ZV-E10 II gerçek künyeleriyle; puan yok, "kaç noktada önde"), Reels kartı manşetle aynı hizada. Onay bekliyor.
 - Ana sayfa taslağı sürüm 2 (kullanıcı geri bildirimi): manşet altında tek parça 6 haberlik şerit + "Daha fazlası"; sağ kutu "Gündemde" / "Çıkış radarı"; videolar eski düzen (büyük sol + 4); özet iki eşit sütun, daha belirgin yavaş dönüş, sayaç cam stilinde; kategorilerde sitenin ürün simgeleri. "Sızıntı" her yerde okuyucuya "Söylenti" (site + Bugün kuralı + yazım üslubu başlık kuralı).
