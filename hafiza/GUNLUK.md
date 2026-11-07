@@ -69,6 +69,9 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 
 ## Günlük (en yeni üstte)
 
+### 7 Kasım 2026
+- Taslaklar'dan açılan düzenleyicide ilişki alanları numara gösteriyordu (künye "127"): `Form.tsx` `useSecenekler` şema bağlamı olmadan da adı okur, künye "Marka Ad", Türkçe sırayla. Kullanıcı (Enes) uzun bir site geri bildirim listesi verdi; anlayış onayı istendi.
+
 ### 6 Kasım 2026
 - Kullanıcı Belgeden yaz düğmesini bulamadı (yalnız Taslaklar başlığındaydı). Artık: soldaki menüde Haberler altında "Belgeden yaz", Masam'da "Yeni yaz"ın yanında, üst aramada.
 - **UPscore tek puan** (kullanıcı onayı): site main'de `hooks/upscore.ts` (inceleme yayınlanınca puan künyeye), puan /10 tek ondalık. Stüdyo: belge-yaz istemi ve `hazirla.ts` /10, çekim listesi maddesi. Sırada: galeri görsel taslağı (onay bekleyecek).

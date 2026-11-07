@@ -33,9 +33,12 @@ function useSecenekler(rel?: string) {
   const [liste, setListe] = useState<{ id: number; ad: string }[] | null>(null);
   useEffect(() => {
     if (!rel) return;
-    const baslik = sema?.koleksiyonlar.find((c) => c.slug === rel)?.baslikAlani ?? "id";
-    api.istekYap<{ docs: Kayit[] }>(`/${rel}?limit=500&depth=0&sort=${encodeURIComponent(baslik)}`)
-      .then((r) => setListe(r.docs.map((d) => ({ id: d.id as number, ad: String(d[baslik] ?? d.name ?? d.title ?? `#${d.id}`) }))))
+    // Şema bağlamı yalnız Site modülünde var; Taslaklar'dan açılan düzenleyicide (Belgeden yaz incelemesi) başlık alanı bilinmiyordu ve
+    // künye "127" gibi numarayla görünüyordu (7 Kasım 2026, kullanıcı: "neden karışık, isim yok"). Ad her durumda okunur; künye "Marka Ad".
+    const baslik = sema?.koleksiyonlar.find((c) => c.slug === rel)?.baslikAlani;
+    const ad = (d: Kayit) => rel === "products" && d.brand ? `${d.brand} ${d.name ?? ""}`.trim() : String((baslik && d[baslik]) ?? d.name ?? d.title ?? `#${d.id}`);
+    api.istekYap<{ docs: Kayit[] }>(`/${rel}?limit=1000&depth=0`)
+      .then((r) => setListe(r.docs.map((d) => ({ id: d.id as number, ad: ad(d) })).sort((x, y) => x.ad.localeCompare(y.ad, "tr"))))
       .catch(() => setListe([]));
   }, [rel, sema]);
   return liste;
