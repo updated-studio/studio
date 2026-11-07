@@ -70,6 +70,7 @@ Bu dosya sohbet geçmişinin yerini tutar. ARCHITECTURE.md **kararları**, bu do
 ## Günlük (en yeni üstte)
 
 ### 7 Kasım 2026
+- Enes'in listesinden netleşenler: lens ve kamerada puan yok (1a; Belgeden yaz bu türlerde puan yazmaz, `hazirla.ts` `PUANSIZ_TUR`); ana sayfadaki künye rafı kalkacak, yerine kategoriler bölümü gelecek, künyeler kategorinin altında (onaylandı). Hızlı düzeltmeler sitede: künyede marka, kartlarda marka büyük, doğrulama notu gizli, rehber ana sayfadan kalktı. Sırada: ana sayfa yeni sırası için görsel taslak.
 - **Hata bildir** kuruldu (kullanıcı istedi, "izin veriyorum"): üst bar düğmesi, `/hatalar` ekranı, göç 0071. Kopya inceleme 7 silindi (site göçü `20261107_080000_kopya_inceleme_sil`). Claude'un yeni bildirimleri ilk incelemesi önerildi, kullanıcı seçmedi; yapılmadı.
 - Haftalık disk kontrolü kuruldu (kullanıcı: "sunucu diski mantıklı"): `/usr/local/bin/updated-disk-uyari` + `updated-disk-uyari.timer`, pazartesi 09:00. Disk %85'i geçerse yöneticilere Stüdyo bildirimi (telefona da), en büyük klasörlerle; link Sistem durumu. `DENE=1` ile yalnız ekrana basar. Altında: sessiz. Kopya 7 inceleme sorusu kullanıcıya yeniden açıklandı.
 - Taslaklar'dan açılan düzenleyicide ilişki alanları numara gösteriyordu (künye "127"): `Form.tsx` `useSecenekler` şema bağlamı olmadan da adı okur, künye "Marka Ad", Türkçe sırayla. Kullanıcı (Enes) uzun bir site geri bildirim listesi verdi; anlayış onayı istendi.

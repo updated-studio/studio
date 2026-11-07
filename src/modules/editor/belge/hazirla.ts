@@ -14,9 +14,10 @@ export type YzSonuc = {
   puanKutusu: { puan: number | null; arti: string[]; eksi: string[]; uygun: string[]; degil: string[]; kullanimGun: number | null; cihazKaynagi: string };
   degisiklikler: string[]; eksikler: string[];
 };
-export type Hazir = { k: api.Koleksiyon; id: number; sonuc: YzSonuc; urun: { id: number; ad: string; yeni?: boolean } | null; yazar: { id: number; ad: string } | null; fotoSayisi: number; uyarilar: string[]; onizleme: string };
+export type Hazir = { k: api.Koleksiyon; id: number; sonuc: YzSonuc; urun: { id: number; ad: string; yeni?: boolean; tur?: string } | null; puansiz?: boolean; yazar: { id: number; ad: string } | null; fotoSayisi: number; uyarilar: string[]; onizleme: string };
 export type Adim = "okunuyor" | "sira" | "yz" | "fotolar" | "taslak";
 
+export const PUANSIZ_TUR = ["camera", "lens"];
 const kes = (s: string, n: number) => { const t = (s ?? "").trim(); return t.length <= n ? t : t.slice(0, n - 1).replace(/\s+\S*$/, "") + "…"; };
 const sade = (s: string) => s.toLocaleLowerCase("tr").replace(/[^a-z0-9ğüşöçı.]/g, "");
 
@@ -78,16 +79,16 @@ function govdeKur(b: Belge, s: YzSonuc, medya: Map<number, number>, kapakN: numb
 async function urunBul(u: YzSonuc["urun"]): Promise<{ id: number; ad: string } | null> {
   if (!u?.model?.trim()) return null;
   const hedef = sade(`${u.model}`);
-  const p = new URLSearchParams({ limit: "300", depth: "0", "select[name]": "true", "select[brand]": "true" });
+  const p = new URLSearchParams({ limit: "300", depth: "0", "select[name]": "true", "select[brand]": "true", "select[type]": "true" });
   if (u.marka?.trim()) p.set("where[brand][like]", u.marka.trim());
   else p.set("where[name][like]", u.model.trim().split(/\s+/)[0]);
-  const r = await api.istekYap<{ docs: { id: number; name: string; brand: string }[] }>(`/products?${p}`).catch(() => ({ docs: [] }));
+  const r = await api.istekYap<{ docs: { id: number; name: string; brand: string; type?: string }[] }>(`/products?${p}`).catch(() => ({ docs: [] }));
   // Model adı en çok örtüşen künye: noktalama ve "|" gibi işaretler yok sayılır (belgede "DG | Art", künyede "DG Art")
-  let en: { id: number; ad: string } | null = null, enPuan = 0;
+  let en: { id: number; ad: string; tur?: string } | null = null, enPuan = 0;
   for (const d of r.docs) {
     const a = sade(d.name);
     const puan = a === hedef ? 100 : hedef.includes(a) || a.includes(hedef) ? 80 - Math.abs(a.length - hedef.length) : 0;
-    if (puan > enPuan) { enPuan = puan; en = { id: d.id, ad: `${d.brand} ${d.name}` }; }
+    if (puan > enPuan) { enPuan = puan; en = { id: d.id, ad: `${d.brand} ${d.name}`, tur: d.type }; }
   }
   return enPuan >= 60 ? en : null;
 }
@@ -163,7 +164,7 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
     try {
       const y = await api.istekYap<{ doc: { id: number; name: string; brand: string } }>("/products?depth=0", { method: "POST",
         body: JSON.stringify({ name: s.urun.model.trim(), brand: s.urun.marka.trim(), type: s.urun.tur || "other", status: "satista" }) });
-      urun = { id: y.doc.id, ad: `${y.doc.brand} ${y.doc.name}`, yeni: true };
+      urun = { id: y.doc.id, ad: `${y.doc.brand} ${y.doc.name}`, yeni: true, tur: s.urun.tur || "other" };
       sb.functions.invoke("kunye-otomatik", { body: { urun_id: y.doc.id } }).catch(() => null);
       uyarilar.push(`"${urun.ad}" künyesi yeni açıldı. Teknik özellikler otomasyonla dolacak, Künye onayı ekranından onayla.`);
     } catch (e) { uyarilar.push(`Künye açılamadı: ${(e as Error).message}`); }
@@ -193,6 +194,8 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
   const k: api.Koleksiyon = s.tur === "inceleme" && urun ? "reviews" : "news";
   if (s.tur === "inceleme" && k === "news") uyarilar.push("Künye olmadığı için yazı haber taslağı olarak açıldı.");
   const pk = s.puanKutusu;
+  // Lens ve kamerada puan yok (7 Kasım 2026, kullanıcı: "şimdilik lens ve kamerada olmayacak"; site apps/cms/src/lib/kit.ts PUANSIZ_TUR)
+  const puansiz = PUANSIZ_TUR.includes(urun?.tur ?? s.urun?.tur ?? "");
   const veri: Record<string, unknown> = {
     title: kes(s.baslik, 70), spot: kes(s.spot, 160), shortAnswer: s.kisa,
     body: govdeKur(belge, s, medya, kapakN),
@@ -203,7 +206,7 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
     ...(k === "reviews" ? {
       product: urun!.id,
       scoreBox: {
-        ...(pk.puan != null && pk.puan >= 0 && pk.puan <= 10 ? { score: Math.round(pk.puan * 10) / 10 } : {}), // UPscore /10, tek ondalık
+        ...(!puansiz && pk.puan != null && pk.puan >= 0 && pk.puan <= 10 ? { score: Math.round(pk.puan * 10) / 10 } : {}), // UPscore /10, tek ondalık
         pros: pk.arti.slice(0, 3).map((x) => x.split(/\s+/).slice(0, 6).join(" ")),
         cons: pk.eksi.slice(0, 3).map((x) => x.split(/\s+/).slice(0, 6).join(" ")),
         ...(pk.kullanimGun ? { usageDays: pk.kullanimGun } : {}),
@@ -216,7 +219,7 @@ export async function belgedenHazirla(dosya: File, adim: (a: Adim, ek?: string) 
   const yazili = typeof r.doc.author === "object" ? r.doc.author?.id : r.doc.author;
   if (yazar && yazili && yazili !== yazar.id) uyarilar.push(`İmza panelin kuralıyla senin adına açıldı. "${yazar.ad}" imzasını yalnız yönetici verebilir.`);
   const onizleme = await api.onizlemeAdresi(k, r.doc.id).catch(() => "");
-  return { k, id: r.doc.id, sonuc: s, urun, yazar: yazar && yazili === yazar.id ? yazar : null, fotoSayisi: medya.size, uyarilar, onizleme };
+  return { k, id: r.doc.id, sonuc: s, urun, yazar: yazar && yazili === yazar.id ? yazar : null, fotoSayisi: medya.size, uyarilar, onizleme, puansiz };
   }
 }
 
